@@ -1,6 +1,7 @@
 // 공부 도우미: 탭과 하위 화면 (설계 docs/superpowers/specs/2026-10-23-study-planner-design.md)
 import { useEffect, useState } from 'react';
 import './study.css';
+import { AddButton } from './Add';
 import { Books } from './Books';
 import { Life } from './Life';
 import { alive } from './model';
@@ -44,11 +45,11 @@ export function Study({ path, loggedIn, onLogin }: { path: string[]; loggedIn: b
 
   let content;
   if (tab === 'books') content = <Books id={id} />;
-  else if (tab === 'tutor') content = <Tutors />;
+  else if (tab === 'tutor') content = <Tutors sub={id} />;
   else if (tab === 'words') content = <Words id={id} sub={sub} />;
   else if (tab === 'review') content = <Review sub={id} />;
-  else if (tab === 'time') content = <Time />;
-  else if (tab === 'life') content = <Life />;
+  else if (tab === 'time') content = <Time sub={id} />;
+  else if (tab === 'life') content = <Life sub={id} />;
   else if (tab === 'settings') content = <Settings />;
   else content = <Today />;
 
@@ -68,8 +69,12 @@ export function Study({ path, loggedIn, onLogin }: { path: string[]; loggedIn: b
       )}
       <div className="st-main">
         {!loggedIn && tab === 'today' && <LoginHint onLogin={onLogin} />}
-        {content}
+        {/* 주소가 바뀌면 화면을 새로 연다 (「＋」에서 같은 화면의 「새로 넣기」 창을 열 때도) */}
+        <div className="st-page-wrap" key={path.join('/')}>
+          {content}
+        </div>
       </div>
+      {!running && <AddButton today={today} />}
       <Toaster />
     </main>
   );
@@ -86,10 +91,13 @@ function LoginHint({ onLogin }: { onLogin: () => void }) {
   if (hidden) return null;
   return (
     <div className="st-banner">
-      <span>로그인하면 폰·PC 에서 같은 공부 계획을 볼 수 있어요. 지금은 이 기기에만 저장돼요.</span>
-      <button className="btn btn-sm btn-primary" onClick={onLogin}>
-        로그인
-      </button>
+      <span>
+        지금은 이 기기에만 저장돼요.{' '}
+        <button className="st-link" onClick={onLogin}>
+          로그인
+        </button>
+        하면 폰·PC 에서 같이 볼 수 있어요.
+      </span>
       <button
         className="st-x"
         aria-label="닫기"

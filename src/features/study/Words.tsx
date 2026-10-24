@@ -10,7 +10,7 @@ import { addWords, answerWord, markDays } from './actions';
 import { parseWords, wordsText, type ParsedWord } from './wordParse';
 import { choicesFor, requeue, type Mode } from './wordSession';
 import { PlanForm } from './PlanForm';
-import { Bar, confirmDelete, Empty, Field, go, Sheet, SubjectDot, SubjectPicker, toast, useToday } from './ui';
+import { Bar, confirmDelete, Empty, Field, go, Menu, Sheet, SubjectDot, SubjectPicker, toast, useToday } from './ui';
 
 const KIND_LABEL: Record<WordList['kind'], string> = { book: '단어장', test: '단어 시험', inbox: '모르는 단어 모음' };
 
@@ -30,13 +30,13 @@ function ListIndex() {
     <div className="st-page">
       <div className="st-page-head">
         <h2>영단어</h2>
-        <button className="btn btn-primary" onClick={() => go('/words/new')}>
-          ＋ 단어 목록
-        </button>
       </div>
       {!views.length && (
         <Empty icon="🔤" title="단어 목록을 만들어 보세요">
           <p>단어장 PDF를 넣거나, 단어와 뜻을 붙여 넣거나, 단어장 사진을 찍어 넣을 수 있어요.</p>
+          <button className="btn btn-primary" onClick={() => go('/words/new')}>
+            단어 목록 만들기
+          </button>
         </Empty>
       )}
       <div className="st-grid">
@@ -135,6 +135,7 @@ function ListDetail({ id }: { id: string }) {
   const allWords = useWords();
   const today = useToday();
   const [importing, setImporting] = useState(false);
+  const [settings, setSettings] = useState(false);
   const [planning, setPlanning] = useState(false);
   const [edit, setEdit] = useState<Word | null>(null);
   const [filter, setFilter] = useState<'all' | 'new' | 'learning' | 'learned'>('all');
@@ -165,12 +166,34 @@ function ListDetail({ id }: { id: string }) {
         <h2>
           <SubjectDot id={list.subjectId} d={d} /> {list.name}
         </h2>
-        <div className="st-row">
-          <button className="btn btn-sm btn-primary" onClick={() => setImporting(true)}>
-            ＋ 단어 넣기
-          </button>
-          <ListMenu list={list} words={ws} />
-        </div>
+        <Menu
+          items={[
+            { label: '단어 넣기 (PDF·붙여넣기·사진)', onClick: () => setImporting(true) },
+            { label: '시험 대비 (전체 한 번씩)', onClick: () => go(`/words/${id}/prep`), hidden: list.kind !== 'test' || !ws.length || v.prep },
+            { label: `자주 틀리는 단어 ${weak.length}개`, onClick: () => go(`/words/${id}/weak`), hidden: !weak.length },
+            { label: '목록 설정', onClick: () => setSettings(true) },
+            {
+              label: '글로 복사 (내보내기)',
+              hidden: !ws.length,
+              onClick: () =>
+                void navigator.clipboard.writeText(wordsText(ws)).then(
+                  () => toast('단어<탭>뜻 글로 복사했어요 (다시 붙여 넣을 수 있어요)'),
+                  () => toast('복사하지 못했어요'),
+                ),
+            },
+            {
+              label: '목록 지우기',
+              danger: true,
+              onClick: () => {
+                if (!confirmDelete(`「${list.name}」과 단어 ${ws.length}개`)) return;
+                removeWords(ws.map((w) => w.id));
+                for (const p of alive(getStudy().plans)) if (p.targetId === list.id) remove('plans', p.id);
+                remove('wordLists', list.id);
+                go('/words');
+              },
+            },
+          ]}
+        />
       </div>
 
       <section className="st-card st-learn-cta">
@@ -197,21 +220,17 @@ function ListDetail({ id }: { id: string }) {
             </span>
           </div>
         </div>
-        <div className="st-col">
-          <button className="btn btn-primary btn-lg" disabled={!v.fresh.length && !v.due.length} onClick={() => go(`/words/${id}/learn`)}>
-            오늘 외우기 {v.fresh.length + v.due.length > 0 && `(${v.fresh.length + v.due.length})`}
+        {v.prep && ws.length > 0 ? (
+          <button className="btn btn-primary btn-lg" onClick={() => go(`/words/${id}/prep`)}>
+            시험 대비 (전체 한 번씩)
           </button>
-          {list.kind === 'test' && (
-            <button className={`btn ${v.prep ? 'btn-primary' : ''}`} disabled={!ws.length} onClick={() => go(`/words/${id}/prep`)}>
-              시험 대비 (전체 한 번씩)
+        ) : (
+          v.fresh.length + v.due.length > 0 && (
+            <button className="btn btn-primary btn-lg" onClick={() => go(`/words/${id}/learn`)}>
+              오늘 외우기 ({v.fresh.length + v.due.length})
             </button>
-          )}
-          {weak.length > 0 && (
-            <button className="btn" onClick={() => go(`/words/${id}/weak`)}>
-              자주 틀리는 단어 {weak.length}개
-            </button>
-          )}
-        </div>
+          )
+        )}
       </section>
 
       {list.kind === 'book' && (
@@ -305,77 +324,45 @@ function ListDetail({ id }: { id: string }) {
         {shown.length > 400 && <p className="st-hint">처음 400개만 보여요. 찾기로 좁혀 보세요.</p>}
       </section>
       {importing && <ImportSheet list={list} existing={ws} onClose={() => setImporting(false)} />}
+      {settings && <ListSettings list={list} onClose={() => setSettings(false)} />}
       {edit && <WordSheet w={edit} onClose={() => setEdit(null)} />}
     </div>
   );
 }
 
-function ListMenu({ list, words }: { list: WordList; words: Word[] }) {
-  const [open, setOpen] = useState(false);
+function ListSettings({ list, onClose }: { list: WordList; onClose: () => void }) {
   const [name, setName] = useState(list.name);
   const [days, setDays] = useState(String(list.days ?? ''));
   const [testDate, setTestDate] = useState(list.testDate ?? '');
   return (
-    <>
-      <button className="btn btn-sm" onClick={() => setOpen(true)}>
-        ⋯
-      </button>
-      {open && (
-        <Sheet title="단어 목록 설정" onClose={() => setOpen(false)}>
-          <div className="st-form">
-            <Field label="이름">
-              <input className="st-input" value={name} onChange={(e) => setName(e.target.value)} />
-            </Field>
-            {list.kind === 'book' && (
-              <Field label="Day 수">
-                <input className="st-input xs" inputMode="numeric" value={days} onChange={(e) => setDays(e.target.value.replace(/\D/g, ''))} />
-              </Field>
-            )}
-            {list.kind === 'test' && (
-              <Field label="시험 날">
-                <input className="st-input sm" type="date" value={testDate} onChange={(e) => setTestDate(e.target.value)} />
-              </Field>
-            )}
-            <div className="st-row">
-              <button
-                className="btn btn-sm"
-                onClick={() => {
-                  void navigator.clipboard.writeText(wordsText(words)).then(
-                    () => toast('단어<탭>뜻 글로 복사했어요 (다시 붙여 넣을 수 있어요)'),
-                    () => toast('복사하지 못했어요'),
-                  );
-                }}
-              >
-                글로 복사 (내보내기)
-              </button>
-              <button
-                className="btn btn-sm st-danger"
-                onClick={() => {
-                  if (!confirmDelete(`「${list.name}」과 단어 ${words.length}개`)) return;
-                  removeWords(words.map((w) => w.id));
-                  for (const p of alive(getStudy().plans)) if (p.targetId === list.id) remove('plans', p.id);
-                  remove('wordLists', list.id);
-                  go('/words');
-                }}
-              >
-                목록 지우기
-              </button>
-            </div>
-            <div className="st-row end">
-              <button
-                className="btn btn-primary"
-                onClick={() => {
-                  put('wordLists', { ...list, name: name.trim() || list.name, days: days ? Number(days) : list.days, testDate: testDate || list.testDate });
-                  setOpen(false);
-                }}
-              >
-                저장
-              </button>
-            </div>
-          </div>
-        </Sheet>
-      )}
-    </>
+    <Sheet title="단어 목록 설정" onClose={onClose}>
+      <div className="st-form">
+        <Field label="이름">
+          <input className="st-input" value={name} onChange={(e) => setName(e.target.value)} />
+        </Field>
+        {list.kind === 'book' && (
+          <Field label="Day 수">
+            <input className="st-input xs" inputMode="numeric" value={days} onChange={(e) => setDays(e.target.value.replace(/\D/g, ''))} />
+          </Field>
+        )}
+        {list.kind === 'test' && (
+          <Field label="시험 날">
+            <input className="st-input sm" type="date" value={testDate} onChange={(e) => setTestDate(e.target.value)} />
+          </Field>
+        )}
+        <div className="st-row end">
+          <button
+            className="btn btn-primary"
+            onClick={() => {
+              put('wordLists', { ...list, name: name.trim() || list.name, days: days ? Number(days) : list.days, testDate: testDate || list.testDate });
+              onClose();
+            }}
+          >
+            저장
+          </button>
+        </div>
+      </div>
+    </Sheet>
   );
 }
 

@@ -176,6 +176,9 @@ const ICON_PATHS: Record<string, string> = {
   time: 'M12 21a8.5 8.5 0 1 0 0-17 8.5 8.5 0 0 0 0 17zM12 8v4.5l3 2',
   life: 'M5 4h14a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1zM8 12l2.8 2.8L16.5 9',
   settings: 'M4 7h9M17 7h3M4 17h3M11 17h9M15 5v4M9 15v4',
+  plus: 'M12 5v14M5 12h14',
+  more: 'M6 12h.01M12 12h.01M18 12h.01',
+  chevron: 'M9 6l6 6-6 6',
 };
 
 /** 선 아이콘 (24×24) */
@@ -223,4 +226,55 @@ export function Toaster() {
       {msg}
     </div>
   ) : null;
+}
+
+export interface MenuItem {
+  label: string;
+  onClick: () => void;
+  danger?: boolean;
+  hidden?: boolean;
+}
+
+/** ⋯ 버튼: 누르면 그 자리에 할 수 있는 일이 나타난다 (평소에는 버튼을 늘어놓지 않으려고) */
+export function Menu({ items, label = '더 보기' }: { items: MenuItem[]; label?: string }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const close = (e: Event) => {
+      if (e instanceof KeyboardEvent ? e.key === 'Escape' : !ref.current?.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener('pointerdown', close);
+    document.addEventListener('keydown', close);
+    return () => {
+      document.removeEventListener('pointerdown', close);
+      document.removeEventListener('keydown', close);
+    };
+  }, [open]);
+  const shown = items.filter((i) => !i.hidden);
+  return (
+    <div className="st-menu" ref={ref}>
+      <button type="button" className="st-iconbtn" aria-label={label} aria-expanded={open} onClick={() => setOpen(!open)}>
+        <Icon name="more" />
+      </button>
+      {open && (
+        <div className="st-menu-list" role="menu">
+          {shown.map((i) => (
+            <button
+              key={i.label}
+              type="button"
+              role="menuitem"
+              className={i.danger ? 'danger' : ''}
+              onClick={() => {
+                setOpen(false);
+                i.onClick();
+              }}
+            >
+              {i.label}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
 }

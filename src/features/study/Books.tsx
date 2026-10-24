@@ -10,7 +10,7 @@ import { parseToc, tocText, type TocRow } from './toc';
 import { markBook } from './actions';
 import { PlanForm } from './PlanForm';
 import { PlanWarning } from './Today';
-import { Bar, confirmDelete, Empty, Field, go, SubjectDot, SubjectPicker, SubjectTag, toast, useToday } from './ui';
+import { Bar, confirmDelete, Empty, Field, go, Menu, SubjectDot, SubjectPicker, SubjectTag, toast, useToday } from './ui';
 
 export function Books({ id }: { id?: string }) {
   if (id === 'new') return <BookEditor onDone={(b) => go(b ? `/books/${b}` : '/books')} />;
@@ -28,13 +28,13 @@ function BookList() {
     <div className="st-page">
       <div className="st-page-head">
         <h2>문제집</h2>
-        <button className="btn btn-primary" onClick={() => go('/books/new')}>
-          ＋ 문제집 넣기
-        </button>
       </div>
       {!books.length && (
         <Empty icon="📖" title="아직 넣은 문제집이 없어요">
           <p>목차를 붙여 넣거나 목차 사진을 찍으면, 시험까지 하루에 풀 페이지를 정해 드려요.</p>
+          <button className="btn btn-primary" onClick={() => go('/books/new')}>
+            문제집 넣기
+          </button>
         </Empty>
       )}
       <div className="st-grid">
@@ -239,22 +239,22 @@ function BookDetail({ id }: { id: string }) {
         <h2>
           <SubjectDot id={b.subjectId} d={d} /> {b.name}
         </h2>
-        <div className="st-row">
-          <button className="btn btn-sm" onClick={() => setEditing(true)}>
-            목차 고치기
-          </button>
-          <button
-            className="btn btn-sm st-danger"
-            onClick={() => {
-              if (!confirmDelete(`「${b.name}」`)) return;
-              for (const p of alive(d.plans)) if (p.targetId === b.id) remove('plans', p.id);
-              remove('books', b.id);
-              go('/books');
-            }}
-          >
-            지우기
-          </button>
-        </div>
+        <Menu
+          items={[
+            { label: v ? '계획 고치기' : '계획 세우기', onClick: () => setPlanning(true), hidden: showPlan },
+            { label: '목차 고치기', onClick: () => setEditing(true) },
+            {
+              label: '문제집 지우기',
+              danger: true,
+              onClick: () => {
+                if (!confirmDelete(`「${b.name}」`)) return;
+                for (const p of alive(d.plans)) if (p.targetId === b.id) remove('plans', p.id);
+                remove('books', b.id);
+                go('/books');
+              },
+            },
+          ]}
+        />
       </div>
 
       <section className="st-card">
@@ -281,11 +281,6 @@ function BookDetail({ id }: { id: string }) {
               {pace !== 0 && <span className={pace > 0 ? 'ok' : 'bad'}> · 계획보다 {Math.abs(pace)}쪽 {pace > 0 ? '앞섬' : '밀림'}</span>}
             </p>
             {v.sched.warning && <PlanWarning p={v} />}
-            {!planning && (
-              <button className="btn btn-sm" onClick={() => setPlanning(true)}>
-                계획 고치기
-              </button>
-            )}
           </>
         )}
         {reserved.size > 0 && <p className="st-hint">과외 숙제로 잡힌 p.{rangeText([...reserved])}는 이 계획에서 빠져요.</p>}
@@ -326,15 +321,20 @@ function BookDetail({ id }: { id: string }) {
             );
           })}
         </div>
-        <div className="st-inline wrap">
-          <input className="st-input sm" placeholder="쪽 직접: 12-20, 25" value={pages} onChange={(e) => setPages(e.target.value)} />
-          <button className="btn btn-sm" onClick={() => markPages(true)}>
-            체크
-          </button>
-          <button className="btn btn-sm" onClick={() => markPages(false)}>
-            해제
-          </button>
-        </div>
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            // 적은 쪽을 이미 다 했으면 해제, 아니면 체크
+            const all = pages
+              .split(/[,\s]+/)
+              .map((x) => x.match(/^(\d+)(?:[-~](\d+))?$/))
+              .filter(Boolean)
+              .flatMap((m) => expand([[Number(m![1]), Number(m![2] ?? m![1])]]));
+            markPages(!(all.length > 0 && all.every((p) => done.has(p))));
+          }}
+        >
+          <input className="st-input" placeholder="쪽 직접 체크 (예: 12-20, 25) · 이미 한 쪽이면 해제" value={pages} onChange={(e) => setPages(e.target.value)} aria-label="쪽 직접 체크" />
+        </form>
         {done.size > 0 && <p className="st-hint">한 쪽: {rangeText(compress(done))}</p>}
       </section>
     </div>

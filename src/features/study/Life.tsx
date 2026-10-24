@@ -4,11 +4,12 @@ import { addDays, shortDate, WEEKDAYS } from './dates';
 import { bestStreak, habitOn, streak } from './habits';
 import { alive, newId, type Habit, type Todo } from './model';
 import { put, remove, useStudy } from './store';
-import { Check, confirmDelete, Empty, Field, Sheet, useToday, WeekdayPicker } from './ui';
+import { Check, confirmDelete, Empty, Field, Icon, Sheet, useToday, WeekdayPicker } from './ui';
 
 const ICONS = ['📖', '🏃', '💧', '😴', '🧘', '✍️', '🎧', '🥗', '🧹', '💊', '📵', '🌅'];
 
-export function Life() {
+/** sub: 'new-habit' 이면 습관 만들기 창 (「＋」에서 올 때) */
+export function Life({ sub }: { sub?: string }) {
   const today = useToday();
   return (
     <div className="st-page">
@@ -17,7 +18,7 @@ export function Life() {
       </div>
       <div className="st-two">
         <Todos today={today} />
-        <Habits today={today} />
+        <Habits today={today} adding={sub === 'new-habit'} />
       </div>
     </div>
   );
@@ -53,14 +54,16 @@ function Todos({ today }: { today: string }) {
           add();
         }}
       >
-        <input className="st-input" placeholder="할 일 (예: 수행평가 보고서)" value={title} onChange={(e) => setTitle(e.target.value)} />
-        <select className="st-input xs" value={due} onChange={(e) => setDue(e.target.value)} aria-label="마감">
-          <option value="">언제든</option>
-          <option value={today}>오늘</option>
-          <option value={addDays(today, 1)}>내일</option>
-          <option value={addDays(today, 7)}>일주일 뒤</option>
-        </select>
-        <button className="btn btn-primary">추가</button>
+        <input className="st-input" placeholder="할 일 추가 · Enter" value={title} onChange={(e) => setTitle(e.target.value)} />
+        {/* 마감 고르기는 글을 쓰기 시작해야 나타난다 */}
+        {title.trim() && (
+          <select className="st-input xs" value={due} onChange={(e) => setDue(e.target.value)} aria-label="마감">
+            <option value="">언제든</option>
+            <option value={today}>오늘</option>
+            <option value={addDays(today, 1)}>내일</option>
+            <option value={addDays(today, 7)}>일주일 뒤</option>
+          </select>
+        )}
       </form>
       {!all.length && <Empty icon="📝" title="할 일이 없어요" />}
       {groups.map(
@@ -130,17 +133,17 @@ function TodoSheet({ t, onClose }: { t: Todo; onClose: () => void }) {
   );
 }
 
-function Habits({ today }: { today: string }) {
+function Habits({ today, adding }: { today: string; adding?: boolean }) {
   const d = useStudy();
-  const [edit, setEdit] = useState<Habit | 'new' | null>(null);
+  const [edit, setEdit] = useState<Habit | 'new' | null>(adding ? 'new' : null);
   const habits = alive(d.habits).filter((h) => !h.archived);
   const days = Array.from({ length: 7 }, (_, i) => addDays(today, i - 6));
   return (
     <section className="st-card">
       <div className="st-inline between">
         <h3 className="st-h">습관</h3>
-        <button className="btn btn-sm btn-primary" onClick={() => setEdit('new')}>
-          ＋ 습관
+        <button className="st-iconbtn" aria-label="습관 만들기" onClick={() => setEdit('new')}>
+          <Icon name="plus" />
         </button>
       </div>
       {!habits.length && (
@@ -186,7 +189,16 @@ function Habits({ today }: { today: string }) {
           ))}
         </div>
       )}
-      {edit && <HabitSheet h={edit === 'new' ? undefined : edit} today={today} onClose={() => setEdit(null)} />}
+      {edit && (
+        <HabitSheet
+          h={edit === 'new' ? undefined : edit}
+          today={today}
+          onClose={() => {
+            setEdit(null);
+            if (adding) window.location.hash = '/life';
+          }}
+        />
+      )}
     </section>
   );
 }

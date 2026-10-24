@@ -7,26 +7,32 @@ import { homeworkViews } from './select';
 import { put, remove, useStudy } from './store';
 import { hasClass, homeworkDue, nextClass } from './tutor';
 import { markHwPages, patchHwItem } from './actions';
-import { Check, confirmDelete, Empty, Field, Sheet, SubjectDot, SubjectPicker, toast, useToday, WeekdayPicker } from './ui';
+import { Check, confirmDelete, Empty, Field, go, Icon, Menu, Sheet, SubjectDot, SubjectPicker, toast, useToday, WeekdayPicker } from './ui';
 
-export function Tutors() {
+/** sub: 'new' 이면 과외 등록 창, 'hw' 면 숙제 넣기 창을 연다 (「＋」에서 올 때) */
+export function Tutors({ sub }: { sub?: string }) {
   const d = useStudy();
   const today = useToday();
-  const [editTutor, setEditTutor] = useState<Tutor | 'new' | null>(null);
-  const [hwFor, setHwFor] = useState<{ tutor: Tutor; hw?: Homework } | null>(null);
   const tutors = alive(d.tutors);
+  const [editTutor, setEditTutor] = useState<Tutor | 'new' | null>(() => (sub === 'new' || (sub === 'hw' && !tutors.length) ? 'new' : null));
+  const [hwFor, setHwFor] = useState<{ tutor: Tutor; hw?: Homework } | null>(() => (sub === 'hw' && tutors.length === 1 ? { tutor: tutors[0] } : null));
+  const [pickTutor, setPickTutor] = useState(sub === 'hw' && tutors.length > 1);
+  const closeTo = (f: () => void) => () => {
+    f();
+    if (sub) go('/tutor');
+  };
   const views = homeworkViews(d, today);
   return (
     <div className="st-page">
       <div className="st-page-head">
         <h2>과외</h2>
-        <button className="btn btn-primary" onClick={() => setEditTutor('new')}>
-          ＋ 과외 등록
-        </button>
       </div>
       {!tutors.length && (
         <Empty icon="🧑‍🏫" title="등록한 과외가 없어요">
           <p>과외 요일을 넣으면 숙제 마감이 자동으로 「다음 수업일」이 되고, 수업 있는 날은 문제집 분량을 줄여 드려요.</p>
+          <button className="btn btn-primary" onClick={() => setEditTutor('new')}>
+            과외 등록
+          </button>
         </Empty>
       )}
       {tutors.map((t) => {
@@ -55,14 +61,12 @@ export function Tutors() {
                   )}
                 </p>
               </div>
-              <div className="st-row">
-                <button className="btn btn-sm btn-primary" onClick={() => setHwFor({ tutor: t })}>
-                  숙제 받았어요
-                </button>
-                <button className="btn btn-sm" onClick={() => setEditTutor(t)}>
-                  고치기
-                </button>
-              </div>
+              <Menu
+                items={[
+                  { label: '숙제 받았어요', onClick: () => setHwFor({ tutor: t }) },
+                  { label: '과외 고치기 (요일·휴강·보강)', onClick: () => setEditTutor(t) },
+                ]}
+              />
             </div>
             {questions.length > 0 && (
               <div className="st-questions">
@@ -76,12 +80,10 @@ export function Tutors() {
             )}
             {open.map((v) => (
               <div key={v.hw.id} className={`st-hw ${v.due < today && !v.finished ? 'late' : ''}`}>
-                <div className="st-hw-head">
+                {/* 숙제 머리줄을 누르면 고치기 */}
+                <div className="st-hw-head st-tap" role="button" tabIndex={0} title="숙제 고치기" onClick={() => setHwFor({ tutor: t, hw: v.hw })}>
                   <span className={`st-pill ${v.due < today && !v.finished ? 'bad' : v.due === today ? 'warn' : ''}`}>마감 {shortDate(v.due)}</span>
                   <small className="st-muted">{shortDate(v.hw.given)}에 받음</small>
-                  <button className="st-link" onClick={() => setHwFor({ tutor: t, hw: v.hw })}>
-                    고치기
-                  </button>
                 </div>
                 {v.items.map((iv) => (
                   <HwLine key={iv.item.id} hw={v.hw} iv={iv} />
@@ -102,8 +104,30 @@ export function Tutors() {
           </section>
         );
       })}
-      {editTutor && <TutorSheet tutor={editTutor === 'new' ? undefined : editTutor} today={today} onClose={() => setEditTutor(null)} />}
-      {hwFor && <HomeworkSheet tutor={hwFor.tutor} hw={hwFor.hw} today={today} onClose={() => setHwFor(null)} />}
+      {editTutor && <TutorSheet tutor={editTutor === 'new' ? undefined : editTutor} today={today} onClose={closeTo(() => setEditTutor(null))} />}
+      {hwFor && <HomeworkSheet tutor={hwFor.tutor} hw={hwFor.hw} today={today} onClose={closeTo(() => setHwFor(null))} />}
+      {pickTutor && (
+        <Sheet title="어느 과외 숙제인가요?" onClose={closeTo(() => setPickTutor(false))}>
+          <div className="st-addlist">
+            {tutors.map((t) => (
+              <button
+                key={t.id}
+                className="st-addrow"
+                onClick={() => {
+                  setPickTutor(false);
+                  setHwFor({ tutor: t });
+                }}
+              >
+                <span>
+                  <b>{t.name}</b>
+                  <small>{t.weekdays.map((w) => WEEKDAYS[w]).join('·')}</small>
+                </span>
+                <Icon name="chevron" />
+              </button>
+            ))}
+          </div>
+        </Sheet>
+      )}
     </div>
   );
 }
@@ -111,6 +135,7 @@ export function Tutors() {
 function HwLine({ hw, iv }: { hw: Homework; iv: ReturnType<typeof homeworkViews>[number]['items'][number] }) {
   const d = useStudy();
   const { item } = iv;
+  // 줄을 누르면 질문 메모 칸이 나타난다
   const [q, setQ] = useState<string | null>(null);
   const title = item.kind === 'pages' ? `${item.bookName ?? d.books[item.bookId ?? '']?.name ?? ''} p.${item.range ? rangeText([item.range]) : ''}` : item.text;
   return (
@@ -120,7 +145,7 @@ function HwLine({ hw, iv }: { hw: Homework; iv: ReturnType<typeof homeworkViews>
       ) : (
         <Check on={!!item.done} label="다 했어요" onClick={() => patchHwItem(hw.id, item.id, { done: !item.done })} />
       )}
-      <div className="st-item-main">
+      <div className="st-item-main" role="button" tabIndex={0} onClick={() => q === null && setQ(item.question ?? '')}>
         <div className={`st-item-title ${iv.finished ? 'done' : ''}`}>{title}</div>
         <div className="st-item-sub">
           {item.kind === 'pages' && !iv.finished && (iv.today.length ? `오늘 p.${rangeText(iv.today)} · ` : '') + `남은 ${iv.remaining.length}쪽`}
@@ -135,16 +160,19 @@ function HwLine({ hw, iv }: { hw: Homework; iv: ReturnType<typeof homeworkViews>
               setQ(null);
             }}
           >
-            <input autoFocus className="st-input sm" value={q} onChange={(e) => setQ(e.target.value)} placeholder="예: p.37 5번 풀이 과정" />
-            <button className="btn btn-sm">저장</button>
+            <input
+              autoFocus
+              className="st-input sm"
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              onBlur={() => setQ(null)}
+              onClick={(e) => e.stopPropagation()}
+              placeholder="다음 수업에서 물어볼 것 (예: p.37 5번) · Enter"
+              aria-label="질문 메모"
+            />
           </form>
         )}
       </div>
-      {q === null && (
-        <button className="st-link" onClick={() => setQ(item.question ?? '')}>
-          질문 메모
-        </button>
-      )}
     </div>
   );
 }

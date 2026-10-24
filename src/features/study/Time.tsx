@@ -5,7 +5,7 @@ import { alive, type StudySession } from './model';
 import { addSession } from './actions';
 import { put, remove, useStudy } from './store';
 import { clock, finish, minutesText, nextPhase, pause, resume, start, view, type TimerState } from './timer';
-import { Bar, Field, Sheet, SubjectDot, SubjectPicker, subjectsOf, toast, useNow, useToday } from './ui';
+import { Bar, Field, go, Sheet, SubjectDot, SubjectPicker, subjectsOf, toast, useNow, useToday } from './ui';
 
 const TIMER_KEY = 'my-study.study.timer.v1';
 
@@ -46,14 +46,15 @@ function beep() {
   }
 }
 
-export function Time() {
+/** sub: 'manual' 이면 공부 시간 직접 넣기 창 (「＋」에서 올 때) */
+export function Time({ sub }: { sub?: string }) {
   const d = useStudy();
   const today = useToday();
   const now = useNow(500);
   const [timer, setTimer] = useState<TimerState | null>(loadTimer);
   const [subjectId, setSubjectId] = useState(timer?.subjectId ?? subjectsOf(d)[0]?.id ?? '');
   const [kind, setKind] = useState<TimerState['kind']>(timer?.kind ?? 'pomo');
-  const [manual, setManual] = useState(false);
+  const [manual, setManual] = useState(sub === 'manual');
   const pomo = d.settings.pomo;
   const v = timer ? view(timer, now, pomo) : null;
   const rang = useRef(false);
@@ -95,9 +96,6 @@ export function Time() {
     <div className="st-page">
       <div className="st-page-head">
         <h2>공부 기록</h2>
-        <button className="btn btn-sm" onClick={() => setManual(true)}>
-          ＋ 직접 넣기
-        </button>
       </div>
       <section className={`st-card st-timer ${timer ? (timer.phase === 'work' ? 'work' : 'rest') : ''}`}>
         {!timer ? (
@@ -158,7 +156,15 @@ export function Time() {
       </section>
 
       <Stats sessions={sessions} today={today} todayMin={todayMin} />
-      {manual && <ManualSheet today={today} onClose={() => setManual(false)} />}
+      {manual && (
+        <ManualSheet
+          today={today}
+          onClose={() => {
+            setManual(false);
+            if (sub) go('/time');
+          }}
+        />
+      )}
     </div>
   );
 }

@@ -6,17 +6,18 @@ import { answer, dueText, dueToday } from './review';
 import { getStudy, put, remove, useStudy } from './store';
 import { addPhoto, photoUrl, removePhoto } from './photos';
 import { requeue } from './wordSession';
-import { Bar, confirmDelete, Empty, Field, go, Sheet, SubjectDot, SubjectPicker, SubjectTag, subjectsOf, toast, useToday } from './ui';
+import { Bar, confirmDelete, Empty, Field, go, Menu, Sheet, SubjectDot, SubjectPicker, SubjectTag, subjectsOf, toast, useToday } from './ui';
 import { KeyHelp, RunCard } from './Words';
 
 export function Review({ sub }: { sub?: string }) {
   if (sub === 'redo') return <NoteRun />;
   if (sub?.startsWith('cards-run')) return <CardRun />;
   if (sub?.startsWith('deck-')) return <DeckView id={sub.slice(5)} />;
-  return <ReviewHome tab={sub === 'cards' ? 'cards' : 'notes'} />;
+  return <ReviewHome tab={sub === 'cards' || sub === 'new-deck' ? 'cards' : 'notes'} sub={sub} />;
 }
 
-function ReviewHome({ tab }: { tab: 'notes' | 'cards' }) {
+/** sub: 'new-note' · 'new-deck' 이면 바로 넣기 창 (「＋」에서 올 때) */
+function ReviewHome({ tab, sub }: { tab: 'notes' | 'cards'; sub?: string }) {
   const d = useStudy();
   const today = useToday();
   const notesDue = dueToday(alive(d.notes), today);
@@ -34,16 +35,16 @@ function ReviewHome({ tab }: { tab: 'notes' | 'cards' }) {
           </button>
         </div>
       </div>
-      {tab === 'notes' ? <Notes today={today} /> : <Cards today={today} />}
+      {tab === 'notes' ? <Notes today={today} adding={sub === 'new-note'} /> : <Cards today={today} adding={sub === 'new-deck'} />}
     </div>
   );
 }
 
 // ===== 오답 노트 =====
 
-function Notes({ today }: { today: string }) {
+function Notes({ today, adding }: { today: string; adding?: boolean }) {
   const d = useStudy();
-  const [edit, setEdit] = useState<WrongNote | 'new' | null>(null);
+  const [edit, setEdit] = useState<WrongNote | 'new' | null>(adding ? 'new' : null);
   const [subject, setSubject] = useState('');
   const [show, setShow] = useState<'open' | 'resolved'>('open');
   const all = alive(d.notes);
@@ -74,14 +75,11 @@ function Notes({ today }: { today: string }) {
             </div>
           )}
         </div>
-        <div className="st-col">
-          <button className="btn btn-primary btn-lg" disabled={!due.length} onClick={() => go('/review/redo')}>
-            다시 풀기 {due.length > 0 && `(${due.length})`}
+        {due.length > 0 && (
+          <button className="btn btn-primary btn-lg" onClick={() => go('/review/redo')}>
+            다시 풀기 ({due.length})
           </button>
-          <button className="btn" onClick={() => setEdit('new')}>
-            ＋ 오답 넣기
-          </button>
-        </div>
+        )}
       </section>
       <div className="st-inline wrap">
         <div className="st-seg sm">
@@ -103,7 +101,12 @@ function Notes({ today }: { today: string }) {
       </div>
       {!list.length ? (
         <Empty icon="📝" title={show === 'open' ? '오답이 없어요' : '아직 해결한 오답이 없어요'}>
-          <p>문제집을 체크할 때 「틀린 번호」를 쓰거나, 여기서 사진과 함께 넣을 수 있어요.</p>
+          <p>문제집을 체크할 때 「틀린 번호」를 쓰거나, 사진과 함께 넣을 수 있어요.</p>
+          {show === 'open' && (
+            <button className="btn btn-primary" onClick={() => setEdit('new')}>
+              오답 넣기
+            </button>
+          )}
         </Empty>
       ) : (
         <div className="st-notes">
@@ -122,7 +125,7 @@ function Notes({ today }: { today: string }) {
           ))}
         </div>
       )}
-      {edit && <NoteSheet note={edit === 'new' ? undefined : edit} today={today} onClose={() => setEdit(null)} />}
+      {edit && <NoteSheet note={edit === 'new' ? undefined : edit} today={today} onClose={() => (setEdit(null), adding && go('/review'))} />}
     </>
   );
 }
@@ -365,9 +368,9 @@ function NoteRun() {
 
 // ===== 암기 카드 =====
 
-function Cards({ today }: { today: string }) {
+function Cards({ today, adding: add }: { today: string; adding?: boolean }) {
   const d = useStudy();
-  const [adding, setAdding] = useState(false);
+  const [adding, setAdding] = useState(!!add);
   const decks = alive(d.decks);
   const cards = alive(d.cards);
   const due = dueToday(cards, today);
@@ -380,18 +383,18 @@ function Cards({ today }: { today: string }) {
           </p>
           <p className="st-hint">영어 단어는 「영단어」 탭이 더 좋아요 (단어장 계획·객관식).</p>
         </div>
-        <div className="st-col">
-          <button className="btn btn-primary btn-lg" disabled={!due.length} onClick={() => go('/review/cards-run')}>
-            카드 복습 {due.length > 0 && `(${due.length})`}
+        {due.length > 0 && (
+          <button className="btn btn-primary btn-lg" onClick={() => go('/review/cards-run')}>
+            카드 복습 ({due.length})
           </button>
-          <button className="btn" onClick={() => setAdding(true)}>
-            ＋ 카드 묶음
-          </button>
-        </div>
+        )}
       </section>
       {!decks.length ? (
         <Empty icon="🃏" title="카드 묶음이 없어요">
           <p>앞면(문제)과 뒷면(답)을 한 줄씩 붙여 넣어 한꺼번에 만들 수 있어요.</p>
+          <button className="btn btn-primary" onClick={() => setAdding(true)}>
+            카드 묶음 만들기
+          </button>
         </Empty>
       ) : (
         <div className="st-grid">
@@ -412,7 +415,7 @@ function Cards({ today }: { today: string }) {
           })}
         </div>
       )}
-      {adding && <DeckSheet onClose={() => setAdding(false)} />}
+      {adding && <DeckSheet onClose={() => (setAdding(false), add && window.location.hash.endsWith('new-deck') && go('/review/cards'))} />}
     </>
   );
 }
@@ -480,22 +483,21 @@ function DeckView({ id }: { id: string }) {
         <h2>
           <SubjectDot id={deck.subjectId} d={d} /> {deck.name}
         </h2>
-        <div className="st-row">
-          <button className="btn btn-sm" onClick={() => setEdit(true)}>
-            고치기
-          </button>
-          <button
-            className="btn btn-sm st-danger"
-            onClick={() => {
-              if (!confirmDelete(`「${deck.name}」과 카드 ${cards.length}장`)) return;
-              for (const c of cards) remove('cards', c.id);
-              remove('decks', deck.id);
-              go('/review/cards');
-            }}
-          >
-            지우기
-          </button>
-        </div>
+        <Menu
+          items={[
+            { label: '이름·과목 고치기', onClick: () => setEdit(true) },
+            {
+              label: '묶음 지우기',
+              danger: true,
+              onClick: () => {
+                if (!confirmDelete(`「${deck.name}」과 카드 ${cards.length}장`)) return;
+                for (const c of cards) remove('cards', c.id);
+                remove('decks', deck.id);
+                go('/review/cards');
+              },
+            },
+          ]}
+        />
       </div>
       <section className="st-card st-form">
         <Field label="카드 한꺼번에 넣기" hint={<>한 줄에 카드 하나: <code>앞면 | 뒷면</code> · 엑셀·시트에서 두 칸 복사 · <code>앞 - 뒤</code></>}>
@@ -516,11 +518,13 @@ function DeckView({ id }: { id: string }) {
         </div>
       </section>
       <section className="st-card">
-        <div className="st-row">
-          <button className="btn btn-primary" disabled={!cards.some((c) => c.box === 0 || (c.due <= today && !c.learned))} onClick={() => go(`/review/cards-run?deck=${id}`)}>
-            이 묶음 공부하기
-          </button>
-        </div>
+        {cards.some((c) => c.box === 0 || (c.due <= today && !c.learned)) && (
+          <div className="st-row">
+            <button className="btn btn-primary" onClick={() => go(`/review/cards-run?deck=${id}`)}>
+              이 묶음 공부하기
+            </button>
+          </div>
+        )}
         <table className="st-table words">
           <tbody>
             {cards.map((c) => (

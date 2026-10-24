@@ -2,14 +2,14 @@
 import { useMemo, useState } from 'react';
 import { addDays, dday, longDate, shortDate } from './dates';
 import { habitOn, streak } from './habits';
-import { alive, newId, type Habit, type Todo } from './model';
+import { alive, type Habit, type Todo } from './model';
 import { rangeText } from './pages';
 import { dueToday } from './review';
-import { homeworkViews, listWords, planViews, wordListViews, type HomeworkView, type PlanView } from './select';
-import { getStudy, put, useStudy, useWords } from './store';
-import { addWords, doneUpTo, markBook, markDays, markHwPages, patchHwItem, quickWrongNotes, splitNumbers } from './actions';
+import { homeworkViews, planViews, wordListViews, type HomeworkView, type PlanView } from './select';
+import { put, useStudy, useWords } from './store';
+import { doneUpTo, markBook, markDays, markHwPages, patchHwItem, quickWrongNotes, splitNumbers } from './actions';
 import { minutesText } from './timer';
-import { Bar, Check, Empty, go, SubjectDot, toast, useToday } from './ui';
+import { Bar, Check, Empty, go, Icon, SubjectDot, toast, useToday } from './ui';
 
 export function Today() {
   const d = useStudy();
@@ -73,18 +73,10 @@ export function Today() {
 
       {empty && (
         <Empty icon="📚" title="오늘 할 것이 아직 없어요">
-          <p>문제집을 넣으면 시험(또는 정한 날)까지 하루 분량을 나눠 드려요.</p>
-          <div className="st-row">
-            <button className="btn btn-primary" onClick={() => go('/books/new')}>
-              문제집 넣기
-            </button>
-            <button className="btn" onClick={() => go('/words/new')}>
-              영단어 넣기
-            </button>
-            <button className="btn" onClick={() => go('/tutor')}>
-              과외 등록
-            </button>
-          </div>
+          <p>문제집을 넣으면 시험(또는 정한 날)까지 하루 분량을 나눠 드려요. 숙제·단어·할 일은 ＋ 로 넣을 수 있어요.</p>
+          <button className="btn btn-primary" onClick={() => go('/books/new')}>
+            문제집 넣기
+          </button>
         </Empty>
       )}
 
@@ -119,7 +111,7 @@ export function Today() {
                 ) : (
                   <span className={`st-badge ${n ? '' : 'ok'}`}>{n ? n : '✓'}</span>
                 )}
-                <div className="st-item-main">
+                <div className="st-item-main" role="button" tabIndex={0} onClick={() => go(`/words/${l.list.id}/${n > 0 || !l.prep ? 'learn' : 'prep'}`)}>
                   <div className="st-item-title">
                     <SubjectDot id={l.list.subjectId} d={d} />
                     {l.list.name}
@@ -131,11 +123,7 @@ export function Today() {
                     {l.list.kind === 'test' && l.list.testDate && ` · 시험 ${shortDate(l.list.testDate)} ${dday(today, l.list.testDate)}`}
                   </div>
                 </div>
-                {(n > 0 || l.prep) && (
-                  <button className="btn btn-sm btn-primary" onClick={() => go(`/words/${l.list.id}/${l.prep && !n ? 'prep' : 'learn'}`)}>
-                    시작
-                  </button>
-                )}
+                {(n > 0 || l.prep) && <Icon name="chevron" />}
               </div>
             );
           })}
@@ -145,7 +133,7 @@ export function Today() {
       {(notesDue.length > 0 || cardsDue.length > 0) && (
         <section className="st-card">
           <h3 className="st-h">오늘 복습</h3>
-          <div className="st-item">
+          <div className="st-item st-tap" role="button" tabIndex={0} onClick={() => go(notesDue.length ? '/review/redo' : '/review/cards-run')}>
             <span className="st-badge">{notesDue.length + cardsDue.length}</span>
             <div className="st-item-main">
               <div className="st-item-title">
@@ -155,9 +143,7 @@ export function Today() {
               </div>
               <div className="st-item-sub">답을 가리고 먼저 떠올려 보세요</div>
             </div>
-            <button className="btn btn-sm btn-primary" onClick={() => go(notesDue.length ? '/review/redo' : '/review/cards-run')}>
-              시작
-            </button>
+            <Icon name="chevron" />
           </div>
         </section>
       )}
@@ -173,8 +159,6 @@ export function Today() {
           ))}
         </section>
       )}
-
-      <QuickAdd today={today} />
 
       {bookPlans.length > 0 && <Week plans={bookPlans} today={today} />}
     </div>
@@ -219,8 +203,8 @@ function HomeworkRow({ h, today }: { h: HomeworkView; today: string }) {
               {item.question && <div className="st-item-sub">질문: {item.question}</div>}
             </div>
             {item.kind === 'words' && item.wordListId && (
-              <button className="btn btn-sm" onClick={() => go(`/words/${item.wordListId}/learn`)}>
-                외우기
+              <button className="st-iconbtn" aria-label="외우기" onClick={() => go(`/words/${item.wordListId}/learn`)}>
+                <Icon name="chevron" />
               </button>
             )}
           </div>
@@ -233,8 +217,9 @@ function HomeworkRow({ h, today }: { h: HomeworkView; today: string }) {
 function BookRow({ p, today }: { p: PlanView; today: string }) {
   const d = useStudy();
   const { sched, plan } = p;
+  // 줄을 누르면 그 문제집에 할 수 있는 일이 나타난다 (체크하면 「틀린 번호」 칸이 바로 열린다)
+  const [open, setOpen] = useState(false);
   const [upTo, setUpTo] = useState('');
-  const [askWrong, setAskWrong] = useState(false);
   const [wrong, setWrong] = useState('');
   const doneToday = sched.today.length > 0 && sched.today.every((x) => p.target.done.has(x));
   const book = d.books[plan.targetId];
@@ -242,62 +227,62 @@ function BookRow({ p, today }: { p: PlanView; today: string }) {
   const unitEnd = sched.today.length > 0 && book.units.some((u) => u.to === sched.today[sched.today.length - 1]);
   const toggle = () => {
     markBook(book.id, sched.today, !doneToday);
-    if (!doneToday) setAskWrong(true);
+    if (!doneToday) setOpen(true);
   };
   return (
     <div className="st-item-wrap">
       <div className="st-item">
         {sched.today.length ? <Check on={doneToday} onClick={toggle} label="오늘 분량 다 했어요" /> : <span className="st-badge ok">–</span>}
-        <div className="st-item-main" onClick={() => go(`/books/${book.id}`)} role="link" tabIndex={0}>
+        <div className="st-item-main" onClick={() => setOpen(!open)} role="button" tabIndex={0} aria-expanded={open}>
           <div className={`st-item-title ${doneToday ? 'done' : ''}`}>
             <SubjectDot id={book.subjectId} d={d} />
             {book.name} {sched.today.length > 0 && <span className="st-pages">p.{rangeText(sched.today)}</span>}
           </div>
           <div className="st-item-sub">
-            {sched.today.length === 0 ? (sched.remaining.length ? '오늘은 쉬는 날' : '다 끝났어요') : `${sched.today.length}쪽${unitNames.length ? ' · ' + unitNames.join(', ') : ''}${unitEnd ? ' · 단원 끝 🎉' : ''}`}
+            {sched.today.length === 0 ? (sched.remaining.length ? '오늘은 쉬는 날' : '다 끝났어요') : `${sched.today.length}쪽${unitNames.length ? ' · ' + unitNames.join(', ') : ''}${unitEnd ? ' · 단원 끝' : ''}`}
             {sched.end && ` · ${shortDate(sched.end)}까지 ${sched.remaining.length}쪽`}
           </div>
           {plan.carried?.date === today && <div className="st-note">지난번 {plan.carried.count}쪽이 남아서 남은 날에 나눠 넣었어요</div>}
           {sched.warning && <PlanWarning p={p} />}
         </div>
-        {!doneToday && sched.today.length > 1 && (
-          <form
-            className="st-upto"
-            onSubmit={(e) => {
-              e.preventDefault();
-              const n = Number(upTo);
-              if (!n) return;
-              doneUpTo(book.id, sched.today, n);
-              setUpTo('');
-              toast(`p.${n}까지 체크했어요`);
-            }}
-          >
-            <input className="st-input xs" inputMode="numeric" placeholder={`p.${sched.today[sched.today.length - 1]}`} value={upTo} onChange={(e) => setUpTo(e.target.value.replace(/\D/g, ''))} aria-label="몇 쪽까지 풀었나요" />
-            <button className="btn btn-sm">까지</button>
-          </form>
-        )}
       </div>
-      {askWrong && (
-        <form
-          className="st-ask"
-          onSubmit={(e) => {
-            e.preventDefault();
-            const nums = splitNumbers(wrong);
-            if (nums.length) {
-              quickWrongNotes(book.subjectId, book.id, sched.today[0], nums, today);
-              toast(`오답 ${nums.length}문제를 넣었어요. 내일 다시 풀어요`);
-            }
-            setAskWrong(false);
-            setWrong('');
-          }}
-        >
-          <span>틀린 문제 있었나요?</span>
-          <input autoFocus className="st-input sm" placeholder="번호: 3, 7, 12" value={wrong} onChange={(e) => setWrong(e.target.value)} />
-          <button className="btn btn-sm btn-primary">넣기</button>
-          <button type="button" className="btn btn-sm" onClick={() => setAskWrong(false)}>
-            없어요
+      {open && (
+        <div className="st-actions">
+          {doneToday ? (
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                const nums = splitNumbers(wrong);
+                if (nums.length) {
+                  quickWrongNotes(book.subjectId, book.id, sched.today[0], nums, today);
+                  toast(`오답 ${nums.length}문제를 넣었어요. 내일 다시 풀어요`);
+                }
+                setWrong('');
+                setOpen(false);
+              }}
+            >
+              <input autoFocus className="st-input sm" placeholder="틀린 번호 (예: 3, 7) · 없으면 비워 두세요" value={wrong} onChange={(e) => setWrong(e.target.value)} aria-label="틀린 문제 번호" />
+            </form>
+          ) : (
+            sched.today.length > 1 && (
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  const n = Number(upTo);
+                  if (!n) return;
+                  doneUpTo(book.id, sched.today, n);
+                  setUpTo('');
+                  toast(`p.${n}까지 체크했어요`);
+                }}
+              >
+                <input className="st-input sm" inputMode="numeric" placeholder={`어디까지 풀었나요? (예: ${sched.today[Math.floor(sched.today.length / 2)]})`} value={upTo} onChange={(e) => setUpTo(e.target.value.replace(/\D/g, ''))} aria-label="몇 쪽까지 풀었나요" />
+              </form>
+            )
+          )}
+          <button className="st-link" onClick={() => go(`/books/${book.id}`)}>
+            문제집 보기
           </button>
-        </form>
+        </div>
       )}
     </div>
   );
@@ -351,53 +336,6 @@ function HabitRow({ h, today }: { h: Habit; today: string }) {
         <div className="st-item-sub">{s > 0 ? `${s}일 연속` : '오늘부터 시작'}</div>
       </div>
     </div>
-  );
-}
-
-/** 어디서나 빨리 넣기: 할 일 · 모르는 단어 */
-function QuickAdd({ today }: { today: string }) {
-  const [kind, setKind] = useState<'todo' | 'word'>('todo');
-  const [text, setText] = useState('');
-  const words = useWords();
-  function submit() {
-    const t = text.trim();
-    if (!t) return;
-    if (kind === 'todo') {
-      put('todos', { id: newId(), title: t, due: today, done: false, created: Date.now() });
-      toast('오늘 할 일에 넣었어요');
-    } else {
-      const d = getStudy();
-      let inbox = alive(d.wordLists).find((l) => l.kind === 'inbox');
-      if (!inbox) {
-        inbox = { id: newId(), updatedAt: 0, name: '모르는 단어 모음', kind: 'inbox', subjectId: alive(d.subjects).find((s) => /영어/.test(s.name))?.id ?? '', done: [], undone: [] };
-        put('wordLists', inbox);
-      }
-      const m = t.match(/^([A-Za-z][A-Za-z '\-.]*?)\s*(?:[:\-–]\s*)?([^A-Za-z].*)?$/);
-      const term = (m?.[1] ?? t).trim();
-      addWords(inbox.id, [{ term, meaning: (m?.[2] ?? '').trim() }], listWords(words, inbox.id), today);
-      toast(`「${term}」를 모르는 단어 모음에 넣었어요`);
-    }
-    setText('');
-  }
-  return (
-    <form
-      className="st-quick"
-      onSubmit={(e) => {
-        e.preventDefault();
-        submit();
-      }}
-    >
-      <div className="st-seg" role="tablist">
-        <button type="button" role="tab" aria-selected={kind === 'todo'} className={kind === 'todo' ? 'on' : ''} onClick={() => setKind('todo')}>
-          ＋ 할 일
-        </button>
-        <button type="button" role="tab" aria-selected={kind === 'word'} className={kind === 'word' ? 'on' : ''} onClick={() => setKind('word')}>
-          ＋ 모르는 단어
-        </button>
-      </div>
-      <input className="st-input" placeholder={kind === 'todo' ? '오늘 할 일 (예: 수행평가 자료 찾기)' : '단어와 뜻 (예: resilience 회복력)'} value={text} onChange={(e) => setText(e.target.value)} />
-      <button className="btn btn-primary">넣기</button>
-    </form>
   );
 }
 
