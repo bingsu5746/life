@@ -9,6 +9,8 @@ import { go, Icon, Sheet, toast } from './ui';
 const ITEMS: { key: string; label: string; sub: string; to?: string }[] = [
   { key: 'todo', label: '할 일', sub: '오늘 할 일 한 줄' },
   { key: 'word', label: '모르는 단어', sub: '모르는 단어 모음에 바로' },
+  { key: 'exam', label: '시험', sub: '시험 날 · 과목별 시험 범위', to: '/exams/new' },
+  { key: 'progress', label: '학교 진도', sub: '오늘 학교에서 어디까지 나갔는지', to: '/exams/progress' },
   { key: 'book', label: '문제집', sub: '목차를 넣고 하루 분량 계획', to: '/books/new' },
   { key: 'hw', label: '과외 숙제', sub: '마감은 다음 수업일로', to: '/tutor/hw' },
   { key: 'words', label: '단어 목록', sub: '단어장 · 단어 시험 (PDF·붙여넣기·사진)', to: '/words/new' },

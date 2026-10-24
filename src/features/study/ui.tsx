@@ -176,6 +176,7 @@ const ICON_PATHS: Record<string, string> = {
   time: 'M12 21a8.5 8.5 0 1 0 0-17 8.5 8.5 0 0 0 0 17zM12 8v4.5l3 2',
   life: 'M5 4h14a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1zM8 12l2.8 2.8L16.5 9',
   settings: 'M4 7h9M17 7h3M4 17h3M11 17h9M15 5v4M9 15v4',
+  exams: 'M7 3v3M17 3v3M4 8h16M5 5h14a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1zM9 14l2 2 4-4',
   plus: 'M12 5v14M5 12h14',
   more: 'M6 12h.01M12 12h.01M18 12h.01',
   chevron: 'M9 6l6 6-6 6',

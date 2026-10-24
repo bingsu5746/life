@@ -2350,3 +2350,218 @@ input[type='range'] {
 .st-sheet-body > .st-link {
   justify-self: start;
 }
+
+/* ===== D-day · 시험 ===== */
+.st-hero {
+  display: grid;
+  gap: 16px;
+  padding: 28px;
+  border-radius: 16px;
+  background: var(--accent);
+  color: var(--on-accent);
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+
+.st-hero:hover {
+  opacity: 0.94;
+}
+
+.st-hero-main {
+  display: flex;
+  align-items: flex-end;
+  gap: 20px;
+  flex-wrap: wrap;
+}
+
+.st-hero-dday {
+  font-size: clamp(3.4rem, 12vw, 5.5rem);
+  font-weight: 800;
+  line-height: 0.9;
+  letter-spacing: -3px;
+  font-variant-numeric: tabular-nums;
+}
+
+.st-hero-main strong {
+  display: block;
+  font-size: 1.2rem;
+  font-weight: 700;
+}
+
+.st-hero-main small {
+  opacity: 0.65;
+  font-size: 0.88rem;
+}
+
+.st-hero .st-bar {
+  background: color-mix(in srgb, var(--on-accent) 18%, transparent);
+}
+
+.st-hero .st-bar i {
+  background: var(--on-accent);
+}
+
+.st-hero-bar {
+  display: grid;
+  gap: 6px;
+}
+
+.st-hero-bar small,
+.st-hero-more {
+  font-size: 0.82rem;
+  opacity: 0.7;
+}
+
+.st-hero-subs {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.st-hero-subs span {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--on-accent) 12%, transparent);
+  font-size: 0.86rem;
+}
+
+.st-hero-subs b {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.st-hero-subs small {
+  opacity: 0.6;
+  font-size: 0.74rem;
+}
+
+.st-hero-more {
+  display: flex;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+.st-dday-empty {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 18px;
+  border-radius: var(--radius);
+  border: 1px dashed var(--line-strong);
+  background: none;
+  color: var(--muted);
+  font-size: 0.9rem;
+  text-align: left;
+}
+
+.st-dday-empty:hover {
+  color: var(--text);
+  border-color: var(--accent);
+}
+
+.st-exam-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 12px;
+}
+
+.st-exam-card {
+  display: grid;
+  gap: 6px;
+  padding: 20px;
+  text-align: left;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+
+.st-exam-card:hover {
+  border-color: var(--line-strong);
+}
+
+.st-exam-card strong {
+  font-weight: 600;
+}
+
+.st-exam-card small {
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
+.st-exam-dday {
+  font-size: 2.2rem;
+  font-weight: 800;
+  letter-spacing: -1.2px;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+.st-exam-dday.big {
+  font-size: clamp(3rem, 10vw, 4.4rem);
+  letter-spacing: -2.5px;
+}
+
+.st-exam-hero {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  flex-wrap: wrap;
+}
+
+.st-exam-hero-bar {
+  flex: 1 1 200px;
+  display: grid;
+  gap: 6px;
+}
+
+.st-exam-hero-bar small {
+  color: var(--muted);
+}
+
+.st-scope-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 4px;
+}
+
+.st-scope-head b {
+  font-weight: 600;
+  font-size: 1.02rem;
+}
+
+.st-scope-head small {
+  margin-left: auto;
+}
+
+.st-addline {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 14px;
+  border-radius: var(--radius);
+  border: 1px dashed var(--line-strong);
+  background: none;
+  color: var(--muted);
+  font-weight: 500;
+}
+
+.st-addline:hover {
+  color: var(--text);
+  border-color: var(--accent);
+}
+
+.st-progress-log {
+  display: grid;
+}
+
+@media (max-width: 860px) {
+  .st-hero {
+    padding: 22px;
+  }
+}

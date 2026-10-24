@@ -355,3 +355,22 @@ describe('habits', () => {
     expect(bestStreak({ ...h, checks: [...h.checks, '2026-10-19'] }, '2026-10-21')).toBe(4);
   });
 });
+
+describe('시험 범위', () => {
+  it('줄 나누기와 체크 유지, 진행·끝나는 날', async () => {
+    const { scopeLines, examProgress, examEnd, nextSubjects, addProgress } = await import('./exams');
+    const a = scopeLines('- 교과서 12~80쪽\n\n2) 프린트 1~5\n학습지');
+    expect(a.map((l) => l.text)).toEqual(['교과서 12~80쪽', '프린트 1~5', '학습지']);
+    a[1].done = true;
+    const b = scopeLines('교과서 12~80쪽\n프린트 1~5\n노트 정리', a);
+    expect(b.map((l) => l.done)).toEqual([false, true, false]);
+    const exam = { id: 'e', updatedAt: 1, name: '기말', date: '2026-12-01', scopes: [
+      { id: 's1', subjectId: 'm', lines: b },
+      { id: 's2', subjectId: 'k', date: '2026-12-03', lines: [{ id: 'x', text: 'a', done: true }] },
+    ] };
+    expect(examProgress(exam)).toEqual({ done: 2, total: 4 });
+    expect(examEnd(exam)).toBe('2026-12-03');
+    expect(nextSubjects(exam, '2026-12-02').map((s) => s.id)).toEqual(['s2']);
+    expect(addProgress([{ date: '2026-10-01', text: 'a' }], '2026-10-01', 'b')).toEqual([{ date: '2026-10-01', text: 'b' }]);
+  });
+});

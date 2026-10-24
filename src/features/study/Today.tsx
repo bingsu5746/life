@@ -9,6 +9,7 @@ import { homeworkViews, planViews, wordListViews, type HomeworkView, type PlanVi
 import { put, useStudy, useWords } from './store';
 import { doneUpTo, markBook, markDays, markHwPages, patchHwItem, quickWrongNotes, splitNumbers } from './actions';
 import { minutesText } from './timer';
+import { DdayHero } from './Exams';
 import { Bar, Check, Empty, go, Icon, SubjectDot, toast, useToday } from './ui';
 
 export function Today() {
@@ -21,10 +22,6 @@ export function Today() {
   const bookPlans = plans.filter((p) => p.plan.target === 'book');
   const notesDue = dueToday(alive(d.notes), today);
   const cardsDue = dueToday(alive(d.cards), today);
-  const exams = alive(d.exams)
-    .filter((e) => e.date >= today)
-    .sort((a, b) => a.date.localeCompare(b.date))
-    .slice(0, 3);
   const todos = alive(d.todos)
     .filter((t) => (!t.done && (t.star || (t.due && t.due <= today))) || (t.done && t.doneAt && t.doneAt > Date.now() - 12 * 3600_000 && (t.star || (t.due && t.due <= today))))
     .sort((a, b) => Number(a.done) - Number(b.done) || (a.due ?? '9').localeCompare(b.due ?? '9'));
@@ -52,6 +49,7 @@ export function Today() {
 
   return (
     <div className="st-today">
+      <DdayHero today={today} />
       <header className="st-today-head">
         <div>
           <h2>{longDate(today)}</h2>
@@ -60,13 +58,6 @@ export function Today() {
               {done === total ? '오늘 할 것 끝' : `오늘 할 것 ${total - done}개 남음`} · 공부 {minutesText(studied)}
             </p>
           )}
-        </div>
-        <div className="st-exams">
-          {exams.map((e) => (
-            <span key={e.id} className={`st-dday ${e.date <= addDays(today, 7) ? 'soon' : ''}`}>
-              {e.name} <b>{dday(today, e.date)}</b>
-            </span>
-          ))}
         </div>
         {total > 0 && <Bar value={done} max={total} color="var(--ok)" />}
       </header>

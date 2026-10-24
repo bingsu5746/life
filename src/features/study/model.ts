@@ -43,12 +43,39 @@ export interface Subject extends Stamp {
   order: number;
   /** 주간 목표 공부 시간 (분) */
   weeklyGoal?: number;
+  /** 학교 진도 기록 (오래된 것부터, 최근 30개) */
+  progress?: ProgressEntry[];
+}
+
+/** 학교에서 어디까지 나갔는지 */
+export interface ProgressEntry {
+  date: DateStr;
+  text: string;
+}
+
+/** 시험 범위 한 줄 (체크하며 공부) */
+export interface ScopeLine {
+  id: Id;
+  text: string;
+  done: boolean;
+}
+
+/** 한 과목의 시험 범위 */
+export interface ExamScope {
+  id: Id;
+  subjectId: Id;
+  /** 이 과목 시험 날 (없으면 시험 날) */
+  date?: DateStr;
+  lines: ScopeLine[];
+  note?: string;
 }
 
 export interface Exam extends Stamp {
   id: Id;
   name: string;
+  /** 시험 시작 날 (과목마다 다르면 첫날) */
   date: DateStr;
+  scopes?: ExamScope[];
 }
 
 export interface Unit {

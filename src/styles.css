@@ -262,3 +262,29 @@ button:disabled {
 .st-addrow.danger b {
   color: var(--bad);
 }
+
+.gear-btn {
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  color: var(--muted);
+}
+
+.gear-btn:hover {
+  background: var(--soft);
+  color: var(--text);
+}
+
+.gear-btn svg {
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}

@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import './study.css';
 import { AddButton } from './Add';
 import { Books } from './Books';
+import { Exams } from './Exams';
 import { Life } from './Life';
 import { alive } from './model';
 import { Review } from './Review';
@@ -19,20 +20,22 @@ import { Words } from './Words';
 
 const TABS = [
   { key: 'today', label: '오늘' },
+  { key: 'exams', label: '시험' },
   { key: 'books', label: '문제집' },
   { key: 'tutor', label: '과외' },
   { key: 'words', label: '영단어' },
   { key: 'review', label: '복습' },
   { key: 'time', label: '기록' },
   { key: 'life', label: '할 일·습관', short: '할 일' },
-  { key: 'settings', label: '설정' },
 ] as const;
+/** 메뉴에는 없지만 열 수 있는 화면 (설정은 맨 위 막대의 톱니) */
+const HIDDEN = ['settings'];
 
 export function Study({ path, loggedIn, onLogin }: { path: string[]; loggedIn: boolean; onLogin: () => void }) {
   const d = useStudy();
   const words = useWords();
   const today = useToday();
-  const tab = TABS.some((t) => t.key === path[0]) ? path[0] : 'today';
+  const tab = TABS.some((t) => t.key === path[0]) || HIDDEN.includes(path[0]) ? path[0] : 'today';
   const [, id, sub] = path;
   const alarm = useTimerAlarm();
 
@@ -53,6 +56,7 @@ export function Study({ path, loggedIn, onLogin }: { path: string[]; loggedIn: b
   else if (tab === 'time') content = <Time sub={id} />;
   else if (tab === 'life') content = <Life sub={id} />;
   else if (tab === 'settings') content = <Settings />;
+  else if (tab === 'exams') content = <Exams id={id} />;
   else content = <Today />;
 
   return (
