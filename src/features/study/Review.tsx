@@ -221,7 +221,7 @@ function NoteSheet({ note, today, onClose }: { note?: WrongNote; today: string; 
             </div>
           ))}
           <label className="st-photo-add">
-            {busy ? '넣는 중…' : '📷 사진'}
+            {busy ? '넣는 중…' : '+ 사진'}
             <input type="file" accept="image/*" multiple hidden onChange={(e) => e.target.files?.length && void addPhotos(e.target.files)} />
           </label>
         </div>
@@ -286,7 +286,6 @@ function NoteRun() {
     return (
       <div className="st-page narrow">
         <div className="st-card st-done-card">
-          <div className="st-empty-icon">🎉</div>
           <h2>오늘 다시 풀기 끝!</h2>
           <p>
             {total}문제 중 {[...first.values()].filter(Boolean).length}문제를 맞혔어요
@@ -351,7 +350,7 @@ function NoteRun() {
               )}
               {n.myAnswer && <div className="st-muted">처음 내 답: {n.myAnswer}</div>}
               {n.reason && <div>왜 틀렸나: {REASONS[n.reason]}</div>}
-              {n.memo && <div>📝 {n.memo}</div>}
+              {n.memo && <div>메모: {n.memo}</div>}
               {!n.answer && !n.reason && !n.memo && <div className="st-muted">적어 둔 정답·메모가 없어요</div>}
             </div>
             <button className="btn btn-lg btn-primary" onClick={() => reply(false)}>
@@ -583,7 +582,6 @@ function CardRun() {
     return (
       <div className="st-page narrow">
         <div className="st-card st-done-card">
-          <div className="st-empty-icon">🎉</div>
           <h2>카드 복습 끝!</h2>
           <p>
             {total}장 중 처음에 안 것 {[...first.values()].filter(Boolean).length}장

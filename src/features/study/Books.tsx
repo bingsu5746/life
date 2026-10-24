@@ -137,7 +137,7 @@ function BookEditor({ book, onDone }: { book?: Book; onDone: (id?: string) => vo
         </Field>
         <div className="st-row">
           <button type="button" className="btn btn-sm" onClick={() => fileRef.current?.click()} disabled={!!ocr}>
-            📷 목차 사진으로 채우기
+            목차 사진으로 채우기
           </button>
           <input ref={fileRef} type="file" accept="image/*" multiple hidden onChange={(e) => e.target.files?.length && void readPhotos(e.target.files)} />
           {ocr && <span className="st-muted">{ocr}</span>}
@@ -298,7 +298,7 @@ function BookDetail({ id }: { id: string }) {
         </section>
       )}
 
-      {v && <Calendar v={v} today={today} color={color} />}
+      {v && <Calendar v={v} today={today} />}
 
       <section className="st-card">
         <h3 className="st-h">단원</h3>
@@ -342,7 +342,7 @@ function BookDetail({ id }: { id: string }) {
 }
 
 /** 이번 달·다음 달 달력: 날마다 배정 쪽 수 */
-function Calendar({ v, today, color }: { v: NonNullable<ReturnType<typeof planViews>[number]>; today: string; color?: string }) {
+function Calendar({ v, today }: { v: NonNullable<ReturnType<typeof planViews>[number]>; today: string }) {
   const [open, setOpen] = useState<string | null>(null);
   const map = new Map<string, { n: number; items: number[]; weight: number }>();
   if (v.sched.today.length) map.set(today, { n: v.sched.today.length, items: v.sched.today, weight: 1 });
@@ -368,7 +368,7 @@ function Calendar({ v, today, color }: { v: NonNullable<ReturnType<typeof planVi
           return (
             <button key={day} className={`st-cal-day ${cls}`} onClick={() => setOpen(day === open ? null : day)} aria-label={`${shortDate(day)} ${x?.n ?? 0}쪽`}>
               <span>{Number(day.slice(8))}</span>
-              {x && x.n > 0 && <i style={{ background: color }}>{x.n}</i>}
+              {x && x.n > 0 && <i>{x.n}</i>}
             </button>
           );
         })}

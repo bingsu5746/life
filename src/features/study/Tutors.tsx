@@ -66,7 +66,7 @@ export function Tutors() {
             </div>
             {questions.length > 0 && (
               <div className="st-questions">
-                <b>❓ 다음 수업에서 물어볼 것</b>
+                <b>다음 수업에서 물어볼 것</b>
                 <ul>
                   {questions.map((q, i) => (
                     <li key={i}>{q}</li>
@@ -124,7 +124,7 @@ function HwLine({ hw, iv }: { hw: Homework; iv: ReturnType<typeof homeworkViews>
         <div className={`st-item-title ${iv.finished ? 'done' : ''}`}>{title}</div>
         <div className="st-item-sub">
           {item.kind === 'pages' && !iv.finished && (iv.today.length ? `오늘 p.${rangeText(iv.today)} · ` : '') + `남은 ${iv.remaining.length}쪽`}
-          {item.question && ` ❓ ${item.question}`}
+          {item.question && ` · 질문: ${item.question}`}
         </div>
         {q !== null && (
           <form

@@ -57,7 +57,7 @@ export function Today() {
           <h2>{longDate(today)}</h2>
           {total > 0 && (
             <p className="st-sub">
-              {done === total ? '오늘 할 것 끝! 🎉' : `오늘 할 것 ${total - done}개 남음`} · 공부 {minutesText(studied)}
+              {done === total ? '오늘 할 것 끝' : `오늘 할 것 ${total - done}개 남음`} · 공부 {minutesText(studied)}
             </p>
           )}
         </div>
@@ -76,13 +76,13 @@ export function Today() {
           <p>문제집을 넣으면 시험(또는 정한 날)까지 하루 분량을 나눠 드려요.</p>
           <div className="st-row">
             <button className="btn btn-primary" onClick={() => go('/books/new')}>
-              📖 문제집 넣기
+              문제집 넣기
             </button>
             <button className="btn" onClick={() => go('/words/new')}>
-              🔤 영단어 넣기
+              영단어 넣기
             </button>
             <button className="btn" onClick={() => go('/tutor')}>
-              🧑‍🏫 과외 등록
+              과외 등록
             </button>
           </div>
         </Empty>
@@ -90,7 +90,7 @@ export function Today() {
 
       {hws.length > 0 && (
         <section className="st-card">
-          <h3 className="st-h">📌 과외 숙제</h3>
+          <h3 className="st-h">과외 숙제</h3>
           {hws.map((h) => (
             <HomeworkRow key={h.hw.id} h={h} today={today} />
           ))}
@@ -99,7 +99,7 @@ export function Today() {
 
       {bookPlans.length > 0 && (
         <section className="st-card">
-          <h3 className="st-h">📖 문제집</h3>
+          <h3 className="st-h">문제집</h3>
           {bookPlans.map((p) => (
             <BookRow key={p.plan.id} p={p} today={today} />
           ))}
@@ -108,7 +108,7 @@ export function Today() {
 
       {lists.length > 0 && (
         <section className="st-card">
-          <h3 className="st-h">🔤 영단어</h3>
+          <h3 className="st-h">영단어</h3>
           {lists.map((l) => {
             const n = l.fresh.length + l.due.length;
             const paperDays = l.list.kind === 'book' && l.todayDays.length > 0 && l.todayDays.every((x) => !l.words.some((w) => w.day === x));
@@ -144,7 +144,7 @@ export function Today() {
 
       {(notesDue.length > 0 || cardsDue.length > 0) && (
         <section className="st-card">
-          <h3 className="st-h">🔁 오늘 복습</h3>
+          <h3 className="st-h">오늘 복습</h3>
           <div className="st-item">
             <span className="st-badge">{notesDue.length + cardsDue.length}</span>
             <div className="st-item-main">
@@ -164,7 +164,7 @@ export function Today() {
 
       {(todos.length > 0 || habits.length > 0) && (
         <section className="st-card">
-          <h3 className="st-h">✅ 할 일 · 습관</h3>
+          <h3 className="st-h">할 일 · 습관</h3>
           {todos.map((t) => (
             <TodoRow key={t.id} t={t} today={today} />
           ))}
@@ -205,7 +205,7 @@ function HomeworkRow({ h, today }: { h: HomeworkView; today: string }) {
                 </div>
                 <div className="st-item-sub">
                   전체 p.{item.range && rangeText([item.range])} · {finished ? '다 했어요' : `남은 ${remaining.length}쪽`}
-                  {item.question && ` · ❓ ${item.question}`}
+                  {item.question && ` · 질문: ${item.question}`}
                 </div>
               </div>
             </div>
@@ -216,7 +216,7 @@ function HomeworkRow({ h, today }: { h: HomeworkView; today: string }) {
             <Check on={!!item.done} label="다 했어요" onClick={() => patchHwItem(h.hw.id, item.id, { done: !item.done })} />
             <div className="st-item-main">
               <div className={`st-item-title ${item.done ? 'done' : ''}`}>{item.text}</div>
-              {item.question && <div className="st-item-sub">❓ {item.question}</div>}
+              {item.question && <div className="st-item-sub">질문: {item.question}</div>}
             </div>
             {item.kind === 'words' && item.wordListId && (
               <button className="btn btn-sm" onClick={() => go(`/words/${item.wordListId}/learn`)}>
@@ -254,7 +254,7 @@ function BookRow({ p, today }: { p: PlanView; today: string }) {
             {book.name} {sched.today.length > 0 && <span className="st-pages">p.{rangeText(sched.today)}</span>}
           </div>
           <div className="st-item-sub">
-            {sched.today.length === 0 ? (sched.remaining.length ? '오늘은 쉬는 날' : '다 끝났어요 🎉') : `${sched.today.length}쪽${unitNames.length ? ' · ' + unitNames.join(', ') : ''}${unitEnd ? ' · 단원 끝 🎉' : ''}`}
+            {sched.today.length === 0 ? (sched.remaining.length ? '오늘은 쉬는 날' : '다 끝났어요') : `${sched.today.length}쪽${unitNames.length ? ' · ' + unitNames.join(', ') : ''}${unitEnd ? ' · 단원 끝 🎉' : ''}`}
             {sched.end && ` · ${shortDate(sched.end)}까지 ${sched.remaining.length}쪽`}
           </div>
           {plan.carried?.date === today && <div className="st-note">지난번 {plan.carried.count}쪽이 남아서 남은 날에 나눠 넣었어요</div>}
@@ -315,7 +315,7 @@ export function PlanWarning({ p }: { p: PlanView }) {
           : `하루 ${w.perDay}쪽이 필요해요 (처음 계획 ${w.baseline}쪽)`;
   return (
     <div className="st-warn" role="alert">
-      ⚠ {text}{' '}
+      {text}{' '}
       <button className="st-link" onClick={(e) => (e.stopPropagation(), go(`/books/${p.plan.targetId}`))}>
         계획 고치기
       </button>
@@ -329,7 +329,7 @@ function TodoRow({ t, today }: { t: Todo; today: string }) {
       <Check on={t.done} label="했어요" onClick={() => put('todos', { ...t, done: !t.done, doneAt: t.done ? undefined : Date.now() })} />
       <div className="st-item-main">
         <div className={`st-item-title ${t.done ? 'done' : ''}`}>
-          {t.star && '⭐ '}
+          {t.star && '★ '}
           {t.title}
         </div>
         {t.due && <div className={`st-item-sub ${t.due < today && !t.done ? 'bad' : ''}`}>{t.due < today ? `${shortDate(t.due)} 마감 지남` : t.due === today ? '오늘 마감' : shortDate(t.due)}</div>}
@@ -348,7 +348,7 @@ function HabitRow({ h, today }: { h: Habit; today: string }) {
         <div className={`st-item-title ${on ? 'done' : ''}`}>
           {h.icon} {h.name}
         </div>
-        <div className="st-item-sub">{s > 0 ? `🔥 ${s}일 연속` : '오늘부터 시작'}</div>
+        <div className="st-item-sub">{s > 0 ? `${s}일 연속` : '오늘부터 시작'}</div>
       </div>
     </div>
   );
@@ -409,7 +409,7 @@ function Week({ plans, today }: { plans: PlanView[]; today: string }) {
   return (
     <section className="st-card">
       <button className="st-fold" onClick={() => setOpen(!open)} aria-expanded={open}>
-        📅 다음 7일 미리 보기 <span>{open ? '▲' : '▼'}</span>
+        다음 7일 미리 보기 <span>{open ? '▲' : '▼'}</span>
       </button>
       {open && (
         <div className="st-week">

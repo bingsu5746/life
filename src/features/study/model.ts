@@ -300,7 +300,8 @@ export const REASONS: Record<WrongReason, string> = {
   etc: '기타',
 };
 
-export const SUBJECT_COLORS = ['#ff6b6b', '#ffa94d', '#ffd43b', '#69db7c', '#38d9a9', '#4dabf7', '#748ffc', '#da77f2', '#f783ac', '#adb5bd'];
+/** 과목 색: 흑백 화면에서 점·막대로만 조금 보이게, 채도를 낮춘 색 */
+export const SUBJECT_COLORS = ['#3f3f46', '#b4533c', '#4d7c5f', '#4a6a8f', '#8a6d3b', '#6b5b8c', '#3f7f7f', '#8c5a6e', '#71717a', '#a16207'];
 
 export function newId(): Id {
   const a = new Uint8Array(9);

@@ -203,7 +203,7 @@ function ListDetail({ id }: { id: string }) {
           </button>
           {list.kind === 'test' && (
             <button className={`btn ${v.prep ? 'btn-primary' : ''}`} disabled={!ws.length} onClick={() => go(`/words/${id}/prep`)}>
-              🎯 시험 대비 (전체 한 번씩)
+              시험 대비 (전체 한 번씩)
             </button>
           )}
           {weak.length > 0 && (
@@ -514,13 +514,13 @@ function ImportSheet({ list, existing, onClose }: { list: WordList; existing: Wo
     <Sheet title="단어 넣기" onClose={onClose} wide>
       <div className="st-seg">
         <button className={tab === 'pdf' ? 'on' : ''} onClick={() => setTab('pdf')}>
-          📄 PDF
+          PDF
         </button>
         <button className={tab === 'paste' ? 'on' : ''} onClick={() => setTab('paste')}>
-          📋 붙여넣기
+          붙여넣기
         </button>
         <button className={tab === 'photo' ? 'on' : ''} onClick={() => setTab('photo')}>
-          📷 사진
+          사진
         </button>
       </div>
       {tab === 'pdf' && (
@@ -665,17 +665,17 @@ function WordRun({ listId, mode }: { listId: string; mode: 'learn' | 'prep' | 'w
           <button className="st-back" onClick={() => go(`/words/${listId}`)} aria-label="돌아가기">
             ‹
           </button>
-          <h2>{mode === 'prep' ? '🎯 시험 대비' : mode === 'weak' ? '자주 틀리는 단어' : '오늘 외우기'}</h2>
+          <h2>{mode === 'prep' ? '시험 대비' : mode === 'weak' ? '자주 틀리는 단어' : '오늘 외우기'}</h2>
         </div>
         <div className="st-card st-form">
           <p className="st-sub">{list.name}</p>
           <Field group label="방식">
             <div className="st-seg">
               <button className={method === 'card' ? 'on' : ''} onClick={() => setMethod('card')}>
-                🃏 카드 넘기기
+                카드 넘기기
               </button>
               <button className={method === 'quiz' ? 'on' : ''} onClick={() => setMethod('quiz')}>
-                ✅ 객관식
+                객관식
               </button>
             </div>
           </Field>
@@ -709,7 +709,6 @@ function WordRun({ listId, mode }: { listId: string; mode: 'learn' | 'prep' | 'w
     return (
       <div className="st-page narrow">
         <div className="st-card st-done-card">
-          <div className="st-empty-icon">🎉</div>
           <h2>끝!</h2>
           <p>
             {total}단어 중 처음에 맞힌 것 {right}개 ({total ? Math.round((right / total) * 100) : 0}%)

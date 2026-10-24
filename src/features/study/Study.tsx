@@ -1,4 +1,4 @@
-// 📚 공부 도우미: 탭과 하위 화면 (설계 docs/superpowers/specs/2026-10-23-study-planner-design.md)
+// 공부 도우미: 탭과 하위 화면 (설계 docs/superpowers/specs/2026-10-23-study-planner-design.md)
 import { useEffect, useState } from 'react';
 import './study.css';
 import { Books } from './Books';
@@ -12,18 +12,18 @@ import { putMany, useStudy, useWords } from './store';
 import { Time } from './Time';
 import { Today } from './Today';
 import { Tutors } from './Tutors';
-import { go, Toaster, useToday } from './ui';
+import { go, Icon, Toaster, useToday } from './ui';
 import { Words } from './Words';
 
 const TABS = [
-  { key: 'today', icon: '☀️', label: '오늘' },
-  { key: 'books', icon: '📖', label: '문제집' },
-  { key: 'tutor', icon: '🧑‍🏫', label: '과외' },
-  { key: 'words', icon: '🔤', label: '영단어' },
-  { key: 'review', icon: '🔁', label: '복습' },
-  { key: 'time', icon: '⏱', label: '기록' },
-  { key: 'life', icon: '✅', label: '할 일·습관', short: '할 일' },
-  { key: 'settings', icon: '⚙️', label: '설정' },
+  { key: 'today', label: '오늘' },
+  { key: 'books', label: '문제집' },
+  { key: 'tutor', label: '과외' },
+  { key: 'words', label: '영단어' },
+  { key: 'review', label: '복습' },
+  { key: 'time', label: '기록' },
+  { key: 'life', label: '할 일·습관', short: '할 일' },
+  { key: 'settings', label: '설정' },
 ] as const;
 
 export function Study({ path, loggedIn, onLogin }: { path: string[]; loggedIn: boolean; onLogin: () => void }) {
@@ -58,9 +58,7 @@ export function Study({ path, loggedIn, onLogin }: { path: string[]; loggedIn: b
         <nav className="st-nav" aria-label="공부 메뉴">
           {TABS.map((t) => (
             <button key={t.key} className={`st-tab ${tab === t.key ? 'on' : ''}`} aria-current={tab === t.key ? 'page' : undefined} onClick={() => go(t.key === 'today' ? '/' : `/${t.key}`)}>
-              <span className="st-tab-icon" aria-hidden>
-                {t.icon}
-              </span>
+              <Icon name={t.key} />
               <span className="st-tab-label">{t.label}</span>
               <span className="st-tab-short">{'short' in t ? t.short : t.label}</span>
               {t.key === 'review' && reviewCount > 0 && <b className="st-count">{reviewCount}</b>}

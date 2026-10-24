@@ -107,10 +107,10 @@ export function Time() {
             </Field>
             <div className="st-seg">
               <button className={kind === 'pomo' ? 'on' : ''} onClick={() => setKind('pomo')}>
-                🍅 뽀모도로 {pomo.work}/{pomo.short}분
+                뽀모도로 {pomo.work}/{pomo.short}분
               </button>
               <button className={kind === 'watch' ? 'on' : ''} onClick={() => setKind('watch')}>
-                ⏱ 스톱워치
+                스톱워치
               </button>
             </div>
             <button className="btn btn-primary btn-lg" onClick={begin}>
@@ -141,15 +141,15 @@ export function Time() {
               {!v!.finished &&
                 (timer.runningSince === null ? (
                   <button className="btn btn-lg" onClick={() => update(resume(timer, Date.now()))}>
-                    ▶ 계속
+                    계속
                   </button>
                 ) : (
                   <button className="btn btn-lg" onClick={() => update(pause(timer, Date.now()))}>
-                    ⏸ 멈춤
+                    멈춤
                   </button>
                 ))}
               <button className="btn btn-lg" onClick={stop}>
-                ■ 끝내고 기록
+                끝내고 기록
               </button>
             </div>
             <p className="st-hint center">폰에서 다른 앱에 가 있으면 알림음이 늦게 날 수 있어요. 돌아오면 시간은 맞게 보여요.</p>

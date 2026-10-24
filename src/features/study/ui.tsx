@@ -148,24 +148,42 @@ export function Field({ label, hint, children, group }: { label: string; hint?: 
   );
 }
 
-export function Bar({ value, max, color }: { value: number; max: number; color?: string }) {
+/** 진행 막대 (흑백 디자인이라 색은 받지 않고 늘 검은색) */
+export function Bar({ value, max }: { value: number; max: number; color?: string }) {
   const pct = max > 0 ? Math.min(100, (value / max) * 100) : 0;
   return (
     <div className="st-bar" role="progressbar" aria-valuenow={value} aria-valuemax={max}>
-      <i style={{ width: `${pct}%`, background: color }} />
+      <i style={{ width: `${pct}%` }} />
     </div>
   );
 }
 
-export function Empty({ icon, title, children }: { icon: string; title: string; children?: ReactNode }) {
+export function Empty({ title, children }: { icon?: string; title: string; children?: ReactNode }) {
   return (
     <div className="st-empty">
-      <div className="st-empty-icon" aria-hidden>
-        {icon}
-      </div>
       <strong>{title}</strong>
       {children}
     </div>
+  );
+}
+
+const ICON_PATHS: Record<string, string> = {
+  today: 'M12 4v2M12 18v2M4 12h2M18 12h2M6.3 6.3l1.4 1.4M16.3 16.3l1.4 1.4M6.3 17.7l1.4-1.4M16.3 7.7l1.4-1.4M12 8.5a3.5 3.5 0 1 0 0 7 3.5 3.5 0 0 0 0-7z',
+  books: 'M4 5.5C4 4.7 4.7 4 5.5 4H11v16H5.5C4.7 20 4 19.3 4 18.5zM13 4h5.5c.8 0 1.5.7 1.5 1.5v13c0 .8-.7 1.5-1.5 1.5H13z',
+  tutor: 'M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM4.5 20c.8-3.5 3.8-6 7.5-6s6.7 2.5 7.5 6',
+  words: 'M3.5 18L8 6l4.5 12M5.2 13.5h5.6M15 10.5c.7-.6 1.5-.9 2.5-.9 1.7 0 3 1 3 3V18M20.5 14.5c-1-.4-2-.5-3-.4-1.6.2-2.6 1-2.6 2.2 0 1.1.9 1.8 2.1 1.8 1.6 0 2.8-.9 3.5-2.2',
+  review: 'M4 12a8 8 0 0 1 13.7-5.7L20 8.5M20 4v4.5h-4.5M20 12a8 8 0 0 1-13.7 5.7L4 15.5M4 20v-4.5h4.5',
+  time: 'M12 21a8.5 8.5 0 1 0 0-17 8.5 8.5 0 0 0 0 17zM12 8v4.5l3 2',
+  life: 'M5 4h14a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1zM8 12l2.8 2.8L16.5 9',
+  settings: 'M4 7h9M17 7h3M4 17h3M11 17h9M15 5v4M9 15v4',
+};
+
+/** 선 아이콘 (24×24) */
+export function Icon({ name }: { name: string }) {
+  return (
+    <svg className="st-icon" viewBox="0 0 24 24" aria-hidden>
+      <path d={ICON_PATHS[name] ?? ''} />
+    </svg>
   );
 }
 

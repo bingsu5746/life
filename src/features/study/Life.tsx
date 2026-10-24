@@ -180,7 +180,7 @@ function Habits({ today }: { today: string }) {
                 );
               })}
               <span className="st-streak" title={`최고 ${bestStreak(h, today)}일`}>
-                🔥{streak(h, today)}
+                {streak(h, today)}일
               </span>
             </div>
           ))}
