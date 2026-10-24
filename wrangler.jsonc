@@ -5,6 +5,8 @@
   "name": "life",
   "compatibility_date": "2026-09-26",
   "main": "worker/index.ts",
+  // 배포할 때 life.<계정>.workers.dev 주소를 켠다
+  "workers_dev": true,
   "assets": {
     "directory": "./dist",
     "binding": "ASSETS",
