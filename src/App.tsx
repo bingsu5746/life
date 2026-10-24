@@ -1,7 +1,7 @@
 // 내 공부: 맨 위 막대(이름·로그인) + 공부 도우미 화면. 주소는 #/오늘·문제집… (src/features/study/Study.tsx)
 import { useEffect, useState } from 'react';
+import { AccountSheet } from './features/auth/AccountSheet';
 import { LoginModal } from './features/auth/LoginModal';
-import { logout } from './features/auth/api';
 import { getSyncStatus, onSyncStatus, syncAll, type SyncStatus } from './features/auth/sync';
 import { displayName, useAuth } from './features/auth/useAuth';
 import { Study } from './features/study/Study';
@@ -26,6 +26,7 @@ export default function App() {
   const [path, setPath] = useState(parse);
   const auth = useAuth();
   const [loginOpen, setLoginOpen] = useState(false);
+  const [accountOpen, setAccountOpen] = useState(false);
   const [sync, setSync] = useState(getSyncStatus);
   useEffect(() => onSyncStatus(setSync), []);
   useEffect(() => {
@@ -51,10 +52,12 @@ export default function App() {
         <div className="account">
           {auth.user ? (
             <>
-              <span className={`sync-dot ${sync}`} title={SYNC_TEXT[sync]} aria-label={SYNC_TEXT[sync]} />
-              <span className="user-name">{displayName(auth.user)}</span>
-              <button className="btn btn-sm" onClick={() => void logout()}>
-                로그아웃
+              <button className="account-btn" onClick={() => setAccountOpen(true)} aria-label={`계정: ${displayName(auth.user)} (${SYNC_TEXT[sync]})`} title={SYNC_TEXT[sync]}>
+                <span className={`sync-dot ${sync}`} />
+                <span className="user-name">{displayName(auth.user)}</span>
+                <span className="avatar" aria-hidden>
+                  {displayName(auth.user).slice(0, 1).toUpperCase()}
+                </span>
               </button>
             </>
           ) : (
@@ -66,6 +69,7 @@ export default function App() {
       </header>
       <Study path={path} loggedIn={!!auth.user} onLogin={() => setLoginOpen(true)} />
       {loginOpen && <LoginModal onClose={() => setLoginOpen(false)} />}
+      {accountOpen && auth.user && <AccountSheet user={auth.user} onClose={() => setAccountOpen(false)} />}
     </div>
   );
 }

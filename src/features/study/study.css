@@ -2322,3 +2322,31 @@ input[type='range'] {
 .st-page-wrap {
   min-width: 0;
 }
+
+/* 타이머가 도는 중이면 「기록」 탭 옆에 남은 시간 */
+.st-timechip {
+  margin-left: auto;
+  font-size: 0.74rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+}
+
+@media (max-width: 860px) {
+  .st-timechip {
+    position: absolute;
+    top: -2px;
+    left: 50%;
+    transform: translateX(-50%);
+    margin: 0;
+    padding: 0 5px;
+    border-radius: 6px;
+    background: var(--accent);
+    color: var(--on-accent);
+    font-size: 0.6rem;
+  }
+}
+
+.st-sheet-body > .st-link {
+  justify-self: start;
+}

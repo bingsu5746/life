@@ -48,11 +48,11 @@ export function LoginModal({ onClose }: { onClose: () => void }) {
           </Field>
         )}
         <Field label="비밀번호">
-          <input className="st-input" type="password" autoComplete={mode === 'login' ? 'current-password' : 'new-password'} minLength={6} value={password} onChange={(e) => setPassword(e.target.value)} required />
+          <input className="st-input" type="password" autoComplete={mode === 'login' ? 'current-password' : 'new-password'} minLength={mode === 'signup' ? 8 : 1} value={password} onChange={(e) => setPassword(e.target.value)} required />
         </Field>
         {mode === 'signup' && (
           <Field label="비밀번호 확인">
-            <input className="st-input" type="password" autoComplete="new-password" minLength={6} value={password2} onChange={(e) => setPassword2(e.target.value)} required />
+            <input className="st-input" type="password" autoComplete="new-password" minLength={8} value={password2} onChange={(e) => setPassword2(e.target.value)} required />
           </Field>
         )}
         {error && (
@@ -66,7 +66,7 @@ export function LoginModal({ onClose }: { onClose: () => void }) {
       </form>
       <p className="st-hint">
         {mode === 'signup'
-          ? '아이디는 3~16자의 한글·영문·숫자·_ , 비밀번호는 6자 이상이에요. 이메일은 받지 않아서 비밀번호를 잊으면 찾을 수 없으니 꼭 기억해 주세요.'
+          ? '아이디는 3~16자의 한글·영문·숫자·_ , 비밀번호는 8자 이상이에요. 이메일은 받지 않아서 비밀번호를 잊으면 찾을 수 없으니 꼭 기억해 주세요.'
           : '로그인하면 공부 자료가 서버에 저장돼서 폰·PC 어디서든 같이 볼 수 있어요.'}
       </p>
     </Sheet>

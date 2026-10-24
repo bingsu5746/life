@@ -1,50 +1,12 @@
 // 공부 타이머 · 기록 (설계 §10)
-import { useEffect, useRef, useState } from 'react';
+import { useState } from 'react';
 import { addDays, daysBetween, shortDate, weekStart, WEEKDAYS } from './dates';
 import { alive, type StudySession } from './model';
 import { addSession } from './actions';
 import { put, remove, useStudy } from './store';
+import { askNotify, loadTimer, saveTimer } from './timerStore';
 import { clock, finish, minutesText, nextPhase, pause, resume, start, view, type TimerState } from './timer';
 import { Bar, Field, go, Sheet, SubjectDot, SubjectPicker, subjectsOf, toast, useNow, useToday } from './ui';
-
-const TIMER_KEY = 'my-study.study.timer.v1';
-
-function loadTimer(): TimerState | null {
-  try {
-    return JSON.parse(localStorage.getItem(TIMER_KEY) ?? 'null');
-  } catch {
-    return null;
-  }
-}
-function saveTimer(t: TimerState | null) {
-  try {
-    if (t) localStorage.setItem(TIMER_KEY, JSON.stringify(t));
-    else localStorage.removeItem(TIMER_KEY);
-  } catch {
-    /* 무시 */
-  }
-}
-
-/** 짧은 알림음 (화면이 켜져 있을 때만) */
-function beep() {
-  try {
-    const ctx = new AudioContext();
-    const o = ctx.createOscillator();
-    const g = ctx.createGain();
-    o.connect(g);
-    g.connect(ctx.destination);
-    o.frequency.value = 880;
-    g.gain.setValueAtTime(0.0001, ctx.currentTime);
-    g.gain.exponentialRampToValueAtTime(0.25, ctx.currentTime + 0.02);
-    g.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.6);
-    o.start();
-    o.stop(ctx.currentTime + 0.65);
-    setTimeout(() => void ctx.close(), 1000);
-    navigator.vibrate?.([200, 100, 200]);
-  } catch {
-    /* 소리를 낼 수 없는 환경 */
-  }
-}
 
 /** sub: 'manual' 이면 공부 시간 직접 넣기 창 (「＋」에서 올 때) */
 export function Time({ sub }: { sub?: string }) {
@@ -57,26 +19,14 @@ export function Time({ sub }: { sub?: string }) {
   const [manual, setManual] = useState(sub === 'manual');
   const pomo = d.settings.pomo;
   const v = timer ? view(timer, now, pomo) : null;
-  const rang = useRef(false);
   const update = (t: TimerState | null) => {
     setTimer(t);
     saveTimer(t);
   };
 
-  useEffect(() => {
-    if (v?.finished && !rang.current) {
-      rang.current = true;
-      if (v.overMs < 5000) beep();
-    }
-    if (!v?.finished) rang.current = false;
-  }, [v?.finished, v?.overMs]);
-
-  useEffect(() => {
-    document.title = v && timer ? `${clock(v.shownMs)} ${timer.phase === 'work' ? '공부' : '휴식'} · 공부` : document.title;
-  });
-
   function begin() {
     if (!subjectId) return toast('과목을 골라 주세요');
+    askNotify();
     update(start(kind, d.subjects[subjectId]?.name ?? '', Date.now(), subjectId));
   }
   function stop() {

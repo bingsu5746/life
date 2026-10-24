@@ -99,6 +99,21 @@ export function removeWords(ids: Id[]) {
   save('words');
 }
 
+/** 이 기기의 공부 자료를 모두 지운다 (로그아웃할 때 고르면, 다른 계정이 이 기기에서 로그인할 때) */
+export async function resetLocal() {
+  study = normalize(null);
+  words = {};
+  save('study', true);
+  save('words', true);
+  try {
+    for (const k of Object.keys(localStorage)) if (k.startsWith('my-study.') && !k.startsWith('my-study.logged-in') && k !== 'my-study.theme') localStorage.removeItem(k);
+  } catch {
+    // 무시
+  }
+  const { idb } = await import('../../lib/idb');
+  await idb.clear('studyPhotos');
+}
+
 /** 계정 동기화가 합친 자료를 넣는다 (다시 올리지 않게 조용히) */
 export function replaceStudy(d: StudyData) {
   study = normalize(d);

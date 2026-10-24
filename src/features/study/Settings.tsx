@@ -2,8 +2,10 @@
 import { useState } from 'react';
 import { dday, shortDate } from './dates';
 import { alive, newId, SUBJECT_COLORS, type Subject } from './model';
-import { put, remove, setSettings, useStudy } from './store';
-import { confirmDelete, Field, subjectsOf, useToday, WeekdayPicker } from './ui';
+import { exportBackup, importBackup } from './backup';
+import { getTheme, setTheme, type Theme } from '../../lib/theme';
+import { put, remove, resetLocal, setSettings, useStudy } from './store';
+import { confirmDelete, Field, subjectsOf, toast, useToday, WeekdayPicker } from './ui';
 
 export function Settings() {
   const d = useStudy();
@@ -12,6 +14,7 @@ export function Settings() {
   const [off, setOff] = useState(today);
   const [exam, setExam] = useState({ name: '', date: today });
   const [subj, setSubj] = useState('');
+  const [theme, setThemeState] = useState<Theme>(getTheme);
   const subjects = subjectsOf(d);
   const exams = alive(d.exams).sort((a, b) => a.date.localeCompare(b.date));
   const num = (v: string, lo: number, hi: number, fb: number) => {
@@ -167,6 +170,58 @@ export function Settings() {
             </label>
           ))}
         </div>
+      </section>
+      <section className="st-card st-form">
+        <h3 className="st-h">화면</h3>
+        <div className="st-seg" role="radiogroup" aria-label="화면 밝기">
+          {(
+            [
+              ['system', '기기 설정'],
+              ['light', '밝게'],
+              ['dark', '어둡게'],
+            ] as const
+          ).map(([k, label]) => (
+            <button key={k} role="radio" aria-checked={theme === k} className={theme === k ? 'on' : ''} onClick={() => (setTheme(k), setThemeState(k))}>
+              {label}
+            </button>
+          ))}
+        </div>
+      </section>
+
+      <section className="st-card st-form">
+        <h3 className="st-h">백업</h3>
+        <p className="st-hint">공부 자료와 단어를 파일 하나로 내려받아요 (오답 사진은 빠져요). 다시 넣으면 지금 자료와 합쳐져요.</p>
+        <div className="st-row">
+          <button className="btn btn-sm" onClick={exportBackup}>
+            백업 파일 내려받기
+          </button>
+          <label className="btn btn-sm">
+            백업에서 가져오기
+            <input
+              type="file"
+              accept="application/json,.json"
+              hidden
+              onChange={(e) => {
+                const f = e.target.files?.[0];
+                e.target.value = '';
+                if (f)
+                  void importBackup(f).then(
+                    (r) => toast(`백업을 합쳤어요 (단어 ${r.words}개)`),
+                    (err: Error) => toast(err.message),
+                  );
+              }}
+            />
+          </label>
+        </div>
+        <button
+          className="st-link st-danger"
+          onClick={() => {
+            if (!window.confirm('이 기기에 저장된 공부 자료를 모두 지울까요? (로그인했다면 계정 자료는 남아요)')) return;
+            void resetLocal().then(() => toast('이 기기의 자료를 지웠어요'));
+          }}
+        >
+          이 기기의 자료 모두 지우기
+        </button>
       </section>
       <p className="st-hint center">로그인하면 공부 자료가 폰·PC 에서 같이 보여요. 로그인하지 않으면 이 기기에만 저장돼요.</p>
     </div>

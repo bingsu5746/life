@@ -11,6 +11,7 @@ import { pendingLocks } from './select';
 import { Settings } from './Settings';
 import { putMany, useStudy, useWords } from './store';
 import { Time } from './Time';
+import { useTimerAlarm } from './timerStore';
 import { Today } from './Today';
 import { Tutors } from './Tutors';
 import { go, Icon, Toaster, useToday } from './ui';
@@ -33,6 +34,7 @@ export function Study({ path, loggedIn, onLogin }: { path: string[]; loggedIn: b
   const today = useToday();
   const tab = TABS.some((t) => t.key === path[0]) ? path[0] : 'today';
   const [, id, sub] = path;
+  const alarm = useTimerAlarm();
 
   // 오늘 분량을 오늘 처음 볼 때 고정한다 (설계 §5.4)
   useEffect(() => {
@@ -63,6 +65,7 @@ export function Study({ path, loggedIn, onLogin }: { path: string[]; loggedIn: b
               <span className="st-tab-label">{t.label}</span>
               <span className="st-tab-short">{'short' in t ? t.short : t.label}</span>
               {t.key === 'review' && reviewCount > 0 && <b className="st-count">{reviewCount}</b>}
+              {t.key === 'time' && alarm.shown && tab !== 'time' && <b className="st-timechip">{alarm.shown}</b>}
             </button>
           ))}
         </nav>

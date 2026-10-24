@@ -1,7 +1,7 @@
 // 오답 노트 사진 (설계 §8.4): 기기에서 줄여서 IndexedDB 에 두고, 로그인했으면 서버에도 올린다.
 // 다른 기기에서는 볼 때 받아 온다.
 import { idb } from '../../lib/idb';
-import { deleteStudyPhoto, getStudyPhoto, getToken, putStudyPhoto } from '../auth/api';
+import { deleteStudyPhoto, getStudyPhoto, isLoggedIn, putStudyPhoto } from '../auth/api';
 import { newId, type Id } from './model';
 
 const MAX_SIDE = 1600;
@@ -47,7 +47,7 @@ export async function addPhoto(file: Blob): Promise<{ id: Id; error?: string }> 
   const id = newId();
   const blob = await shrink(file);
   await idb.put('studyPhotos', id, blob);
-  if (getToken()) {
+  if (isLoggedIn()) {
     try {
       await putStudyPhoto(id, await toB64(blob));
     } catch (e) {
@@ -64,7 +64,7 @@ export async function photoUrl(id: Id): Promise<string | null> {
   const cached = urls.get(id);
   if (cached) return cached;
   let blob = await idb.get<Blob>('studyPhotos', id);
-  if (!blob && getToken()) {
+  if (!blob && isLoggedIn()) {
     try {
       blob = fromB64(await getStudyPhoto(id));
       await idb.put('studyPhotos', id, blob);
@@ -83,5 +83,5 @@ export async function removePhoto(id: Id) {
   const u = urls.get(id);
   if (u) URL.revokeObjectURL(u);
   urls.delete(id);
-  if (getToken()) await deleteStudyPhoto(id).catch(() => undefined);
+  if (isLoggedIn()) await deleteStudyPhoto(id).catch(() => undefined);
 }

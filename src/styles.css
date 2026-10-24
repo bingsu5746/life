@@ -23,8 +23,9 @@
   -webkit-font-smoothing: antialiased;
 }
 
+/* 어두운 화면: 기기 설정을 따르고, 설정 화면에서 직접 고를 수도 있다 (main.tsx 가 data-theme 을 붙임) */
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-theme='light']) {
     --bg: #0a0a0a;
     --surface: #141414;
     --soft: #1f1f1f;
@@ -40,6 +41,23 @@
     --warn: #facc15;
     color-scheme: dark;
   }
+}
+
+:root[data-theme='dark'] {
+  --bg: #0a0a0a;
+  --surface: #141414;
+  --soft: #1f1f1f;
+  --softer: #181818;
+  --line: #262626;
+  --line-strong: #3a3a3a;
+  --text: #fafafa;
+  --muted: #a1a1aa;
+  --faint: #71717a;
+  --accent: #fafafa;
+  --on-accent: #0a0a0a;
+  --bad: #fb923c;
+  --warn: #facc15;
+  color-scheme: dark;
 }
 
 * {
@@ -213,4 +231,34 @@ button:disabled {
   .user-name {
     display: none;
   }
+}
+
+.account-btn {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border: 0;
+  background: none;
+  padding: 4px;
+  border-radius: 999px;
+}
+
+.account-btn:hover .avatar {
+  opacity: 0.85;
+}
+
+.avatar {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: var(--accent);
+  color: var(--on-accent);
+  font-weight: 700;
+  font-size: 0.85rem;
+}
+
+.st-addrow.danger b {
+  color: var(--bad);
 }

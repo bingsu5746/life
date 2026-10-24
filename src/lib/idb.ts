@@ -36,5 +36,6 @@ export const idb = {
   get: <T>(store: StoreName, key: string) => run<T | undefined>(store, 'readonly', (s) => s.get(key) as IDBRequest<T | undefined>).catch(() => undefined),
   put: <T>(store: StoreName, key: string, value: T) => run(store, 'readwrite', (s) => s.put(value, key)).catch(() => undefined),
   del: (store: StoreName, key: string) => run(store, 'readwrite', (s) => s.delete(key)).catch(() => undefined),
+  clear: (store: StoreName) => run(store, 'readwrite', (s) => s.clear()).catch(() => undefined),
   keys: (store: StoreName) => run<IDBValidKey[]>(store, 'readonly', (s) => s.getAllKeys()).then((k) => k.map(String)).catch(() => [] as string[]),
 };

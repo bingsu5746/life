@@ -1,4 +1,6 @@
-// 로그인 서버(worker/accounts.ts)와 이야기하는 부분. 로그인 토큰은 이 기기(localStorage)에 저장한다.
+// 로그인 서버(worker/accounts.ts)와 이야기하는 부분.
+// 로그인 토큰은 서버가 HttpOnly 쿠키로만 주고 받는다 (이 페이지의 자바스크립트는 토큰을 볼 수 없음).
+// 이 기기에는 「로그인했는지」 표시와 계정 id(자료 주인 확인용)만 남긴다.
 
 export interface Account {
   id: string;
@@ -6,19 +8,23 @@ export interface Account {
   nickname: string;
 }
 
-const TOKEN_KEY = 'my-study.session.v1';
+const FLAG_KEY = 'my-study.logged-in.v2';
 
-export function getToken(): string | null {
+function readFlag(): string | null {
   try {
-    return localStorage.getItem(TOKEN_KEY);
+    return localStorage.getItem(FLAG_KEY);
   } catch {
     return null;
   }
 }
-function setToken(t: string | null) {
+/** 로그인했다고 기억하고 있는지 (진짜 확인은 서버의 /api/me) */
+export const isLoggedIn = () => !!readFlag();
+export const loggedInUserId = () => readFlag();
+
+function setFlag(userId: string | null) {
   try {
-    if (t) localStorage.setItem(TOKEN_KEY, t);
-    else localStorage.removeItem(TOKEN_KEY);
+    if (userId) localStorage.setItem(FLAG_KEY, userId);
+    else localStorage.removeItem(FLAG_KEY);
   } catch {
     // 저장할 수 없는 환경
   }
@@ -35,12 +41,12 @@ export class ApiError extends Error {
 }
 
 async function call<T>(path: string, method = 'GET', body?: unknown): Promise<T> {
-  const token = getToken();
   let res: Response;
   try {
     res = await fetch(`/api/${path}`, {
       method,
-      headers: { 'content-type': 'application/json', ...(token ? { authorization: `Bearer ${token}` } : {}) },
+      credentials: 'same-origin',
+      headers: body === undefined ? {} : { 'content-type': 'application/json' },
       body: body === undefined ? undefined : JSON.stringify(body),
     });
   } catch {
@@ -53,30 +59,46 @@ async function call<T>(path: string, method = 'GET', body?: unknown): Promise<T>
     throw new ApiError('서버에 연결할 수 없어요.', res.status);
   }
   if (!res.ok) {
-    if (res.status === 401 && token && path !== 'auth/login') setToken(null); // 로그인이 풀림
+    // 로그인이 풀림 (비밀번호가 틀린 것은 401 이 아니라 403 으로 온다: 로그인 화면 빼고)
+    if (res.status === 401 && path !== 'auth/login' && readFlag()) setFlag(null);
     throw new ApiError(data.error ?? '오류가 났어요.', res.status);
   }
   return data;
 }
 
 export async function signup(username: string, password: string, nickname: string) {
-  const r = await call<{ token: string; user: Account }>('auth/signup', 'POST', { username, password, nickname });
-  setToken(r.token);
+  const r = await call<{ user: Account }>('auth/signup', 'POST', { username, password, nickname });
+  setFlag(r.user.id);
   return r.user;
 }
 export async function login(username: string, password: string) {
-  const r = await call<{ token: string; user: Account }>('auth/login', 'POST', { username, password });
-  setToken(r.token);
+  const r = await call<{ user: Account }>('auth/login', 'POST', { username, password });
+  setFlag(r.user.id);
   return r.user;
 }
-export async function logout() {
+export async function logout(everywhere = false) {
   try {
-    await call('auth/logout', 'POST', {});
+    await call(everywhere ? 'auth/logout-all' : 'auth/logout', 'POST', {});
   } finally {
-    setToken(null);
+    setFlag(null);
   }
 }
-export const me = () => call<{ user: Account }>('me').then((r) => r.user);
+export async function me() {
+  try {
+    const user = (await call<{ user: Account }>('me')).user;
+    if (readFlag() !== user.id) setFlag(user.id);
+    return user;
+  } catch (e) {
+    if (e instanceof ApiError && e.status === 401) setFlag(null);
+    throw e;
+  }
+}
+export const changeNickname = (nickname: string) => call<{ user: Account }>('me/nickname', 'PUT', { nickname }).then((r) => r.user);
+export const changePassword = (current: string, password: string) => call('me/password', 'PUT', { current, password });
+export async function deleteAccount(password: string) {
+  await call('me', 'DELETE', { password });
+  setFlag(null);
+}
 
 // ===== 기기끼리 맞추는 묶음 자료 (gzip 으로 줄여 base64 글자로 보낸다) =====
 async function gzipB64(text: string): Promise<string> {
