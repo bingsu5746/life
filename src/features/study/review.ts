@@ -1,0 +1,40 @@
+// 다시 보기 상자 (설계 §9.1, §9.7). 오답·암기 카드·영단어가 함께 쓴다.
+import { addDays, diffDays } from './dates';
+import type { DateStr, Review } from './model';
+
+export type Via = 'card' | 'quiz' | 'redo';
+
+/**
+ * 맞혔는지에 따라 다음 상자와 날짜.
+ * - 맞히면 다음 상자, 5번 상자에서 맞히면 익힘.
+ * - 객관식(quiz)으로는 quizMaxBox 까지만 오른다 (보기에서 고르기는 떠올리기보다 쉬움).
+ * - 틀리면 1번 상자, 내일.
+ */
+export function answer<T extends Review>(item: T, correct: boolean, via: Via, today: DateStr, intervals: number[], quizMaxBox = 3): T {
+  if (!correct) return { ...item, box: 1, due: addDays(today, intervals[0] ?? 1), wrong: item.wrong + 1, learned: false };
+  let box = item.box + 1;
+  if (via === 'quiz') box = Math.min(box, Math.max(item.box, quizMaxBox));
+  if (box > intervals.length) return { ...item, box: intervals.length, due: addDays(today, intervals[intervals.length - 1]), learned: true };
+  return { ...item, box, due: addDays(today, intervals[box - 1]), learned: false };
+}
+
+/** 오늘 다시 볼 것인지 */
+export const isDue = (r: Review, today: DateStr) => r.box > 0 && !r.learned && r.due <= today;
+
+/**
+ * 오늘 복습 목록: 오래 밀린 것부터. 100개가 넘게 밀렸으면 오늘은 50개만 (나머지는 내일).
+ */
+export function dueToday<T extends Review>(items: T[], today: DateStr, cap = 50, flood = 100): T[] {
+  const due = items.filter((r) => isDue(r, today)).sort((a, b) => a.due.localeCompare(b.due) || a.box - b.box);
+  return due.length > flood ? due.slice(0, cap) : due;
+}
+
+export const BOX_LABEL = ['새로', '1일', '3일', '7일', '14일', '30일'];
+
+/** 3일 뒤 · 내일 · 오늘 */
+export function dueText(r: Review, today: DateStr): string {
+  if (r.learned) return '익힘';
+  if (r.box === 0) return '아직 안 봄';
+  const n = diffDays(today, r.due);
+  return n <= 0 ? '오늘' : n === 1 ? '내일' : `${n}일 뒤`;
+}
