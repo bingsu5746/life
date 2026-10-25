@@ -1,5 +1,5 @@
 // 공부 화면들이 같이 쓰는 작은 부품
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type InputHTMLAttributes, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from 'react';
 import { studyDate, WEEKDAYS } from './dates';
 import { alive, newId, SUBJECT_COLORS, type Id, type StudyData, type Subject } from './model';
 import { put, useStudy } from './store';
@@ -103,18 +103,45 @@ export function WeekdayPicker({ value, onChange, label }: { value: number[]; onC
   );
 }
 
+const FOCUSABLE = 'a[href], button:not([disabled]), input:not([disabled]):not([type=hidden]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+
 /** 아래에서 올라오는 창 (폰) / 가운데 창 (PC) */
 export function Sheet({ title, onClose, children, wide }: { title: string; onClose: () => void; children: ReactNode; wide?: boolean }) {
   const ref = useRef<HTMLDivElement>(null);
+  // 부르는 쪽이 그릴 때마다 새 onClose 를 넘겨도 창을 처음 열 때만 칸에 커서를 둔다 (1초마다 커서가 튀지 않게)
+  const closeRef = useRef(onClose);
   useEffect(() => {
-    const key = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
+    closeRef.current = onClose;
+  });
+  useEffect(() => {
+    const before = document.activeElement as HTMLElement | null;
+    const key = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') return closeRef.current();
+      if (e.key !== 'Tab' || !ref.current) return;
+      // 창 안에서만 Tab 이 돌게
+      const items = [...ref.current.querySelectorAll<HTMLElement>(FOCUSABLE)].filter((x) => x.offsetParent !== null);
+      if (!items.length) return;
+      const first = items[0];
+      const last = items[items.length - 1];
+      if (e.shiftKey && (document.activeElement === first || !ref.current.contains(document.activeElement))) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && (document.activeElement === last || !ref.current.contains(document.activeElement))) {
+        e.preventDefault();
+        first.focus();
+      }
+    };
     window.addEventListener('keydown', key);
-    ref.current?.querySelector<HTMLElement>('input, textarea, select')?.focus();
-    return () => window.removeEventListener('keydown', key);
-  }, [onClose]);
+    if (!ref.current?.contains(document.activeElement)) (ref.current?.querySelector<HTMLElement>('input:not([hidden]):not([type=file]):not([type=checkbox]), textarea, select') ?? ref.current)?.focus();
+    return () => {
+      window.removeEventListener('keydown', key);
+      // 닫으면 연 단추로 돌아간다
+      if (before && before.isConnected && before !== document.body) before.focus();
+    };
+  }, []);
   return (
     <div className="st-sheet-bg" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
-      <div className={`st-sheet ${wide ? 'wide' : ''}`} role="dialog" aria-modal="true" aria-label={title} ref={ref}>
+      <div className={`st-sheet ${wide ? 'wide' : ''}`} role="dialog" aria-modal="true" aria-label={title} ref={ref} tabIndex={-1}>
         <header>
           <h3>{title}</h3>
           <button className="st-x" onClick={onClose} aria-label="닫기">
@@ -149,10 +176,10 @@ export function Field({ label, hint, children, group }: { label: string; hint?: 
 }
 
 /** 진행 막대 (흑백 디자인이라 색은 받지 않고 늘 검은색) */
-export function Bar({ value, max }: { value: number; max: number; color?: string }) {
+export function Bar({ value, max, label = '진행' }: { value: number; max: number; label?: string }) {
   const pct = max > 0 ? Math.min(100, (value / max) * 100) : 0;
   return (
-    <div className="st-bar" role="progressbar" aria-valuenow={value} aria-valuemax={max}>
+    <div className="st-bar" role="progressbar" aria-label={label} aria-valuemin={0} aria-valuenow={value} aria-valuemax={max}>
       <i style={{ width: `${pct}%` }} />
     </div>
   );
@@ -201,8 +228,99 @@ export function Check({ on, onClick, label, color }: { on: boolean; onClick: () 
   );
 }
 
-export function confirmDelete(what: string) {
-  return window.confirm(`${what}을(를) 지울까요?`);
+/** 받침이 있는지 (한글·숫자만 알 수 있다. 모르면 null) */
+function hasBatchim(word: string): boolean | null {
+  const s = word.replace(/[\s」』"'’)\].,!?…]+$/u, '');
+  const ch = s.slice(-1);
+  if (!ch) return null;
+  const c = ch.charCodeAt(0);
+  if (c >= 0xac00 && c <= 0xd7a3) return (c - 0xac00) % 28 !== 0;
+  // 0 영 · 1 일 · 3 삼 · 6 육 · 7 칠 · 8 팔 은 받침이 있다
+  if (/[0-9]/.test(ch)) return '013678'.includes(ch);
+  return null;
+}
+
+/** 낱말 뒤에 붙는 조사: josa('수학', '을', '를') → '을'. 받침을 모르면 「을(를)」 */
+export function josa(word: string, withBatchim: string, without: string): string {
+  const b = hasBatchim(word);
+  return b === null ? `${withBatchim}(${without})` : b ? withBatchim : without;
+}
+
+export function confirmDelete(what: string, extra = '') {
+  return window.confirm(`${what}${josa(what, '을', '를')} 지울까요?${extra ? '\n' + extra : ''}`);
+}
+
+/** 줄 전체를 누를 수 있는 곳 (div): 키보드 Enter·스페이스로도 누를 수 있게 */
+export function tap(onClick: () => void) {
+  return {
+    role: 'button' as const,
+    tabIndex: 0,
+    onClick,
+    onKeyDown: (e: ReactKeyboardEvent) => {
+      if (e.target !== e.currentTarget || (e.key !== 'Enter' && e.key !== ' ')) return;
+      e.preventDefault();
+      onClick();
+    },
+  };
+}
+
+type InputRest = Omit<InputHTMLAttributes<HTMLInputElement>, 'value' | 'onChange' | 'onBlur' | 'defaultValue' | 'min' | 'max'>;
+
+/**
+ * 숫자 칸. 저장된 값이 바뀌면(다른 기기에서 와도) 따라 바뀌고,
+ * 칸을 떠나거나 Enter 를 누를 때 값이 정말 달라졌을 때만 저장한다 (같은 값을 다시 저장해 다른 기기의 고침을 덮지 않게).
+ */
+export function NumInput({ value, onCommit, min, max, allowEmpty, ...rest }: { value: number | null | undefined; onCommit: (v: number | null) => void; min: number; max: number; allowEmpty?: boolean } & InputRest) {
+  const shown = value == null ? '' : String(value);
+  const [text, setText] = useState(shown);
+  const [editing, setEditing] = useState(false);
+  useEffect(() => {
+    if (!editing) setText(shown);
+  }, [shown, editing]);
+  function commit() {
+    setEditing(false);
+    const t = text.trim();
+    let next: number | null = value ?? null;
+    if (!t) next = allowEmpty ? null : (value ?? null);
+    else if (Number.isFinite(Number(t))) next = Math.min(max, Math.max(min, Number(t)));
+    if (next !== (value ?? null)) onCommit(next);
+    else setText(shown);
+  }
+  return (
+    <input
+      {...rest}
+      inputMode="decimal"
+      value={text}
+      onFocus={() => setEditing(true)}
+      onChange={(e) => setText(e.target.value.replace(/[^\d.]/g, ''))}
+      onBlur={commit}
+      onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()}
+    />
+  );
+}
+
+/** 글 칸: NumInput 처럼 저장된 값을 따라가고, 바뀌었을 때만 저장 */
+export function TextInput({ value, onCommit, ...rest }: { value: string; onCommit: (v: string) => void } & InputRest) {
+  const [text, setText] = useState(value);
+  const [editing, setEditing] = useState(false);
+  useEffect(() => {
+    if (!editing) setText(value);
+  }, [value, editing]);
+  return (
+    <input
+      {...rest}
+      value={text}
+      onFocus={() => setEditing(true)}
+      onChange={(e) => setText(e.target.value)}
+      onBlur={() => {
+        setEditing(false);
+        const t = text.trim();
+        if (t && t !== value) onCommit(t);
+        else setText(value);
+      }}
+      onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()}
+    />
+  );
 }
 
 /** 작은 알림 (몇 초 뒤 사라짐) */
@@ -212,14 +330,20 @@ export function Toaster() {
   const [msg, setMsg] = useState<string | null>(null);
   useEffect(() => {
     let t = 0;
+    let shownAt = 0;
     toastFn = (m) => {
       setMsg(m);
+      shownAt = Date.now();
       clearTimeout(t);
       t = window.setTimeout(() => setMsg(null), 2800);
     };
+    // 다른 화면으로 가면 지난 알림은 지운다 (누르자마자 화면이 바뀌는 알림은 남긴다)
+    const onNav = () => Date.now() - shownAt > 800 && setMsg(null);
+    window.addEventListener('hashchange', onNav);
     return () => {
       toastFn = null;
       clearTimeout(t);
+      window.removeEventListener('hashchange', onNav);
     };
   }, []);
   return msg ? (
@@ -242,8 +366,13 @@ export function Menu({ items, label = '더 보기' }: { items: MenuItem[]; label
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (!open) return;
+    // 열면 첫 항목에 (키보드로 바로 고를 수 있게)
+    ref.current?.querySelector<HTMLElement>('[role=menuitem]')?.focus();
     const close = (e: Event) => {
-      if (e instanceof KeyboardEvent ? e.key === 'Escape' : !ref.current?.contains(e.target as Node)) setOpen(false);
+      if (e instanceof KeyboardEvent ? e.key === 'Escape' : !ref.current?.contains(e.target as Node)) {
+        setOpen(false);
+        if (e instanceof KeyboardEvent) ref.current?.querySelector<HTMLElement>('.st-iconbtn')?.focus();
+      }
     };
     document.addEventListener('pointerdown', close);
     document.addEventListener('keydown', close);
@@ -259,7 +388,18 @@ export function Menu({ items, label = '더 보기' }: { items: MenuItem[]; label
         <Icon name="more" />
       </button>
       {open && (
-        <div className="st-menu-list" role="menu">
+        <div
+          className="st-menu-list"
+          role="menu"
+          onKeyDown={(e) => {
+            if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp' && e.key !== 'Home' && e.key !== 'End') return;
+            e.preventDefault();
+            const items = [...e.currentTarget.querySelectorAll<HTMLElement>('[role=menuitem]')];
+            const i = items.indexOf(document.activeElement as HTMLElement);
+            const next = e.key === 'Home' ? 0 : e.key === 'End' ? items.length - 1 : (i + (e.key === 'ArrowDown' ? 1 : -1) + items.length) % items.length;
+            items[next]?.focus();
+          }}
+        >
           {shown.map((i) => (
             <button
               key={i.label}

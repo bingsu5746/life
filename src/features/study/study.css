@@ -2565,3 +2565,139 @@ input[type='range'] {
     padding: 22px;
   }
 }
+
+/* ===== 검토 뒤 고친 것 ===== */
+/* 설정: 과목 줄 (색 · 이름 · 순서 단추) 이 폰에서도 한 줄에 */
+.st-subject-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+}
+
+.st-subject-row .st-input.sm {
+  width: 100%;
+}
+
+/* 글이 잘리지 않게 내용만큼 (「새벽 4시」 같은 고르기) */
+.st-input.sm.st-fit {
+  flex: none;
+  width: auto;
+}
+
+.st-intervals {
+  gap: 6px;
+}
+
+.st-intervals .st-input.xs {
+  width: 50px;
+  padding: 6px 8px;
+}
+
+/* 흐린 글자는 읽을 수 있을 만큼 진하게 (도움말·자리 표시 글·작은 아이콘) */
+.st-input::placeholder,
+.st-x,
+.st-addrow .st-icon {
+  color: var(--muted);
+}
+
+.st-menu > .st-iconbtn {
+  color: var(--text);
+}
+
+/* 펼치기 화살표 */
+.st-fold-icon {
+  display: inline-grid;
+  vertical-align: middle;
+  transform: rotate(90deg);
+  transition: transform 0.15s;
+}
+
+.st-fold-icon.open {
+  transform: rotate(-90deg);
+}
+
+.st-fold-icon .st-icon {
+  width: 14px;
+  height: 14px;
+}
+
+.st-banner.bad {
+  color: var(--bad);
+  border: 1px solid currentColor;
+  background: none;
+}
+
+@media (max-width: 860px) {
+  .study {
+    padding-bottom: calc(150px + env(safe-area-inset-bottom));
+  }
+
+  .st-tab {
+    font-size: 0.7rem;
+  }
+
+  /* 상자 칸이 5+2 로 나뉘지 않게 한 줄에 */
+  .st-boxes {
+    display: grid;
+    grid-auto-flow: column;
+    grid-auto-columns: minmax(0, 1fr);
+  }
+
+  .st-boxes span {
+    min-width: 0;
+    padding: 8px 2px;
+  }
+}
+
+/* 어두운 화면: 과목 점이 바탕에 묻히지 않게, D-day 칸은 흰 덩어리 대신 테두리로 */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) .st-dot {
+    filter: brightness(1.8);
+    box-shadow: 0 0 0 1px var(--line-strong);
+  }
+  :root:not([data-theme='light']) .st-hero {
+    background: var(--surface);
+    color: var(--text);
+    border: 1px solid var(--line-strong);
+  }
+  :root:not([data-theme='light']) .st-hero .st-bar {
+    background: var(--soft);
+  }
+  :root:not([data-theme='light']) .st-hero .st-bar i {
+    background: var(--accent);
+  }
+}
+
+:root[data-theme='dark'] .st-dot {
+  filter: brightness(1.8);
+  box-shadow: 0 0 0 1px var(--line-strong);
+}
+
+:root[data-theme='dark'] .st-hero {
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid var(--line-strong);
+}
+
+:root[data-theme='dark'] .st-hero .st-bar {
+  background: var(--soft);
+}
+
+:root[data-theme='dark'] .st-hero .st-bar i {
+  background: var(--accent);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) .st-hero-subs span {
+    background: var(--soft);
+  }
+}
+:root[data-theme='dark'] .st-hero-subs span {
+  background: var(--soft);
+}
+
+/* ⋯ 점이 너무 작아 보이지 않게 */
+.st-menu > .st-iconbtn .st-icon {
+  stroke-width: 2.8;
+}

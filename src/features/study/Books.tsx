@@ -2,10 +2,10 @@
 import { useMemo, useRef, useState } from 'react';
 import { addDays, daysBetween, longDate, shortDate, weekStart } from './dates';
 import { alive, newId, type Book, type Unit } from './model';
-import { compress, expand, rangeText } from './pages';
+import { compress, expand, parseRanges, rangeText } from './pages';
 import { paceOf } from './plan';
 import { bookDone, planCtx, planViews, reservedPages } from './select';
-import { put, remove, useStudy, useWords } from './store';
+import { getStudy, put, remove, useStudy, useWords } from './store';
 import { parseToc, tocText, type TocRow } from './toc';
 import { markBook } from './actions';
 import { PlanForm } from './PlanForm';
@@ -50,13 +50,13 @@ function BookList() {
               <div className="st-book-body">
                 <SubjectTag id={b.subjectId} d={d} />
                 <strong>{b.name}</strong>
-                <Bar value={n} max={all.length} color={color} />
+                <Bar value={n} max={all.length} label="푼 쪽" />
                 <small>
                   {n}/{all.length}쪽 ({all.length ? Math.round((n / all.length) * 100) : 0}%)
                 </small>
                 {v ? (
                   <small className={v.sched.warning ? 'bad' : ''}>
-                    {v.sched.today.length ? `오늘 p.${rangeText(v.sched.today)}` : v.sched.remaining.length ? '오늘은 쉬는 날' : '계획 끝'}
+                    {v.sched.today.length ? `오늘 p.${rangeText(v.sched.today)}` : !v.sched.remaining.length ? '계획 끝' : v.sched.warning?.kind === 'ended' ? '시험 끝' : v.plan.start > today ? `${shortDate(v.plan.start)}부터 시작` : '오늘은 쉬는 날'}
                     {v.sched.end && ` · ${shortDate(v.sched.end)}까지`}
                   </small>
                 ) : (
@@ -71,17 +71,29 @@ function BookList() {
   );
 }
 
+/** 단원마다 「이름#그 이름의 몇 번째」 */
+function unitKeys(units: { name: string }[]): string[] {
+  const seen = new Map<string, number>();
+  return units.map((u) => {
+    const n = (seen.get(u.name) ?? 0) + 1;
+    seen.set(u.name, n);
+    return `${u.name}#${n}`;
+  });
+}
+
 /** 문제집 넣기·고치기: 이름 · 과목 · 목차 */
 function BookEditor({ book, onDone }: { book?: Book; onDone: (id?: string) => void }) {
   const [name, setName] = useState(book?.name ?? '');
   const [subjectId, setSubjectId] = useState(book?.subjectId ?? '');
   const [text, setText] = useState(book ? tocText(book.units) : '');
   const [last, setLast] = useState('');
-  const [skips, setSkips] = useState<Set<string>>(() => new Set(book?.units.filter((u) => u.skip).map((u) => u.name)));
+  // 계획에서 뺄 단원: 「이름#몇 번째」로 기억한다 (이름이 같은 단원이 여럿이어도 하나만 빠지게)
+  const [skips, setSkips] = useState<Set<string>>(() => new Set(unitKeys(book?.units ?? []).filter((_, i) => book!.units[i].skip)));
   const [ocr, setOcr] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const rows: TocRow[] = useMemo(() => parseToc(text, Number(last) || undefined), [text, last]);
   const good = rows.filter((r) => !r.problem);
+  const keys = unitKeys(rows);
   const needsLast = rows.some((r) => r.problem === '끝 페이지를 알려 주세요');
 
   async function readPhotos(files: FileList) {
@@ -104,9 +116,16 @@ function BookEditor({ book, onDone }: { book?: Book; onDone: (id?: string) => vo
 
   function save() {
     if (!name.trim() || !subjectId || !good.length) return;
-    const units: Unit[] = good.map((r) => ({ name: r.name, from: r.from, to: r.to, skip: skips.has(r.name) || undefined }));
+    const units: Unit[] = rows.flatMap((r, i) => (r.problem ? [] : [{ name: r.name, from: r.from, to: r.to, skip: skips.has(keys[i]) || undefined }]));
     const id = book?.id ?? newId();
     put('books', { ...(book ?? { done: [], undone: [] }), id, name: name.trim(), subjectId, units });
+    // 목차를 고치면, 문제집 전체(빼지 않은 단원)를 범위로 한 계획은 새 목차를 따라간다
+    if (book) {
+      const full = (us: Unit[]) => JSON.stringify(compress(expand(us.filter((u) => !u.skip).map((u) => [u.from, u.to]))));
+      const before = full(book.units);
+      const after = compress(expand(units.filter((u) => !u.skip).map((u) => [u.from, u.to])));
+      for (const p of alive(getStudy().plans)) if (p.target === 'book' && p.targetId === id && !p.finished && JSON.stringify(compress(expand(p.range))) === before && before !== JSON.stringify(after)) put('plans', { ...p, range: after, todayLock: undefined });
+    }
     onDone(id);
   }
 
@@ -167,10 +186,10 @@ function BookEditor({ book, onDone }: { book?: Book; onDone: (id?: string) => vo
                       <input
                         type="checkbox"
                         aria-label={`${r.name} 빼기`}
-                        checked={skips.has(r.name)}
+                        checked={skips.has(keys[i])}
                         onChange={() => {
                           const n = new Set(skips);
-                          n.has(r.name) ? n.delete(r.name) : n.add(r.name);
+                          n.has(keys[i]) ? n.delete(keys[i]) : n.add(keys[i]);
                           setSkips(n);
                         }}
                       />
@@ -214,16 +233,11 @@ function BookDetail({ id }: { id: string }) {
   const v = planViews(d, words, today).find((x) => x.plan.target === 'book' && x.plan.targetId === b.id);
   const all = expand(b.units.filter((u) => !u.skip).map((u) => [u.from, u.to]));
   const n = all.filter((p) => done.has(p)).length;
-  const color = d.subjects[b.subjectId]?.color;
   const pace = v ? paceOf(v.plan, v.target, planCtx(d, today)) : 0;
   const showPlan = planning || (!v && !alive(d.plans).some((p) => p.targetId === b.id));
 
   function markPages(on: boolean) {
-    const r = pages
-      .split(/[,\s]+/)
-      .map((x) => x.match(/^(\d+)(?:[-~](\d+))?$/))
-      .filter(Boolean)
-      .flatMap((m) => expand([[Number(m![1]), Number(m![2] ?? m![1])]]));
+    const r = expand(parseRanges(pages));
     if (!r.length) return;
     markBook(b.id, r, on);
     setPages('');
@@ -265,7 +279,7 @@ function BookDetail({ id }: { id: string }) {
               {n} / {all.length}쪽
             </span>
           </div>
-          <Bar value={n} max={all.length} color={color} />
+          <Bar value={n} max={all.length} label="푼 쪽" />
         </div>
         {v && (
           <>
@@ -274,6 +288,8 @@ function BookDetail({ id }: { id: string }) {
                 <>
                   오늘 <b>p.{rangeText(v.sched.today)}</b> ({v.sched.today.length}쪽)
                 </>
+              ) : v.plan.start > today ? (
+                `${shortDate(v.plan.start)}부터 시작`
               ) : (
                 '오늘은 배정 없음'
               )}
@@ -315,7 +331,7 @@ function BookDetail({ id }: { id: string }) {
                   {u.skip && ' · 계획에서 뺌'}
                 </small>
                 <div className="st-mini">
-                  <Bar value={k} max={ps.length} color={color} />
+                  <Bar value={k} max={ps.length} label={`${u.name} 푼 쪽`} />
                 </div>
               </div>
             );
@@ -325,11 +341,7 @@ function BookDetail({ id }: { id: string }) {
           onSubmit={(e) => {
             e.preventDefault();
             // 적은 쪽을 이미 다 했으면 해제, 아니면 체크
-            const all = pages
-              .split(/[,\s]+/)
-              .map((x) => x.match(/^(\d+)(?:[-~](\d+))?$/))
-              .filter(Boolean)
-              .flatMap((m) => expand([[Number(m![1]), Number(m![2] ?? m![1])]]));
+            const all = expand(parseRanges(pages));
             markPages(!(all.length > 0 && all.every((p) => done.has(p))));
           }}
         >

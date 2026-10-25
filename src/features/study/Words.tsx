@@ -2,15 +2,15 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { addDays, dday, shortDate } from './dates';
 import { alive, newId, type Word, type WordList } from './model';
-import { rangeText } from './pages';
-import { BOX_LABEL, dueText } from './review';
+import { MAX_DAYS, rangeText } from './pages';
+import { boxLabel, dueText } from './review';
 import { dayUnits, listDoneDays, listWords, planViews, wordListViews } from './select';
 import { getStudy, getWords, put, putWords, remove, removeWords, useStudy, useWords } from './store';
 import { addWords, answerWord, markDays } from './actions';
 import { parseWords, wordsText, type ParsedWord } from './wordParse';
 import { choicesFor, requeue, type Mode } from './wordSession';
 import { PlanForm } from './PlanForm';
-import { Bar, confirmDelete, Empty, Field, go, Menu, Sheet, SubjectDot, SubjectPicker, toast, useToday } from './ui';
+import { Bar, confirmDelete, Empty, Field, go, Menu, Sheet, SubjectDot, SubjectPicker, toast, useToday, tap } from './ui';
 
 const KIND_LABEL: Record<WordList['kind'], string> = { book: '단어장', test: '단어 시험', inbox: '모르는 단어 모음' };
 
@@ -52,7 +52,7 @@ function ListIndex() {
               <strong>
                 <SubjectDot id={v.list.subjectId} d={d} /> {v.list.name}
               </strong>
-              <Bar value={seen} max={v.words.length} color="var(--blue-2)" />
+              <Bar value={seen} max={v.words.length} label="본 단어" />
               <small>
                 {v.words.length}단어 · 익히는 중 {seen - learned} · 익힘 {learned}
               </small>
@@ -76,7 +76,7 @@ function NewList() {
   function save() {
     if (!name.trim() || !subjectId) return;
     const id = newId();
-    put('wordLists', { id, name: name.trim(), kind, subjectId, days: kind === 'book' && days ? Number(days) : undefined, testDate: kind === 'test' ? testDate : undefined, done: [], undone: [] });
+    put('wordLists', { id, name: name.trim(), kind, subjectId, days: kind === 'book' && Number(days) > 0 ? Math.min(MAX_DAYS, Number(days)) : undefined, testDate: kind === 'test' ? testDate : undefined, done: [], undone: [] });
     go(`/words/${id}`);
   }
   return (
@@ -155,7 +155,7 @@ function ListDetail({ id }: { id: string }) {
   const doneDays = listDoneDays(list, ws);
   const weak = ws.filter((w) => w.wrong > 0).sort((a, b) => b.wrong - a.wrong).slice(0, 20);
   const shown = ws.filter((w) => (filter === 'new' ? w.box === 0 : filter === 'learning' ? w.box > 0 && !w.learned : filter === 'learned' ? w.learned : true)).filter((w) => !q || w.term.toLowerCase().includes(q.toLowerCase()) || w.meaning.includes(q));
-  const days = list.days ?? 0;
+  const days = Math.min(MAX_DAYS, list.days ?? 0);
 
   return (
     <div className="st-page">
@@ -208,8 +208,8 @@ function ListDetail({ id }: { id: string }) {
             {ws.length}단어 · 아직 안 봄 {ws.filter((w) => w.box === 0).length} · 익히는 중 {ws.filter((w) => w.box > 0 && !w.learned).length} · 익힘 {ws.filter((w) => w.learned).length}
           </p>
           <div className="st-boxes" aria-label="상자별 단어 수">
-            {BOX_LABEL.map((_, b) => (
-              <span key={b}>
+            {Array.from({ length: d.settings.intervals.length + 1 }, (_, b) => (
+              <span key={b} title={boxLabel(b, d.settings.intervals)}>
                 <b>{ws.filter((w) => w.box === b && !w.learned).length}</b>
                 <small>{b === 0 ? '새 단어' : `${b}번 상자`}</small>
               </span>
@@ -309,7 +309,7 @@ function ListDetail({ id }: { id: string }) {
           <table className="st-table words">
             <tbody>
               {shown.slice(0, 400).map((w) => (
-                <tr key={w.id} onClick={() => setEdit(w)}>
+                <tr key={w.id} {...tap(() => setEdit(w))}>
                   <td className="st-term">{w.term}</td>
                   <td>{w.meaning || <span className="bad">뜻 없음</span>}</td>
                   <td className="st-muted nowrap">
@@ -341,12 +341,12 @@ function ListSettings({ list, onClose }: { list: WordList; onClose: () => void }
           <input className="st-input" value={name} onChange={(e) => setName(e.target.value)} />
         </Field>
         {list.kind === 'book' && (
-          <Field label="Day 수">
+          <Field label="Day 수" hint="비우면 Day 수를 없애요">
             <input className="st-input xs" inputMode="numeric" value={days} onChange={(e) => setDays(e.target.value.replace(/\D/g, ''))} />
           </Field>
         )}
         {list.kind === 'test' && (
-          <Field label="시험 날">
+          <Field label="시험 날" hint="비우면 시험 날을 없애요">
             <input className="st-input sm" type="date" value={testDate} onChange={(e) => setTestDate(e.target.value)} />
           </Field>
         )}
@@ -354,7 +354,7 @@ function ListSettings({ list, onClose }: { list: WordList; onClose: () => void }
           <button
             className="btn btn-primary"
             onClick={() => {
-              put('wordLists', { ...list, name: name.trim() || list.name, days: days ? Number(days) : list.days, testDate: testDate || list.testDate });
+              put('wordLists', { ...list, name: name.trim() || list.name, days: Number(days) > 0 ? Math.min(MAX_DAYS, Number(days)) : undefined, testDate: testDate || undefined });
               onClose();
             }}
           >
@@ -367,6 +367,7 @@ function ListSettings({ list, onClose }: { list: WordList; onClose: () => void }
 }
 
 function WordSheet({ w, onClose }: { w: Word; onClose: () => void }) {
+  const intervals = useStudy().settings.intervals;
   const [term, setTerm] = useState(w.term);
   const [meaning, setMeaning] = useState(w.meaning);
   const [day, setDay] = useState(w.day === undefined ? '' : String(w.day));
@@ -383,7 +384,7 @@ function WordSheet({ w, onClose }: { w: Word; onClose: () => void }) {
           <input className="st-input xs" inputMode="numeric" value={day} onChange={(e) => setDay(e.target.value.replace(/\D/g, ''))} />
         </Field>
         <p className="st-hint">
-          {w.box === 0 ? '아직 안 봄' : w.learned ? '익힘' : `${w.box}번 상자 · 다음 ${w.due}`} · 틀린 횟수 {w.wrong}
+          {w.box === 0 ? '아직 안 봄' : w.learned ? '익힘' : `${boxLabel(w.box, intervals)} · 다음 ${shortDate(w.due)}`} · 틀린 횟수 {w.wrong}
         </p>
         <div className="st-row end">
           <button
@@ -492,7 +493,7 @@ function ImportSheet({ list, existing, onClose }: { list: WordList; existing: Wo
     if (!good.length) return;
     addWords(list.id, good, existing, today);
     const maxDay = Math.max(0, ...good.map((r) => r.day ?? 0));
-    if (list.kind === 'book' && maxDay > (list.days ?? 0)) put('wordLists', { ...getStudy().wordLists[list.id], days: maxDay });
+    if (list.kind === 'book' && maxDay > (list.days ?? 0)) put('wordLists', { ...getStudy().wordLists[list.id], days: Math.min(MAX_DAYS, maxDay) });
     toast(`${good.length}단어를 넣었어요`);
     onClose();
   }
@@ -616,7 +617,13 @@ function WordRun({ listId, mode }: { listId: string; mode: 'learn' | 'prep' | 'w
   const d = useStudy();
   const today = useToday();
   const list = d.wordLists[listId];
-  const [method, setMethod] = useState<'card' | 'quiz'>(() => (localStorage.getItem('my-study.study.word-method') === 'quiz' ? 'quiz' : 'card'));
+  const [method, setMethod] = useState<'card' | 'quiz'>(() => {
+    try {
+      return localStorage.getItem('my-study.study.word-method') === 'quiz' ? 'quiz' : 'card';
+    } catch {
+      return 'card';
+    }
+  });
   const [dir, setDir] = useState<'en' | 'ko'>('en');
   // 세션을 시작할 때의 단어 목록 (도중에 상자가 바뀌어도 그대로)
   const [queue, setQueue] = useState<string[] | null>(null);
@@ -624,6 +631,9 @@ function WordRun({ listId, mode }: { listId: string; mode: 'learn' | 'prep' | 'w
   const [shown, setShown] = useState(false);
   const [picked, setPicked] = useState<string | null>(null);
   const [total, setTotal] = useState(0);
+  // 객관식 보기는 한 번 정하면 그 카드 동안 그대로 (다시 그릴 때마다 섞이지 않게). step: 지금까지 답한 횟수
+  const [step, setStep] = useState(0);
+  const choiceCache = useRef(new Map<string, string[] | null>());
 
   function begin() {
     const all = getWords();
@@ -700,7 +710,7 @@ function WordRun({ listId, mode }: { listId: string; mode: 'learn' | 'prep' | 'w
           <p>
             {total}단어 중 처음에 맞힌 것 {right}개 ({total ? Math.round((right / total) * 100) : 0}%)
           </p>
-          <p className="st-hint">틀린 단어는 내일 다시 나와요.</p>
+          <p className="st-hint">{mode === 'prep' ? '틀린 단어는 1번 상자로 가서' : '틀린 단어는'} {d.settings.intervals[0] === 1 ? '내일' : `${d.settings.intervals[0]}일 뒤에`} 다시 나와요.</p>
           <div className="st-row">
             <button className="btn btn-primary" onClick={() => go('/')}>
               오늘 화면으로
@@ -716,7 +726,9 @@ function WordRun({ listId, mode }: { listId: string; mode: 'learn' | 'prep' | 'w
 
   const pool = alive(words).filter((w) => w.meaning);
   const field = dir === 'en' ? 'meaning' : 'term';
-  const choices = method === 'quiz' ? choicesFor(cur, pool, Math.random, field) : null;
+  const ck = `${cur.id}:${step}:${field}`;
+  if (method === 'quiz' && !choiceCache.current.has(ck)) choiceCache.current.set(ck, choicesFor(cur, pool, Math.random, field));
+  const choices = method === 'quiz' ? (choiceCache.current.get(ck) ?? null) : null;
   const useQuiz = method === 'quiz' && choices;
   const ask = dir === 'en' ? cur.term : cur.meaning || cur.term;
   const ans = dir === 'en' ? cur.meaning : cur.term;
@@ -727,6 +739,7 @@ function WordRun({ listId, mode }: { listId: string; mode: 'learn' | 'prep' | 'w
       setAnswered(new Map(answered).set(cur!.id, correct));
     }
     setQueue(requeue(queue!, correct));
+    setStep((x) => x + 1);
     setShown(false);
     setPicked(null);
   }
@@ -737,12 +750,12 @@ function WordRun({ listId, mode }: { listId: string; mode: 'learn' | 'prep' | 'w
         <button className="st-back" onClick={() => go(`/words/${listId}`)} aria-label="그만하기">
           ✕
         </button>
-        <Bar value={total - queue.length} max={total} color="var(--ok)" />
+        <Bar value={total - queue.length} max={total} label="외운 단어" />
         <span className="st-muted">
           {firstTry}/{total}
         </span>
       </div>
-      <RunCard key={cur.id + queue.length} ask={ask} sub={dir === 'en' && cur.day !== undefined ? `Day ${cur.day}` : answered.has(cur.id) ? '다시 나온 단어' : `${BOX_LABEL[cur.box] === '새로' ? '새 단어' : `${cur.box}번 상자`}`}>
+      <RunCard key={`${cur.id}:${step}`} ask={ask} sub={dir === 'en' && cur.day !== undefined ? `Day ${cur.day}` : answered.has(cur.id) ? '다시 나온 단어' : boxLabel(cur.box, d.settings.intervals)}>
         {useQuiz ? (
           <div className="st-choices">
             {choices!.map((c, i) => {

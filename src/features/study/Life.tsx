@@ -1,10 +1,10 @@
 // 할 일 · 습관 (4단계)
 import { useState } from 'react';
 import { addDays, shortDate, WEEKDAYS } from './dates';
-import { bestStreak, habitOn, streak } from './habits';
+import { bestStreak, habitOn, streak, toggleHabit } from './habits';
 import { alive, newId, type Habit, type Todo } from './model';
 import { put, remove, useStudy } from './store';
-import { Check, confirmDelete, Empty, Field, Icon, Sheet, useToday, WeekdayPicker } from './ui';
+import { Check, confirmDelete, Empty, Field, Icon, Sheet, useToday, WeekdayPicker, tap } from './ui';
 
 const ICONS = ['📖', '🏃', '💧', '😴', '🧘', '✍️', '🎧', '🥗', '🧹', '💊', '📵', '🌅'];
 
@@ -74,7 +74,7 @@ function Todos({ today }: { today: string }) {
               {ts.map((t) => (
                 <div key={t.id} className="st-item">
                   <Check on={false} label="했어요" onClick={() => put('todos', { ...t, done: true, doneAt: Date.now() })} />
-                  <div className="st-item-main" onClick={() => setEdit(t)} role="button" tabIndex={0}>
+                  <div className="st-item-main" {...tap(() => setEdit(t))}>
                     <div className="st-item-title">{t.title}</div>
                     {t.due && <div className="st-item-sub">{t.due === today ? '오늘' : shortDate(t.due)}</div>}
                   </div>
@@ -88,7 +88,7 @@ function Todos({ today }: { today: string }) {
       )}
       {done.length > 0 && (
         <button className="st-fold" onClick={() => setShowDone(!showDone)}>
-          한 일 {done.length} {showDone ? '▲' : '▼'}
+          한 일 {done.length} <span className={`st-fold-icon ${showDone ? 'open' : ''}`}><Icon name="chevron" /></span>
         </button>
       )}
       {showDone &&
@@ -176,7 +176,7 @@ function Habits({ today, adding }: { today: string; adding?: boolean }) {
                     className={`st-hcell ${on ? 'on' : ''} ${active ? '' : 'off'} ${x === today ? 'today' : ''}`}
                     aria-pressed={on}
                     aria-label={`${h.name} ${shortDate(x)}`}
-                    onClick={() => put('habits', { ...h, checks: on ? h.checks.filter((c) => c !== x) : [...h.checks, x].sort().slice(-400) })}
+                    onClick={() => put('habits', toggleHabit(h, x))}
                   >
                     {on ? '✓' : ''}
                   </button>

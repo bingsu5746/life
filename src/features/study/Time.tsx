@@ -3,22 +3,20 @@ import { useState } from 'react';
 import { addDays, daysBetween, shortDate, weekStart, WEEKDAYS } from './dates';
 import { alive, type StudySession } from './model';
 import { addSession } from './actions';
-import { put, remove, useStudy } from './store';
-import { askNotify, loadTimer, saveTimer } from './timerStore';
+import { getStudy, put, remove, useStudy } from './store';
+import { askNotify, loadTimer, primeAudio, saveTimer } from './timerStore';
 import { clock, finish, minutesText, nextPhase, pause, resume, start, view, type TimerState } from './timer';
-import { Bar, Field, go, Sheet, SubjectDot, SubjectPicker, subjectsOf, toast, useNow, useToday } from './ui';
+import { Bar, confirmDelete, Field, go, NumInput, Sheet, SubjectDot, SubjectPicker, subjectsOf, tap, toast, useNow, useToday } from './ui';
 
 /** sub: 'manual' 이면 공부 시간 직접 넣기 창 (「＋」에서 올 때) */
 export function Time({ sub }: { sub?: string }) {
   const d = useStudy();
   const today = useToday();
-  const now = useNow(500);
   const [timer, setTimer] = useState<TimerState | null>(loadTimer);
   const [subjectId, setSubjectId] = useState(timer?.subjectId ?? subjectsOf(d)[0]?.id ?? '');
   const [kind, setKind] = useState<TimerState['kind']>(timer?.kind ?? 'pomo');
   const [manual, setManual] = useState(sub === 'manual');
   const pomo = d.settings.pomo;
-  const v = timer ? view(timer, now, pomo) : null;
   const update = (t: TimerState | null) => {
     setTimer(t);
     saveTimer(t);
@@ -31,7 +29,15 @@ export function Time({ sub }: { sub?: string }) {
   }
   function stop() {
     if (!timer) return;
-    const min = finish(timer, Date.now(), pomo);
+    let min = finish(timer, Date.now(), pomo);
+    // 끄는 것을 잊고 오래 켜 둔 스톱워치: 기록할 시간을 확인한다
+    if (min > 180) {
+      const ans = window.prompt(`타이머가 ${minutesText(min)} 동안 켜져 있었어요. 실제로 공부한 시간(분)을 확인해 주세요.`, String(min));
+      if (ans === null) return;
+      const n = Math.round(Number(ans.replace(/[^\d]/g, '')));
+      if (!Number.isFinite(n)) return;
+      min = Math.min(n, min);
+    }
     if (min > 0) {
       addSession({ subjectId: timer.subjectId, bookId: timer.bookId, start: timer.startedAt, end: Date.now(), minutes: min, date: today, kind: timer.kind });
       toast(`${minutesText(min)} 기록했어요`);
@@ -66,6 +72,31 @@ export function Time({ sub }: { sub?: string }) {
             </button>
           </div>
         ) : (
+          <RunningTimer timer={timer} update={update} onStop={stop} />
+        )}
+      </section>
+
+      <Stats sessions={sessions} today={today} todayMin={todayMin} />
+      {manual && (
+        <ManualSheet
+          today={today}
+          onClose={() => {
+            setManual(false);
+            if (sub) go('/time');
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+/** 돌고 있는 타이머 (이 부품만 0.5초마다 다시 그린다) */
+function RunningTimer({ timer, update, onStop }: { timer: TimerState; update: (t: TimerState | null) => void; onStop: () => void }) {
+  const d = useStudy();
+  const now = useNow(500);
+  const pomo = d.settings.pomo;
+  const v = view(timer, now, pomo);
+  return (
           <div className="st-timer-run">
             <Ring progress={v!.progress} phase={timer.kind === 'watch' ? 'work' : timer.phase}>
               <span className="st-timer-label">
@@ -82,13 +113,13 @@ export function Time({ sub }: { sub?: string }) {
             )}
             <div className="st-row center">
               {timer.kind === 'pomo' && (v!.finished || timer.phase !== 'work') && (
-                <button className="btn btn-primary btn-lg" onClick={() => update(nextPhase(timer, Date.now(), pomo).state)}>
+                <button className="btn btn-primary btn-lg" onClick={() => (primeAudio(), update(nextPhase(timer, Date.now(), pomo).state))}>
                   {timer.phase === 'work' ? '휴식 시작' : '다음 공부 시작'}
                 </button>
               )}
               {!v!.finished &&
                 (timer.runningSince === null ? (
-                  <button className="btn btn-lg" onClick={() => update(resume(timer, Date.now()))}>
+                  <button className="btn btn-lg" onClick={() => (primeAudio(), update(resume(timer, Date.now())))}>
                     계속
                   </button>
                 ) : (
@@ -96,26 +127,12 @@ export function Time({ sub }: { sub?: string }) {
                     멈춤
                   </button>
                 ))}
-              <button className="btn btn-lg" onClick={stop}>
+              <button className="btn btn-lg" onClick={onStop}>
                 끝내고 기록
               </button>
             </div>
             <p className="st-hint center">폰에서 다른 앱에 가 있으면 알림음이 늦게 날 수 있어요. 돌아오면 시간은 맞게 보여요.</p>
           </div>
-        )}
-      </section>
-
-      <Stats sessions={sessions} today={today} todayMin={todayMin} />
-      {manual && (
-        <ManualSheet
-          today={today}
-          onClose={() => {
-            setManual(false);
-            if (sub) go('/time');
-          }}
-        />
-      )}
-    </div>
   );
 }
 
@@ -135,6 +152,7 @@ function Ring({ progress, phase, children }: { progress: number; phase: string; 
 
 function Stats({ sessions, today, todayMin }: { sessions: StudySession[]; today: string; todayMin: number }) {
   const d = useStudy();
+  const [edit, setEdit] = useState<StudySession | null>(null);
   const ws = weekStart(today);
   const week = daysBetween(ws, addDays(ws, 6));
   const weekS = sessions.filter((s) => s.date >= ws && s.date <= addDays(ws, 6));
@@ -182,7 +200,7 @@ function Stats({ sessions, today, todayMin }: { sessions: StudySession[]; today:
               <span>
                 <SubjectDot id={s.id} d={d} /> {s.name}
               </span>
-              <Bar value={min} max={s.weeklyGoal || Math.max(...bySubject.map((x) => x.min), 1)} color={s.color} />
+              <Bar value={min} max={s.weeklyGoal || Math.max(...bySubject.map((x) => x.min), 1)} label={`${s.name} 이번 주 공부 시간`} />
               <small>
                 {minutesText(min)}
                 {s.weeklyGoal ? ` / 목표 ${minutesText(s.weeklyGoal)}` : ''}
@@ -207,7 +225,7 @@ function Stats({ sessions, today, todayMin }: { sessions: StudySession[]; today:
           {recent.map((s) => (
             <div key={s.id} className="st-item">
               <SubjectDot id={s.subjectId} d={d} />
-              <div className="st-item-main">
+              <div className="st-item-main" {...tap(() => setEdit(s))} title="기록 고치기">
                 <div className="st-item-title">
                   {d.subjects[s.subjectId ?? '']?.name ?? '공부'} · {minutesText(s.minutes)}
                 </div>
@@ -215,14 +233,13 @@ function Stats({ sessions, today, todayMin }: { sessions: StudySession[]; today:
                   {shortDate(s.date)} {new Date(s.start).toTimeString().slice(0, 5)} · {s.kind === 'pomo' ? '뽀모도로' : s.kind === 'watch' ? '스톱워치' : '직접 넣음'}
                 </div>
               </div>
-              <button className="st-x" aria-label="기록 지우기" onClick={() => window.confirm('이 기록을 지울까요?') && remove('sessions', s.id)}>
-                ✕
-              </button>
             </div>
           ))}
+          <p className="st-hint">기록을 누르면 시간을 고치거나 지울 수 있어요.</p>
         </section>
       )}
       <WeeklyGoals />
+      {edit && <ManualSheet today={today} session={edit} onClose={() => setEdit(null)} />}
     </>
   );
 }
@@ -239,16 +256,15 @@ function WeeklyGoals() {
           <span className="st-goal-name">
             <SubjectDot id={s.id} d={d} /> {s.name}
           </span>
-          <input
+          <NumInput
             className="st-input xs"
-            inputMode="numeric"
-            defaultValue={s.weeklyGoal ? String(s.weeklyGoal / 60) : ''}
+            value={s.weeklyGoal ? Math.round((s.weeklyGoal / 60) * 10) / 10 : null}
+            min={0}
+            max={100}
+            allowEmpty
             placeholder="없음"
             aria-label={`${s.name} 주간 목표 (시간)`}
-            onBlur={(e) => {
-              const h = Number(e.target.value);
-              put('subjects', { ...s, weeklyGoal: h > 0 ? Math.round(h * 60) : undefined });
-            }}
+            onCommit={(h) => put('subjects', { ...getStudy().subjects[s.id], weeklyGoal: h && h > 0 ? Math.round(h * 60) : undefined })}
           />
           시간
         </div>
@@ -257,13 +273,15 @@ function WeeklyGoals() {
   );
 }
 
-function ManualSheet({ today, onClose }: { today: string; onClose: () => void }) {
+/** 공부 시간 직접 넣기 · 기록 고치기 (session 이 있으면) */
+function ManualSheet({ today, session, onClose }: { today: string; session?: StudySession; onClose: () => void }) {
   const d = useStudy();
-  const [subjectId, setSubjectId] = useState(subjectsOf(d)[0]?.id ?? '');
-  const [date, setDate] = useState(today);
-  const [min, setMin] = useState('60');
+  const [subjectId, setSubjectId] = useState(session?.subjectId ?? subjectsOf(d)[0]?.id ?? '');
+  const [date, setDate] = useState(session?.date ?? today);
+  const [min, setMin] = useState(String(session?.minutes ?? 60));
+  const n = Number(min);
   return (
-    <Sheet title="공부 시간 직접 넣기" onClose={onClose}>
+    <Sheet title={session ? '공부 기록 고치기' : '공부 시간 직접 넣기'} onClose={onClose}>
       <div className="st-form">
         <Field group label="과목">
           <SubjectPicker value={subjectId} onChange={setSubjectId} />
@@ -272,17 +290,37 @@ function ManualSheet({ today, onClose }: { today: string; onClose: () => void })
           <input className="st-input sm" type="date" value={date} max={today} onChange={(e) => setDate(e.target.value)} aria-label="날짜" />
           <input className="st-input xs" inputMode="numeric" value={min} onChange={(e) => setMin(e.target.value.replace(/\D/g, ''))} aria-label="분" />분
         </div>
+        {n > 720 && <p className="bad">하루에 {minutesText(n)}은 너무 길어요. 다시 확인해 주세요.</p>}
         <div className="st-row end">
+          {session && (
+            <button
+              className="btn btn-sm st-danger"
+              onClick={() => {
+                if (!confirmDelete('이 기록')) return;
+                remove('sessions', session.id);
+                onClose();
+              }}
+            >
+              지우기
+            </button>
+          )}
           <button
             className="btn btn-primary"
-            disabled={!subjectId || !Number(min)}
+            disabled={!subjectId || !n || n > 720}
             onClick={() => {
-              const now = Date.now();
-              addSession({ subjectId, start: now - Number(min) * 60_000, end: now, minutes: Number(min), date, kind: 'manual' });
+              if (session) {
+                // 날짜를 바꾸면 그날 낮 12시에 한 것으로 (시작 시각을 알 수 없으므로)
+                const start = date === session.date ? session.start : new Date(`${date}T12:00:00`).getTime();
+                put('sessions', { ...session, subjectId, date, minutes: n, start, end: start + n * 60_000 });
+              } else {
+                // 오늘이면 지금 끝난 것으로, 지난 날이면 그날 낮 12시부터 한 것으로
+                const end = date === today ? Date.now() : new Date(`${date}T12:00:00`).getTime() + n * 60_000;
+                addSession({ subjectId, start: end - n * 60_000, end, minutes: n, date, kind: 'manual' });
+              }
               onClose();
             }}
           >
-            넣기
+            {session ? '저장' : '넣기'}
           </button>
         </div>
       </div>

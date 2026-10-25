@@ -1,26 +1,20 @@
 // 공부 설정: 과목 · 시험 · 쉬는 날 · 과외 날 비율 · 복습 간격 · 타이머
 import { useState } from 'react';
-import { dday, shortDate } from './dates';
-import { alive, newId, SUBJECT_COLORS, type Subject } from './model';
+import { shortDate } from './dates';
+import { alive, newId, SUBJECT_COLORS, type StudyData, type Subject } from './model';
 import { exportBackup, importBackup } from './backup';
 import { getTheme, setTheme, type Theme } from '../../lib/theme';
-import { put, remove, resetLocal, setSettings, useStudy } from './store';
-import { confirmDelete, Field, subjectsOf, toast, useToday, WeekdayPicker } from './ui';
+import { getStudy, put, remove, resetLocal, setSettings, useStudy } from './store';
+import { confirmDelete, Field, go, NumInput, subjectsOf, TextInput, toast, useToday, WeekdayPicker } from './ui';
 
 export function Settings() {
   const d = useStudy();
   const s = d.settings;
   const today = useToday();
   const [off, setOff] = useState(today);
-  const [exam, setExam] = useState({ name: '', date: today });
   const [subj, setSubj] = useState('');
   const [theme, setThemeState] = useState<Theme>(getTheme);
   const subjects = subjectsOf(d);
-  const exams = alive(d.exams).sort((a, b) => a.date.localeCompare(b.date));
-  const num = (v: string, lo: number, hi: number, fb: number) => {
-    const n = Number(v);
-    return Number.isFinite(n) && n >= lo && n <= hi ? n : fb;
-  };
   return (
     <div className="st-page narrow">
       <div className="st-page-head">
@@ -46,36 +40,13 @@ export function Settings() {
         </form>
       </section>
 
-      <section className="st-card st-form">
-        <h3 className="st-h">시험</h3>
-        {exams.map((e) => (
-          <div key={e.id} className="st-inline between">
-            <span>
-              {e.name} · {shortDate(e.date)} <b>{dday(today, e.date)}</b>
-            </span>
-            <span className="st-inline">
-              <input className="st-input sm" type="date" value={e.date} onChange={(ev) => ev.target.value && put('exams', { ...e, date: ev.target.value })} aria-label={`${e.name} 날짜`} />
-              <button className="st-x" aria-label="지우기" onClick={() => confirmDelete(`「${e.name}」`) && remove('exams', e.id)}>
-                ✕
-              </button>
-            </span>
-          </div>
-        ))}
-        <p className="st-hint">시험 날짜를 바꾸면 그 시험에 맞춘 계획이 모두 다시 계산돼요.</p>
-        <form
-          className="st-inline wrap"
-          onSubmit={(e) => {
-            e.preventDefault();
-            if (!exam.name.trim()) return;
-            put('exams', { id: newId(), name: exam.name.trim(), date: exam.date });
-            setExam({ name: '', date: exam.date });
-          }}
-        >
-          <input className="st-input sm" placeholder="시험 이름" value={exam.name} onChange={(e) => setExam({ ...exam, name: e.target.value })} />
-          <input className="st-input sm" type="date" value={exam.date} onChange={(e) => setExam({ ...exam, date: e.target.value })} />
-          <button className="btn btn-sm">추가</button>
-        </form>
-      </section>
+      <p className="st-hint">
+        시험 날짜·범위는{' '}
+        <button className="st-link" onClick={() => go('/exams')}>
+          시험
+        </button>{' '}
+        화면에서 넣고 고쳐요.
+      </p>
 
       <section className="st-card st-form">
         <h3 className="st-h">하루 분량 나누기</h3>
@@ -106,7 +77,7 @@ export function Settings() {
           <input type="checkbox" checked={s.wordsUseTutorRatio} onChange={(e) => setSettings({ wordsUseTutorRatio: e.target.checked })} /> 단어장 계획에도 과외 날 비율 쓰기
         </label>
         <Field label="하루가 시작되는 시각" hint="이 시각 전에 공부해도 전날 분량으로 쳐요">
-          <select className="st-input xs" value={s.dayStart} onChange={(e) => setSettings({ dayStart: Number(e.target.value) })}>
+          <select className="st-input sm st-fit" value={s.dayStart} onChange={(e) => setSettings({ dayStart: Number(e.target.value) })}>
             {[0, 1, 2, 3, 4, 5, 6].map((h) => (
               <option key={h} value={h}>
                 새벽 {h}시
@@ -115,24 +86,25 @@ export function Settings() {
           </select>
         </Field>
         <Field label="하루 최대 쪽 (넘으면 알림)">
-          <input className="st-input xs" inputMode="numeric" defaultValue={s.dailyMax ?? ''} placeholder="없음" onBlur={(e) => setSettings({ dailyMax: Number(e.target.value) > 0 ? Number(e.target.value) : null })} />
+          <NumInput className="st-input xs" value={s.dailyMax} min={0} max={9999} allowEmpty placeholder="없음" onCommit={(v) => setSettings({ dailyMax: v && v > 0 ? Math.round(v) : null })} />
         </Field>
       </section>
 
       <section className="st-card st-form">
         <h3 className="st-h">복습 · 영단어</h3>
         <Field label="다시 보기 간격 (일, 상자 1~5)" hint="맞히면 다음 상자, 틀리면 1번 상자. 5번 상자에서 맞히면 익힘">
-          <div className="st-inline">
+          <div className="st-inline wrap st-intervals">
             {s.intervals.map((v, i) => (
-              <input
+              <NumInput
                 key={i}
                 className="st-input xs"
-                inputMode="numeric"
-                defaultValue={v}
+                value={v}
+                min={1}
+                max={365}
                 aria-label={`${i + 1}번 상자`}
-                onBlur={(e) => {
-                  const next = [...s.intervals];
-                  next[i] = num(e.target.value, 1, 365, v);
+                onCommit={(n) => {
+                  const next = [...getStudy().settings.intervals];
+                  next[i] = Math.round(n ?? v);
                   setSettings({ intervals: next });
                 }}
               />
@@ -140,7 +112,7 @@ export function Settings() {
           </div>
         </Field>
         <Field label="객관식으로 오를 수 있는 상자">
-          <select className="st-input xs" value={s.quizMaxBox} onChange={(e) => setSettings({ quizMaxBox: Number(e.target.value) })}>
+          <select className="st-input sm st-fit" value={s.quizMaxBox} onChange={(e) => setSettings({ quizMaxBox: Number(e.target.value) })}>
             {[1, 2, 3, 4, 5].map((b) => (
               <option key={b} value={b}>
                 {b}번까지
@@ -149,7 +121,7 @@ export function Settings() {
           </select>
         </Field>
         <Field label="모르는 단어 모음: 하루 새 단어">
-          <input className="st-input xs" inputMode="numeric" defaultValue={s.inboxPerDay} onBlur={(e) => setSettings({ inboxPerDay: num(e.target.value, 1, 200, s.inboxPerDay) })} />
+          <NumInput className="st-input xs" value={s.inboxPerDay} min={1} max={200} onCommit={(v) => setSettings({ inboxPerDay: Math.round(v ?? s.inboxPerDay) })} />
         </Field>
       </section>
 
@@ -166,7 +138,7 @@ export function Settings() {
           ).map(([k, label]) => (
             <label key={k} className="st-mini-field">
               <small>{label}</small>
-              <input className="st-input xs" inputMode="numeric" defaultValue={s.pomo[k]} onBlur={(e) => setSettings({ pomo: { ...s.pomo, [k]: num(e.target.value, 1, 180, s.pomo[k]) } })} />
+              <NumInput className="st-input xs" value={s.pomo[k]} min={1} max={180} onCommit={(v) => setSettings({ pomo: { ...getStudy().settings.pomo, [k]: Math.round(v ?? s.pomo[k]) } })} />
             </label>
           ))}
         </div>
@@ -235,11 +207,9 @@ function SubjectRow({ s, first, last, prev, next }: { s: Subject; first: boolean
     put('subjects', { ...o, order: s.order });
   };
   return (
-    <div className="st-inline between">
-      <span className="st-inline">
-        <input type="color" value={s.color} onChange={(e) => put('subjects', { ...s, color: e.target.value })} aria-label={`${s.name} 색`} className="st-color" />
-        <input className="st-input sm" defaultValue={s.name} onBlur={(e) => e.target.value.trim() && e.target.value !== s.name && put('subjects', { ...s, name: e.target.value.trim() })} aria-label="과목 이름" />
-      </span>
+    <div className="st-subject-row">
+      <input type="color" value={s.color} onChange={(e) => put('subjects', { ...getStudy().subjects[s.id], color: e.target.value })} aria-label={`${s.name} 색`} className="st-color" />
+      <TextInput className="st-input sm" value={s.name} onCommit={(name) => put('subjects', { ...getStudy().subjects[s.id], name })} aria-label="과목 이름" />
       <span className="st-inline">
         <button className="st-x" disabled={first} onClick={() => swap(prev)} aria-label="위로">
           ↑
@@ -247,10 +217,27 @@ function SubjectRow({ s, first, last, prev, next }: { s: Subject; first: boolean
         <button className="st-x" disabled={last} onClick={() => swap(next)} aria-label="아래로">
           ↓
         </button>
-        <button className="st-x" aria-label="지우기" onClick={() => confirmDelete(`과목 「${s.name}」`) && remove('subjects', s.id)}>
+        <button className="st-x" aria-label="지우기" onClick={() => confirmDelete(`과목 「${s.name}」`, subjectUse(getStudy(), s.id)) && remove('subjects', s.id)}>
           ✕
         </button>
       </span>
     </div>
   );
+}
+
+/** 과목을 지울 때 알릴 것: 그 과목으로 넣은 자료 수 (자료는 남고 과목 표시만 없어진다) */
+function subjectUse(d: StudyData, id: string): string {
+  const parts = (
+    [
+      ['문제집', alive(d.books)],
+      ['단어 목록', alive(d.wordLists)],
+      ['과외', alive(d.tutors)],
+      ['오답', alive(d.notes)],
+      ['카드 묶음', alive(d.decks)],
+    ] as const
+  )
+    .map(([label, xs]) => [label, (xs as { subjectId: string }[]).filter((x) => x.subjectId === id).length] as const)
+    .filter(([, n]) => n > 0)
+    .map(([label, n]) => `${label} ${n}개`);
+  return parts.length ? `이 과목으로 넣은 ${parts.join(' · ')}는 지워지지 않고 과목 없이 남아요.` : '';
 }

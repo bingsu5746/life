@@ -2,7 +2,7 @@
 import { useMemo, useState } from 'react';
 import { addDays, shortDate } from './dates';
 import { alive, newId, type Id, type Plan, type Range, type Unit } from './model';
-import { compress, expand, rangeText } from './pages';
+import { compress, expand, parseRanges, rangeText } from './pages';
 import { baselineOf, schedule } from './plan';
 import { planCtx } from './select';
 import { put, remove, useStudy } from './store';
@@ -21,15 +21,6 @@ interface Props {
 
 const unitWord = (t: Plan['target']) => (t === 'book' ? '쪽' : 'Day');
 
-/** 「12-30, 45」 → 범위 */
-function parseRanges(s: string): Range[] {
-  const out: Range[] = [];
-  for (const part of s.split(/[,\s]+/)) {
-    const m = part.match(/^(\d+)(?:[-~](\d+))?$/);
-    if (m) out.push([Number(m[1]), Number(m[2] ?? m[1])]);
-  }
-  return out;
-}
 
 export function PlanForm({ target, targetId, units, done, reserved, existing, today, onDone }: Props) {
   const d = useStudy();
@@ -73,7 +64,7 @@ export function PlanForm({ target, targetId, units, done, reserved, existing, to
     dailyMax: max ? Number(max) : null,
     baseline: 0,
   };
-  const t = { units, done, reserved };
+  const t = { units, done, reserved, subjectId: (target === 'book' ? d.books[targetId] : d.wordLists[targetId])?.subjectId };
   const ctx = planCtx(d, today);
   const baseline = baselineOf(draft, t, ctx);
   const preview = schedule({ ...draft, baseline }, t, ctx);
@@ -179,7 +170,7 @@ export function PlanForm({ target, targetId, units, done, reserved, existing, to
           '범위를 골라 주세요'
         ) : left === 0 ? (
           '이 범위는 이미 다 했어요'
-        ) : preview.warning?.kind === 'overdue' || preview.warning?.kind === 'nodays' ? (
+        ) : preview.warning?.kind === 'overdue' || preview.warning?.kind === 'nodays' || preview.warning?.kind === 'ended' ? (
           <span className="bad">마감까지 공부하는 날이 없어요. 날짜를 바꿔 주세요</span>
         ) : (
           <>

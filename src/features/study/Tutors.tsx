@@ -2,12 +2,12 @@
 import { useState } from 'react';
 import { addDays, shortDate, WEEKDAYS } from './dates';
 import { alive, newId, type HwItem, type Homework, type Id, type Tutor } from './model';
-import { rangeText } from './pages';
+import { clampRange, expand, rangeText } from './pages';
 import { homeworkViews } from './select';
 import { put, remove, useStudy } from './store';
 import { hasClass, homeworkDue, nextClass } from './tutor';
 import { markHwPages, patchHwItem } from './actions';
-import { Check, confirmDelete, Empty, Field, go, Icon, Menu, Sheet, SubjectDot, SubjectPicker, toast, useToday, WeekdayPicker } from './ui';
+import { Check, confirmDelete, Empty, Field, go, Icon, Menu, Sheet, SubjectDot, SubjectPicker, toast, useToday, WeekdayPicker, tap } from './ui';
 
 /** sub: 'new' 이면 과외 등록 창, 'hw' 면 숙제 넣기 창을 연다 (「＋」에서 올 때) */
 export function Tutors({ sub }: { sub?: string }) {
@@ -81,7 +81,7 @@ export function Tutors({ sub }: { sub?: string }) {
             {open.map((v) => (
               <div key={v.hw.id} className={`st-hw ${v.due < today && !v.finished ? 'late' : ''}`}>
                 {/* 숙제 머리줄을 누르면 고치기 */}
-                <div className="st-hw-head st-tap" role="button" tabIndex={0} title="숙제 고치기" onClick={() => setHwFor({ tutor: t, hw: v.hw })}>
+                <div className="st-hw-head st-tap" title="숙제 고치기" {...tap(() => setHwFor({ tutor: t, hw: v.hw }))}>
                   <span className={`st-pill ${v.due < today && !v.finished ? 'bad' : v.due === today ? 'warn' : ''}`}>마감 {shortDate(v.due)}</span>
                   <small className="st-muted">{shortDate(v.hw.given)}에 받음</small>
                 </div>
@@ -141,11 +141,11 @@ function HwLine({ hw, iv }: { hw: Homework; iv: ReturnType<typeof homeworkViews>
   return (
     <div className="st-item">
       {item.kind === 'pages' ? (
-        <Check on={iv.finished} label="다 했어요" onClick={() => markHwPages(hw, item, iv.finished ? [] : iv.remaining, !iv.finished)} />
+        <Check on={iv.finished} label="다 했어요" onClick={() => markHwPages(hw, item, iv.finished ? expand(item.range ? [item.range] : []) : iv.remaining, !iv.finished)} />
       ) : (
         <Check on={!!item.done} label="다 했어요" onClick={() => patchHwItem(hw.id, item.id, { done: !item.done })} />
       )}
-      <div className="st-item-main" role="button" tabIndex={0} onClick={() => q === null && setQ(item.question ?? '')}>
+      <div className="st-item-main" {...tap(() => q === null && setQ(item.question ?? ''))}>
         <div className={`st-item-title ${iv.finished ? 'done' : ''}`}>{title}</div>
         <div className="st-item-sub">
           {item.kind === 'pages' && !iv.finished && (iv.today.length ? `오늘 p.${rangeText(iv.today)} · ` : '') + `남은 ${iv.remaining.length}쪽`}
@@ -229,7 +229,9 @@ function TutorSheet({ tutor, today, onClose }: { tutor?: Tutor; today: string; o
             <button
               className="btn btn-sm st-danger"
               onClick={() => {
-                if (!confirmDelete(`「${tutor.name}」`)) return;
+                const hws = alive(d.homework).filter((h) => h.tutorId === tutor.id);
+                if (!confirmDelete(`「${tutor.name}」`, hws.length ? `이 과외의 숙제 ${hws.length}개도 함께 지워요.` : '')) return;
+                for (const h of hws) remove('homework', h.id);
                 remove('tutors', tutor.id);
                 onClose();
               }}
@@ -276,11 +278,10 @@ function HomeworkSheet({ tutor, hw, today, onClose }: { tutor: Tutor; hw?: Homew
     for (const x of items) {
       const prev = hw?.items.find((i) => i.id === x.id);
       if (x.kind === 'pages') {
-        const m = x.pages.match(/^\s*(\d+)\s*(?:[-~]\s*(\d+))?\s*$/);
-        if (!m) continue;
-        const a = Number(m[1]);
-        const b = Number(m[2] ?? m[1]);
-        out.push({ ...prev, id: x.id, kind: 'pages', bookId: x.bookId || undefined, bookName: x.bookId ? undefined : x.bookName.trim() || '문제집', range: [Math.min(a, b), Math.max(a, b)] });
+        const m = x.pages.match(/^\s*(\d{1,12})\s*(?:[-~]\s*(\d{1,12}))?\s*$/);
+        const range = m && clampRange(Number(m[1]), Number(m[2] ?? m[1]));
+        if (!range) continue;
+        out.push({ ...prev, id: x.id, kind: 'pages', bookId: x.bookId || undefined, bookName: x.bookId ? undefined : x.bookName.trim() || '문제집', range });
       } else if (x.kind === 'words') {
         const l = d.wordLists[x.wordListId];
         if (!l) continue;
@@ -288,6 +289,8 @@ function HomeworkSheet({ tutor, hw, today, onClose }: { tutor: Tutor; hw?: Homew
       } else if (x.text.trim()) out.push({ ...prev, id: x.id, kind: 'text', text: x.text.trim() });
     }
     if (!out.length) return toast('숙제 내용을 넣어 주세요');
+    const at = Date.now();
+    for (const it of out) it.at = at;
     put('homework', { id: hw?.id ?? newId(), tutorId: tutor.id, given: hw?.given ?? today, due: manual ? due : autoDue, dueManual: manual, includeDue, items: out, note: note.trim() });
     onClose();
   }

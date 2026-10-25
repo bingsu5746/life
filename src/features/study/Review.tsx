@@ -1,12 +1,13 @@
 // 복습: 오답 노트 · 암기 카드 (설계 §9.1~9.3)
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { shortDate } from './dates';
 import { alive, newId, REASONS, type CardDeck, type MemoCard, type WrongNote, type WrongReason } from './model';
 import { answer, dueText, dueToday } from './review';
-import { getStudy, put, remove, useStudy } from './store';
+import { cardsToday } from './select';
+import { getStudy, put, putMany, remove, useStudy } from './store';
 import { addPhoto, photoUrl, removePhoto } from './photos';
 import { requeue } from './wordSession';
-import { Bar, confirmDelete, Empty, Field, go, Menu, Sheet, SubjectDot, SubjectPicker, SubjectTag, subjectsOf, toast, useToday } from './ui';
+import { Bar, confirmDelete, Empty, Field, go, Menu, Sheet, SubjectDot, SubjectPicker, SubjectTag, subjectsOf, toast, useToday, tap } from './ui';
 import { KeyHelp, RunCard } from './Words';
 
 export function Review({ sub }: { sub?: string }) {
@@ -21,7 +22,7 @@ function ReviewHome({ tab, sub }: { tab: 'notes' | 'cards'; sub?: string }) {
   const d = useStudy();
   const today = useToday();
   const notesDue = dueToday(alive(d.notes), today);
-  const cardsDue = dueToday(alive(d.cards), today);
+  const cardsDue = cardsToday(d, today);
   return (
     <div className="st-page">
       <div className="st-page-head">
@@ -164,6 +165,13 @@ function NoteSheet({ note, today, onClose }: { note?: WrongNote; today: string; 
     memo: note?.memo ?? '',
   }));
   const [busy, setBusy] = useState(false);
+  // 이 창에서 넣은 사진: 저장하지 않고 닫으면 지운다 (서버 사진 수 한도를 쓰지 않게)
+  const added = useRef<string[]>([]);
+  const saved = useRef(false);
+  const close = () => {
+    if (!saved.current) for (const p of added.current) void removePhoto(p);
+    onClose();
+  };
   const books = alive(d.books).filter((b) => !f.subjectId || b.subjectId === f.subjectId);
   async function addPhotos(files: FileList) {
     setBusy(true);
@@ -172,7 +180,8 @@ function NoteSheet({ note, today, onClose }: { note?: WrongNote; today: string; 
       try {
         const r = await addPhoto(file);
         ids.push(r.id);
-        if (r.error) toast(`이 기기에는 저장했지만 서버에는 못 올렸어요: ${r.error}`);
+        added.current.push(r.id);
+        if (r.error) toast(`이 기기에는 저장했어요. 서버에는 못 올려서 나중에 다시 올려요 (${r.error})`);
       } catch {
         toast('사진을 넣지 못했어요');
       }
@@ -184,10 +193,13 @@ function NoteSheet({ note, today, onClose }: { note?: WrongNote; today: string; 
     if (!f.subjectId) return toast('과목을 골라 주세요');
     const base = note ?? { id: newId(), created: Date.now(), box: 1, due: today, wrong: 1 };
     put('notes', { ...base, subjectId: f.subjectId, bookId: f.bookId || undefined, page: f.page ? Number(f.page) : undefined, number: f.number || undefined, question: f.question, photos: f.photos, myAnswer: f.myAnswer, answer: f.answer, reason: f.reason, memo: f.memo });
+    // 뺀 사진은 저장할 때 지운다 (취소하면 그대로 남게)
+    for (const p of note?.photos ?? []) if (!f.photos.includes(p)) void removePhoto(p);
+    saved.current = true;
     onClose();
   }
   return (
-    <Sheet title={note ? '오답 고치기' : '오답 넣기'} onClose={onClose} wide>
+    <Sheet title={note ? '오답 고치기' : '오답 넣기'} onClose={close} wide>
       <div className="st-form">
         <Field group label="과목">
           <SubjectPicker value={f.subjectId} onChange={(id) => setF({ ...f, subjectId: id })} />
@@ -215,7 +227,10 @@ function NoteSheet({ note, today, onClose }: { note?: WrongNote; today: string; 
                 className="st-x"
                 aria-label="사진 빼기"
                 onClick={() => {
-                  void removePhoto(p);
+                  if (added.current.includes(p)) {
+                    added.current = added.current.filter((x) => x !== p);
+                    void removePhoto(p);
+                  }
                   setF({ ...f, photos: f.photos.filter((x) => x !== p) });
                 }}
               >
@@ -255,8 +270,9 @@ function NoteSheet({ note, today, onClose }: { note?: WrongNote; today: string; 
               className="btn btn-sm st-danger"
               onClick={() => {
                 if (!confirmDelete('이 오답')) return;
-                for (const p of note.photos) void removePhoto(p);
+                for (const p of new Set([...note.photos, ...f.photos])) void removePhoto(p);
                 remove('notes', note.id);
+                saved.current = true;
                 onClose();
               }}
             >
@@ -264,7 +280,7 @@ function NoteSheet({ note, today, onClose }: { note?: WrongNote; today: string; 
             </button>
           )}
           {note?.learned && (
-            <button className="btn btn-sm" onClick={() => (put('notes', { ...note, learned: false, box: 1, due: today }), onClose())}>
+            <button className="btn btn-sm" onClick={() => (put('notes', { ...note, learned: false, box: 1, due: today }), close())}>
               다시 풀기에 넣기
             </button>
           )}
@@ -317,7 +333,7 @@ function NoteRun() {
         <button className="st-back" onClick={() => go('/review')} aria-label="그만하기">
           ✕
         </button>
-        <Bar value={total - queue.length} max={total} color="var(--ok)" />
+        <Bar value={total - queue.length} max={total} label="푼 문제" />
         <span className="st-muted">
           {total - queue.length + 1}/{total}
         </span>
@@ -336,11 +352,8 @@ function NoteRun() {
         {!revealed ? (
           <div className="st-row center">
             <p className="st-hint">답을 보기 전에 직접 풀어 보세요</p>
-            <button className="btn btn-lg st-no" onClick={() => setRevealed(true)}>
-              또 틀렸어요
-            </button>
-            <button className="btn btn-lg st-yes" onClick={() => reply(true)}>
-              맞혔어요
+            <button className="btn btn-lg btn-primary" onClick={() => setRevealed(true)}>
+              다 풀었어요 · 답 확인
             </button>
           </div>
         ) : (
@@ -354,11 +367,17 @@ function NoteRun() {
               {n.myAnswer && <div className="st-muted">처음 내 답: {n.myAnswer}</div>}
               {n.reason && <div>왜 틀렸나: {REASONS[n.reason]}</div>}
               {n.memo && <div>메모: {n.memo}</div>}
-              {!n.answer && !n.reason && !n.memo && <div className="st-muted">적어 둔 정답·메모가 없어요</div>}
+              {!n.answer && !n.reason && !n.memo && <div className="st-muted">적어 둔 정답·메모가 없어요. 풀이를 직접 맞춰 보세요</div>}
             </div>
-            <button className="btn btn-lg btn-primary" onClick={() => reply(false)}>
-              다음 (내일 다시)
-            </button>
+            <div className="st-row center">
+              <button className="btn btn-lg st-no" onClick={() => reply(false)}>
+                또 틀렸어요
+              </button>
+              <button className="btn btn-lg st-yes" onClick={() => reply(true)}>
+                맞혔어요
+              </button>
+            </div>
+            <p className="st-hint center">틀리면 {d.settings.intervals[0] === 1 ? '내일' : `${d.settings.intervals[0]}일 뒤`} 다시 풀어요</p>
           </>
         )}
       </div>
@@ -373,7 +392,7 @@ function Cards({ today, adding: add }: { today: string; adding?: boolean }) {
   const [adding, setAdding] = useState(!!add);
   const decks = alive(d.decks);
   const cards = alive(d.cards);
-  const due = dueToday(cards, today);
+  const due = cardsToday(d, today);
   return (
     <>
       <section className="st-card st-learn-cta">
@@ -406,9 +425,9 @@ function Cards({ today, adding: add }: { today: string; adding?: boolean }) {
                 <strong>
                   <SubjectDot id={dk.subjectId} d={d} /> {dk.name}
                 </strong>
-                <Bar value={n} max={cs.length} color={d.subjects[dk.subjectId]?.color} />
+                <Bar value={n} max={cs.length} label="익힌 카드" />
                 <small>
-                  {cs.length}장 · 오늘 {dueToday(cs, today).length + cs.filter((c) => c.box === 0).length}
+                  {cs.length}장 · 오늘 {cardsToday(d, today, dk.id).length}
                 </small>
               </button>
             );
@@ -508,7 +527,10 @@ function DeckView({ id }: { id: string }) {
             className="btn btn-primary"
             disabled={!parsed.length}
             onClick={() => {
-              for (const c of parsed) put('cards', { id: newId(), deckId: id, front: c.front, back: c.back, box: 0, due: today, wrong: 0 });
+              {
+                const now = Date.now();
+                putMany(parsed.map((c, i) => ({ c: 'cards' as const, item: { id: newId(), deckId: id, front: c.front, back: c.back, box: 0, due: today, wrong: 0, created: now + i } })));
+              }
               setText('');
               toast(`${parsed.length}장을 넣었어요`);
             }}
@@ -528,7 +550,7 @@ function DeckView({ id }: { id: string }) {
         <table className="st-table words">
           <tbody>
             {cards.map((c) => (
-              <tr key={c.id} onClick={() => setCard(c)}>
+              <tr key={c.id} {...tap(() => setCard(c))}>
                 <td className="st-term">{c.front}</td>
                 <td>{c.back}</td>
                 <td className="st-muted nowrap">{dueText(c, today)}</td>
@@ -573,9 +595,8 @@ function CardRun() {
   const deckId = new URLSearchParams(window.location.hash.split('?')[1] ?? '').get('deck');
   const [flip, setFlip] = useState(false);
   const [queue, setQueue] = useState<string[]>(() => {
-    const cs = alive(getStudy().cards).filter((c) => !deckId || c.deckId === deckId);
-    // 복습할 카드 + (묶음을 고르면) 새 카드 20장까지
-    return [...dueToday(cs, today), ...(deckId ? cs.filter((c) => c.box === 0).slice(0, 20) : [])].map((c) => c.id);
+    // 복습할 카드 + 오늘 새로 볼 카드 (하루 정한 수까지)
+    return cardsToday(getStudy(), today, deckId).map((c) => c.id);
   });
   const [total] = useState(queue.length);
   const [first, setFirst] = useState<Map<string, boolean>>(new Map());
@@ -599,7 +620,7 @@ function CardRun() {
   function reply(ok: boolean) {
     if (!first.has(c!.id)) {
       const s = getStudy().settings;
-      put('cards', answer(c!, ok, 'card', today, s.intervals, s.quizMaxBox));
+      put('cards', { ...answer(c!, ok, 'card', today, s.intervals, s.quizMaxBox), firstSeen: c!.firstSeen ?? today });
       setFirst(new Map(first).set(c!.id, ok));
     }
     setQueue(requeue(queue, ok));
@@ -611,7 +632,7 @@ function CardRun() {
         <button className="st-back" onClick={() => go('/review/cards')} aria-label="그만하기">
           ✕
         </button>
-        <Bar value={first.size} max={total} color="var(--ok)" />
+        <Bar value={first.size} max={total} label="본 카드" />
         <label className="st-toggle sm">
           <input type="checkbox" checked={flip} onChange={(e) => setFlip(e.target.checked)} /> 뒤→앞
         </label>

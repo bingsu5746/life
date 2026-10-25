@@ -3,8 +3,9 @@ import { useState } from 'react';
 import { addDays, dday, diffDays, longDate, shortDate } from './dates';
 import { addProgress, daysAgo, examEnd, examProgress, nextSubjects, scopeDate, scopeLines, scopeText, upcomingExams } from './exams';
 import { alive, newId, type Exam, type ExamScope, type Subject } from './model';
-import { put, remove, useStudy } from './store';
-import { Bar, Check, confirmDelete, Empty, Field, go, Icon, Menu, Sheet, SubjectDot, SubjectPicker, subjectsOf, toast, useToday } from './ui';
+import { put, useStudy } from './store';
+import { removeExam } from './actions';
+import { Bar, Check, confirmDelete, Empty, Field, go, Icon, Menu, Sheet, SubjectDot, SubjectPicker, subjectsOf, toast, useToday, tap } from './ui';
 
 /** id: 'new' 이면 시험 넣기 창, 'progress' 면 학교 진도 적기 창, 그 밖엔 시험 하나 */
 export function Exams({ id }: { id?: string }) {
@@ -53,7 +54,7 @@ function ExamList({ adding, progress }: { adding: boolean; progress: boolean }) 
                 </small>
                 {p.total > 0 ? (
                   <>
-                    <Bar value={p.done} max={p.total} />
+                    <Bar value={p.done} max={p.total} label="시험 범위" />
                     <small>
                       범위 {p.done}/{p.total} · 과목 {e.scopes?.length ?? 0}개
                     </small>
@@ -82,7 +83,7 @@ function ExamList({ adding, progress }: { adding: boolean; progress: boolean }) 
           subjects.map((s) => {
             const last = s.progress?.[s.progress.length - 1];
             return (
-              <div key={s.id} className="st-item st-tap" role="button" tabIndex={0} onClick={() => setProg(s)}>
+              <div key={s.id} className="st-item st-tap" {...tap(() => setProg(s))}>
                 <SubjectDot id={s.id} d={d} />
                 <div className="st-item-main">
                   <div className="st-item-title">{s.name}</div>
@@ -99,7 +100,7 @@ function ExamList({ adding, progress }: { adding: boolean; progress: boolean }) 
         <details className="st-card st-more">
           <summary>지난 시험 {past.length}</summary>
           {past.map((e) => (
-            <div key={e.id} className="st-item st-tap" role="button" tabIndex={0} onClick={() => go(`/exams/${e.id}`)}>
+            <div key={e.id} className="st-item st-tap" {...tap(() => go(`/exams/${e.id}`))}>
               <div className="st-item-main">
                 <div className="st-item-title">{e.name}</div>
                 <div className="st-item-sub">{longDate(e.date)}</div>
@@ -215,7 +216,7 @@ function ExamDetail({ id }: { id: string }) {
   const scopes = [...(exam.scopes ?? [])].sort((a, b) => scopeDate(exam, a).localeCompare(scopeDate(exam, b)));
   const plans = alive(d.plans).filter((pl) => pl.examId === exam.id && !pl.finished);
   const saveScopes = (list: ExamScope[]) => put('exams', { ...exam, scopes: list });
-  const toggle = (s: ExamScope, lineId: string) => saveScopes((exam.scopes ?? []).map((x) => (x.id === s.id ? { ...x, lines: x.lines.map((l) => (l.id === lineId ? { ...l, done: !l.done } : l)) } : x)));
+  const toggle = (s: ExamScope, lineId: string) => saveScopes((exam.scopes ?? []).map((x) => (x.id === s.id ? { ...x, lines: x.lines.map((l) => (l.id === lineId ? { ...l, done: !l.done, at: Date.now() } : l)) } : x)));
   const left = diffDays(today, exam.date);
 
   return (
@@ -234,7 +235,7 @@ function ExamDetail({ id }: { id: string }) {
               danger: true,
               onClick: () => {
                 if (!confirmDelete(`「${exam.name}」`)) return;
-                remove('exams', exam.id);
+                removeExam(exam.id);
                 go('/exams');
               },
             },
@@ -251,7 +252,7 @@ function ExamDetail({ id }: { id: string }) {
         </div>
         {p.total > 0 && (
           <div className="st-exam-hero-bar">
-            <Bar value={p.done} max={p.total} />
+            <Bar value={p.done} max={p.total} label="시험 범위" />
             <small>
               범위 {p.done}/{p.total} ({Math.round((p.done / p.total) * 100)}%)
             </small>
@@ -264,7 +265,7 @@ function ExamDetail({ id }: { id: string }) {
         const n = s.lines.filter((l) => l.done).length;
         return (
           <section key={s.id} className="st-card">
-            <div className="st-scope-head st-tap" role="button" tabIndex={0} onClick={() => setScope(s)} title="범위 고치기">
+            <div className="st-scope-head st-tap" {...tap(() => setScope(s))} title="범위 고치기">
               <SubjectDot id={s.subjectId} d={d} />
               <b>{d.subjects[s.subjectId]?.name ?? '과목'}</b>
               <span className="st-pill">
@@ -301,7 +302,7 @@ function ExamDetail({ id }: { id: string }) {
           {plans.map((pl) => {
             const owner = pl.target === 'book' ? d.books[pl.targetId] : d.wordLists[pl.targetId];
             return (
-              <div key={pl.id} className="st-item st-tap" role="button" tabIndex={0} onClick={() => go(pl.target === 'book' ? `/books/${pl.targetId}` : `/words/${pl.targetId}`)}>
+              <div key={pl.id} className="st-item st-tap" {...tap(() => go(pl.target === 'book' ? `/books/${pl.targetId}` : `/words/${pl.targetId}`))}>
                 <SubjectDot id={owner?.subjectId} d={d} />
                 <div className="st-item-main">
                   <div className="st-item-title">{owner?.name}</div>
@@ -367,7 +368,7 @@ function ScopeSheet({ exam, scope, onClose, onSave, onDelete }: { exam: Exam; sc
           <button
             className="btn btn-primary"
             disabled={!subjectId || !lines.length || used.has(subjectId)}
-            onClick={() => onSave({ id: scope?.id ?? newId(), subjectId, date: date && date !== exam.date ? date : undefined, lines, note: note.trim() || undefined })}
+            onClick={() => onSave({ id: scope?.id ?? newId(), subjectId, date: date && date !== exam.date ? date : undefined, lines, note: note.trim() || undefined, at: Date.now() })}
           >
             저장 ({lines.length}줄)
           </button>
@@ -392,7 +393,7 @@ export function DdayHero({ today }: { today: string }) {
   const subs = nextSubjects(e, today).slice(0, 4);
   const left = diffDays(today, e.date);
   return (
-    <section className="st-hero" role="button" tabIndex={0} onClick={() => go(`/exams/${e.id}`)} aria-label={`${e.name} ${dday(today, e.date)}`}>
+    <section className="st-hero" {...tap(() => go(`/exams/${e.id}`))} aria-label={`${e.name} ${dday(today, e.date)}`}>
       <div className="st-hero-main">
         <span className="st-hero-dday">{left > 0 ? `D-${left}` : left === 0 ? 'D-day' : '시험 중'}</span>
         <div>
@@ -402,7 +403,7 @@ export function DdayHero({ today }: { today: string }) {
       </div>
       {p.total > 0 && (
         <div className="st-hero-bar">
-          <Bar value={p.done} max={p.total} />
+          <Bar value={p.done} max={p.total} label="시험 범위" />
           <small>
             시험 범위 {p.done}/{p.total}
           </small>
