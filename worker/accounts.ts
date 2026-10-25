@@ -13,6 +13,7 @@
 //   (학교처럼 여럿이 한 주소를 같이 쓰는 곳을 생각해 넉넉하게 잡는다)
 import { DurableObject } from 'cloudflare:workers';
 import { COOKIE_NAME, cutText, Limiter, passwordProblem, readCookie } from './security';
+import { fetchBoxOffice, fetchUpcoming } from './kobis';
 import { allowedEndpoint, localDate, makeVapid, nextFire, sendPush, type PushSub, type Vapid } from './push';
 import { buildExamplesInput, readExamples, readExamplesRequest, buildInput, buildMeaningsInput, FAST_MODEL, modelInput, parseTranslation, readMeanings, readOutput, readRequest, readWordsRequest, TRANSLATE_MODEL } from './translate';
 
@@ -85,6 +86,8 @@ export class Accounts extends DurableObject<Env> {
   private translateByUser = new Limiter(30, 10 * 60_000);
   private translateByUserDay = new Limiter(300, DAY);
   private translateAll = new Limiter(1500, DAY);
+  // 영화 정보 (KOBIS): 결과는 6시간 동안 저장해 두고 같이 쓴다
+  private kobisByIp = new Limiter(60, 60 * 60_000);
 
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
@@ -100,6 +103,7 @@ export class Accounts extends DurableObject<Env> {
       CREATE INDEX IF NOT EXISTS push_subs_user ON push_subs (user_id);
       CREATE TABLE IF NOT EXISTS notify (user_id TEXT PRIMARY KEY, times TEXT NOT NULL, tz INTEGER NOT NULL, next_at INTEGER, digest TEXT NOT NULL DEFAULT '[]', origin TEXT NOT NULL);
       CREATE TABLE IF NOT EXISTS vapid (id INTEGER PRIMARY KEY, pub TEXT NOT NULL, priv TEXT NOT NULL);
+      CREATE TABLE IF NOT EXISTS cache (key TEXT PRIMARY KEY, data TEXT NOT NULL, at INTEGER NOT NULL);
     `);
   }
 
@@ -142,6 +146,7 @@ export class Accounts extends DurableObject<Env> {
       }
     }
 
+    if (path === 'movies/kobis' && req.method === 'GET') return this.kobis(ip, req.headers.get('x-life-kobis-key') ?? undefined);
     if (path === 'auth/signup' && req.method === 'POST') return this.signup(body, ip);
     if (path === 'auth/login' && req.method === 'POST') return this.login(body, ip);
 
@@ -379,6 +384,34 @@ export class Accounts extends DurableObject<Env> {
     // 다른 기기의 로그인은 모두 끊는다 (이 기기는 그대로)
     this.sql.exec('DELETE FROM sessions WHERE user_id = ? AND token_hash != ?', user.id, keepToken);
     return json({ ok: true });
+  }
+
+  // ===== 영화 정보 (KOBIS) =====
+
+  private async kobis(ip: string, fromWorker?: string): Promise<Response> {
+    if (this.kobisByIp.hit(ip)) return fail('잠시 뒤에 다시 해 주세요.', 429);
+    // 키는 바깥 Worker 가 비밀값에서 꺼내 붙여 준다 (밖에서 온 같은 이름 머리글은 Worker 가 지운다)
+    const key = fromWorker || (this.env as unknown as { KOBIS_KEY?: string }).KOBIS_KEY;
+    if (!key) return fail('영화 정보 키(KOBIS_KEY)가 아직 설정되지 않았어요.', 503);
+    // 한국 날짜
+    const kst = (offset: number) => new Date(Date.now() + 9 * 3600_000 + offset * 86_400_000).toISOString().slice(0, 10);
+    const today = kst(0);
+    const cached = this.sql.exec<{ data: string; at: number }>("SELECT data, at FROM cache WHERE key = 'kobis'").toArray()[0];
+    if (cached && Date.now() - cached.at < 6 * 3600_000 && (JSON.parse(cached.data) as { today?: string }).today === today) return json(JSON.parse(cached.data));
+    const out: { today: string; boxOffice?: unknown; upcoming?: unknown; errors: string[] } = { today, errors: [] };
+    try {
+      out.boxOffice = await fetchBoxOffice(key, kst(-1));
+    } catch (e) {
+      out.errors.push(`박스오피스: ${e instanceof Error ? e.message : String(e)}`);
+    }
+    try {
+      out.upcoming = await fetchUpcoming(key, today, kst(90));
+    } catch (e) {
+      out.errors.push(`개봉 예정: ${e instanceof Error ? e.message : String(e)}`);
+    }
+    if (out.boxOffice || out.upcoming) this.sql.exec("INSERT OR REPLACE INTO cache (key, data, at) VALUES ('kobis', ?, ?)", JSON.stringify(out), Date.now());
+    else console.error('kobis failed', out.errors.join(' / '));
+    return json(out);
   }
 
   // ===== 알림 (웹 푸시) =====

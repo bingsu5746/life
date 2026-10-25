@@ -202,3 +202,14 @@ export async function notifyTest() {
 export async function wordExamples(items: { term: string; meaning: string }[]) {
   return call<{ examples: ({ s: string; ko: string } | null)[] }>('translate', 'POST', { examples: items });
 }
+
+export interface KobisInfo {
+  today: string;
+  boxOffice?: { rank: number; title: string; open?: string; audience?: number; code?: string }[];
+  upcoming?: { code: string; title: string; titleEn?: string; open: string; genre?: string; nation?: string; director?: string }[];
+  errors: string[];
+}
+/** 영화진흥위원회(KOBIS) 어제 박스오피스 · 개봉 예정 (서버가 6시간 저장해 둠) */
+export async function kobisInfo() {
+  return call<KobisInfo>('movies/kobis');
+}

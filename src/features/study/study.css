@@ -4160,3 +4160,20 @@ body {
     padding: 4px 10px;
   }
 }
+
+.mv-now {
+  display: grid;
+  gap: 12px;
+}
+
+.mv-rank {
+  width: 1.6em;
+  text-align: center;
+  font-size: 1.05rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.mv-open {
+  min-width: 4.5em;
+  line-height: 1.3;
+}

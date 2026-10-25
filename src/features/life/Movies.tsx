@@ -1,5 +1,6 @@
 // 영화: 본 영화에 별점(0.5 단위)과 한줄평, 보고 싶은 영화(개봉일 D-day). 내 기록만 (외부 영화 정보는 쓰지 않음)
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { kobisInfo, type KobisInfo } from '../auth/api';
 import { BarChart } from '../study/charts';
 import { dday, shortDate } from '../study/dates';
 import { alive, newId, type Movie } from '../study/model';
@@ -32,7 +33,7 @@ export function HobbyTabs({ on }: { on: 'hobby' | 'movies' }) {
 export function Movies({ sub }: { sub?: string }) {
   const d = useStudy();
   const today = useToday();
-  const [tab, setTab] = useState<'watched' | 'want'>('watched');
+  const [tab, setTab] = useState<'watched' | 'want' | 'now'>('watched');
   const [sort, setSort] = useState<'recent' | 'rating'>('recent');
   const [edit, setEdit] = useState<Movie | 'new' | null>(sub === 'new' ? 'new' : null);
   const all = alive(d.movies);
@@ -83,6 +84,12 @@ export function Movies({ sub }: { sub?: string }) {
             영화 넣기
           </button>
         </Empty>
+      ) : null}
+      {!all.length ? (
+        <section className="st-card">
+          <h3 className="st-h">극장가</h3>
+          <NowShowing today={today} />
+        </section>
       ) : (
         <>
           <section className="st-card">
@@ -111,6 +118,9 @@ export function Movies({ sub }: { sub?: string }) {
               <button className={tab === 'want' ? 'on' : ''} aria-pressed={tab === 'want'} onClick={() => setTab('want')}>
                 보고 싶어요 {want.length || ''}
               </button>
+              <button className={tab === 'now' ? 'on' : ''} aria-pressed={tab === 'now'} onClick={() => setTab('now')}>
+                극장가
+              </button>
             </div>
             {tab === 'watched' && (
               <select className="st-input sm" value={sort} onChange={(e) => setSort(e.target.value as 'recent' | 'rating')} aria-label="정렬">
@@ -120,6 +130,9 @@ export function Movies({ sub }: { sub?: string }) {
             )}
           </div>
 
+          {tab === 'now' ? (
+            <NowShowing today={today} />
+          ) : (
           <div className="mv-list">
             {(tab === 'watched' ? watched : want).map((m) => (
               <article key={m.id} className="mv-card st-tap" {...tap(() => setEdit(m))}>
@@ -154,9 +167,10 @@ export function Movies({ sub }: { sub?: string }) {
               </article>
             ))}
           </div>
+          )}
         </>
       )}
-      <p className="st-hint">곧 개봉하는 영화 목록은 영화 정보 사이트와 연결해야 해서 지금은 직접 넣어요. 왓챠피디아와는 연결하지 않았어요.</p>
+      <p className="st-hint">「극장가」의 박스오피스·개봉 예정 정보는 영화진흥위원회(KOBIS) 오픈 API 에서 받아요. 왓챠피디아와는 연결하지 않았어요.</p>
       {edit && <MovieSheet item={edit === 'new' ? undefined : edit} today={today} onClose={close} />}
     </div>
   );
@@ -267,5 +281,77 @@ function MovieSheet({ item, today, onClose }: { item?: Movie; today: string; onC
         </div>
       </div>
     </Sheet>
+  );
+}
+
+/** 어제 박스오피스 · 앞으로 90일 개봉 예정 (KOBIS) */
+function NowShowing({ today }: { today: string }) {
+  const d = useStudy();
+  const [info, setInfo] = useState<KobisInfo | null>(null);
+  const [err, setErr] = useState('');
+  useEffect(() => {
+    let on = true;
+    kobisInfo()
+      .then((r) => on && setInfo(r))
+      .catch((e: Error) => on && setErr(e.message));
+    return () => {
+      on = false;
+    };
+  }, []);
+  const have = new Set(alive(d.movies).map((m) => m.title.replace(/\s+/g, '')));
+  const add = (title: string, release?: string) => {
+    put('movies', { id: newId(), title, status: 'want', release, created: Date.now() } as Movie);
+    toast(`「${title}」 보고 싶어요에 넣었어요`);
+  };
+  if (err) return <p className="st-hint bad">{err}</p>;
+  if (!info) return <p className="st-muted">영화 정보를 받는 중…</p>;
+  return (
+    <div className="mv-now">
+      {info.errors.length > 0 && <p className="st-hint bad">{info.errors.join(' · ')}</p>}
+      {info.boxOffice && info.boxOffice.length > 0 && (
+        <section className="st-card">
+          <h3 className="st-h">어제 박스오피스</h3>
+          {info.boxOffice.map((m) => (
+            <div key={m.rank} className="st-item">
+              <b className="mv-rank">{m.rank}</b>
+              <div className="st-item-main">
+                <div className="st-item-title">{m.title}</div>
+                <div className="st-item-sub">{[m.open && `${shortDate(m.open)} 개봉`, m.audience && `누적 ${m.audience.toLocaleString('ko-KR')}명`].filter(Boolean).join(' · ')}</div>
+              </div>
+              {!have.has(m.title.replace(/\s+/g, '')) && (
+                <button className="btn btn-sm" onClick={() => add(m.title, m.open)}>
+                  보고 싶어요
+                </button>
+              )}
+            </div>
+          ))}
+        </section>
+      )}
+      {info.upcoming && (
+        <section className="st-card">
+          <h3 className="st-h">개봉 예정 (90일 안)</h3>
+          {!info.upcoming.length && <p className="st-hint">찾은 개봉 예정 영화가 없어요.</p>}
+          {info.upcoming.slice(0, 60).map((m) => (
+            <div key={m.code} className="st-item">
+              <small className="st-muted nowrap mv-open">
+                {shortDate(m.open)}
+                <br />
+                {dday(today, m.open)}
+              </small>
+              <div className="st-item-main">
+                <div className="st-item-title">{m.title}</div>
+                <div className="st-item-sub">{[m.genre, m.nation, m.director].filter(Boolean).join(' · ')}</div>
+              </div>
+              {!have.has(m.title.replace(/\s+/g, '')) && (
+                <button className="btn btn-sm" onClick={() => add(m.title, m.open)}>
+                  보고 싶어요
+                </button>
+              )}
+            </div>
+          ))}
+        </section>
+      )}
+      <p className="st-hint">자료: 영화진흥위원회 영화관입장권통합전산망(KOBIS). 6시간마다 새로 받아요.</p>
+    </div>
   );
 }
