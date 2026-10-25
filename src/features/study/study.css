@@ -3128,3 +3128,78 @@ input[type='range'] {
   color: var(--muted);
   font-size: 0.78rem;
 }
+
+/* 폰 아래 메뉴: 칸이 많으면 좁게, 그래도 넘치면 옆으로 밀어서 */
+@media (max-width: 860px) {
+  .st-nav {
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+
+  .st-nav::-webkit-scrollbar {
+    display: none;
+  }
+
+  .st-tab {
+    flex: 1 0 38px;
+  }
+}
+
+/* ===== 번역: 사전 보기 · 직역 ===== */
+.tr-literal {
+  margin-right: auto;
+}
+
+.tr-row > .tr-literal + small {
+  margin-right: 0;
+}
+
+.tr-dict {
+  display: grid;
+  gap: 8px;
+}
+
+.tr-word {
+  font-size: 1.4rem;
+  letter-spacing: -0.3px;
+}
+
+.tr-sense {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+  font-size: 1.05rem;
+}
+
+.tr-example {
+  display: grid;
+  gap: 2px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--soft);
+}
+
+.tr-literal-out {
+  display: grid;
+  gap: 2px;
+  padding-top: 10px;
+  border-top: 1px solid var(--line);
+}
+
+.tr-literal-out p {
+  margin: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+/* ===== 예습 ===== */
+.pv-check {
+  display: grid;
+  gap: 8px;
+  padding: 10px 0;
+  border-top: 1px solid var(--line);
+}
+
+.pv-check:first-of-type {
+  border-top: 0;
+}

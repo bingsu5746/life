@@ -17,24 +17,17 @@ const Life = lazy(() => import('./Life').then((m) => ({ default: m.Life })));
 const Review = lazy(() => import('./Review').then((m) => ({ default: m.Review })));
 const Settings = lazy(() => import('./Settings').then((m) => ({ default: m.Settings })));
 const Time = lazy(() => import('./Time').then((m) => ({ default: m.Time })));
+const Preview = lazy(() => import('./Preview').then((m) => ({ default: m.Preview })));
 const Translate = lazy(() => import('./Translate').then((m) => ({ default: m.Translate })));
 const Tutors = lazy(() => import('./Tutors').then((m) => ({ default: m.Tutors })));
 const Words = lazy(() => import('./Words').then((m) => ({ default: m.Words })));
 
-const PRELOAD = [() => import('./Books'), () => import('./Life'), () => import('./Review'), () => import('./Settings'), () => import('./Time'), () => import('./Translate'), () => import('./Tutors'), () => import('./Words')];
+const PRELOAD = [() => import('./Books'), () => import('./Life'), () => import('./Review'), () => import('./Settings'), () => import('./Time'), () => import('./Translate'), () => import('./Preview'), () => import('./Tutors'), () => import('./Words')];
 
-const TABS = [
-  { key: 'today', label: '오늘' },
-  { key: 'exams', label: '시험' },
-  { key: 'books', label: '문제집' },
-  { key: 'tutor', label: '과외' },
-  { key: 'words', label: '영단어' },
-  { key: 'review', label: '복습' },
-  { key: 'time', label: '기록' },
-  { key: 'life', label: '할 일·습관', short: '할 일' },
-] as const;
-/** 메뉴에는 없지만 열 수 있는 화면 (설정·번역은 맨 위 막대의 단추) */
-const HIDDEN = ['settings', 'translate'];
+import { TABS } from './tabs';
+export { TABS };
+/** 메뉴에는 없지만 열 수 있는 화면 (설정은 맨 위 막대의 톱니) */
+const HIDDEN = ['settings'];
 
 export function Study({ path, loggedIn, syncReady = true, onLogin }: { path: string[]; loggedIn: boolean; syncReady?: boolean; onLogin: () => void }) {
   const d = useStudy();
@@ -70,6 +63,7 @@ export function Study({ path, loggedIn, syncReady = true, onLogin }: { path: str
   else if (tab === 'time') content = <Time sub={id} />;
   else if (tab === 'life') content = <Life sub={id} />;
   else if (tab === 'settings') content = <Settings />;
+  else if (tab === 'preview') content = <Preview sub={id} />;
   else if (tab === 'translate') content = <Translate loggedIn={loggedIn} onLogin={onLogin} />;
   else if (tab === 'exams') content = <Exams id={id} sub={sub} />;
   else content = <Today />;
@@ -78,7 +72,7 @@ export function Study({ path, loggedIn, syncReady = true, onLogin }: { path: str
     <main className={`study ${running ? 'running' : ''}`}>
       {!running && (
         <nav className="st-nav" aria-label="공부 메뉴">
-          {TABS.map((t) => (
+          {TABS.filter((t) => t.key === 'today' || t.key === tab || !d.settings.hiddenTabs?.includes(t.key)).map((t) => (
             <button key={t.key} className={`st-tab ${tab === t.key ? 'on' : ''}`} aria-current={tab === t.key ? 'page' : undefined} onClick={() => go(t.key === 'today' ? '/' : `/${t.key}`)}>
               <Icon name={t.key} />
               <span className="st-tab-label">{t.label}</span>

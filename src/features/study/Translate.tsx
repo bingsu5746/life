@@ -1,7 +1,7 @@
 // 한국어 ↔ 영어 번역기. 번역은 서버(worker/translate.ts)가 하고, 로그인한 사람만 쓸 수 있다 (무료 한도를 지키려고).
 // 영어 낱말을 한국어로 바꾸면 「모르는 단어 모음」에 바로 넣을 수 있다.
 import { useEffect, useRef, useState } from 'react';
-import { translate } from '../auth/api';
+import { translate, type TranslateResult } from '../auth/api';
 import { addToInbox } from './actions';
 import { useWords } from './store';
 import { toast, useToday } from './ui';
@@ -15,16 +15,35 @@ interface Recent {
   from: string;
   to: string;
   target: Lang;
+  /** 화면에 다시 보여 줄 번역 결과 (예전 기록에는 없음) */
+  r?: TranslateResult;
 }
 
 const hasHangul = (s: string) => /[ㄱ-ㆎ가-힣]/.test(s);
 /** 낱말 하나나 짧은 말(세 낱말까지)인 영어인지: 단어 모음에 넣을 수 있는지 */
 const isShortEnglish = (s: string) => /^[A-Za-z][A-Za-z'\-.]*( [A-Za-z][A-Za-z'\-.]*){0,2}$/.test(s.trim());
 
+const isStr = (v: unknown): v is string => typeof v === 'string';
+/** 기기에 남긴 번역 결과 모양이 맞는지 (망가진 기록으로 화면이 멈추지 않게) */
+function okResult(r: unknown): r is TranslateResult {
+  if (!r || typeof r !== 'object') return false;
+  const x = r as TranslateResult;
+  return (
+    isStr(x.text) &&
+    (x.literal === undefined || isStr(x.literal)) &&
+    (x.senses === undefined || (Array.isArray(x.senses) && x.senses.every((v) => v && isStr(v.pos) && isStr(v.text)))) &&
+    (x.examples === undefined || (Array.isArray(x.examples) && x.examples.every((v) => v && isStr(v.a) && isStr(v.b))))
+  );
+}
+
 function readRecent(): Recent[] {
   try {
     const r = JSON.parse(localStorage.getItem(RECENT_KEY) ?? '[]') as Recent[];
-    return Array.isArray(r) ? r.filter((x) => x && typeof x.from === 'string' && typeof x.to === 'string' && (x.target === 'ko' || x.target === 'en')).slice(0, 10) : [];
+    if (!Array.isArray(r)) return [];
+    return r
+      .filter((x) => x && typeof x.from === 'string' && typeof x.to === 'string' && (x.target === 'ko' || x.target === 'en'))
+      .slice(0, 10)
+      .map((x) => ({ from: x.from, to: x.to, target: x.target, r: okResult(x.r) ? x.r : undefined }));
   } catch {
     return [];
   }
@@ -54,7 +73,8 @@ export function Translate({ loggedIn, onLogin }: { loggedIn: boolean; onLogin: (
   // 바꿀 언어. 사람이 직접 고르기 전에는 넣은 글을 보고 정한다
   const [target, setTarget] = useState<Lang>('en');
   const [manual, setManual] = useState(false);
-  const [result, setResult] = useState<{ from: string; to: string; target: Lang } | null>(null);
+  const [result, setResult] = useState<Recent | null>(null);
+  const [literal, setLiteral] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [recent, setRecent] = useState<Recent[]>(readRecent);
@@ -77,9 +97,9 @@ export function Translate({ loggedIn, onLogin }: { loggedIn: boolean; onLogin: (
     setBusy(true);
     setError('');
     try {
-      const r = await translate(t, to);
+      const r = await translate(t, to, literal);
       if (my !== seq.current) return;
-      const item = { from: t, to: r.text, target: r.to };
+      const item: Recent = { from: t, to: r.text, target: r.to, r };
       setResult(item);
       const next = [item, ...recent.filter((x) => !(x.from === t && x.target === r.to))].slice(0, 10);
       setRecent(next);
@@ -111,7 +131,9 @@ export function Translate({ loggedIn, onLogin }: { loggedIn: boolean; onLogin: (
 
   const shown = result && result.from === text.trim() ? result : null;
   const word = shown && shown.target === 'ko' && isShortEnglish(shown.from) ? shown.from.trim() : shown && shown.target === 'en' && isShortEnglish(shown.to) ? shown.to.trim() : '';
-  const meaning = word ? (shown!.target === 'ko' ? shown!.to : shown!.from) : '';
+  const senses = shown?.r?.senses;
+  // 단어 모음에 넣을 뜻: 사전 보기면 앞의 두 품사 뜻
+  const meaning = word ? (shown!.target === 'ko' ? (senses?.length ? senses.slice(0, 2).map((x) => x.text).join('; ') : shown!.to) : shown!.from) : '';
 
   return (
     <div className="st-page narrow">
@@ -161,6 +183,9 @@ export function Translate({ loggedIn, onLogin }: { loggedIn: boolean; onLogin: (
             }}
           />
           <div className="tr-row">
+            <label className="st-toggle tr-literal">
+              <input type="checkbox" checked={literal} onChange={(e) => setLiteral(e.target.checked)} /> 직역도 함께
+            </label>
             <small className="st-muted">
               {text.length.toLocaleString()} / {MAX.toLocaleString()}
             </small>
@@ -193,9 +218,32 @@ export function Translate({ loggedIn, onLogin }: { loggedIn: boolean; onLogin: (
 
       {shown && (
         <section className="st-card tr-box" aria-live="polite">
-          <p className="tr-out" lang={shown.target}>
-            {shown.to}
-          </p>
+          {senses?.length ? (
+            <div className="tr-dict" lang={shown.target}>
+              <b className="tr-word">{shown.from}</b>
+              {senses.map((x, i) => (
+                <div key={i} className="tr-sense">
+                  <span className="st-pill">{x.pos}</span> {x.text}
+                </div>
+              ))}
+              {shown.r?.examples?.map((x, i) => (
+                <div key={i} className="tr-example">
+                  <span lang={shown.target === 'ko' ? 'en' : 'ko'}>{x.a}</span>
+                  <small className="st-muted">{x.b}</small>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="tr-out" lang={shown.target}>
+              {shown.to}
+            </p>
+          )}
+          {shown.r?.literal && (
+            <div className="tr-literal-out">
+              <small className="st-muted">직역</small>
+              <p lang={shown.target}>{shown.r.literal}</p>
+            </div>
+          )}
           <div className="tr-row">
             {canSpeak() && (
               <button className="btn btn-sm" onClick={() => speak(shown.to, shown.target)}>
@@ -241,6 +289,7 @@ export function Translate({ loggedIn, onLogin }: { loggedIn: boolean; onLogin: (
                 <button
                   className="tr-recent-item"
                   onClick={() => {
+                    setLiteral(!!r.r?.literal);
                     setText(r.from);
                     setTarget(r.target);
                     setManual(true);

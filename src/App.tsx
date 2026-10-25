@@ -51,11 +51,6 @@ export default function App() {
           <span>내 공부</span>
         </button>
         <div className="account">
-          <button className="gear-btn" aria-label="번역" title="번역 (한국어 ↔ 영어)" onClick={() => (window.location.hash = '/translate')}>
-            <svg viewBox="0 0 24 24" aria-hidden>
-              <path d="M4 5h8M8 3v2M10 5c-.5 3.5-2.5 6-5.5 7.5M6 8c1 2 2.6 3.4 4.5 4.2M13 20l4-9 4 9M14.4 17h5.2" />
-            </svg>
-          </button>
           <button className="gear-btn" aria-label="설정" title="설정" onClick={() => (window.location.hash = '/settings')}>
             <svg viewBox="0 0 24 24" aria-hidden>
               <path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z" />

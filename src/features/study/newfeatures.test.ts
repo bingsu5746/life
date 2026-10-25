@@ -140,3 +140,19 @@ describe('붙여넣기 형식 더', () => {
     expect(splitWordLine('in spite of, ~에도 불구하고')?.term).toBe('in spite of');
   });
 });
+
+describe('예습', () => {
+  it('오늘 화면에 보일 것·수업 날 글', async () => {
+    const { previewsForToday, classDayText } = await import('./Preview');
+    const p = (id: string, date: string, done = false) => ({ id, updatedAt: 1, subjectId: 'm', date, text: id, done, created: 1 });
+    expect(previewsForToday([p('a', '2026-10-27'), p('b', '2026-10-26'), p('c', '2026-10-24'), p('d', '2026-10-26', true)], '2026-10-25').map((x) => x.id)).toEqual(['c', 'b']);
+    expect(classDayText('2026-10-25', '2026-10-25')).toBe('오늘 수업');
+    expect(classDayText('2026-10-25', '2026-10-26')).toBe('내일 수업');
+    expect(classDayText('2026-10-25', '2026-10-24')).toContain('지남');
+  });
+  it('다듬기', () => {
+    const c = sanitizeCollections({ previews: { a: { id: 'a', updatedAt: 1, date: '2026-10-26', text: 3, after: 'x', done: 'yes' }, b: { id: 'b', updatedAt: 1, date: 'no' } } as never });
+    expect(Object.keys(c.previews)).toEqual(['a']);
+    expect(c.previews.a).toMatchObject({ text: '', after: undefined, done: false });
+  });
+});

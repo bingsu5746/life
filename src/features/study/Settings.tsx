@@ -4,6 +4,7 @@ import { shortDate } from './dates';
 import { alive, newId, SUBJECT_COLORS, type StudyData, type Subject } from './model';
 import { exportBackup, importBackup } from './backup';
 import { getTheme, setTheme, type Theme } from '../../lib/theme';
+import { TABS } from './tabs';
 import { getStudy, put, remove, resetLocal, setSettings, useStudy } from './store';
 import { confirmDelete, Field, go, NumInput, subjectsOf, TextInput, toast, useToday, WeekdayPicker } from './ui';
 
@@ -157,6 +158,27 @@ export function Settings() {
               {label}
             </button>
           ))}
+        </div>
+      </section>
+
+      <section className="st-card st-form">
+        <h3 className="st-h">메뉴에 보일 칸</h3>
+        <p className="st-hint">안 쓰는 칸은 꺼 두면 메뉴에서 숨겨요. 넣어 둔 자료는 지워지지 않고, 다시 켜면 그대로 보여요.</p>
+        <div className="st-chips">
+          {TABS.filter((t) => t.key !== 'today').map((t) => {
+            const on = !s.hiddenTabs?.includes(t.key);
+            return (
+              <button
+                key={t.key}
+                type="button"
+                className={`st-chip ${on ? 'on' : ''}`}
+                aria-pressed={on}
+                onClick={() => setSettings({ hiddenTabs: on ? [...(s.hiddenTabs ?? []), t.key] : (s.hiddenTabs ?? []).filter((k) => k !== t.key) })}
+              >
+                {t.label}
+              </button>
+            );
+          })}
         </div>
       </section>
 

@@ -153,6 +153,19 @@ const FIX: Record<Collection, Fix> = {
     created: optDate(x.created) ?? '2000-01-01',
     archived: x.archived === true ? true : undefined,
   }),
+  previews: (x) =>
+    isDate(x.date)
+      ? {
+          ...x,
+          subjectId: str(x.subjectId),
+          text: str(x.text),
+          done: bool(x.done),
+          doneAt: optNum(x.doneAt),
+          questions: optStr(x.questions),
+          after: x.after === 'ok' || x.after === 'some' || x.after === 'no' ? x.after : undefined,
+          created: num(x.created),
+        }
+      : null,
   grades: (x) =>
     isDate(x.date)
       ? {
@@ -218,6 +231,7 @@ export function sanitizeSettings(s: unknown): StudySettings & { updatedAt: numbe
     quizMaxBox: Math.round(clamp(x.quizMaxBox, 1, 5, d.quizMaxBox)),
     inboxPerDay: Math.round(clamp(x.inboxPerDay, 1, 200, d.inboxPerDay)),
     wordsUseTutorRatio: bool(x.wordsUseTutorRatio),
+    hiddenTabs: x.hiddenTabs === undefined ? undefined : arr(x.hiddenTabs).filter((t): t is string => typeof t === 'string' && t !== 'today').slice(0, 20),
     pomo: {
       work: clamp(pomo.work, 1, 180, d.pomo.work),
       short: clamp(pomo.short, 1, 180, d.pomo.short),

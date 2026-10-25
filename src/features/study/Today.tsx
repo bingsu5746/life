@@ -10,6 +10,7 @@ import { put, useStudy, useWords } from './store';
 import { doneUpTo, finishPlan, markBook, markDays, markHwPages, patchHwItem, parseWrong, quickWrongNotes } from './actions';
 import { minutesText } from './timer';
 import { DdayHero } from './Exams';
+import { PreviewRow, previewsForToday } from './Preview';
 import { Bar, Check, Empty, go, Icon, SubjectDot, toast, useToday, tap } from './ui';
 
 export function Today() {
@@ -28,6 +29,7 @@ export function Today() {
     .filter((t) => (!t.done && (t.star || (t.due && t.due <= today))) || (t.done && t.doneAt && t.doneAt > Date.now() - 12 * 3600_000 && (t.star || (t.due && t.due <= today))))
     .sort((a, b) => Number(a.done) - Number(b.done) || (a.due ?? '9').localeCompare(b.due ?? '9'));
   const habits = alive(d.habits).filter((h) => !h.archived && habitOn(h, today));
+  const previews = d.settings.hiddenTabs?.includes('preview') ? [] : previewsForToday(alive(d.previews), today);
   const studied = alive(d.sessions)
     .filter((s) => s.date === today)
     .reduce((a, s) => a + s.minutes, 0);
@@ -42,12 +44,13 @@ export function Today() {
   for (const h of hws) for (const i of h.items) if (i.item.kind !== 'pages' || i.today.length || i.finished) count(i.finished || (i.item.kind === 'pages' && i.today.every((p) => !i.remaining.includes(p))));
   for (const p of bookPlans) if (p.sched.today.length) count(p.sched.today.every((x) => p.target.done.has(x)));
   for (const t of todos) count(t.done);
+  for (const p of previews) count(p.done);
   for (const h of habits) count(h.checks.includes(today));
   const wordsLeft = lists.reduce((a, l) => a + l.fresh.length + l.due.length, 0);
   if (wordsLeft) count(false);
   if (notesDue.length + cardsDue.length) count(false);
 
-  const empty = !hws.length && !plans.length && !lists.length && !alive(d.notes).length && !alive(d.cards).length && !todos.length && !habits.length;
+  const empty = !hws.length && !plans.length && !lists.length && !alive(d.notes).length && !alive(d.cards).length && !todos.length && !habits.length && !previews.length;
 
   return (
     <div className="st-today">
@@ -71,6 +74,15 @@ export function Today() {
             문제집 넣기
           </button>
         </Empty>
+      )}
+
+      {previews.length > 0 && (
+        <section className="st-card">
+          <h3 className="st-h">예습</h3>
+          {previews.map((p) => (
+            <PreviewRow key={p.id} p={p} today={today} onEdit={() => go('/preview')} />
+          ))}
+        </section>
       )}
 
       {hws.length > 0 && (

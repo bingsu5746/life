@@ -11,7 +11,7 @@ import { parseWords, wordsText, type ParsedWord } from './wordParse';
 import { choicesFor, requeue, type Mode } from './wordSession';
 import { PlanForm } from './PlanForm';
 import { isLoggedIn, wordMeanings } from '../auth/api';
-import { Bar, confirmDelete, Empty, Field, go, Menu, Sheet, SubjectDot, SubjectPicker, toast, useToday, tap } from './ui';
+import { Bar, confirmDelete, Empty, Field, go, Menu, Sheet, SubjectDot, toast, useToday, tap } from './ui';
 
 const KIND_LABEL: Record<WordList['kind'], string> = { book: '단어장', test: '단어 시험', inbox: '모르는 단어 모음' };
 
@@ -31,9 +31,6 @@ function ListIndex() {
     <div className="st-page">
       <div className="st-page-head">
         <h2>영단어</h2>
-        <button className="btn btn-sm" onClick={() => go('/translate')}>
-          번역
-        </button>
       </div>
       {!views.length && (
         <Empty icon="🔤" title="단어 목록을 만들어 보세요">
@@ -74,12 +71,13 @@ function NewList() {
   const today = useToday();
   const [kind, setKind] = useState<WordList['kind']>('book');
   const [name, setName] = useState('');
-  const [subjectId, setSubjectId] = useState(() => alive(d.subjects).find((s) => /영어|english/i.test(s.name))?.id ?? '');
   const [days, setDays] = useState('');
   const [testDate, setTestDate] = useState(addDays(today, 7));
   function save() {
-    if (!name.trim() || !subjectId) return;
+    if (!name.trim()) return;
     const id = newId();
+    // 과목은 따로 고르지 않는다: 「영어」 과목이 있으면 거기에 (시험 날짜·공부 시간을 영어로 셀 수 있게)
+    const subjectId = alive(d.subjects).find((s) => /영어|english/i.test(s.name))?.id ?? '';
     put('wordLists', { id, name: name.trim(), kind, subjectId, days: kind === 'book' && Number(days) > 0 ? Math.min(MAX_DAYS, Number(days)) : undefined, testDate: kind === 'test' ? testDate : undefined, done: [], undone: [] });
     go(`/words/${id}`);
   }
@@ -111,9 +109,6 @@ function NewList() {
         <Field label="이름">
           <input className="st-input" value={name} onChange={(e) => setName(e.target.value)} placeholder={kind === 'book' ? '예: 수능 영단어 2000' : kind === 'test' ? '예: 학원 단어 시험 Day 5~8' : '모르는 단어 모음'} />
         </Field>
-        <Field group label="과목">
-          <SubjectPicker value={subjectId} onChange={setSubjectId} />
-        </Field>
         {kind === 'book' && (
           <Field label="Day 수" hint="PDF·붙여넣기로 단어를 넣으면 Day 수는 자동으로 맞춰져요">
             <input className="st-input xs" inputMode="numeric" value={days} onChange={(e) => setDays(e.target.value.replace(/\D/g, ''))} placeholder="예: 50" />
@@ -125,7 +120,7 @@ function NewList() {
           </Field>
         )}
         <div className="st-row end">
-          <button className="btn btn-primary" disabled={!name.trim() || !subjectId} onClick={save}>
+          <button className="btn btn-primary" disabled={!name.trim()} onClick={save}>
             만들기
           </button>
         </div>

@@ -14,7 +14,7 @@
 //   (학교처럼 여럿이 한 주소를 같이 쓰는 곳을 생각해 넉넉하게 잡는다)
 import { DurableObject } from 'cloudflare:workers';
 import { COOKIE_NAME, cutText, Limiter, passwordProblem, readCookie, usernameKey } from './security';
-import { buildInput, buildMeaningsInput, readMeanings, readOutput, readRequest, readWordsRequest, TRANSLATE_MODEL } from './translate';
+import { buildInput, buildMeaningsInput, FAST_MODEL, modelInput, parseTranslation, readMeanings, readOutput, readRequest, readWordsRequest, TRANSLATE_MODEL } from './translate';
 
 const ITER = 100_000;
 const SESSION_DAYS = 90;
@@ -232,23 +232,38 @@ export class Accounts extends DurableObject<Env> {
     if (wait) return fail(`번역을 너무 자주 했어요. ${wait}초 뒤에 다시 해 주세요.`, 429);
     if (this.translateByUserDay.hit(user.id)) return fail('오늘 번역할 수 있는 횟수를 다 썼어요. 내일 다시 해 주세요.', 429);
     if (this.translateAll.hit('all')) return fail('오늘 사이트 전체의 번역 한도를 다 썼어요. 내일 다시 해 주세요.', 429);
-    let out: unknown;
-    try {
-      out = await this.env.AI.run(TRANSLATE_MODEL, (wr ? buildMeaningsInput(wr.words) : buildInput(r!.text, r!.to)) as never);
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e);
-      console.error('translate error', msg);
-      if (/neuron|limit|quota|exceeded/i.test(msg)) return fail('오늘 번역 무료 한도를 다 썼어요. 한국 시간 오전 9시 뒤에 다시 해 주세요.', 503);
-      return fail('번역 서버에 문제가 있어요. 잠시 뒤 다시 해 주세요.', 502);
-    }
+    const quota = (msg: string) => /neuron|quota|exceeded|daily|limit/i.test(msg);
+    const run = async (model: string, input: unknown) => {
+      try {
+        return { out: await this.env.AI.run(model as never, input as never) as unknown };
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e);
+        console.error('translate error', model, msg);
+        return { err: msg };
+      }
+    };
+    const busy = (err: string) => (quota(err) ? fail('오늘 번역 무료 한도를 다 썼어요. 한국 시간 오전 9시 뒤에 다시 해 주세요.', 503) : fail('번역 서버에 문제가 있어요. 잠시 뒤 다시 해 주세요.', 502));
+
     if (wr) {
-      const meanings = readMeanings(out, wr.words.length);
+      const res = await run(FAST_MODEL, buildMeaningsInput(wr.words));
+      if ('err' in res) return busy(res.err!);
+      const meanings = readMeanings(res.out, wr.words.length);
       if (!meanings.some(Boolean)) return fail('뜻을 받지 못했어요. 다시 해 주세요.', 502);
       return json({ words: wr.words, meanings });
     }
-    const text = readOutput(out);
-    if (!text) return fail('번역 결과를 받지 못했어요. 다시 해 주세요.', 502);
-    return json({ text, to: r!.to });
+
+    const q = r!;
+    const input = buildInput(q.text, q.to, q.mode);
+    // 큰 모델로 먼저, 실패하거나 답이 비면 작은 모델로 한 번 더
+    let res = await run(TRANSLATE_MODEL, modelInput(TRANSLATE_MODEL, input));
+    let t = 'out' in res ? parseTranslation(readOutput(res.out), q.mode) : null;
+    if (!t) {
+      const first = 'err' in res ? res.err! : '';
+      res = await run(FAST_MODEL, modelInput(FAST_MODEL, input));
+      t = 'out' in res ? parseTranslation(readOutput(res.out), q.mode) : null;
+      if (!t) return busy(('err' in res ? res.err! : '') || first);
+    }
+    return json({ ...t, to: q.to, mode: q.mode });
   }
 
   private publicUser(u: UserRow) {

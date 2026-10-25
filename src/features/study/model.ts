@@ -34,6 +34,8 @@ export interface StudySettings {
   /** 단어장 계획에도 과외 날 비율을 쓸지 */
   wordsUseTutorRatio: boolean;
   pomo: { work: number; short: number; long: number; every: number };
+  /** 메뉴에서 숨긴 칸 (예: 'preview') */
+  hiddenTabs?: string[];
 }
 
 export interface Subject extends Stamp {
@@ -118,6 +120,23 @@ export interface GradeScore {
   /** 모의고사: 백분위 */
   percentile?: number;
   at?: number;
+}
+
+/** 예습 한 가지: 수업 전에 미리 볼 곳 */
+export interface PreviewItem extends Stamp {
+  id: Id;
+  subjectId: Id;
+  /** 수업 날 (이날 수업 전까지 예습) */
+  date: DateStr;
+  /** 예습할 곳 (예: 3단원 2절, 교과서 58~63쪽) */
+  text: string;
+  done: boolean;
+  doneAt?: number;
+  /** 예습하며 궁금했던 것 (수업 때 확인) */
+  questions?: string;
+  /** 수업 듣고 나서: ok 이해함, some 조금 헷갈림, no 모르겠음 */
+  after?: 'ok' | 'some' | 'no';
+  created: number;
 }
 
 /** 지난 성적 (시험 한 번) */
@@ -341,12 +360,13 @@ export interface StudyData {
   todos: Record<Id, Todo>;
   habits: Record<Id, Habit>;
   grades: Record<Id, GradeRecord>;
+  previews: Record<Id, PreviewItem>;
 }
 
 /** 단어는 많아질 수 있어 따로 묶는다 */
 export type WordsData = Record<Id, Word>;
 
-export const COLLECTIONS = ['subjects', 'exams', 'books', 'plans', 'tutors', 'homework', 'notes', 'decks', 'cards', 'wordLists', 'sessions', 'todos', 'habits', 'grades'] as const;
+export const COLLECTIONS = ['subjects', 'exams', 'books', 'plans', 'tutors', 'homework', 'notes', 'decks', 'cards', 'wordLists', 'sessions', 'todos', 'habits', 'grades', 'previews'] as const;
 export type Collection = (typeof COLLECTIONS)[number];
 
 export const DEFAULT_SETTINGS: StudySettings = {
@@ -380,6 +400,7 @@ export function emptyStudy(): StudyData {
     todos: {},
     habits: {},
     grades: {},
+    previews: {},
   };
 }
 

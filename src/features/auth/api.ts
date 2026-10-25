@@ -161,8 +161,19 @@ export const getStudyPhoto = (id: string) => call<{ data: string }>('study-photo
 export const deleteStudyPhoto = (id: string) => call('study-photo/' + id, 'DELETE');
 
 /** 한국어 ↔ 영어 번역 (로그인한 사람만, worker/translate.ts) */
-export async function translate(text: string, to: 'ko' | 'en') {
-  return call<{ text: string; to: 'ko' | 'en' }>('translate', 'POST', { text, to });
+export interface TranslateResult {
+  text: string;
+  to: 'ko' | 'en';
+  mode: 'text' | 'both' | 'dict';
+  /** 직역 (의역·직역을 함께 고를 때) */
+  literal?: string;
+  /** 낱말 뜻 (품사별) */
+  senses?: { pos: string; text: string }[];
+  examples?: { a: string; b: string }[];
+}
+/** literal: 의역과 직역을 함께. 아니면 짧은 말은 사전처럼, 긴 글은 자연스럽게 */
+export async function translate(text: string, to: 'ko' | 'en', literal = false) {
+  return call<TranslateResult>('translate', 'POST', { text, to, mode: literal ? 'both' : undefined });
 }
 
 /** 영어 낱말들의 뜻 (로그인한 사람만, 한 번에 60개까지) */
