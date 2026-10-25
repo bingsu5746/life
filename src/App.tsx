@@ -4,6 +4,7 @@ import { AccountSheet } from './features/auth/AccountSheet';
 import { LoginModal } from './features/auth/LoginModal';
 import { getSyncStatus, onSyncStatus, syncAll, type SyncStatus } from './features/auth/sync';
 import { displayName, useAuth } from './features/auth/useAuth';
+import { isLoggedIn } from './features/auth/api';
 import { Study } from './features/study/Study';
 
 const safeDecode = (s: string) => {
@@ -56,9 +57,11 @@ export default function App() {
               <path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z" />
             </svg>
           </button>
-          {auth.user ? (
+          {auth.loading ? (
+            <span className="account-wait" aria-hidden />
+          ) : auth.user ? (
             <>
-              <button className="account-btn" onClick={() => setAccountOpen(true)} aria-label={`계정: ${displayName(auth.user)} (${SYNC_TEXT[sync]})`} title={SYNC_TEXT[sync]}>
+              <button className="account-btn" onClick={() => setAccountOpen(true)} aria-label={`계정: ${displayName(auth.user)} (${SYNC_TEXT[sync]})`} title={auth.offline ? '서버에 연결할 수 없어요 (이 기기에 저장 중)' : SYNC_TEXT[sync]}>
                 <span className={`sync-dot ${sync}`} />
                 <span className="user-name">{displayName(auth.user)}</span>
                 <span className="avatar" aria-hidden>
@@ -73,7 +76,8 @@ export default function App() {
           )}
         </div>
       </header>
-      <Study path={path} loggedIn={!!auth.user} onLogin={() => setLoginOpen(true)} />
+      {/* 로그인했으면 첫 동기화가 끝난 뒤에 오늘 분량을 고정한다 (다른 기기의 최신 진도로) */}
+      <Study path={path} loggedIn={!!auth.user || auth.loading} syncReady={!isLoggedIn() || sync !== 'syncing'} onLogin={() => setLoginOpen(true)} />
       {loginOpen && <LoginModal onClose={() => setLoginOpen(false)} />}
       {accountOpen && auth.user && <AccountSheet user={auth.user} onClose={() => setAccountOpen(false)} />}
     </div>

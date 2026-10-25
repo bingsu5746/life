@@ -17,12 +17,13 @@ export function AccountSheet({ user, onClose }: { user: Account; onClose: () => 
   const [wipe, setWipe] = useState(true);
   const [confirmText, setConfirmText] = useState('');
 
+  /** f 가 글을 돌려주면 그 글로 알린다 */
   async function run(f: () => Promise<unknown>, done: string) {
     setBusy(true);
     setError(null);
     try {
-      await f();
-      toast(done);
+      const msg = await f();
+      toast(typeof msg === 'string' ? msg : done);
       onClose();
     } catch (e) {
       setError(e instanceof Error ? e.message : '오류가 났어요.');
@@ -103,8 +104,16 @@ export function AccountSheet({ user, onClose }: { user: Account; onClose: () => 
             disabled={busy}
             onClick={() =>
               void run(async () => {
-                await logout();
-                await forgetDevice(wipe);
+                // 서버에 못 알려도(인터넷 끊김) 이 기기의 로그아웃과 자료 지우기는 한다
+                let offline = false;
+                try {
+                  await logout();
+                } catch {
+                  offline = true;
+                } finally {
+                  await forgetDevice(wipe);
+                }
+                if (offline) return '이 기기에서 로그아웃했어요. 서버에 연결하지 못해 서버의 로그인 기록이 남아 있을 수 있어요';
               }, '로그아웃했어요')
             }
           >

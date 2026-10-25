@@ -9,6 +9,8 @@ export interface Account {
 }
 
 const FLAG_KEY = 'my-study.logged-in.v2';
+/** 마지막으로 확인한 계정 (인터넷이 안 될 때도 로그인한 채로 보이게). 토큰이 아니라 이름만 */
+const ACCOUNT_KEY = 'my-study.logged-in.account';
 
 function readFlag(): string | null {
   try {
@@ -21,10 +23,25 @@ function readFlag(): string | null {
 export const isLoggedIn = () => !!readFlag();
 export const loggedInUserId = () => readFlag();
 
-function setFlag(userId: string | null) {
+/** 이 기기에 기억한 계정 (로그인 표시와 같은 계정일 때만) */
+export function cachedAccount(): Account | null {
   try {
-    if (userId) localStorage.setItem(FLAG_KEY, userId);
-    else localStorage.removeItem(FLAG_KEY);
+    const a = JSON.parse(localStorage.getItem(ACCOUNT_KEY) ?? 'null') as Account | null;
+    return a && typeof a.id === 'string' && a.id === readFlag() ? a : null;
+  } catch {
+    return null;
+  }
+}
+
+function setFlag(user: Account | null) {
+  try {
+    if (user) {
+      localStorage.setItem(FLAG_KEY, user.id);
+      localStorage.setItem(ACCOUNT_KEY, JSON.stringify({ id: user.id, username: user.username, nickname: user.nickname }));
+    } else {
+      localStorage.removeItem(FLAG_KEY);
+      localStorage.removeItem(ACCOUNT_KEY);
+    }
   } catch {
     // 저장할 수 없는 환경
   }
@@ -68,17 +85,26 @@ async function call<T>(path: string, method = 'GET', body?: unknown): Promise<T>
 
 export async function signup(username: string, password: string, nickname: string) {
   const r = await call<{ user: Account }>('auth/signup', 'POST', { username, password, nickname });
-  setFlag(r.user.id);
+  setFlag(r.user);
   return r.user;
 }
 export async function login(username: string, password: string) {
   const r = await call<{ user: Account }>('auth/login', 'POST', { username, password });
-  setFlag(r.user.id);
+  setFlag(r.user);
   return r.user;
 }
+/**
+ * 로그아웃. 이 기기만이면 서버에 못 알려도(인터넷 끊김) 이 기기에서는 로그아웃하고 오류를 던진다.
+ * 모든 기기에서면 서버가 받아야 의미가 있으므로, 실패하면 로그인한 채로 두고 오류를 던진다 (다시 할 수 있게).
+ */
 export async function logout(everywhere = false) {
+  if (everywhere) {
+    await call('auth/logout-all', 'POST', {});
+    setFlag(null);
+    return;
+  }
   try {
-    await call(everywhere ? 'auth/logout-all' : 'auth/logout', 'POST', {});
+    await call('auth/logout', 'POST', {});
   } finally {
     setFlag(null);
   }
@@ -86,14 +112,19 @@ export async function logout(everywhere = false) {
 export async function me() {
   try {
     const user = (await call<{ user: Account }>('me')).user;
-    if (readFlag() !== user.id) setFlag(user.id);
+    const c = cachedAccount();
+    if (!c || c.id !== user.id || c.nickname !== user.nickname || c.username !== user.username) setFlag(user);
     return user;
   } catch (e) {
     if (e instanceof ApiError && e.status === 401) setFlag(null);
     throw e;
   }
 }
-export const changeNickname = (nickname: string) => call<{ user: Account }>('me/nickname', 'PUT', { nickname }).then((r) => r.user);
+export const changeNickname = (nickname: string) =>
+  call<{ user: Account }>('me/nickname', 'PUT', { nickname }).then((r) => {
+    setFlag(r.user);
+    return r.user;
+  });
 export const changePassword = (current: string, password: string) => call('me/password', 'PUT', { current, password });
 export async function deleteAccount(password: string) {
   await call('me', 'DELETE', { password });
