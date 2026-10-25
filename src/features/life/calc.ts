@@ -1,6 +1,6 @@
 // 운동 · 돈 · 취미 계산
 import { addDays, daysBetween, weekStart } from '../study/dates';
-import { alive, type DateStr, type HobbyLog, type MoneyTx, type SavingGoal, type StudyData, type Workout } from '../study/model';
+import { alive, type DateStr, type HobbyLog, type MoneyRule, type MoneyTx, type SavingGoal, type StudyData, type Workout } from '../study/model';
 
 export const won = (n: number) => `${Math.round(n).toLocaleString('ko-KR')}원`;
 
@@ -107,3 +107,58 @@ export function monthlyOut(d: StudyData, today: DateStr, months: number): { mont
 }
 
 export const datesOfWeek = (from: DateStr) => daysBetween(from, addDays(from, 6));
+
+// ===== 고정 지출·수입 =====
+
+/** 규칙이 from~to 사이에 생기는 날들 */
+export function ruleDates(r: MoneyRule, from: DateStr, to: DateStr): DateStr[] {
+  const a = from > r.start ? from : r.start;
+  const b = r.end && r.end < to ? r.end : to;
+  if (a > b) return [];
+  const out: DateStr[] = [];
+  for (const d of daysBetween(a, b)) {
+    if (r.freq === 'daily') out.push(d);
+    else if (r.freq === 'weekly') {
+      if (new Date(`${d}T00:00:00Z`).getUTCDay() === (r.day ?? new Date(`${r.start}T00:00:00Z`).getUTCDay())) out.push(d);
+    } else if (r.freq === 'monthly') {
+      const want = Math.min(r.day ?? Number(r.start.slice(8, 10)), daysInMonth(d.slice(0, 7)));
+      if (Number(d.slice(8, 10)) === want) out.push(d);
+    } else {
+      // 매년: 시작 날짜의 월·일 (2월 29일은 없는 해에 2월 28일)
+      const md = r.start.slice(5);
+      const y = d.slice(0, 4);
+      const target = md === '02-29' && daysInMonth(`${y}-02`) === 28 ? '02-28' : md;
+      if (d.slice(5) === target) out.push(d);
+    }
+  }
+  return out;
+}
+
+export const ruleTxId = (ruleId: string, date: DateStr) => `r-${ruleId}-${date}`;
+
+/** 자동으로 넣을 기록: 최근 90일 안에서 아직 없는 것 (지운 것도 다시 만들지 않는다: 같은 id) */
+export function dueRuleTx(d: StudyData, today: DateStr, now = Date.now()): MoneyTx[] {
+  const out: MoneyTx[] = [];
+  const from = addDays(today, -90);
+  for (const r of alive(d.moneyRules)) {
+    if (r.paused) continue;
+    for (const date of ruleDates(r, from, today)) {
+      const id = ruleTxId(r.id, date);
+      if (d.moneyTx[id]) continue;
+      out.push({ id, updatedAt: 0, date, type: r.type, amount: r.amount, category: r.category, memo: r.name, ruleId: r.id, created: now });
+    }
+  }
+  return out;
+}
+
+/** 앞으로 days 일 안의 고정 지출·수입 */
+export function upcomingRules(d: StudyData, today: DateStr, days = 30): { date: DateStr; rule: MoneyRule }[] {
+  const out: { date: DateStr; rule: MoneyRule }[] = [];
+  for (const r of alive(d.moneyRules)) if (!r.paused) for (const date of ruleDates(r, addDays(today, 1), addDays(today, days))) out.push({ date, rule: r });
+  return out.sort((a, b) => a.date.localeCompare(b.date));
+}
+
+/** 한 달로 치면 얼마 (매일 ×30, 매주 ×52/12, 매년 ÷12 — 어림값) */
+export function monthlyAmount(r: MoneyRule): number {
+  return r.freq === 'daily' ? r.amount * 30 : r.freq === 'weekly' ? Math.round((r.amount * 52) / 12) : r.freq === 'yearly' ? Math.round(r.amount / 12) : r.amount;
+}

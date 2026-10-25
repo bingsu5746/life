@@ -158,7 +158,21 @@ const FIX: Record<Collection, Fix> = {
   bodyLogs: (x) => (score(x.weight, 10, 400) !== undefined ? { ...x, weight: x.weight } : null),
   moneyTx: (x) =>
     isDate(x.date) && score(x.amount, 0, 1e10) !== undefined
-      ? { ...x, type: x.type === 'in' ? 'in' : 'out', amount: Math.round(x.amount as number), category: str(x.category, '기타').slice(0, 20), memo: optStr(x.memo)?.slice(0, 200), created: num(x.created) }
+      ? { ...x, type: x.type === 'in' ? 'in' : 'out', amount: Math.round(x.amount as number), category: str(x.category, '기타').slice(0, 20), memo: optStr(x.memo)?.slice(0, 200), ruleId: optStr(x.ruleId), created: num(x.created) }
+      : null,
+  moneyRules: (x) =>
+    isDate(x.start) && score(x.amount, 1, 1e10) !== undefined && ['daily', 'weekly', 'monthly', 'yearly'].includes(x.freq as string)
+      ? {
+          ...x,
+          name: str(x.name, '고정').slice(0, 30),
+          type: x.type === 'in' ? 'in' : 'out',
+          amount: Math.round(x.amount as number),
+          category: str(x.category, '기타').slice(0, 20),
+          day: x.freq === 'weekly' ? score(x.day, 0, 6) : x.freq === 'monthly' ? score(x.day, 1, 31) : undefined,
+          end: optDate(x.end),
+          paused: x.paused === true ? true : undefined,
+          created: num(x.created),
+        }
       : null,
   savings: (x) =>
     score(x.target, 1, 1e10) !== undefined

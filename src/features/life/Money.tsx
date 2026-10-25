@@ -2,10 +2,11 @@
 import { useState } from 'react';
 import { BarChart } from '../study/charts';
 import { shortDate } from '../study/dates';
-import { alive, newId, type MoneyTx, type SavingGoal } from '../study/model';
+import { alive, newId, type MoneyRule, type MoneyTx, type SavingGoal } from '../study/model';
 import { put, remove, setSettings, useStudy } from '../study/store';
 import { Bar, confirmDelete, Empty, Field, go, Icon, Sheet, tap, toast, useToday } from '../study/ui';
-import { budgetView, monthLabel, monthlyOut, monthOf, monthSummary, readWon, saved, shiftMonth, won } from './calc';
+import { budgetView, monthlyAmount, monthLabel, monthlyOut, monthOf, monthSummary, readWon, saved, shiftMonth, upcomingRules, won } from './calc';
+import { WEEKDAYS } from '../study/dates';
 
 const OUT = ['식비', '간식·카페', '교통', '쇼핑', '문화·여가', '교육·책', '통신', '선물', '기타'];
 const IN = ['용돈', '알바', '선물', '기타'];
@@ -18,6 +19,11 @@ export function Money({ sub }: { sub?: string }) {
   const [edit, setEdit] = useState<MoneyTx | 'new' | null>(sub === 'new' ? 'new' : null);
   const [budgetOpen, setBudgetOpen] = useState(false);
   const [goal, setGoal] = useState<SavingGoal | 'new' | null>(null);
+  const [rule, setRule] = useState<MoneyRule | 'new' | null>(null);
+  const rules = alive(d.moneyRules).sort((a, b) => Number(!!a.paused) - Number(!!b.paused) || a.type.localeCompare(b.type) || b.amount - a.amount);
+  const fixedOut = rules.filter((r) => !r.paused && r.type === 'out').reduce((a, r) => a + monthlyAmount(r), 0);
+  const fixedIn = rules.filter((r) => !r.paused && r.type === 'in').reduce((a, r) => a + monthlyAmount(r), 0);
+  const soon = upcomingRules(d, today, 14).slice(0, 6);
   const s = monthSummary(d, month);
   const budget = d.settings.monthlyBudget;
   const bv = budget ? budgetView(budget, s.out, month, today) : null;
@@ -120,7 +126,10 @@ export function Money({ sub }: { sub?: string }) {
                   <div key={t.id} className="st-item st-tap" {...tap(() => setEdit(t))}>
                     <div className="st-item-main">
                       <div className="st-item-title">{t.memo || t.category}</div>
-                      <div className="st-item-sub">{t.category}</div>
+                      <div className="st-item-sub">
+                        {t.category}
+                        {t.ruleId ? ' · 고정' : ''}
+                      </div>
                     </div>
                     <b className={t.type === 'in' ? 'mn-in' : ''}>
                       {t.type === 'in' ? '+' : '−'}
@@ -133,6 +142,45 @@ export function Money({ sub }: { sub?: string }) {
           </section>
         </>
       )}
+
+      <section className="st-card">
+        <div className="st-inline between">
+          <h3 className="st-h">고정 지출 · 수입</h3>
+          <button className="st-link" onClick={() => setRule('new')}>
+            ＋ 추가
+          </button>
+        </div>
+        {!rules.length ? (
+          <p className="st-hint">넷플릭스·통신비처럼 정해진 날마다 나가는 돈, 용돈처럼 들어오는 돈을 넣어 두면 그날 자동으로 적어요.</p>
+        ) : (
+          <>
+            <p className="st-sub">
+              한 달에 나가는 돈 약 {won(fixedOut)}
+              {fixedIn > 0 && ` · 들어오는 돈 약 ${won(fixedIn)}`}
+            </p>
+            {rules.map((r) => (
+              <div key={r.id} className={`st-item st-tap ${r.paused ? 'mn-paused' : ''}`} {...tap(() => setRule(r))}>
+                <div className="st-item-main">
+                  <div className="st-item-title">{r.name}</div>
+                  <div className="st-item-sub">
+                    {ruleText(r)} · {r.category}
+                    {r.paused ? ' · 멈춤' : ''}
+                  </div>
+                </div>
+                <b className={r.type === 'in' ? 'mn-in' : ''}>
+                  {r.type === 'in' ? '+' : '−'}
+                  {won(r.amount)}
+                </b>
+              </div>
+            ))}
+            {soon.length > 0 && (
+              <p className="st-hint">
+                다가오는 것: {soon.map((x) => `${shortDate(x.date)} ${x.rule.name}`).join(' · ')}
+              </p>
+            )}
+          </>
+        )}
+      </section>
 
       <section className="st-card">
         <div className="st-inline between">
@@ -149,6 +197,7 @@ export function Money({ sub }: { sub?: string }) {
 
       {edit && <TxSheet item={edit === 'new' ? undefined : edit} today={today} onClose={close} />}
       {budgetOpen && <BudgetSheet onClose={() => setBudgetOpen(false)} />}
+      {rule && <RuleSheet item={rule === 'new' ? undefined : rule} today={today} onClose={() => setRule(null)} />}
       {goal && <GoalSheet item={goal === 'new' ? undefined : goal} onClose={() => setGoal(null)} />}
     </div>
   );
@@ -319,6 +368,147 @@ function GoalSheet({ item, onClose }: { item?: SavingGoal; onClose: () => void }
             disabled={!name.trim() || !t}
             onClick={() => {
               put('savings', { ...(item ?? { deposits: [], created: Date.now() }), id: item?.id ?? newId(), name: name.trim().slice(0, 40), target: t!, due: due || undefined } as SavingGoal);
+              onClose();
+            }}
+          >
+            저장
+          </button>
+        </div>
+      </div>
+    </Sheet>
+  );
+}
+
+/** 「매달 15일」 · 「매주 월요일」 · 「매일」 · 「매년 3월 2일」 */
+export function ruleText(r: MoneyRule): string {
+  if (r.freq === 'daily') return '매일';
+  if (r.freq === 'weekly') return `매주 ${WEEKDAYS[r.day ?? 0]}요일`;
+  if (r.freq === 'monthly') return `매달 ${r.day ?? Number(r.start.slice(8))}일`;
+  return `매년 ${Number(r.start.slice(5, 7))}월 ${Number(r.start.slice(8))}일`;
+}
+
+const FREQ: Record<MoneyRule['freq'], string> = { daily: '매일', weekly: '매주', monthly: '매달', yearly: '매년' };
+
+function RuleSheet({ item, today, onClose }: { item?: MoneyRule; today: string; onClose: () => void }) {
+  const [type, setType] = useState<MoneyRule['type']>(item?.type ?? 'out');
+  const [name, setName] = useState(item?.name ?? '');
+  const [amount, setAmount] = useState(item ? item.amount.toLocaleString('ko-KR') : '');
+  const [category, setCategory] = useState(item?.category ?? '문화·여가');
+  const [freq, setFreq] = useState<MoneyRule['freq']>(item?.freq ?? 'monthly');
+  const [wday, setWday] = useState(item?.freq === 'weekly' ? (item.day ?? 1) : 1);
+  const [mday, setMday] = useState(String(item?.freq === 'monthly' ? (item.day ?? 1) : Number(today.slice(8))));
+  const [start, setStart] = useState(item?.start ?? today);
+  const [end, setEnd] = useState(item?.end ?? '');
+  const [paused, setPaused] = useState(!!item?.paused);
+  const cats = type === 'out' ? OUT : IN;
+  const n = readWon(amount);
+  const md = Number(mday);
+  const ok = !!name.trim() && !!n && !!start && (freq !== 'monthly' || (md >= 1 && md <= 31)) && (!end || end >= start);
+  return (
+    <Sheet title={item ? '고정 지출·수입 고치기' : '고정 지출·수입 추가'} onClose={onClose}>
+      <div className="st-form">
+        <div className="st-seg">
+          <button type="button" className={type === 'out' ? 'on' : ''} aria-pressed={type === 'out'} onClick={() => (setType('out'), setCategory('문화·여가'))}>
+            나가는 돈
+          </button>
+          <button type="button" className={type === 'in' ? 'on' : ''} aria-pressed={type === 'in'} onClick={() => (setType('in'), setCategory(IN[0]))}>
+            들어오는 돈
+          </button>
+        </div>
+        <input className="st-input" value={name} onChange={(e) => setName(e.target.value)} placeholder={type === 'out' ? '이름 (예: 넷플릭스, 통신비)' : '이름 (예: 용돈)'} aria-label="이름" />
+        <div className="st-inline">
+          <input
+            className="st-input mn-amount"
+            inputMode="numeric"
+            value={amount}
+            onChange={(e) => {
+              const digits = e.target.value.replace(/\D/g, '').slice(0, 10);
+              setAmount(digits ? Number(digits).toLocaleString('ko-KR') : '');
+            }}
+            placeholder="0"
+            aria-label="금액 (원)"
+          />
+          원
+        </div>
+        <div className="st-chips">
+          {cats.map((c) => (
+            <button key={c} type="button" className={`st-chip ${category === c ? 'on' : ''}`} aria-pressed={category === c} onClick={() => setCategory(c)}>
+              {c}
+            </button>
+          ))}
+        </div>
+        <Field group label="언제">
+          <div className="st-seg">
+            {(Object.keys(FREQ) as MoneyRule['freq'][]).map((f) => (
+              <button key={f} type="button" className={freq === f ? 'on' : ''} aria-pressed={freq === f} onClick={() => setFreq(f)}>
+                {FREQ[f]}
+              </button>
+            ))}
+          </div>
+          {freq === 'weekly' && (
+            <div className="st-chips">
+              {[1, 2, 3, 4, 5, 6, 0].map((w) => (
+                <button key={w} type="button" className={`st-chip ${wday === w ? 'on' : ''}`} aria-pressed={wday === w} onClick={() => setWday(w)}>
+                  {WEEKDAYS[w]}
+                </button>
+              ))}
+            </div>
+          )}
+          {freq === 'monthly' && (
+            <div className="st-inline">
+              매달
+              <input className="st-input xs" inputMode="numeric" value={mday} onChange={(e) => setMday(e.target.value.replace(/\D/g, '').slice(0, 2))} aria-label="매달 며칠" />
+              일 <small className="st-muted">(31일처럼 없는 날은 그 달 마지막 날)</small>
+            </div>
+          )}
+        </Field>
+        <div className="st-inline wrap">
+          <label className="st-cond-time">
+            {freq === 'yearly' ? '날짜 (매년 이 날)' : '시작하는 날'}
+            <input className="st-input sm" type="date" value={start} onChange={(e) => setStart(e.target.value)} />
+          </label>
+          <label className="st-cond-time">
+            끝나는 날 (선택)
+            <input className="st-input sm" type="date" value={end} min={start} onChange={(e) => setEnd(e.target.value)} />
+          </label>
+        </div>
+        {item && (
+          <label className="st-toggle">
+            <input type="checkbox" checked={paused} onChange={(e) => setPaused(e.target.checked)} /> 잠시 멈추기 (구독을 쉬는 동안)
+          </label>
+        )}
+        <p className="st-hint">그날이 되면 자동으로 기록에 들어가요. 시작하는 날을 지난날로 정하면 최근 90일 안의 것은 바로 들어가요. 자동으로 들어간 기록을 지우면 다시 생기지 않아요.</p>
+        <div className="st-row end">
+          {item && (
+            <button
+              className="btn btn-sm st-danger"
+              onClick={() => {
+                if (!confirmDelete(`「${item.name}」 고정 ${item.type === 'out' ? '지출' : '수입'}`, '이미 들어간 기록은 그대로 남아요.')) return;
+                remove('moneyRules', item.id);
+                onClose();
+              }}
+            >
+              지우기
+            </button>
+          )}
+          <button
+            className="btn btn-primary"
+            disabled={!ok}
+            onClick={() => {
+              put('moneyRules', {
+                ...(item ?? { created: Date.now() }),
+                id: item?.id ?? newId(),
+                name: name.trim().slice(0, 30),
+                type,
+                amount: n!,
+                category: cats.includes(category) ? category : cats[0],
+                freq,
+                day: freq === 'weekly' ? wday : freq === 'monthly' ? md : undefined,
+                start,
+                end: end || undefined,
+                paused: paused || undefined,
+              } as MoneyRule);
+              toast(item ? '고쳤어요' : '추가했어요');
               onClose();
             }}
           >

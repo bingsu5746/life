@@ -8,6 +8,7 @@ import { useTimerAlarm, useTimerView } from './timerStore';
 import { clock } from './timer';
 import { Today } from './Today';
 import { localTimes, uploadDigest } from './notify';
+import { dueRuleTx } from '../life/calc';
 // 시험 화면은 오늘 화면(D-day)과 같이 쓰여 함께 받는다
 import { Exams } from './Exams';
 import { go, Icon, Toaster, useToday } from './ui';
@@ -53,6 +54,12 @@ export function Study({ path, loggedIn, syncReady = true, onLogin }: { path: str
     const locks = pendingLocks(d, words, today);
     if (locks.length) putMany(locks.map((p) => ({ c: 'plans' as const, item: p as never })));
   }, [d, words, today, syncReady]);
+  // 고정 지출·수입: 날이 된 것을 자동으로 넣는다 (같은 날·같은 규칙은 같은 id 라 두 기기에서 넣어도 하나)
+  useEffect(() => {
+    if (!syncReady) return;
+    const due = dueRuleTx(d, today);
+    if (due.length) putMany(due.map((t) => ({ c: 'moneyTx' as const, item: t as never })));
+  }, [d, today, syncReady]);
   // 알림을 켜 둔 기기: 자료가 바뀌면 잠시 뒤 알림 글을 다시 올린다
   useEffect(() => {
     if (!loggedIn || !localTimes()) return;

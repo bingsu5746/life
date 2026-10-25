@@ -389,6 +389,27 @@ export interface MoneyTx extends Stamp {
   amount: number;
   category: string;
   memo?: string;
+  /** 고정 지출·수입에서 자동으로 넣은 것이면 그 규칙 */
+  ruleId?: Id;
+  created: number;
+}
+
+/** 고정 지출·수입: 매일 · 매주 · 매달 · 매년 자동으로 넣는다 */
+export interface MoneyRule extends Stamp {
+  id: Id;
+  /** 예: 넷플릭스, 용돈 */
+  name: string;
+  type: 'out' | 'in';
+  amount: number;
+  category: string;
+  freq: 'daily' | 'weekly' | 'monthly' | 'yearly';
+  /** 매주: 요일(0=일 … 6=토), 매달: 날짜(1~31, 그 달에 없으면 마지막 날) */
+  day?: number;
+  /** 이날부터 (매년이면 이 날짜의 월·일마다) */
+  start: DateStr;
+  /** 이날까지 (없으면 계속) */
+  end?: DateStr;
+  paused?: boolean;
   created: number;
 }
 
@@ -557,12 +578,13 @@ export interface StudyData {
   hobbyLogs: Record<Id, HobbyLog>;
   wishes: Record<Id, WishItem>;
   diary: Record<Id, DiaryEntry>;
+  moneyRules: Record<Id, MoneyRule>;
 }
 
 /** 단어는 많아질 수 있어 따로 묶는다 */
 export type WordsData = Record<Id, Word>;
 
-export const COLLECTIONS = ['subjects', 'exams', 'books', 'plans', 'tutors', 'homework', 'notes', 'decks', 'cards', 'wordLists', 'sessions', 'todos', 'habits', 'grades', 'previews', 'assessments', 'blanks', 'conditions', 'weekNotes', 'papers', 'workouts', 'bodyLogs', 'moneyTx', 'savings', 'hobbies', 'hobbyLogs', 'wishes', 'diary'] as const;
+export const COLLECTIONS = ['subjects', 'exams', 'books', 'plans', 'tutors', 'homework', 'notes', 'decks', 'cards', 'wordLists', 'sessions', 'todos', 'habits', 'grades', 'previews', 'assessments', 'blanks', 'conditions', 'weekNotes', 'papers', 'workouts', 'bodyLogs', 'moneyTx', 'savings', 'hobbies', 'hobbyLogs', 'wishes', 'diary', 'moneyRules'] as const;
 export type Collection = (typeof COLLECTIONS)[number];
 
 export const DEFAULT_SETTINGS: StudySettings = {
@@ -610,6 +632,7 @@ export function emptyStudy(): StudyData {
     hobbyLogs: {},
     wishes: {},
     diary: {},
+    moneyRules: {},
   };
 }
 
