@@ -76,12 +76,61 @@ export interface ExamScope {
   at?: number;
 }
 
+/** 시험 기간의 하루: 그날 보는 과목들 */
+export interface ExamDay {
+  date: DateStr;
+  subjectIds: Id[];
+  /** 고친 시각 */
+  at?: number;
+}
+
+/** school: 내신(학교 시험), mock: 모의고사·수능, other: 그 밖 */
+export type ExamKind = 'school' | 'mock' | 'other';
+
 export interface Exam extends Stamp {
   id: Id;
   name: string;
   /** 시험 시작 날 (과목마다 다르면 첫날) */
   date: DateStr;
+  /** 여러 날 보는 시험의 마지막 날 (하루만 보면 없음) */
+  end?: DateStr;
+  kind?: ExamKind;
+  /** 날짜별 시험 과목 (여러 날 보는 시험) */
+  days?: ExamDay[];
   scopes?: ExamScope[];
+}
+
+/** 성적 한 과목 */
+export interface GradeScore {
+  id: Id;
+  /** 과목 이름 (모의고사 과목은 내 과목 목록과 다를 수 있어 이름으로 둔다) */
+  subject: string;
+  /** 원점수 */
+  raw?: number;
+  /** 만점 (없으면 100) */
+  full?: number;
+  /** 등급 (1~9) */
+  grade?: number;
+  /** 내신: 과목 평균 */
+  average?: number;
+  /** 모의고사: 표준점수 */
+  standard?: number;
+  /** 모의고사: 백분위 */
+  percentile?: number;
+  at?: number;
+}
+
+/** 지난 성적 (시험 한 번) */
+export interface GradeRecord extends Stamp {
+  id: Id;
+  kind: 'school' | 'mock';
+  /** 예: 1학년 2학기 기말고사, 6월 모의고사 */
+  name: string;
+  date: DateStr;
+  /** 이 앱의 시험에서 넣었으면 그 시험 */
+  examId?: Id;
+  scores: GradeScore[];
+  memo?: string;
 }
 
 export interface Unit {
@@ -291,12 +340,13 @@ export interface StudyData {
   sessions: Record<Id, StudySession>;
   todos: Record<Id, Todo>;
   habits: Record<Id, Habit>;
+  grades: Record<Id, GradeRecord>;
 }
 
 /** 단어는 많아질 수 있어 따로 묶는다 */
 export type WordsData = Record<Id, Word>;
 
-export const COLLECTIONS = ['subjects', 'exams', 'books', 'plans', 'tutors', 'homework', 'notes', 'decks', 'cards', 'wordLists', 'sessions', 'todos', 'habits'] as const;
+export const COLLECTIONS = ['subjects', 'exams', 'books', 'plans', 'tutors', 'homework', 'notes', 'decks', 'cards', 'wordLists', 'sessions', 'todos', 'habits', 'grades'] as const;
 export type Collection = (typeof COLLECTIONS)[number];
 
 export const DEFAULT_SETTINGS: StudySettings = {
@@ -329,6 +379,7 @@ export function emptyStudy(): StudyData {
     sessions: {},
     todos: {},
     habits: {},
+    grades: {},
   };
 }
 

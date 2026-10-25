@@ -1,12 +1,14 @@
 // 공부 타이머 · 기록 (설계 §10)
 import { useState } from 'react';
 import { addDays, daysBetween, shortDate, weekStart, WEEKDAYS } from './dates';
+import { BarChart, TableView } from './charts';
+import { bySubject, compare, daily, minutesByDate, studyStreak, weekdayAverage, weekly } from './timeStats';
 import { alive, type StudySession } from './model';
 import { addSession } from './actions';
 import { getStudy, put, remove, useStudy } from './store';
 import { askNotify, loadTimer, primeAudio, saveTimer } from './timerStore';
 import { clock, finish, minutesText, nextPhase, pause, resume, start, view, type TimerState } from './timer';
-import { Bar, confirmDelete, Field, go, NumInput, Sheet, SubjectDot, SubjectPicker, subjectsOf, tap, toast, useNow, useToday } from './ui';
+import { Bar, confirmDelete, Field, go, Icon, NumInput, Sheet, SubjectDot, SubjectPicker, subjectsOf, tap, toast, useNow, useToday } from './ui';
 
 /** sub: 'manual' 이면 공부 시간 직접 넣기 창 (「＋」에서 올 때) */
 export function Time({ sub }: { sub?: string }) {
@@ -52,6 +54,9 @@ export function Time({ sub }: { sub?: string }) {
     <div className="st-page">
       <div className="st-page-head">
         <h2>공부 기록</h2>
+        <button className="btn btn-sm" onClick={() => setManual(true)}>
+          <Icon name="plus" /> 공부 시간 넣기
+        </button>
       </div>
       <section className={`st-card st-timer ${timer ? (timer.phase === 'work' ? 'work' : 'rest') : ''}`}>
         {!timer ? (
@@ -77,6 +82,7 @@ export function Time({ sub }: { sub?: string }) {
       </section>
 
       <Stats sessions={sessions} today={today} todayMin={todayMin} />
+      {sessions.length > 0 && <Analysis sessions={sessions} today={today} />}
       {manual && (
         <ManualSheet
           today={today}
@@ -273,22 +279,123 @@ function WeeklyGoals() {
   );
 }
 
+/** 공부 시간 분석: 기간을 골라 날짜별·주별·요일별·과목별로 */
+function Analysis({ sessions, today }: { sessions: StudySession[]; today: string }) {
+  const d = useStudy();
+  const [range, setRange] = useState<14 | 30 | 90>(30);
+  const byDate = minutesByDate(sessions);
+  const days = daily(byDate, today, range);
+  const total = days.reduce((a, x) => a + x.min, 0);
+  const studied = days.filter((x) => x.min > 0);
+  const best = studied.reduce<{ date: string; min: number } | null>((b, x) => (!b || x.min > b.min ? x : b), null);
+  const week = compare(byDate, today, 7);
+  const month = compare(byDate, today, 30);
+  const weeks = weekly(byDate, today, 12);
+  const wd = weekdayAverage(byDate, today, range);
+  const subj = bySubject(sessions, addDays(today, -(range - 1)), today);
+  const subjMax = Math.max(1, ...subj.map((x) => x.min));
+  const h = (m: number) => (m >= 60 ? `${Math.round((m / 60) * 10) / 10}시간` : `${m}분`);
+  // 2시간이 넘는 그래프는 눈금을 시간 단위로
+  const unit = (vals: number[]) => (Math.max(0, ...vals) >= 120 ? 60 : 1);
+  const cmpText = (c: { now: number; before: number; pct: number | null }) =>
+    c.pct === null ? (c.now ? '앞 기간 기록이 없어요' : '') : c.pct === 0 ? '앞 기간과 같아요' : `앞 기간보다 ${Math.abs(c.pct)}% ${c.pct > 0 ? '많아요' : '적어요'}`;
+  const md = (x: string) => shortDate(x).replace(/\(.\)/, '');
+  return (
+    <section className="st-card ta">
+      <div className="st-inline wrap between">
+        <h3 className="st-h">공부 시간 분석</h3>
+        <div className="st-seg" aria-label="기간">
+          {([14, 30, 90] as const).map((r) => (
+            <button key={r} className={range === r ? 'on' : ''} aria-pressed={range === r} onClick={() => setRange(r)}>
+              {r === 14 ? '2주' : r === 30 ? '30일' : '90일'}
+            </button>
+          ))}
+        </div>
+      </div>
+      <div className="st-stat-row">
+        <div>
+          <small>하루 평균</small>
+          <b>{minutesText(Math.round(total / range))}</b>
+        </div>
+        <div>
+          <small>공부한 날</small>
+          <b>
+            {studied.length}/{range}일
+          </b>
+        </div>
+        <div>
+          <small>연속</small>
+          <b>{studyStreak(byDate, today)}일</b>
+        </div>
+        <div>
+          <small>가장 많이 한 날</small>
+          <b>{best ? `${md(best.date)} ${h(best.min)}` : '—'}</b>
+        </div>
+      </div>
+      <BarChart label={`최근 ${range}일 날짜별 공부 시간`} bars={days.map((x) => ({ label: md(x.date), title: shortDate(x.date), value: x.min, strong: x.date === today }))} avg={Math.round(total / range)} format={h} tickUnit={unit(days.map((x) => x.min))} />
+
+      <div className="ta-compare">
+        <div>
+          <small>최근 7일</small>
+          <b>{minutesText(week.now)}</b>
+          <small>{cmpText(week)}</small>
+        </div>
+        <div>
+          <small>최근 30일</small>
+          <b>{minutesText(month.now)}</b>
+          <small>{cmpText(month)}</small>
+        </div>
+      </div>
+
+      <h4 className="ta-h">주별 (최근 12주)</h4>
+      <BarChart label="최근 12주 주별 공부 시간" height={150} bars={weeks.map((w, i) => ({ label: md(w.start), title: `${shortDate(w.start)} 주`, value: w.min, strong: i === weeks.length - 1 }))} format={h} tickUnit={unit(weeks.map((w) => w.min))} />
+
+      <h4 className="ta-h">요일별 평균 (최근 {range}일)</h4>
+      <BarChart label="요일별 평균 공부 시간" height={140} bars={wd.map((m, i) => ({ label: WEEKDAYS[(i + 1) % 7], value: m }))} format={h} tickUnit={unit(wd)} />
+
+      {subj.length > 0 && (
+        <>
+          <h4 className="ta-h">과목별 (최근 {range}일)</h4>
+          {subj.map((x) => (
+            <div key={x.subjectId || 'none'} className="st-subj-row">
+              <span>
+                {x.subjectId && <SubjectDot id={x.subjectId} d={d} />} {d.subjects[x.subjectId]?.name ?? '과목 없음'}
+              </span>
+              <Bar value={x.min} max={subjMax} label={`${d.subjects[x.subjectId]?.name ?? '과목 없음'} 공부 시간`} />
+              <small>
+                {minutesText(x.min)} · {total ? Math.round((x.min / total) * 100) : 0}%
+              </small>
+            </div>
+          ))}
+        </>
+      )}
+      <TableView head={['날짜', '공부 시간']} rows={[...days].reverse().map((x) => [shortDate(x.date), minutesText(x.min)])} />
+    </section>
+  );
+}
+
 /** 공부 시간 직접 넣기 · 기록 고치기 (session 이 있으면) */
 function ManualSheet({ today, session, onClose }: { today: string; session?: StudySession; onClose: () => void }) {
   const d = useStudy();
-  const [subjectId, setSubjectId] = useState(session?.subjectId ?? subjectsOf(d)[0]?.id ?? '');
+  const [subjectId, setSubjectId] = useState(session ? (session.subjectId ?? '') : (subjectsOf(d)[0]?.id ?? ''));
   const [date, setDate] = useState(session?.date ?? today);
-  const [min, setMin] = useState(String(session?.minutes ?? 60));
-  const n = Number(min);
+  const start0 = session?.minutes ?? 60;
+  const [hours, setHours] = useState(String(Math.floor(start0 / 60)));
+  const [mins, setMins] = useState(String(start0 % 60));
+  const n = (Number(hours) || 0) * 60 + (Number(mins) || 0);
   return (
     <Sheet title={session ? '공부 기록 고치기' : '공부 시간 직접 넣기'} onClose={onClose}>
       <div className="st-form">
         <Field group label="과목">
           <SubjectPicker value={subjectId} onChange={setSubjectId} />
+          <button type="button" className={`st-chip ${subjectId === '' ? 'on' : ''}`} aria-pressed={subjectId === ''} onClick={() => setSubjectId('')}>
+            과목 없이 (하루 합계)
+          </button>
         </Field>
-        <div className="st-inline">
+        <div className="st-inline wrap">
           <input className="st-input sm" type="date" value={date} max={today} onChange={(e) => setDate(e.target.value)} aria-label="날짜" />
-          <input className="st-input xs" inputMode="numeric" value={min} onChange={(e) => setMin(e.target.value.replace(/\D/g, ''))} aria-label="분" />분
+          <input className="st-input xs" inputMode="numeric" value={hours} onChange={(e) => setHours(e.target.value.replace(/\D/g, '').slice(0, 2))} aria-label="시간" />시간
+          <input className="st-input xs" inputMode="numeric" value={mins} onChange={(e) => setMins(e.target.value.replace(/\D/g, '').slice(0, 3))} aria-label="분" />분
         </div>
         {n > 720 && <p className="bad">하루에 {minutesText(n)}은 너무 길어요. 다시 확인해 주세요.</p>}
         <div className="st-row end">
@@ -306,16 +413,16 @@ function ManualSheet({ today, session, onClose }: { today: string; session?: Stu
           )}
           <button
             className="btn btn-primary"
-            disabled={!subjectId || !n || n > 720}
+            disabled={!n || n > 720}
             onClick={() => {
               if (session) {
                 // 날짜를 바꾸면 그날 낮 12시에 한 것으로 (시작 시각을 알 수 없으므로)
                 const start = date === session.date ? session.start : new Date(`${date}T12:00:00`).getTime();
-                put('sessions', { ...session, subjectId, date, minutes: n, start, end: start + n * 60_000 });
+                put('sessions', { ...session, subjectId: subjectId || undefined, date, minutes: n, start, end: start + n * 60_000 });
               } else {
                 // 오늘이면 지금 끝난 것으로, 지난 날이면 그날 낮 12시부터 한 것으로
                 const end = date === today ? Date.now() : new Date(`${date}T12:00:00`).getTime() + n * 60_000;
-                addSession({ subjectId, start: end - n * 60_000, end, minutes: n, date, kind: 'manual' });
+                addSession({ subjectId: subjectId || undefined, start: end - n * 60_000, end, minutes: n, date, kind: 'manual' });
               }
               onClose();
             }}

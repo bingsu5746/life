@@ -71,7 +71,7 @@ export function Study({ path, loggedIn, syncReady = true, onLogin }: { path: str
   else if (tab === 'life') content = <Life sub={id} />;
   else if (tab === 'settings') content = <Settings />;
   else if (tab === 'translate') content = <Translate loggedIn={loggedIn} onLogin={onLogin} />;
-  else if (tab === 'exams') content = <Exams id={id} />;
+  else if (tab === 'exams') content = <Exams id={id} sub={sub} />;
   else content = <Today />;
 
   return (

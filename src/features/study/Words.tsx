@@ -10,6 +10,7 @@ import { addWords, answerWord, markDays } from './actions';
 import { parseWords, wordsText, type ParsedWord } from './wordParse';
 import { choicesFor, requeue, type Mode } from './wordSession';
 import { PlanForm } from './PlanForm';
+import { isLoggedIn, wordMeanings } from '../auth/api';
 import { Bar, confirmDelete, Empty, Field, go, Menu, Sheet, SubjectDot, SubjectPicker, toast, useToday, tap } from './ui';
 
 const KIND_LABEL: Record<WordList['kind'], string> = { book: '단어장', test: '단어 시험', inbox: '모르는 단어 모음' };
@@ -426,7 +427,7 @@ function WordSheet({ w, onClose }: { w: Word; onClose: () => void }) {
 /** 단어 넣기: PDF · 붙여넣기 · 사진 → 표로 확인 → 저장 */
 function ImportSheet({ list, existing, onClose }: { list: WordList; existing: Word[]; onClose: () => void }) {
   const today = useToday();
-  const [tab, setTab] = useState<'pdf' | 'paste' | 'photo'>(list.kind === 'book' ? 'pdf' : 'paste');
+  const [tab, setTab] = useState<'pdf' | 'paste' | 'photo' | 'mark'>(list.kind === 'book' ? 'pdf' : 'paste');
   const [text, setText] = useState('');
   const [busy, setBusy] = useState<string | null>(null);
   const [pdf, setPdf] = useState<{ file: File; pages: number; from: string; to: string; password?: string } | null>(null);
@@ -492,6 +493,54 @@ function ImportSheet({ list, existing, onClose }: { list: WordList; existing: Wo
     setText((t) => (t.trim() ? t.trim() + '\n' : '') + all.trim());
   }
 
+  async function readMarked(files: FileList) {
+    setBusy('형광펜 단어 찾는 중…');
+    try {
+      const { readHighlightedWords } = await import('../../lib/highlight');
+      const r = await readHighlightedWords([...files], (stage, ratio) => setBusy(`${stage} ${Math.round(ratio * 100)}%`));
+      if (!r.words.length) {
+        toast(r.seen ? '칠한 단어를 찾지 못했어요. 형광펜이 잘 보이게 밝은 곳에서 찍어 주세요' : '사진에서 글자를 읽지 못했어요');
+        return;
+      }
+      setText((t) => (t.trim() ? t.trim() + '\n' : '') + r.words.join('\n'));
+      setSkip(new Set());
+      toast(`칠한 단어 ${r.words.length}개를 찾았어요. 틀린 것은 고치거나 빼 주세요`);
+    } catch {
+      toast('사진을 읽지 못했어요. 인터넷 연결을 확인해 주세요 (처음엔 글자 인식 자료를 받아요)');
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  // 뜻이 빈 단어들: AI 로 뜻 채우기 (로그인했을 때)
+  const empty = rows.filter((r, i) => !skip.has(i) && r.problem === '뜻이 비어 있어요');
+  async function fillMeanings() {
+    if (!empty.length) return;
+    if (!isLoggedIn()) return toast('뜻 자동 채우기는 로그인한 뒤에 쓸 수 있어요');
+    const replace = new Map<string, string>();
+    try {
+      for (let i = 0; i < empty.length; i += 60) {
+        const part = empty.slice(i, i + 60);
+        setBusy(`뜻 찾는 중… ${i}/${empty.length}`);
+        const r = await wordMeanings(part.map((x) => x.term));
+        // 서버가 겹친 단어를 하나로 줄였을 수 있어 이름으로 맞춘다
+        const byTerm = new Map(r.words.map((w, j) => [w.toLowerCase(), r.meanings[j]]));
+        for (const x of part) {
+          const m = byTerm.get(x.term.toLowerCase());
+          if (m) replace.set(x.line, `${x.term}\t${m}`);
+        }
+      }
+    } catch (e) {
+      toast(e instanceof Error ? e.message : '뜻을 찾지 못했어요');
+    } finally {
+      setBusy(null);
+    }
+    if (replace.size) {
+      setText((t) => t.split(/\r?\n/).map((l) => replace.get(l) ?? l).join('\n'));
+      toast(`${replace.size}단어의 뜻을 채웠어요. AI 가 찾은 뜻이라 한 번 확인해 주세요`);
+    }
+  }
+
   function save() {
     if (!good.length) return;
     addWords(list.id, good, existing, today);
@@ -512,6 +561,9 @@ function ImportSheet({ list, existing, onClose }: { list: WordList; existing: Wo
         </button>
         <button className={tab === 'photo' ? 'on' : ''} onClick={() => setTab('photo')}>
           사진
+        </button>
+        <button className={tab === 'mark' ? 'on' : ''} onClick={() => setTab('mark')}>
+          형광펜 사진
         </button>
       </div>
       {tab === 'pdf' && (
@@ -557,15 +609,32 @@ function ImportSheet({ list, existing, onClose }: { list: WordList; existing: Wo
           <input type="file" accept="image/*" multiple onChange={(e) => e.target.files?.length && void readPhotos(e.target.files)} />
         </div>
       )}
+      {tab === 'mark' && (
+        <div className="st-form">
+          <p className="st-hint">
+            책·프린트에서 모르는 단어에 형광펜을 칠하고 찍으면, 칠한 영어 단어만 골라 넣어요. 이어서 칠한 낱말(숙어)은 한 줄로 묶어요. 뜻은 아래 「뜻 자동으로 채우기」로 넣을 수 있어요. 사진은 이
+            기기 안에서만 읽고 저장하지 않아요.
+          </p>
+          <input type="file" accept="image/*" multiple onChange={(e) => e.target.files?.length && void readMarked(e.target.files)} />
+          <p className="st-hint">잘 찍는 법: 밝은 곳에서, 종이가 화면에 꽉 차게, 그림자 없이. 노랑·연두·분홍 형광펜이 잘 읽혀요.</p>
+        </div>
+      )}
       {busy && <p className="st-muted">{busy}</p>}
-      <Field label={tab === 'paste' ? '한 줄에 단어 하나' : '읽은 글 (고칠 수 있어요)'} hint={<>예: <code>apple 사과</code> · <code>1. give up 포기하다</code> · 엑셀에서 두 칸 복사 · <code>Day 3</code> 줄로 Day 나누기</>}>
+      <Field label={tab === 'paste' ? '한 줄에 단어 하나' : '읽은 글 (고칠 수 있어요)'} hint={<>예: <code>apple 사과</code> · <code>1. give up 포기하다</code> · <code>abandon, 버리다</code> · 엑셀에서 두 칸 복사 · <code>Day 3</code> 줄로 Day 나누기. 다른 사이트에서 만든 단어장도 한 줄에 「단어 뜻」 모양이면 그대로 붙여 넣을 수 있고, 단어만 있으면 「뜻 자동으로 채우기」를 눌러요.</>}>
         <textarea className="st-input mono" rows={tab === 'paste' ? 10 : 6} value={text} onChange={(e) => (setText(e.target.value), setSkip(new Set()))} placeholder={'Day 1\nabandon 버리다\nabsorb 흡수하다'} />
       </Field>
       {rows.length > 0 && (
         <>
-          <p className="st-sub">
-            {good.length}단어 넣을 수 있어요 {rows.length - good.length > 0 && <span className="bad">· 빼는 줄 {rows.length - good.length}</span>}
-          </p>
+          <div className="st-inline wrap between">
+            <p className="st-sub">
+              {good.length}단어 넣을 수 있어요 {rows.length - good.length > 0 && <span className="bad">· 빼는 줄 {rows.length - good.length}</span>}
+            </p>
+            {empty.length > 0 && (
+              <button className="btn btn-sm" disabled={!!busy} onClick={() => void fillMeanings()}>
+                뜻 자동으로 채우기 ({empty.length})
+              </button>
+            )}
+          </div>
           <div className="st-table-wrap">
             <table className="st-table">
               <thead>

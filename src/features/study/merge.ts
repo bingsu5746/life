@@ -1,5 +1,5 @@
 // 두 기기의 공부 자료 합치기 (설계 §8.2). 합치기는 기기에서, 서버는 저장만 한다.
-import { COLLECTIONS, type Collection, type Exam, type ExamScope, type Habit, type Homework, type Id, type Mark, type Stamp, type StudyData, type Subject, type WordsData } from './model';
+import { COLLECTIONS, type Collection, type Exam, type ExamScope, type GradeRecord, type Habit, type Homework, type Id, type Mark, type Stamp, type StudyData, type Subject, type WordsData } from './model';
 import { mergeHabitChecks } from './habits';
 import { compactMarks } from './pages';
 
@@ -68,7 +68,14 @@ function mergeExam(a?: Exam, b?: Exam): Exam | undefined {
   const s = sides(a, b);
   if (!s) return pick(a, b);
   const [w, o] = s;
-  return w.scopes ? { ...w, scopes: mergeList(w.scopes, o.scopes, (x) => x.id, mergeScope) } : w;
+  return { ...w, scopes: mergeList(w.scopes, o.scopes, (x) => x.id, mergeScope), days: mergeList(w.days, o.days, (x) => x.date) };
+}
+
+function mergeGrade(a?: GradeRecord, b?: GradeRecord): GradeRecord | undefined {
+  const s = sides(a, b);
+  if (!s) return pick(a, b);
+  const [w, o] = s;
+  return { ...w, scores: mergeList(w.scores, o.scores, (x) => x.id) ?? w.scores };
 }
 
 function mergeHomework(a?: Homework, b?: Homework): Homework | undefined {
@@ -99,6 +106,7 @@ const MERGERS: Partial<Record<Collection, (a?: never, b?: never) => unknown>> = 
   homework: mergeHomework as never,
   habits: mergeHabit as never,
   subjects: mergeSubject as never,
+  grades: mergeGrade as never,
 };
 
 export function mergeRecords<T extends Stamp>(a: Record<Id, T>, b: Record<Id, T>, merge: (x?: T, y?: T) => T | undefined = pick, now = Date.now()): Record<Id, T> {

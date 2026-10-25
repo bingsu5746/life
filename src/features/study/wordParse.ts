@@ -26,6 +26,8 @@ export function splitWordLine(raw: string): { term: string; meaning: string } | 
   if (!s) return null;
   // 앞 번호 (1. / 001 / ① / 1) / □ / ☐)
   s = s.replace(/^(?:[□☐■○●◯▢\-*•]\s*)+/, '').replace(/^(?:\d{1,4}\s*[.)\]:]?|[①-⑳])\s+/, '').trim();
+  // CSV 한 줄 「"단어","뜻"」 → 탭으로
+  s = s.replace(/^"([^"]*)"\s*,\s*"([^"]*)"\s*$/, '$1\t$2');
   let term = '';
   let meaning = '';
   const tab = s.split(/\t+/).map((x) => x.trim()).filter(Boolean);
@@ -35,7 +37,8 @@ export function splitWordLine(raw: string): { term: string; meaning: string } | 
     term = cells[0];
     meaning = cells.slice(1).join(' ');
   } else {
-    const sep = s.match(/^(.+?)\s*(?:\s[-–—]\s|:|\|)\s*(.+)$/);
+    // 「단어 - 뜻」 · 「단어: 뜻」 · 「단어 | 뜻」 · 「단어, 뜻」(뜻이 한글일 때) · CSV 「"단어","뜻"」
+    const sep = s.match(/^(.+?)\s*(?:\s[-–—]\s|:|\||,(?=\s*["'“~]?[가-힣(~]))\s*(.+)$/);
     if (sep && /^[A-Za-z]/.test(sep[1]) && !/[가-힣]/.test(sep[1])) {
       term = sep[1];
       meaning = sep[2];
@@ -50,6 +53,10 @@ export function splitWordLine(raw: string): { term: string; meaning: string } | 
       }
     }
   }
+  // 둘러싼 따옴표 (CSV)
+  const unq = (x: string) => x.trim().replace(/^["'“”‘’]+|["'“”‘’]+$/g, '');
+  term = unq(term);
+  meaning = unq(meaning);
   // 단어 쪽에 붙은 발음기호 [ǽpl] / /ǽpl/ 은 지운다
   term = term
     .replace(/\s*\[[^\]]*\]\s*$/, '')

@@ -28,3 +28,18 @@ describe('번역', () => {
     expect(readOutput(null)).toBe('');
   });
 });
+
+describe('단어 뜻 채우기', () => {
+  it('요청 확인', async () => {
+    const { readWordsRequest, MAX_MEANING_WORDS } = await import('./translate');
+    expect(readWordsRequest({ words: ['abandon', 'Abandon', ' give  up '] })).toEqual({ words: ['abandon', 'give up'] });
+    expect(readWordsRequest({ words: ['사과'] })).toHaveProperty('error');
+    expect(readWordsRequest({ words: 'x' })).toHaveProperty('error');
+    expect(readWordsRequest({ words: Array.from({ length: MAX_MEANING_WORDS + 1 }, (_, i) => 'w' + 'a'.repeat(i % 30) + String.fromCharCode(97 + (i % 26)) + String.fromCharCode(97 + Math.floor(i / 26))) })).toHaveProperty('error');
+  });
+  it('답 읽기: 번호로 맞추고 한글이 없는 줄은 버린다', async () => {
+    const { readMeanings } = await import('./translate');
+    const out = { choices: [{ message: { content: '1\t버리다, 포기하다\n3. resilience: 회복력\n2\tgive up\nnoise' } }] };
+    expect(readMeanings(out, 3)).toEqual(['버리다, 포기하다', '', '회복력']);
+  });
+});

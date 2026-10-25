@@ -4,6 +4,7 @@
 import { apportion, slice, snapToUnits } from './allocate';
 import { addDays, daysBetween, weekday } from './dates';
 import type { DateStr, Exam, Id, Plan, StudySettings, Tutor, Unit } from './model';
+import { subjectExamDate } from './exams';
 import { expand } from './pages';
 import { hasClass } from './tutor';
 
@@ -57,7 +58,7 @@ export interface Schedule {
 export function planDue(plan: Plan, exams: Record<Id, Exam>, subjectId?: Id): DateStr | null {
   if (plan.examId) {
     const e = exams[plan.examId];
-    if (e && !e.deleted) return (subjectId && e.scopes?.find((s) => s.subjectId === subjectId)?.date) || e.date;
+    if (e && !e.deleted) return subjectExamDate(e, subjectId);
     // 시험을 지웠으면: 지울 때 옮겨 둔 날짜, 없으면 지운 표시에 남은 시험 날짜
     if (plan.due) return plan.due;
     if (e?.date) return e.date;

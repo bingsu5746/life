@@ -1,16 +1,47 @@
 // 시험 · 시험 범위 · 학교 진도
-import { useState } from 'react';
+import { lazy, Suspense, useState } from 'react';
 import { addDays, dday, diffDays, longDate, shortDate } from './dates';
-import { addProgress, daysAgo, examEnd, examProgress, nextSubjects, scopeDate, scopeLines, scopeText, upcomingExams } from './exams';
-import { alive, newId, type Exam, type ExamScope, type Subject } from './model';
+import { addProgress, daysAgo, examDates, examEnd, examProgress, MAX_EXAM_DAYS, nextSubjects, scopeDate, scopeLines, scopeText, timetable, timetableDate, upcomingExams } from './exams';
+import { alive, newId, SUBJECT_COLORS, type Exam, type ExamDay, type ExamKind, type ExamScope, type Subject } from './model';
 import { put, useStudy } from './store';
 import { removeExam } from './actions';
 import { Bar, Check, confirmDelete, Empty, Field, go, Icon, Menu, Sheet, SubjectDot, SubjectPicker, subjectsOf, toast, useToday, tap } from './ui';
 
-/** id: 'new' 이면 시험 넣기 창, 'progress' 면 학교 진도 적기 창, 그 밖엔 시험 하나 */
-export function Exams({ id }: { id?: string }) {
+// 성적 화면은 그래프가 있어 열 때 받는다
+const Grades = lazy(() => import('./Grades').then((m) => ({ default: m.Grades })));
+
+export const KIND_NAME: Record<ExamKind, string> = { school: '내신', mock: '모의고사·수능', other: '기타' };
+
+/** id: 'new' 이면 시험 넣기 창, 'progress' 면 학교 진도 적기 창, 'grades' 면 성적, 그 밖엔 시험 하나 */
+export function Exams({ id, sub }: { id?: string; sub?: string }) {
+  if (id === 'grades')
+    return (
+      <Suspense fallback={<p className="st-muted">여는 중…</p>}>
+        <Grades sub={sub} />
+      </Suspense>
+    );
   if (id && id !== 'new' && id !== 'progress') return <ExamDetail id={id} />;
   return <ExamList adding={id === 'new'} progress={id === 'progress'} />;
+}
+
+/** 시험 · 성적 바꾸기 */
+export function ExamTabs({ on }: { on: 'exams' | 'grades' }) {
+  return (
+    <div className="st-seg" role="tablist" aria-label="시험과 성적">
+      <button role="tab" aria-selected={on === 'exams'} className={on === 'exams' ? 'on' : ''} onClick={() => go('/exams')}>
+        시험
+      </button>
+      <button role="tab" aria-selected={on === 'grades'} className={on === 'grades' ? 'on' : ''} onClick={() => go('/exams/grades')}>
+        성적
+      </button>
+    </div>
+  );
+}
+
+/** 2026-11-30 ~ 12-03 처럼 기간 글 */
+export function examPeriodText(e: Exam) {
+  const end = examEnd(e);
+  return end !== e.date ? `${longDate(e.date)} ~ ${shortDate(end)}` : longDate(e.date);
 }
 
 function ExamList({ adding, progress }: { adding: boolean; progress: boolean }) {
@@ -31,7 +62,11 @@ function ExamList({ adding, progress }: { adding: boolean; progress: boolean }) 
     <div className="st-page">
       <div className="st-page-head">
         <h2>시험</h2>
+        <button className="btn btn-sm btn-primary" onClick={() => setEdit('new')}>
+          <Icon name="plus" /> 시험 넣기
+        </button>
       </div>
+      <ExamTabs on="exams" />
 
       {!upcoming.length ? (
         <Empty title="다가오는 시험이 없어요">
@@ -46,11 +81,11 @@ function ExamList({ adding, progress }: { adding: boolean; progress: boolean }) 
             const p = examProgress(e);
             return (
               <button key={e.id} className="st-exam-card" onClick={() => go(`/exams/${e.id}`)}>
-                <span className="st-exam-dday">{dday(today, e.date)}</span>
+                <span className="st-exam-dday">{diffDays(today, e.date) < 0 ? '시험 기간' : dday(today, e.date)}</span>
                 <strong>{e.name}</strong>
                 <small>
-                  {longDate(e.date)}
-                  {examEnd(e) !== e.date && ` ~ ${shortDate(examEnd(e))}`}
+                  {e.kind && `${KIND_NAME[e.kind]} · `}
+                  {examPeriodText(e)}
                 </small>
                 {p.total > 0 ? (
                   <>
@@ -103,8 +138,19 @@ function ExamList({ adding, progress }: { adding: boolean; progress: boolean }) 
             <div key={e.id} className="st-item st-tap" {...tap(() => go(`/exams/${e.id}`))}>
               <div className="st-item-main">
                 <div className="st-item-title">{e.name}</div>
-                <div className="st-item-sub">{longDate(e.date)}</div>
+                <div className="st-item-sub">{examPeriodText(e)}</div>
               </div>
+              {!alive(d.grades).some((g) => g.examId === e.id) && (
+                <button
+                  className="btn btn-sm"
+                  onClick={(ev) => {
+                    ev.stopPropagation();
+                    go(`/exams/grades/from-${e.id}`);
+                  }}
+                >
+                  성적 넣기
+                </button>
+              )}
             </div>
           ))}
         </details>
@@ -171,28 +217,136 @@ function ProgressSheet({ subject, today, onClose }: { subject: Subject; today: s
 }
 
 function ExamSheet({ exam, today, onClose }: { exam?: Exam; today: string; onClose: () => void }) {
+  const d = useStudy();
   const [name, setName] = useState(exam?.name ?? '');
+  const [kind, setKind] = useState<ExamKind>(exam?.kind ?? 'school');
+  const [multi, setMulti] = useState(!!exam?.end);
   const [date, setDate] = useState(exam?.date ?? addDays(today, 30));
+  const [end, setEnd] = useState(exam?.end ?? addDays(exam?.date ?? addDays(today, 30), 3));
+  const [days, setDays] = useState<ExamDay[]>(exam?.days ?? []);
+  const [newSubj, setNewSubj] = useState('');
+  const subjects = subjectsOf(d);
+  const endOk = !multi || (end > date && diffDays(date, end) < MAX_EXAM_DAYS);
+  const draft: Exam = { id: exam?.id ?? 'draft', updatedAt: 0, name, date, end: multi && endOk ? end : undefined, days };
+  const rows = multi && endOk ? timetable(draft) : [];
+
+  function toggle(dayDate: string, sid: string) {
+    const now = Date.now();
+    const has = days.some((x) => x.date === dayDate && x.subjectIds.includes(sid));
+    // 한 과목은 하루에만 (다른 날에 있었으면 옮긴다)
+    const next = days.map((x) => {
+      if (x.date === dayDate) return { ...x, subjectIds: has ? x.subjectIds.filter((i) => i !== sid) : [...x.subjectIds, sid], at: now };
+      return x.subjectIds.includes(sid) ? { ...x, subjectIds: x.subjectIds.filter((i) => i !== sid), at: now } : x;
+    });
+    if (!next.some((x) => x.date === dayDate)) next.push({ date: dayDate, subjectIds: [sid], at: now });
+    setDays(next.sort((x, y) => x.date.localeCompare(y.date)));
+  }
+
+  function addSubject() {
+    const n = newSubj.trim();
+    if (!n) return;
+    put('subjects', { id: newId(), name: n, color: SUBJECT_COLORS[subjects.length % SUBJECT_COLORS.length], order: subjects.length });
+    setNewSubj('');
+  }
+
   return (
-    <Sheet title={exam ? '시험 고치기' : '시험 넣기'} onClose={onClose}>
+    <Sheet title={exam ? '시험 고치기' : '시험 넣기'} onClose={onClose} wide>
       <form
         className="st-form"
         onSubmit={(e) => {
           e.preventDefault();
-          if (!name.trim() || !date) return;
+          if (!name.trim() || !date || !endOk) return;
           const id = exam?.id ?? newId();
-          put('exams', { ...(exam ?? { scopes: [] }), id, name: name.trim(), date });
+          const inRange = new Set(multi ? examDates(draft) : []);
+          put('exams', {
+            ...(exam ?? { scopes: [] }),
+            id,
+            name: name.trim(),
+            kind,
+            date,
+            end: multi ? end : undefined,
+            days: multi ? days.filter((x) => inRange.has(x.date) && x.subjectIds.length) : undefined,
+          });
           onClose();
           if (!exam) go(`/exams/${id}`);
         }}
       >
         <Field label="이름">
-          <input className="st-input" value={name} onChange={(e) => setName(e.target.value)} placeholder="예: 2학기 기말고사" required />
+          <input className="st-input" value={name} onChange={(e) => setName(e.target.value)} placeholder={kind === 'mock' ? '예: 6월 모의고사' : '예: 2학기 기말고사'} required />
         </Field>
-        <Field label="시험 시작 날" hint="과목마다 날이 다르면 범위를 넣을 때 과목 날짜를 따로 정해요">
-          <input className="st-input sm" type="date" value={date} onChange={(e) => setDate(e.target.value)} required />
+        <Field group label="종류">
+          <div className="st-seg">
+            {(['school', 'mock', 'other'] as const).map((k) => (
+              <button key={k} type="button" className={kind === k ? 'on' : ''} aria-pressed={kind === k} onClick={() => setKind(k)}>
+                {KIND_NAME[k]}
+              </button>
+            ))}
+          </div>
         </Field>
-        <button className="btn btn-primary">{exam ? '저장' : '넣고 범위 쓰기'}</button>
+        <Field group label="시험 보는 날">
+          <div className="st-seg">
+            <button type="button" className={!multi ? 'on' : ''} aria-pressed={!multi} onClick={() => setMulti(false)}>
+              하루
+            </button>
+            <button type="button" className={multi ? 'on' : ''} aria-pressed={multi} onClick={() => setMulti(true)}>
+              여러 날 (시험 기간)
+            </button>
+          </div>
+        </Field>
+        <div className="st-inline wrap">
+          <input
+            className="st-input sm"
+            type="date"
+            value={date}
+            onChange={(e) => {
+              const v = e.target.value;
+              // 시작 날을 옮기면 기간 길이는 그대로
+              if (multi && v && date) setEnd(addDays(end, diffDays(date, v)));
+              setDate(v);
+            }}
+            aria-label={multi ? '시험 첫날' : '시험 날'}
+            required
+          />
+          {multi && (
+            <>
+              ~
+              <input className="st-input sm" type="date" value={end} min={addDays(date, 1)} max={addDays(date, MAX_EXAM_DAYS - 1)} onChange={(e) => setEnd(e.target.value)} aria-label="시험 마지막 날" required />
+            </>
+          )}
+        </div>
+        {multi && !endOk && <p className="bad">마지막 날은 첫날 뒤, {MAX_EXAM_DAYS}일 안으로 골라 주세요.</p>}
+        {multi && endOk && (
+          <Field group label="날짜별 시험 과목" hint="그날 보는 과목을 눌러 고르세요. 과목별 시험 날이 정해져 계획·D-day 에 쓰여요.">
+            {!subjects.length && <p className="st-hint">아래에서 과목을 먼저 추가해 주세요.</p>}
+            <div className="st-timetable-edit">
+              {rows.map((r) => (
+                <div key={r.date} className="st-tt-row">
+                  <span className="st-tt-date">{shortDate(r.date)}</span>
+                  <div className="st-chips">
+                    {subjects.map((sub) => {
+                      const on = r.subjectIds.includes(sub.id);
+                      return (
+                        <button key={sub.id} type="button" className={`st-chip ${on ? 'on' : ''}`} aria-pressed={on} style={{ ['--c' as string]: sub.color }} onClick={() => toggle(r.date, sub.id)}>
+                          {sub.name}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div className="st-inline">
+              <input className="st-input sm" placeholder="과목 추가 (예: 한국사)" value={newSubj} onChange={(e) => setNewSubj(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), addSubject())} aria-label="새 과목 이름" />
+              <button type="button" className="btn btn-sm" onClick={addSubject}>
+                추가
+              </button>
+            </div>
+          </Field>
+        )}
+        {!multi && <p className="st-hint">과목별 시험 범위는 저장한 뒤 넣어요.</p>}
+        <button className="btn btn-primary" disabled={!endOk}>
+          {exam ? '저장' : '넣고 범위 쓰기'}
+        </button>
       </form>
     </Sheet>
   );
@@ -229,7 +383,8 @@ function ExamDetail({ id }: { id: string }) {
         <Menu
           items={[
             { label: '과목 범위 넣기', onClick: () => setScope('new') },
-            { label: '이름·날짜 고치기', onClick: () => setEdit(true) },
+            { label: '이름·날짜·과목 고치기', onClick: () => setEdit(true) },
+            { label: '이 시험 성적 넣기', onClick: () => go(`/exams/grades/from-${exam.id}`) },
             {
               label: '시험 지우기',
               danger: true,
@@ -248,7 +403,10 @@ function ExamDetail({ id }: { id: string }) {
         <div>
           <strong>{longDate(exam.date)}</strong>
           {examEnd(exam) !== exam.date && <span className="st-muted"> ~ {longDate(examEnd(exam))}</span>}
-          <p className="st-sub">{left > 0 ? `${left}일 남았어요` : left === 0 ? '오늘이 시험이에요' : '시험이 끝났어요'}</p>
+          <p className="st-sub">
+            {exam.kind && `${KIND_NAME[exam.kind]} · `}
+            {left > 0 ? `${left}일 남았어요` : left === 0 ? '오늘 시험이 시작돼요' : examEnd(exam) >= today ? '시험 기간이에요' : '시험이 끝났어요'}
+          </p>
         </div>
         {p.total > 0 && (
           <div className="st-exam-hero-bar">
@@ -259,6 +417,33 @@ function ExamDetail({ id }: { id: string }) {
           </div>
         )}
       </section>
+
+      {exam.end && (
+        <section className="st-card">
+          <div className="st-inline between">
+            <h3 className="st-h">날짜별 시험 과목</h3>
+            <button className="st-link" onClick={() => setEdit(true)}>
+              고치기
+            </button>
+          </div>
+          <div className="st-timetable">
+            {timetable(exam).map((r) => (
+              <div key={r.date} className={`st-tt-row ${r.date === today ? 'today' : ''} ${r.date < today ? 'past' : ''}`}>
+                <span className="st-tt-date">
+                  {shortDate(r.date)} <small className="st-muted">{r.date >= today ? dday(today, r.date) : '끝'}</small>
+                </span>
+                <span className="st-tt-subs">{r.subjectIds.length ? r.subjectIds.map((sid) => d.subjects[sid]?.name ?? '과목').join(' · ') : <span className="st-muted">시험 없음</span>}</span>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {examEnd(exam) < today && !alive(d.grades).some((g) => g.examId === exam.id) && (
+        <button className="st-addline" onClick={() => go(`/exams/grades/from-${exam.id}`)}>
+          <Icon name="plus" /> 이 시험 성적 넣기
+        </button>
+      )}
 
       {scopes.map((s) => {
         const sd = scopeDate(exam, s);
@@ -338,7 +523,7 @@ function ExamDetail({ id }: { id: string }) {
 function ScopeSheet({ exam, scope, onClose, onSave, onDelete }: { exam: Exam; scope?: ExamScope; onClose: () => void; onSave: (s: ExamScope) => void; onDelete: (id: string) => void }) {
   const d = useStudy();
   const used = new Set((exam.scopes ?? []).filter((s) => s.id !== scope?.id).map((s) => s.subjectId));
-  const [subjectId, setSubjectId] = useState(scope?.subjectId ?? subjectsOf(d).find((s) => !used.has(s.id))?.id ?? '');
+  const [subjectId, setSubjectId] = useState(scope?.subjectId ?? (exam.days ?? []).flatMap((x) => x.subjectIds).find((id) => !used.has(id) && d.subjects[id] && !d.subjects[id].deleted) ?? subjectsOf(d).find((s) => !used.has(s.id))?.id ?? '');
   const [date, setDate] = useState(scope?.date ?? exam.date);
   const [text, setText] = useState(scope ? scopeText(scope.lines) : '');
   const [note, setNote] = useState(scope?.note ?? '');
@@ -350,9 +535,13 @@ function ScopeSheet({ exam, scope, onClose, onSave, onDelete }: { exam: Exam; sc
           <SubjectPicker value={subjectId} onChange={setSubjectId} />
         </Field>
         {used.has(subjectId) && <p className="bad">이 과목 범위는 이미 있어요. 그 과목을 눌러 고쳐 주세요.</p>}
-        <Field label="이 과목 시험 날">
-          <input className="st-input sm" type="date" value={date} onChange={(e) => setDate(e.target.value)} />
-        </Field>
+        {timetableDate(exam, subjectId) ? (
+          <p className="st-hint">이 과목 시험 날: {longDate(timetableDate(exam, subjectId)!)} (날짜별 시험 과목에서 정했어요)</p>
+        ) : (
+          <Field label="이 과목 시험 날">
+            <input className="st-input sm" type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+          </Field>
+        )}
         <Field label="시험 범위 (한 줄에 하나, 체크하며 공부해요)" hint="예: 교과서 12~80쪽 / 1~3단원 / 프린트 1~5 / 쎈 B단계">
           <textarea className="st-input" rows={6} value={text} onChange={(e) => setText(e.target.value)} placeholder={'교과서 12~80쪽\n1~3단원 개념 정리\n프린트 1~5'} />
         </Field>
@@ -368,7 +557,7 @@ function ScopeSheet({ exam, scope, onClose, onSave, onDelete }: { exam: Exam; sc
           <button
             className="btn btn-primary"
             disabled={!subjectId || !lines.length || used.has(subjectId)}
-            onClick={() => onSave({ id: scope?.id ?? newId(), subjectId, date: date && date !== exam.date ? date : undefined, lines, note: note.trim() || undefined, at: Date.now() })}
+            onClick={() => onSave({ id: scope?.id ?? newId(), subjectId, date: !timetableDate(exam, subjectId) && date && date !== exam.date ? date : undefined, lines, note: note.trim() || undefined, at: Date.now() })}
           >
             저장 ({lines.length}줄)
           </button>
@@ -398,7 +587,11 @@ export function DdayHero({ today }: { today: string }) {
         <span className="st-hero-dday">{left > 0 ? `D-${left}` : left === 0 ? 'D-day' : '시험 중'}</span>
         <div>
           <strong>{e.name}</strong>
-          <small>{longDate(e.date)}</small>
+          <small>{examPeriodText(e)}</small>
+          {left <= 0 && (() => {
+            const t = timetable(e).find((x) => x.date === today);
+            return t?.subjectIds.length ? <small>오늘 시험: {t.subjectIds.map((sid) => d.subjects[sid]?.name ?? '과목').join(' · ')}</small> : null;
+          })()}
         </div>
       </div>
       {p.total > 0 && (

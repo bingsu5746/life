@@ -6,7 +6,7 @@
  * tesseract.js 판을 올리면 두 곳을 함께 고쳐야 한다. (언어 자료는 tesseract.js 가 정한 @tesseract.js-data/<언어>/4.0.0_best_int 에서 받는다)
  */
 const CDN = 'https://cdn.jsdelivr.net/npm';
-const OCR_PATHS = {
+export const OCR_PATHS = {
   workerPath: `${CDN}/tesseract.js@v7.0.0/dist/worker.min.js`,
   corePath: `${CDN}/tesseract.js-core@v7.0.0`,
 };

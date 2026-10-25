@@ -164,3 +164,8 @@ export const deleteStudyPhoto = (id: string) => call('study-photo/' + id, 'DELET
 export async function translate(text: string, to: 'ko' | 'en') {
   return call<{ text: string; to: 'ko' | 'en' }>('translate', 'POST', { text, to });
 }
+
+/** 영어 낱말들의 뜻 (로그인한 사람만, 한 번에 60개까지) */
+export async function wordMeanings(words: string[]) {
+  return call<{ words: string[]; meanings: string[] }>('translate', 'POST', { words });
+}

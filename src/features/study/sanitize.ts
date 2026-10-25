@@ -12,6 +12,8 @@ const num = (v: unknown, fb = 0) => (typeof v === 'number' && Number.isFinite(v)
 const optNum = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) ? v : undefined);
 const bool = (v: unknown) => v === true;
 const arr = (v: unknown): unknown[] => (Array.isArray(v) ? v : []);
+/** 점수 칸: 범위 밖이면 버린다 */
+const score = (v: unknown, lo: number, hi: number) => (typeof v === 'number' && Number.isFinite(v) && v >= lo && v <= hi ? v : undefined);
 const optDate = (v: unknown): DateStr | undefined => (isDate(v) ? v : undefined);
 const dates = (v: unknown): DateStr[] => arr(v).filter(isDate);
 const ints = (v: unknown, lo: number, hi: number): number[] => arr(v).filter((x): x is number => Number.isInteger(x) && (x as number) >= lo && (x as number) <= hi);
@@ -51,6 +53,14 @@ const FIX: Record<Collection, Fix> = {
       ? {
           ...x,
           name: str(x.name, '시험'),
+          end: isDate(x.end) && x.end > x.date ? x.end : undefined,
+          kind: x.kind === 'school' || x.kind === 'mock' || x.kind === 'other' ? x.kind : undefined,
+          days:
+            x.days === undefined
+              ? undefined
+              : arr(x.days)
+                  .filter((d): d is Obj => isObj(d) && isDate(d.date))
+                  .map((d) => ({ date: d.date as DateStr, subjectIds: arr(d.subjectIds).filter((i): i is string => typeof i === 'string'), at: optNum(d.at) })),
           scopes:
             x.scopes === undefined
               ? undefined
@@ -143,6 +153,29 @@ const FIX: Record<Collection, Fix> = {
     created: optDate(x.created) ?? '2000-01-01',
     archived: x.archived === true ? true : undefined,
   }),
+  grades: (x) =>
+    isDate(x.date)
+      ? {
+          ...x,
+          kind: x.kind === 'mock' ? 'mock' : 'school',
+          name: str(x.name, '시험'),
+          examId: optStr(x.examId),
+          memo: optStr(x.memo),
+          scores: arr(x.scores)
+            .filter((g): g is Obj => isObj(g) && typeof g.id === 'string' && typeof g.subject === 'string')
+            .map((g) => ({
+              id: g.id,
+              subject: g.subject,
+              raw: score(g.raw, 0, 1000),
+              full: score(g.full, 1, 1000),
+              grade: score(g.grade, 1, 9),
+              average: score(g.average, 0, 1000),
+              standard: score(g.standard, 0, 300),
+              percentile: score(g.percentile, 0, 100),
+              at: optNum(g.at),
+            })),
+        }
+      : null,
 };
 
 /** 항목들: id 가 있는 객체만, 지운 표시는 그대로 (그 안의 칸은 화면에 쓰지 않는다) */
