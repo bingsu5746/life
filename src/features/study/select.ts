@@ -2,21 +2,33 @@
 import { apportion } from './allocate';
 import { addDays, daysBetween } from './dates';
 import { habitOn } from './habits';
-import { alive, type Book, type DateStr, type Homework, type HwItem, type Id, type Plan, type StudyData, type Unit, type Word, type WordList, type WordsData } from './model';
-import { doneSet, expand } from './pages';
+import { alive, type Book, type DateStr, type Homework, type HwItem, type Id, type MemoCard, type Plan, type StudyData, type Unit, type Word, type WordList, type WordsData } from './model';
+import { doneSet, expand, MAX_DAYS } from './pages';
 import { lockToday, schedule, type PlanCtx, type Schedule, type Target } from './plan';
-import { dueToday } from './review';
+import { dueToday, newToday } from './review';
 import { homeworkDue } from './tutor';
 import { bookNewToday, dueWords, finishedDays, inboxNewToday, isTestPrepDay, testNewToday } from './wordSession';
+
+/** 오늘 볼 암기 카드: 복습할 카드 + 하루 정한 수만큼의 새 카드 */
+export function cardsToday(d: StudyData, today: DateStr, deckId?: Id | null): MemoCard[] {
+  const cs = alive(d.cards).filter((c) => !deckId || c.deckId === deckId);
+  return [...dueToday(cs, today), ...newToday(cs, today)];
+}
+
+/** 오늘 복습 수 (오답 + 카드) */
+export const reviewCountToday = (d: StudyData, today: DateStr) => dueToday(alive(d.notes), today).length + cardsToday(d, today).length;
 
 export function planCtx(d: StudyData, today: DateStr): PlanCtx {
   return { today, settings: d.settings, tutors: alive(d.tutors), exams: d.exams };
 }
 
+/** 살아 있는 과외의 숙제만 (과외를 지우면 그 숙제도 오늘 화면·계획에서 빠진다) */
+export const liveHomework = (d: StudyData): Homework[] => alive(d.homework).filter((hw) => d.tutors[hw.tutorId] && !d.tutors[hw.tutorId].deleted);
+
 /** 과외 숙제로 잡힌 문제집 페이지 (문제집 계획에서 뺀다) */
 export function reservedPages(d: StudyData, bookId: Id): Set<number> {
   const out = new Set<number>();
-  for (const hw of alive(d.homework))
+  for (const hw of liveHomework(d))
     for (const it of hw.items) if (it.kind === 'pages' && it.bookId === bookId && it.range) for (const p of expand([it.range])) out.add(p);
   return out;
 }
@@ -29,7 +41,7 @@ export function listWords(words: WordsData, listId: Id): Word[] {
     .sort((a, b) => (a.day ?? 0) - (b.day ?? 0) || a.order - b.order);
 }
 
-export const dayUnits = (n: number): Unit[] => Array.from({ length: n }, (_, i) => ({ name: `Day ${i + 1}`, from: i + 1, to: i + 1 }));
+export const dayUnits = (n: number): Unit[] => Array.from({ length: Math.max(0, Math.min(MAX_DAYS, Math.floor(n) || 0)) }, (_, i) => ({ name: `Day ${i + 1}`, from: i + 1, to: i + 1 }));
 
 /** 단어장에서 끝낸 Day: 직접 체크했거나, 그 Day 단어를 모두 한 번 이상 익힘 */
 export function listDoneDays(list: WordList, ws: Word[]): Set<number> {
@@ -42,11 +54,11 @@ export function targetOf(d: StudyData, words: WordsData, plan: Plan): Target | n
   if (plan.target === 'book') {
     const b = d.books[plan.targetId];
     if (!b || b.deleted) return null;
-    return { units: b.units, done: bookDone(b), reserved: reservedPages(d, b.id) };
+    return { units: b.units, done: bookDone(b), reserved: reservedPages(d, b.id), subjectId: b.subjectId };
   }
   const l = d.wordLists[plan.targetId];
   if (!l || l.deleted) return null;
-  return { units: dayUnits(l.days ?? 0), done: listDoneDays(l, listWords(words, l.id)), reserved: new Set() };
+  return { units: dayUnits(l.days ?? 0), done: listDoneDays(l, listWords(words, l.id)), reserved: new Set(), subjectId: l.subjectId };
 }
 
 export interface PlanView {
@@ -116,7 +128,7 @@ export function homeworkToday(remaining: number[], today: DateStr, due: DateStr,
 }
 
 export function homeworkViews(d: StudyData, today: DateStr): HomeworkView[] {
-  return alive(d.homework)
+  return liveHomework(d)
     .map((hw) => {
       const tutor = d.tutors[hw.tutorId];
       const due = homeworkDue(hw, tutor && !tutor.deleted ? tutor : undefined);
@@ -181,7 +193,7 @@ export function todaySummary(d: StudyData, words: WordsData, today: DateStr): To
       if (!i.finished) left++;
     }
   }
-  const reviewCount = dueToday(alive(d.notes), today).length + dueToday(alive(d.cards), today).length;
+  const reviewCount = reviewCountToday(d, today);
   if (reviewCount) {
     total++;
     left++;

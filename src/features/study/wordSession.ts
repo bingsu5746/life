@@ -8,7 +8,8 @@ const byOrder = (a: Word, b: Word) => (a.day ?? 0) - (b.day ?? 0) || a.order - b
 
 /** 단어 시험: 새 단어는 시험 이틀 전까지 나눠 익히고, 전날은 전체 복습 */
 export function testNewToday(list: WordList, words: Word[], today: DateStr): Word[] {
-  if (!list.testDate) return [];
+  // 시험이 지났으면 새 단어는 더 내지 않는다 (익힌 단어의 복습만)
+  if (!list.testDate || today > list.testDate) return [];
   const unseen = words.filter((w) => w.box === 0).sort(byOrder);
   const seenToday = words.filter((w) => w.firstSeen === today).length;
   const lastNew = addDays(list.testDate, -2);

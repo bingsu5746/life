@@ -20,6 +20,8 @@ export interface Target {
   done: Set<number>;
   /** 과외 숙제로 잡힌 페이지 (계획에서 뺌) */
   reserved: Set<number>;
+  /** 문제집·단어장의 과목 (시험에 그 과목 시험 날이 따로 있으면 그날까지) */
+  subjectId?: Id;
 }
 
 export interface DayPlan {
@@ -32,7 +34,9 @@ export type Warning =
   | { kind: 'over'; perDay: number; baseline: number }
   | { kind: 'max'; perDay: number; max: number }
   | { kind: 'nodays' }
-  | { kind: 'overdue'; due: DateStr };
+  | { kind: 'overdue'; due: DateStr }
+  /** 맞춘 시험이 끝났다 (오늘 분량은 없음, 끝내거나 고치기) */
+  | { kind: 'ended'; due: DateStr };
 
 export interface Schedule {
   /** 마지막 공부하는 날 (마감 전날 또는 마감 날) */
@@ -49,18 +53,22 @@ export interface Schedule {
   warning: Warning | null;
 }
 
-/** 마감 날짜 (시험이면 시험일) */
-export function planDue(plan: Plan, exams: Record<Id, Exam>): DateStr | null {
+/** 마감 날짜 (시험이면 그 과목 시험 날, 따로 없으면 시험 첫날) */
+export function planDue(plan: Plan, exams: Record<Id, Exam>, subjectId?: Id): DateStr | null {
   if (plan.examId) {
     const e = exams[plan.examId];
-    if (e && !e.deleted) return e.date;
+    if (e && !e.deleted) return (subjectId && e.scopes?.find((s) => s.subjectId === subjectId)?.date) || e.date;
+    // 시험을 지웠으면: 지울 때 옮겨 둔 날짜, 없으면 지운 표시에 남은 시험 날짜
+    if (plan.due) return plan.due;
+    if (e?.date) return e.date;
+    return null;
   }
   return plan.due ?? null;
 }
 
 /** 마지막 공부하는 날 */
-export function planEnd(plan: Plan, exams: Record<Id, Exam>): DateStr | null {
-  const due = planDue(plan, exams);
+export function planEnd(plan: Plan, exams: Record<Id, Exam>, subjectId?: Id): DateStr | null {
+  const due = planDue(plan, exams, subjectId);
   if (!due) return null;
   return plan.includeDue ? due : addDays(due, -1);
 }
@@ -96,12 +104,17 @@ export function schedule(plan: Plan, target: Target, ctx: PlanCtx): Schedule {
   const all = expand(plan.range);
   const remaining = remainingItems(plan, target);
   const doneCount = all.filter((p) => target.done.has(p)).length;
-  const end = planEnd(plan, ctx.exams);
+  const end = planEnd(plan, ctx.exams, target.subjectId);
   const first = plan.start > ctx.today ? plan.start : ctx.today;
   const base: Omit<Schedule, 'today' | 'locked' | 'days' | 'warning'> = { end, remaining, total: all.length, doneCount };
   if (!remaining.length) return { ...base, today: [], locked: false, days: [], warning: null };
 
   const lock = plan.todayLock?.date === ctx.today ? plan.todayLock : undefined;
+  const due = planDue(plan, ctx.exams, target.subjectId);
+  if (plan.examId && due && due < ctx.today) {
+    // 시험이 끝났다: 남은 것을 매일 다 보여 주지 않고, 끝내거나 고치라고 알린다
+    return { ...base, today: [], locked: false, days: [], warning: { kind: 'ended', due } };
+  }
   if (!end || end < first) {
     // 마감이 지났다: 남은 것을 오늘 다 보여 주고 알린다
     const due = end ? addDays(end, plan.includeDue ? 0 : 1) : ctx.today;
@@ -114,7 +127,9 @@ export function schedule(plan: Plan, target: Target, ctx: PlanCtx): Schedule {
     todayItems = lock.items;
     const locked = new Set(lock.items);
     const rest = remaining.filter((p) => !locked.has(p));
-    days = end > ctx.today ? allocateDays(rest, daysBetween(addDays(ctx.today, 1), end), plan, ctx, target) : [];
+    // 내일부터 (시작일이 더 뒤면 시작일부터) 나눈다
+    const from = first > ctx.today ? first : addDays(ctx.today, 1);
+    days = end >= from ? allocateDays(rest, daysBetween(from, end), plan, ctx, target) : [];
     // 마감 날인데 오늘 분량 밖에 남은 게 있으면 (다른 기기에서 해제 등) 오늘에 붙인다
     if (!days.length && rest.length) todayItems = [...todayItems, ...rest];
   } else {
@@ -140,7 +155,10 @@ export function schedule(plan: Plan, target: Target, ctx: PlanCtx): Schedule {
  */
 export function lockToday(plan: Plan, target: Target, ctx: PlanCtx): Plan | null {
   if (plan.finished || plan.deleted || plan.todayLock?.date === ctx.today) return null;
+  // 아직 시작하지 않은 계획은 고정할 것이 없다 (빈 분량을 고정하면 시작일 전부터 나눠 버린다)
+  if (plan.start > ctx.today) return null;
   const s = schedule({ ...plan, todayLock: undefined }, target, ctx);
+  if (s.warning?.kind === 'ended') return null;
   const prev = plan.todayLock;
   const missed = prev && prev.date < ctx.today ? prev.items.filter((p) => !target.done.has(p)).length : 0;
   return {
@@ -153,7 +171,7 @@ export function lockToday(plan: Plan, target: Target, ctx: PlanCtx): Plan | null
 /** 계획을 처음 만들 때의 하루 평균 (경고 기준) */
 export function baselineOf(plan: Omit<Plan, 'baseline'>, target: Target, ctx: PlanCtx): number {
   const items = remainingItems({ ...plan, baseline: 0 } as Plan, target);
-  const end = planEnd({ ...plan, baseline: 0 } as Plan, ctx.exams);
+  const end = planEnd({ ...plan, baseline: 0 } as Plan, ctx.exams, target.subjectId);
   if (!end || !items.length) return 0;
   const first = plan.start > ctx.today ? plan.start : ctx.today;
   if (end < first) return items.length;
@@ -163,7 +181,7 @@ export function baselineOf(plan: Omit<Plan, 'baseline'>, target: Target, ctx: Pl
 
 /** 지금까지 계획대로였다면 한 양 vs 실제 (앞섬·밀림) */
 export function paceOf(plan: Plan, target: Target, ctx: PlanCtx): number {
-  const end = planEnd(plan, ctx.exams);
+  const end = planEnd(plan, ctx.exams, target.subjectId);
   const total = expand(plan.range).length;
   if (!end || plan.start > ctx.today) return 0;
   const dates = daysBetween(plan.start, end);

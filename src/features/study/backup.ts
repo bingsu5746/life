@@ -2,6 +2,7 @@
 import { mergeStudy, mergeWords } from './merge';
 import type { StudyData, WordsData } from './model';
 import { getStudy, getWords, normalize, replaceStudy, replaceWords } from './store';
+import { sanitizeWords } from './sanitize';
 import { notifyChange } from '../../lib/dataSync';
 
 interface BackupFile {
@@ -32,9 +33,10 @@ export async function importBackup(file: File): Promise<{ words: number }> {
     throw new Error('백업 파일을 읽지 못했어요.');
   }
   if (data.app !== 'life-study' || data.version !== 1 || typeof data.study !== 'object' || typeof data.words !== 'object' || !data.study || !data.words) throw new Error('이 사이트의 백업 파일이 아니에요.');
-  const words = Object.fromEntries(Object.entries(data.words).filter(([, w]) => w && typeof w === 'object' && typeof w.term === 'string' && typeof w.id === 'string'));
+  // 모양이 틀린 항목은 다듬거나 버린다 (sanitize.ts)
+  const words = sanitizeWords(data.words);
   replaceStudy(mergeStudy(getStudy(), normalize(data.study)));
-  replaceWords(mergeWords(getWords(), words as WordsData));
+  replaceWords(mergeWords(getWords(), words));
   // 로그인했다면 계정에도 올린다
   notifyChange('study');
   notifyChange('words');

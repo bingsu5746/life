@@ -51,6 +51,8 @@ export interface Subject extends Stamp {
 export interface ProgressEntry {
   date: DateStr;
   text: string;
+  /** 고친 시각 (두 기기에서 따로 고쳤을 때 합치기용) */
+  at?: number;
 }
 
 /** 시험 범위 한 줄 (체크하며 공부) */
@@ -58,6 +60,8 @@ export interface ScopeLine {
   id: Id;
   text: string;
   done: boolean;
+  /** 체크·고친 시각 (두 기기에서 따로 체크해도 합칠 수 있게) */
+  at?: number;
 }
 
 /** 한 과목의 시험 범위 */
@@ -68,6 +72,8 @@ export interface ExamScope {
   date?: DateStr;
   lines: ScopeLine[];
   note?: string;
+  /** 고친 시각 */
+  at?: number;
 }
 
 export interface Exam extends Stamp {
@@ -149,6 +155,8 @@ export interface HwItem {
   done?: boolean;
   /** 질문 메모 (다음 수업에서 물어볼 것) */
   question?: string;
+  /** 고친 시각 (두 기기에서 따로 체크해도 합칠 수 있게) */
+  at?: number;
 }
 
 export interface Homework extends Stamp {
@@ -199,6 +207,10 @@ export interface MemoCard extends Stamp, Review {
   deckId: Id;
   front: string;
   back: string;
+  /** 넣은 시각 (새 카드 순서) */
+  created?: number;
+  /** 처음 본 날 (하루 새 카드 수 세기) */
+  firstSeen?: DateStr;
 }
 
 export interface WordList extends Stamp {
@@ -257,6 +269,8 @@ export interface Habit extends Stamp {
   /** 하는 요일 (비면 매일) */
   weekdays: number[];
   checks: DateStr[];
+  /** 날짜마다 마지막으로 체크(+시각)·해제(-시각)한 때: 두 기기에서 다른 날을 체크해도 합칠 수 있게 */
+  log?: Record<DateStr, number>;
   created: DateStr;
   archived?: boolean;
 }

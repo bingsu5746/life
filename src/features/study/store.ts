@@ -1,7 +1,9 @@
 // 공부 자료를 이 기기에 저장하고 화면에 알린다. 바뀌면 notifyChange 로 계정 동기화에 알린다 (src/features/auth/accountSync.ts).
 import { useSyncExternalStore } from 'react';
 import { notifyChange } from '../../lib/dataSync';
-import { COLLECTIONS, DEFAULT_SETTINGS, emptyStudy, type Collection, type Id, type Stamp, type StudyData, type StudySettings, type Word, type WordsData } from './model';
+import { idb } from '../../lib/idb';
+import { emptyStudy, type Collection, type Id, type Stamp, type StudyData, type StudySettings, type Word, type WordsData } from './model';
+import { sanitizeCollections, sanitizeSettings, sanitizeWords } from './sanitize';
 
 const KEY = 'my-study.study.v1';
 const WORDS_KEY = 'my-study.study-words.v1';
@@ -15,19 +17,15 @@ function read<T>(key: string, fallback: () => T): T {
   }
 }
 
-/** 옛 자료나 다른 기기의 자료에 빠진 칸을 채운다 */
+/** 옛 자료나 다른 기기의 자료에 빠진 칸을 채우고, 모양이 틀린 항목은 버린다 (sanitize.ts) */
 export function normalize(d: Partial<StudyData> | null | undefined): StudyData {
   const base = emptyStudy();
-  if (!d || typeof d !== 'object') return base;
-  const out = { ...base, ...d, v: 1 } as StudyData;
-  out.settings = { ...DEFAULT_SETTINGS, updatedAt: 0, ...(d.settings ?? {}) };
-  out.settings.pomo = { ...DEFAULT_SETTINGS.pomo, ...(d.settings?.pomo ?? {}) };
-  for (const c of COLLECTIONS) if (!out[c] || typeof out[c] !== 'object') (out as unknown as Record<string, unknown>)[c] = {};
-  return out;
+  if (!d || typeof d !== 'object' || Array.isArray(d)) return base;
+  return { ...base, ...d, v: 1, settings: sanitizeSettings(d.settings), ...sanitizeCollections(d) } as StudyData;
 }
 
 let study: StudyData = normalize(read<StudyData | null>(KEY, () => null));
-let words: WordsData = read<WordsData>(WORDS_KEY, () => ({}));
+let words: WordsData = sanitizeWords(read<unknown>(WORDS_KEY, () => ({})));
 const listeners = new Set<() => void>();
 const emit = () => listeners.forEach((f) => f());
 const subscribe = (f: () => void) => {
@@ -35,12 +33,19 @@ const subscribe = (f: () => void) => {
   return () => void listeners.delete(f);
 };
 
+/** 이 기기에 저장하지 못했는지 (저장 공간이 꽉 참 등). 화면 위에 알린다 */
+const failed = { study: false, words: false };
+export const getSaveFailed = () => failed.study || failed.words;
+export const useSaveFailed = () => useSyncExternalStore(subscribe, getSaveFailed);
+
 function save(which: 'study' | 'words', quiet = false) {
   try {
     if (which === 'study') localStorage.setItem(KEY, JSON.stringify(study));
     else localStorage.setItem(WORDS_KEY, JSON.stringify(words));
+    failed[which] = false;
   } catch {
-    // 저장 공간이 꽉 찼거나 쓸 수 없는 환경: 화면에는 남는다
+    // 저장 공간이 꽉 찼거나 쓸 수 없는 환경: 화면에는 남지만 새로 고치면 사라지므로 알린다
+    failed[which] = true;
   }
   emit();
   if (!quiet) notifyChange(which);
@@ -110,7 +115,6 @@ export async function resetLocal() {
   } catch {
     // 무시
   }
-  const { idb } = await import('../../lib/idb');
   await idb.clear('studyPhotos');
 }
 
@@ -120,6 +124,6 @@ export function replaceStudy(d: StudyData) {
   save('study', true);
 }
 export function replaceWords(w: WordsData) {
-  words = w;
+  words = sanitizeWords(w);
   save('words', true);
 }

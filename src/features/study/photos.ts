@@ -42,17 +42,58 @@ const fromB64 = (s: string) => {
   return new Blob([buf], { type: 'image/jpeg' });
 };
 
-/** 사진 저장 → id. 서버 올리기가 실패해도 이 기기에는 남는다 (오류 문구를 돌려줌) */
+// ===== 아직 서버에 올리지 못한 사진 (로그인 전에 넣었거나 올리다 실패한 것) =====
+const PENDING_KEY = 'my-study.photos.pending.v1';
+function pending(): Id[] {
+  try {
+    const v: unknown = JSON.parse(localStorage.getItem(PENDING_KEY) ?? '[]');
+    return Array.isArray(v) ? v.filter((x): x is Id => typeof x === 'string') : [];
+  } catch {
+    return [];
+  }
+}
+function setPending(ids: Id[]) {
+  try {
+    if (ids.length) localStorage.setItem(PENDING_KEY, JSON.stringify([...new Set(ids)]));
+    else localStorage.removeItem(PENDING_KEY);
+  } catch {
+    // 무시
+  }
+}
+export const pendingPhotoCount = () => pending().length;
+
+let uploading = false;
+/** 올리지 못한 사진을 올린다 (동기화가 끝날 때마다). 서버 한도·연결 오류면 다음에 다시 */
+export async function uploadPendingPhotos() {
+  if (uploading || !isLoggedIn()) return;
+  uploading = true;
+  try {
+    for (const id of pending()) {
+      const blob = await idb.get<Blob>('studyPhotos', id);
+      if (blob) await putStudyPhoto(id, await toB64(blob));
+      setPending(pending().filter((x) => x !== id));
+    }
+  } catch {
+    // 다음 동기화 때 다시
+  } finally {
+    uploading = false;
+  }
+}
+
+/** 사진 저장 → id. 서버 올리기가 실패해도 이 기기에는 남고, 나중에 다시 올린다 (오류 문구를 돌려줌) */
 export async function addPhoto(file: Blob): Promise<{ id: Id; error?: string }> {
   const id = newId();
   const blob = await shrink(file);
   await idb.put('studyPhotos', id, blob);
-  if (isLoggedIn()) {
-    try {
-      await putStudyPhoto(id, await toB64(blob));
-    } catch (e) {
-      return { id, error: (e as Error).message };
-    }
+  if (!isLoggedIn()) {
+    setPending([...pending(), id]);
+    return { id };
+  }
+  try {
+    await putStudyPhoto(id, await toB64(blob));
+  } catch (e) {
+    setPending([...pending(), id]);
+    return { id, error: (e as Error).message };
   }
   return { id };
 }
@@ -79,6 +120,7 @@ export async function photoUrl(id: Id): Promise<string | null> {
 }
 
 export async function removePhoto(id: Id) {
+  setPending(pending().filter((x) => x !== id));
   await idb.del('studyPhotos', id);
   const u = urls.get(id);
   if (u) URL.revokeObjectURL(u);

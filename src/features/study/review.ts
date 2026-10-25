@@ -22,14 +22,28 @@ export function answer<T extends Review>(item: T, correct: boolean, via: Via, to
 export const isDue = (r: Review, today: DateStr) => r.box > 0 && !r.learned && r.due <= today;
 
 /**
- * 오늘 복습 목록: 오래 밀린 것부터. 100개가 넘게 밀렸으면 오늘은 50개만 (나머지는 내일).
+ * 오늘 복습 목록: 오래 밀린 것부터, 하루 50개까지 (나머지는 내일).
+ * (예전에는 100개까지는 다 보여 주고 101개부터 50개로 줄여서, 하나 늘면 오히려 줄어드는 일이 있었다)
  */
-export function dueToday<T extends Review>(items: T[], today: DateStr, cap = 50, flood = 100): T[] {
+export function dueToday<T extends Review>(items: T[], today: DateStr, cap = 50): T[] {
   const due = items.filter((r) => isDue(r, today)).sort((a, b) => a.due.localeCompare(b.due) || a.box - b.box);
-  return due.length > flood ? due.slice(0, cap) : due;
+  return due.slice(0, cap);
 }
 
-export const BOX_LABEL = ['새로', '1일', '3일', '7일', '14일', '30일'];
+/** 암기 카드: 하루에 새로 볼 카드 수 */
+export const NEW_CARDS_PER_DAY = 20;
+
+/** 오늘 처음 볼 새 카드 (아직 안 본 카드를 넣은 순서대로, 오늘 이미 처음 본 만큼 빼고) */
+export function newToday<T extends Review & { firstSeen?: DateStr; created?: number; updatedAt: number }>(items: T[], today: DateStr, perDay = NEW_CARDS_PER_DAY): T[] {
+  const seenToday = items.filter((x) => x.firstSeen === today).length;
+  return items
+    .filter((x) => x.box === 0 && !x.learned)
+    .sort((a, b) => (a.created ?? a.updatedAt) - (b.created ?? b.updatedAt))
+    .slice(0, Math.max(0, perDay - seenToday));
+}
+
+/** 상자 이름: 0 → 새 단어, 그 밖엔 「2번 상자 · 3일」 (간격은 설정에서 바꿀 수 있다) */
+export const boxLabel = (box: number, intervals: number[]) => (box === 0 ? '새 단어' : `${box}번 상자 · ${intervals[box - 1] ?? '?'}일`);
 
 /** 3일 뒤 · 내일 · 오늘 */
 export function dueText(r: Review, today: DateStr): string {

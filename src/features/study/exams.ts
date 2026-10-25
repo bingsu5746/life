@@ -2,15 +2,19 @@
 import { diffDays } from './dates';
 import { alive, newId, type DateStr, type Exam, type ExamScope, type ScopeLine, type StudyData } from './model';
 
-/** 범위 글(한 줄에 하나) → 체크 줄. 같은 글의 줄은 체크 상태를 그대로 둔다 */
-export function scopeLines(text: string, prev: ScopeLine[] = []): ScopeLine[] {
-  const old = new Map(prev.map((l) => [l.text, l]));
+/**
+ * 범위 글(한 줄에 하나) → 체크 줄. 같은 글의 줄은 체크 상태를 그대로 둔다.
+ * 같은 글의 줄이 여러 개면 예전 줄을 하나씩 짝지어 쓴다 (한 줄을 체크하면 다른 줄까지 체크되지 않게).
+ */
+export function scopeLines(text: string, prev: ScopeLine[] = [], now = Date.now()): ScopeLine[] {
+  const old = new Map<string, ScopeLine[]>();
+  for (const l of prev) old.set(l.text, [...(old.get(l.text) ?? []), l]);
   const out: ScopeLine[] = [];
   for (const raw of text.split(/\r?\n/)) {
     const t = raw.replace(/^\s*(?:[-*•·]|\d+[.)])\s*/, '').trim();
     if (!t) continue;
-    const o = old.get(t);
-    out.push(o ? { ...o } : { id: newId(), text: t, done: false });
+    const o = old.get(t)?.shift();
+    out.push(o ? { ...o } : { id: newId(), text: t, done: false, at: now });
   }
   return out;
 }
@@ -49,9 +53,9 @@ export function nextSubjects(exam: Exam, today: DateStr): ExamScope[] {
 }
 
 /** 학교 진도에 새 기록 (같은 날이면 고친다, 최근 30개) */
-export function addProgress(list: { date: DateStr; text: string }[] = [], date: DateStr, text: string) {
+export function addProgress(list: { date: DateStr; text: string; at?: number }[] = [], date: DateStr, text: string, now = Date.now()) {
   const rest = list.filter((p) => p.date !== date);
-  return [...rest, { date, text }].sort((a, b) => a.date.localeCompare(b.date)).slice(-30);
+  return [...rest, { date, text, at: now }].sort((a, b) => a.date.localeCompare(b.date)).slice(-30);
 }
 
 /** 진도 기록이 며칠 전인지 */

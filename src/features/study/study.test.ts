@@ -213,10 +213,11 @@ describe('review', () => {
     expect(answer({ ...r, box: 4 }, true, 'quiz', T0, DEFAULT_SETTINGS.intervals).box).toBe(4);
     expect(answer({ ...r, box: 3 }, true, 'card', T0, DEFAULT_SETTINGS.intervals).box).toBe(4);
   });
-  it('밀린 것이 100개 넘으면 50개만', () => {
+  it('하루 50개까지, 오래 밀린 것부터', () => {
     const many = Array.from({ length: 120 }, (_, i) => ({ box: 1, due: addDays(T0, -(i % 5)), wrong: 0 }));
     expect(dueToday(many, T0).length).toBe(50);
-    expect(dueToday(many.slice(0, 80), T0).length).toBe(80);
+    expect(dueToday(many, T0)[0].due).toBe(addDays(T0, -4));
+    expect(dueToday(many.slice(0, 40), T0).length).toBe(40);
   });
 });
 
@@ -371,6 +372,6 @@ describe('시험 범위', () => {
     expect(examProgress(exam)).toEqual({ done: 2, total: 4 });
     expect(examEnd(exam)).toBe('2026-12-03');
     expect(nextSubjects(exam, '2026-12-02').map((s) => s.id)).toEqual(['s2']);
-    expect(addProgress([{ date: '2026-10-01', text: 'a' }], '2026-10-01', 'b')).toEqual([{ date: '2026-10-01', text: 'b' }]);
+    expect(addProgress([{ date: '2026-10-01', text: 'a' }], '2026-10-01', 'b', 7)).toEqual([{ date: '2026-10-01', text: 'b', at: 7 }]);
   });
 });

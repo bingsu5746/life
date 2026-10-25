@@ -33,3 +33,35 @@ export function bestStreak(h: Pick<Habit, 'weekdays' | 'checks' | 'created'>, to
   }
   return best;
 }
+
+/** 체크 기록은 최근 400일치만 */
+const KEEP = 400;
+
+/** 그날 체크·해제 (log 에 시각을 남겨 다른 기기와 합칠 수 있게) */
+export function toggleHabit(h: Habit, date: DateStr, now = Date.now()): Habit {
+  const on = h.checks.includes(date);
+  const checks = on ? h.checks.filter((x) => x !== date) : [...h.checks, date].sort().slice(-KEEP);
+  const log = Object.fromEntries(
+    Object.entries({ ...(h.log ?? {}), [date]: on ? -now : now })
+      .sort(([a], [b]) => a.localeCompare(b))
+      .slice(-KEEP),
+  );
+  return { ...h, checks, log };
+}
+
+/** 두 기기의 체크 합치기: 날짜마다 늦게 한 것(체크·해제). 기록(log)이 없는 옛 체크는 「아주 예전에 체크함」으로 본다 */
+export function mergeHabitChecks(a: Pick<Habit, 'checks' | 'log'>, b: Pick<Habit, 'checks' | 'log'>): Pick<Habit, 'checks' | 'log'> {
+  const state = new Map<DateStr, number>();
+  const log: Record<DateStr, number> = {};
+  for (const h of [a, b]) {
+    for (const d of h.checks ?? []) if (!state.has(d)) state.set(d, 0);
+    for (const [d, t] of Object.entries(h.log ?? {})) {
+      if (Math.abs(t) >= Math.abs(state.get(d) ?? 0)) state.set(d, t);
+      if (Math.abs(t) > Math.abs(log[d] ?? 0)) log[d] = t;
+    }
+  }
+  // 체크 목록: 마지막이 체크(+) 이거나 기록 없이 체크돼 있던(0) 날
+  const checks = [...state].filter(([, t]) => t >= 0).map(([d]) => d).sort().slice(-KEEP);
+  const keep = Object.keys(log).sort().slice(-KEEP);
+  return { checks, log: Object.fromEntries(keep.map((d) => [d, log[d]])) };
+}
