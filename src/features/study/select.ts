@@ -16,7 +16,9 @@ export function cardsToday(d: StudyData, today: DateStr, deckId?: Id | null): Me
 }
 
 /** 오늘 복습 수 (오답 + 카드) */
-export const reviewCountToday = (d: StudyData, today: DateStr) => dueToday(alive(d.notes), today).length + cardsToday(d, today).length;
+/** 오늘 할 백지 복습: 한 번도 안 해 본 것 + 다시 볼 날이 된 것 */
+export const blanksToday = (d: StudyData, today: DateStr) => alive(d.blanks).filter((b) => b.box === 0 || (!b.learned && b.due <= today));
+export const reviewCountToday = (d: StudyData, today: DateStr) => dueToday(alive(d.notes), today).length + cardsToday(d, today).length + blanksToday(d, today).length;
 
 export function planCtx(d: StudyData, today: DateStr): PlanCtx {
   return { today, settings: d.settings, tutors: alive(d.tutors), exams: d.exams };

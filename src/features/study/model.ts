@@ -36,6 +36,10 @@ export interface StudySettings {
   pomo: { work: number; short: number; long: number; every: number };
   /** 메뉴에서 숨긴 칸 (예: 'preview') */
   hiddenTabs?: string[];
+  /** 학교 시간표: 요일(1=월 … 5=금, 6=토)마다 그날 수업 과목 (교시 순) */
+  schoolTimetable?: Record<string, Id[]>;
+  /** 목표 등급: 성적 종류마다 과목 이름 → 등급 */
+  gradeGoals?: { school?: Record<string, number>; mock?: Record<string, number> };
 }
 
 export interface Subject extends Stamp {
@@ -119,6 +123,8 @@ export interface GradeScore {
   standard?: number;
   /** 모의고사: 백분위 */
   percentile?: number;
+  /** 틀린 문항 번호 */
+  wrong?: number[];
   at?: number;
 }
 
@@ -137,6 +143,50 @@ export interface PreviewItem extends Stamp {
   /** 수업 듣고 나서: ok 이해함, some 조금 헷갈림, no 모르겠음 */
   after?: 'ok' | 'some' | 'no';
   created: number;
+}
+
+/** 수행평가 */
+export interface Assessment extends Stamp {
+  id: Id;
+  subjectId: Id;
+  title: string;
+  /** 내는 날 · 발표하는 날 */
+  due: DateStr;
+  /** 준비할 것 (체크하며) */
+  steps: ScopeLine[];
+  done: boolean;
+  memo?: string;
+  created: number;
+}
+
+/** 백지 복습: 단원 이름만 보고 떠올려 쓴 뒤 핵심 내용과 비교 */
+export interface BlankSheet extends Stamp, Review {
+  id: Id;
+  subjectId: Id;
+  /** 단원 이름 (떠올릴 때 보이는 것) */
+  title: string;
+  /** 핵심 내용 (한 줄에 하나) */
+  points: ScopeLine[];
+  /** 떠올려 본 기록 (최근 10개) */
+  tries: { id: Id; date: DateStr; missed: Id[]; at?: number }[];
+  created: number;
+}
+
+/** 하루 잠·컨디션 (id 는 날짜) */
+export interface DayCondition extends Stamp {
+  id: DateStr;
+  /** 잠든 시각 HH:MM (전날 밤) */
+  sleep?: string;
+  /** 일어난 시각 HH:MM */
+  wake?: string;
+  /** 컨디션 1(나쁨)~5(좋음) */
+  mood?: number;
+}
+
+/** 주간 돌아보기 한 줄 (id 는 그 주 월요일) */
+export interface WeekNote extends Stamp {
+  id: DateStr;
+  text: string;
 }
 
 /** 지난 성적 (시험 한 번) */
@@ -306,6 +356,8 @@ export interface Word extends Stamp, Review {
   order: number;
   /** 처음 익힌 날 */
   firstSeen?: DateStr;
+  /** 예문: 문장 안의 그 단어(활용형)를 [ ] 로 감싼다. 예: They [abandoned] the car. */
+  example?: { s: string; ko: string };
 }
 
 export interface StudySession extends Stamp {
@@ -361,12 +413,16 @@ export interface StudyData {
   habits: Record<Id, Habit>;
   grades: Record<Id, GradeRecord>;
   previews: Record<Id, PreviewItem>;
+  assessments: Record<Id, Assessment>;
+  blanks: Record<Id, BlankSheet>;
+  conditions: Record<Id, DayCondition>;
+  weekNotes: Record<Id, WeekNote>;
 }
 
 /** 단어는 많아질 수 있어 따로 묶는다 */
 export type WordsData = Record<Id, Word>;
 
-export const COLLECTIONS = ['subjects', 'exams', 'books', 'plans', 'tutors', 'homework', 'notes', 'decks', 'cards', 'wordLists', 'sessions', 'todos', 'habits', 'grades', 'previews'] as const;
+export const COLLECTIONS = ['subjects', 'exams', 'books', 'plans', 'tutors', 'homework', 'notes', 'decks', 'cards', 'wordLists', 'sessions', 'todos', 'habits', 'grades', 'previews', 'assessments', 'blanks', 'conditions', 'weekNotes'] as const;
 export type Collection = (typeof COLLECTIONS)[number];
 
 export const DEFAULT_SETTINGS: StudySettings = {
@@ -401,6 +457,10 @@ export function emptyStudy(): StudyData {
     habits: {},
     grades: {},
     previews: {},
+    assessments: {},
+    blanks: {},
+    conditions: {},
+    weekNotes: {},
   };
 }
 

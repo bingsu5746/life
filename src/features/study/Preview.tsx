@@ -4,6 +4,8 @@ import { useState } from 'react';
 import { addDays, diffDays, shortDate } from './dates';
 import { alive, newId, type PreviewItem } from './model';
 import { put, remove, useStudy } from './store';
+import { classesOn, nextClassDate } from './timetable';
+import { TimetableEditor } from './TimetableEditor';
 import { Check, confirmDelete, Empty, Field, go, Icon, Sheet, SubjectDot, SubjectPicker, subjectsOf, tap, toast, useToday } from './ui';
 
 const AFTER: Record<NonNullable<PreviewItem['after']>, string> = { ok: '이해했어요', some: '조금 헷갈려요', no: '모르겠어요' };
@@ -30,7 +32,7 @@ export function togglePreview(p: PreviewItem) {
 export function Preview({ sub }: { sub?: string }) {
   const d = useStudy();
   const today = useToday();
-  const [edit, setEdit] = useState<PreviewItem | 'new' | null>(sub === 'new' ? 'new' : null);
+  const [edit, setEdit] = useState<PreviewItem | 'new' | { subjectId: string; date: string } | null>(sub === 'new' ? 'new' : null);
   const all = alive(d.previews);
   const todo = all.filter((p) => !p.done).sort((a, b) => a.date.localeCompare(b.date) || a.created - b.created);
   // 수업이 끝났는데 이해했는지 아직 안 적은 것
@@ -56,6 +58,8 @@ export function Preview({ sub }: { sub?: string }) {
           <Icon name="plus" /> 예습 넣기
         </button>
       </div>
+
+      <TomorrowClasses today={today} onAdd={(subjectId, date) => setEdit({ subjectId, date })} />
 
       {!all.length ? (
         <Empty title="예습할 곳을 적어 보세요">
@@ -132,8 +136,38 @@ export function Preview({ sub }: { sub?: string }) {
         </>
       )}
 
-      {edit && <PreviewSheet item={edit === 'new' ? undefined : edit} today={today} onClose={close} />}
+      <details className="st-card st-more">
+        <summary>학교 시간표</summary>
+        <TimetableEditor />
+      </details>
+
+      {edit && <PreviewSheet item={edit === 'new' || !('id' in edit) ? undefined : edit} start={edit !== 'new' && !('id' in edit) ? edit : undefined} today={today} onClose={close} />}
     </div>
+  );
+}
+
+/** 내일(다음 수업일) 시간표 과목 중 예습을 아직 안 넣은 것: 바로 넣기 */
+function TomorrowClasses({ today, onAdd }: { today: string; onAdd: (subjectId: string, date: string) => void }) {
+  const d = useStudy();
+  const tt = d.settings.schoolTimetable;
+  // 내일부터 7일 안의 첫 수업 날
+  let date = '';
+  for (let i = 1; i <= 7 && !date; i++) if (classesOn(tt, addDays(today, i)).length) date = addDays(today, i);
+  if (!date) return null;
+  const ids = [...new Set(classesOn(tt, date))].filter((id) => d.subjects[id] && !d.subjects[id].deleted);
+  const has = new Set(alive(d.previews).filter((p) => p.date === date).map((p) => p.subjectId));
+  return (
+    <section className="st-card">
+      <h3 className="st-h">{classDayText(today, date)} 과목</h3>
+      <div className="st-chips">
+        {ids.map((id) => (
+          <button key={id} type="button" className={`st-chip ${has.has(id) ? 'on' : ''}`} onClick={() => !has.has(id) && onAdd(id, date)} aria-label={has.has(id) ? `${d.subjects[id].name} 예습 넣었어요` : `${d.subjects[id].name} 예습 넣기`}>
+            {has.has(id) ? '✓ ' : '+ '}
+            {d.subjects[id].name}
+          </button>
+        ))}
+      </div>
+    </section>
   );
 }
 
@@ -154,10 +188,19 @@ export function PreviewRow({ p, today, onEdit }: { p: PreviewItem; today: string
   );
 }
 
-function PreviewSheet({ item, today, onClose }: { item?: PreviewItem; today: string; onClose: () => void }) {
+function PreviewSheet({ item, start, today, onClose }: { item?: PreviewItem; start?: { subjectId: string; date: string }; today: string; onClose: () => void }) {
   const d = useStudy();
-  const [subjectId, setSubjectId] = useState(item?.subjectId ?? subjectsOf(d)[0]?.id ?? '');
-  const [date, setDate] = useState(item?.date ?? addDays(today, 1));
+  const tt = d.settings.schoolTimetable;
+  const firstSubject = item?.subjectId ?? start?.subjectId ?? subjectsOf(d)[0]?.id ?? '';
+  const [subjectId, setSubjectIdState] = useState(firstSubject);
+  const [date, setDate] = useState(item?.date ?? start?.date ?? nextClassDate(tt, firstSubject, today, false, d.settings.offDates) ?? addDays(today, 1));
+  // 과목을 바꾸면 시간표의 다음 수업 날로
+  const setSubjectId = (id: string) => {
+    setSubjectIdState(id);
+    const next = nextClassDate(tt, id, today, false, d.settings.offDates);
+    if (next && !item) setDate(next);
+  };
+  const nextOf = nextClassDate(tt, subjectId, today, false, d.settings.offDates);
   const [text, setText] = useState(item?.text ?? '');
   const [questions, setQuestions] = useState(item?.questions ?? '');
   const last = d.subjects[subjectId]?.progress?.slice(-1)[0];
@@ -194,6 +237,7 @@ function PreviewSheet({ item, today, onClose }: { item?: PreviewItem; today: str
             ))}
             <input className="st-input sm" type="date" value={date} onChange={(e) => setDate(e.target.value)} aria-label="수업 날" />
           </div>
+          {nextOf && <p className="st-hint">시간표로 본 다음 {d.subjects[subjectId]?.name} 수업: {shortDate(nextOf)}</p>}
         </Field>
         <Field label="예습할 곳" hint={last ? `학교 진도: ${last.text} (${shortDate(last.date)}) — 그다음 부분을 적어 보세요` : '예: 3단원 2절 · 교과서 58~63쪽 · 프린트 4번'}>
           <input className="st-input" value={text} onChange={(e) => setText(e.target.value)} placeholder="예: 교과서 58~63쪽 읽고 모르는 말 표시" onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), save())} />

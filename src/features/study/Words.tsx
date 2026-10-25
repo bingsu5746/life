@@ -6,10 +6,12 @@ import { MAX_DAYS, rangeText } from './pages';
 import { boxLabel, dueText } from './review';
 import { dayUnits, listDoneDays, listWords, planViews, wordListViews } from './select';
 import { getStudy, getWords, put, putWords, remove, removeWords, useStudy, useWords } from './store';
-import { addWords, answerWord, markDays } from './actions';
+import { addWords, answerWord, fillExamples, markDays } from './actions';
 import { parseWords, wordsText, type ParsedWord } from './wordParse';
 import { choicesFor, requeue, type Mode } from './wordSession';
 import { PlanForm } from './PlanForm';
+import { Practice } from './Practice';
+import { WordTestSheet } from './WordTestSheet';
 import { isLoggedIn, wordMeanings } from '../auth/api';
 import { Bar, confirmDelete, Empty, Field, go, Menu, Sheet, SubjectDot, toast, useToday, tap } from './ui';
 
@@ -17,6 +19,8 @@ const KIND_LABEL: Record<WordList['kind'], string> = { book: '단어장', test: 
 
 export function Words({ id, sub }: { id?: string; sub?: string }) {
   if (id === 'new') return <NewList />;
+  if (id === 'practice') return <Practice listId={sub} />;
+  if (id && sub === 'test') return <WordTestSheet listId={id} />;
   if (id && (sub === 'learn' || sub === 'prep' || sub === 'weak')) return <WordRun listId={id} mode={sub} />;
   if (id) return <ListDetail id={id} />;
   return <ListIndex />;
@@ -31,6 +35,11 @@ function ListIndex() {
     <div className="st-page">
       <div className="st-page-head">
         <h2>영단어</h2>
+        {alive(words).length > 0 && (
+          <button className="btn btn-sm" onClick={() => go('/words/practice')}>
+            연습
+          </button>
+        )}
       </div>
       {!views.length && (
         <Empty icon="🔤" title="단어 목록을 만들어 보세요">
@@ -139,6 +148,7 @@ function ListDetail({ id }: { id: string }) {
   const [edit, setEdit] = useState<Word | null>(null);
   const [filter, setFilter] = useState<'all' | 'new' | 'learning' | 'learned'>('all');
   const [q, setQ] = useState('');
+  const [exBusy, setExBusy] = useState<string | null>(null);
   const list = d.wordLists[id];
   const plans = planViews(d, allWords, today);
   if (!list || list.deleted)
@@ -231,6 +241,33 @@ function ListDetail({ id }: { id: string }) {
           )
         )}
       </section>
+
+      {ws.length > 0 && (
+        <div className="st-inline wrap">
+          <button className="btn btn-sm" onClick={() => go(`/words/practice/${id}`)}>
+            연습 (카드·4지선다·예문·듣고 쓰기)
+          </button>
+          <button className="btn btn-sm" onClick={() => go(`/words/${id}/test`)}>
+            시험지 만들기
+          </button>
+          {ws.some((w) => !w.example) && (
+            <button
+              className="btn btn-sm"
+              disabled={!!exBusy}
+              onClick={() => {
+                if (!isLoggedIn()) return toast('예문 만들기는 로그인한 뒤에 쓸 수 있어요');
+                setExBusy('예문 만드는 중…');
+                void fillExamples(ws, (a, b) => setExBusy(`예문 만드는 중… ${a}/${b}`))
+                  .then((n) => toast(`${n}단어에 예문을 넣었어요. AI 가 만든 문장이라 한 번 확인해 주세요`))
+                  .catch((e: Error) => toast(e.message))
+                  .finally(() => setExBusy(null));
+              }}
+            >
+              {exBusy ?? `예문 만들기 (AI, ${ws.filter((w) => !w.example).length}개)`}
+            </button>
+          )}
+        </div>
+      )}
 
       {list.kind === 'book' && (
         <section className="st-card">

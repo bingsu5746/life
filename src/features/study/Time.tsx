@@ -2,6 +2,8 @@
 import { useState } from 'react';
 import { addDays, daysBetween, shortDate, weekStart, WEEKDAYS } from './dates';
 import { BarChart, TableView } from './charts';
+import { WeekReview } from './WeekReview';
+import { sleepMinutes, splitStudy } from './condition';
 import { bySubject, compare, daily, minutesByDate, studyStreak, weekdayAverage, weekly } from './timeStats';
 import { alive, type StudySession } from './model';
 import { addSession } from './actions';
@@ -12,6 +14,11 @@ import { Bar, confirmDelete, Field, go, Icon, NumInput, Sheet, SubjectDot, Subje
 
 /** sub: 'manual' 이면 공부 시간 직접 넣기 창 (「＋」에서 올 때) */
 export function Time({ sub }: { sub?: string }) {
+  if (sub?.startsWith('week')) return <WeekReview from={sub.slice(5) || undefined} />;
+  return <TimeHome sub={sub} />;
+}
+
+function TimeHome({ sub }: { sub?: string }) {
   const d = useStudy();
   const today = useToday();
   const [timer, setTimer] = useState<TimerState | null>(loadTimer);
@@ -54,9 +61,14 @@ export function Time({ sub }: { sub?: string }) {
     <div className="st-page">
       <div className="st-page-head">
         <h2>공부 기록</h2>
-        <button className="btn btn-sm" onClick={() => setManual(true)}>
-          <Icon name="plus" /> 공부 시간 넣기
-        </button>
+        <div className="st-inline">
+          <button className="btn btn-sm" onClick={() => go('/time/week')}>
+            주간 돌아보기
+          </button>
+          <button className="btn btn-sm" onClick={() => setManual(true)}>
+            <Icon name="plus" /> 공부 시간 넣기
+          </button>
+        </div>
       </div>
       <section className={`st-card st-timer ${timer ? (timer.phase === 'work' ? 'work' : 'rest') : ''}`}>
         {!timer ? (
@@ -83,6 +95,7 @@ export function Time({ sub }: { sub?: string }) {
 
       <Stats sessions={sessions} today={today} todayMin={todayMin} />
       {sessions.length > 0 && <Analysis sessions={sessions} today={today} />}
+      <SleepStudy today={today} />
       {manual && (
         <ManualSheet
           today={today}
@@ -432,5 +445,76 @@ function ManualSheet({ today, session, onClose }: { today: string; session?: Stu
         </div>
       </div>
     </Sheet>
+  );
+}
+
+/** 잠·컨디션과 공부 시간 (최근 30일) */
+function SleepStudy({ today }: { today: string }) {
+  const d = useStudy();
+  const days = daysBetween(addDays(today, -29), today);
+  const conds = days.map((date) => ({ date, c: d.conditions[date]?.deleted ? undefined : d.conditions[date] }));
+  const sleep = conds.map((x) => ({ date: x.date, value: sleepMinutes(x.c) }));
+  const mood = conds.map((x) => ({ date: x.date, value: x.c?.mood ?? null }));
+  const n = sleep.filter((x) => x.value !== null).length;
+  const m = mood.filter((x) => x.value !== null).length;
+  if (!n && !m) return null;
+  const study = new Map<string, number>();
+  for (const s of alive(d.sessions)) if (s.date >= days[0]) study.set(s.date, (study.get(s.date) ?? 0) + s.minutes);
+  const bySleep = splitStudy(sleep, study, 7 * 60);
+  const byMood = splitStudy(mood, study, 4);
+  const avgSleep = n ? Math.round(sleep.reduce((a, x) => a + (x.value ?? 0), 0) / n) : null;
+  const hh = (v: number) => `${Math.round((v / 60) * 10) / 10}시간`;
+  return (
+    <section className="st-card ta">
+      <h3 className="st-h">잠 · 컨디션과 공부 (최근 30일)</h3>
+      <div className="st-stat-row">
+        <div>
+          <small>평균 잠</small>
+          <b>{avgSleep === null ? '—' : minutesText(avgSleep)}</b>
+        </div>
+        <div>
+          <small>잠 기록한 날</small>
+          <b>{n}일</b>
+        </div>
+        <div>
+          <small>평균 컨디션</small>
+          <b>{m ? `${Math.round((mood.reduce((a, x) => a + (x.value ?? 0), 0) / m) * 10) / 10}/5` : '—'}</b>
+        </div>
+      </div>
+      {n > 1 && <BarChart label="날짜별 잔 시간" height={140} bars={sleep.map((x) => ({ label: shortDate(x.date).replace(/\(.\)/, ''), title: shortDate(x.date), value: x.value ?? 0, strong: x.date === today }))} format={hh} tickUnit={60} />}
+      <div className="ta-compare">
+        <div>
+          <small>7시간 넘게 잔 날 vs 덜 잔 날</small>
+          {bySleep ? (
+            <>
+              <b>
+                {minutesText(bySleep.high)} vs {minutesText(bySleep.low)}
+              </b>
+              <small>
+                하루 평균 공부 ({bySleep.highDays}일 · {bySleep.lowDays}일)
+              </small>
+            </>
+          ) : (
+            <small>양쪽 다 3일 넘게 기록하면 비교해 드려요</small>
+          )}
+        </div>
+        <div>
+          <small>컨디션 좋은 날(좋음·최고) vs 그 밖</small>
+          {byMood ? (
+            <>
+              <b>
+                {minutesText(byMood.high)} vs {minutesText(byMood.low)}
+              </b>
+              <small>
+                하루 평균 공부 ({byMood.highDays}일 · {byMood.lowDays}일)
+              </small>
+            </>
+          ) : (
+            <small>양쪽 다 3일 넘게 기록하면 비교해 드려요</small>
+          )}
+        </div>
+      </div>
+      <p className="st-hint">기록한 날끼리 평균을 낸 것이라, 잠 때문에 공부 시간이 달라졌다고 단정할 수는 없어요.</p>
+    </section>
   );
 }

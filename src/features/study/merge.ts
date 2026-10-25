@@ -1,5 +1,5 @@
 // 두 기기의 공부 자료 합치기 (설계 §8.2). 합치기는 기기에서, 서버는 저장만 한다.
-import { COLLECTIONS, type Collection, type Exam, type ExamScope, type GradeRecord, type Habit, type Homework, type Id, type Mark, type Stamp, type StudyData, type Subject, type WordsData } from './model';
+import { COLLECTIONS, type Collection, type Assessment, type BlankSheet, type Exam, type ExamScope, type GradeRecord, type Habit, type Homework, type Id, type Mark, type Stamp, type StudyData, type Subject, type WordsData } from './model';
 import { mergeHabitChecks } from './habits';
 import { compactMarks } from './pages';
 
@@ -71,6 +71,22 @@ function mergeExam(a?: Exam, b?: Exam): Exam | undefined {
   return { ...w, scopes: mergeList(w.scopes, o.scopes, (x) => x.id, mergeScope), days: mergeList(w.days, o.days, (x) => x.date) };
 }
 
+function mergeAssessment(a?: Assessment, b?: Assessment): Assessment | undefined {
+  const s = sides(a, b);
+  if (!s) return pick(a, b);
+  const [w, o] = s;
+  return { ...w, steps: mergeList(w.steps, o.steps, (x) => x.id) ?? w.steps };
+}
+
+function mergeBlank(a?: BlankSheet, b?: BlankSheet): BlankSheet | undefined {
+  const s = sides(a, b);
+  if (!s) return pick(a, b);
+  const [w, o] = s;
+  // 떠올려 본 기록은 두 기기 것을 모두 (같은 id 는 하나)
+  const tries = [...w.tries, ...o.tries.filter((t) => !w.tries.some((x) => x.id === t.id))].sort((x, y) => x.date.localeCompare(y.date) || (x.at ?? 0) - (y.at ?? 0)).slice(-10);
+  return { ...w, tries };
+}
+
 function mergeGrade(a?: GradeRecord, b?: GradeRecord): GradeRecord | undefined {
   const s = sides(a, b);
   if (!s) return pick(a, b);
@@ -107,6 +123,8 @@ const MERGERS: Partial<Record<Collection, (a?: never, b?: never) => unknown>> = 
   habits: mergeHabit as never,
   subjects: mergeSubject as never,
   grades: mergeGrade as never,
+  assessments: mergeAssessment as never,
+  blanks: mergeBlank as never,
 };
 
 export function mergeRecords<T extends Stamp>(a: Record<Id, T>, b: Record<Id, T>, merge: (x?: T, y?: T) => T | undefined = pick, now = Date.now()): Record<Id, T> {

@@ -12,6 +12,10 @@ const num = (v: unknown, fb = 0) => (typeof v === 'number' && Number.isFinite(v)
 const optNum = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) ? v : undefined);
 const bool = (v: unknown) => v === true;
 const arr = (v: unknown): unknown[] => (Array.isArray(v) ? v : []);
+/** 체크 줄 목록 (시험 범위·수행평가 준비·백지 복습 핵심) */
+const lines = (v: unknown) => arr(v).filter((l): l is Obj => isObj(l) && typeof l.id === 'string' && typeof l.text === 'string').map((l) => ({ ...l, done: bool(l.done) }));
+/** 시각 HH:MM */
+const hhmm = (v: unknown) => (typeof v === 'string' && /^([01]\d|2[0-3]):[0-5]\d$/.test(v) ? v : undefined);
 /** 점수 칸: 범위 밖이면 버린다 */
 const score = (v: unknown, lo: number, hi: number) => (typeof v === 'number' && Number.isFinite(v) && v >= lo && v <= hi ? v : undefined);
 const optDate = (v: unknown): DateStr | undefined => (isDate(v) ? v : undefined);
@@ -153,6 +157,29 @@ const FIX: Record<Collection, Fix> = {
     created: optDate(x.created) ?? '2000-01-01',
     archived: x.archived === true ? true : undefined,
   }),
+  assessments: (x) =>
+    isDate(x.due)
+      ? { ...x, subjectId: str(x.subjectId), title: str(x.title, '수행평가'), steps: lines(x.steps), done: bool(x.done), memo: optStr(x.memo), created: num(x.created) }
+      : null,
+  blanks: (x) => ({
+    ...x,
+    ...review(x),
+    subjectId: str(x.subjectId),
+    title: str(x.title, '단원'),
+    points: lines(x.points),
+    tries: arr(x.tries)
+      .filter((t): t is Obj => isObj(t) && typeof t.id === 'string' && isDate(t.date))
+      .map((t) => ({ id: t.id as string, date: t.date as DateStr, missed: arr(t.missed).filter((i): i is string => typeof i === 'string'), at: optNum(t.at) }))
+      .slice(-10),
+    created: num(x.created),
+  }),
+  conditions: (x) => ({
+    ...x,
+    sleep: hhmm(x.sleep),
+    wake: hhmm(x.wake),
+    mood: Number.isInteger(x.mood) && (x.mood as number) >= 1 && (x.mood as number) <= 5 ? (x.mood as number) : undefined,
+  }),
+  weekNotes: (x) => ({ ...x, text: str(x.text).slice(0, 1000) }),
   previews: (x) =>
     isDate(x.date)
       ? {
@@ -185,6 +212,7 @@ const FIX: Record<Collection, Fix> = {
               average: score(g.average, 0, 1000),
               standard: score(g.standard, 0, 300),
               percentile: score(g.percentile, 0, 100),
+              wrong: g.wrong === undefined ? undefined : ints(g.wrong, 1, 200).slice(0, 100),
               at: optNum(g.at),
             })),
         }
@@ -213,6 +241,11 @@ function fixRecords(rec: unknown, fix: Fix): Record<Id, unknown> {
   return out;
 }
 
+function goals(v: unknown): Record<string, number> | undefined {
+  if (!isObj(v)) return undefined;
+  return Object.fromEntries(Object.entries(v).filter((e): e is [string, number] => e[0].length <= 20 && typeof e[1] === 'number' && e[1] >= 1 && e[1] <= 9));
+}
+
 export function sanitizeSettings(s: unknown): StudySettings & { updatedAt: number } {
   const x = isObj(s) ? s : {};
   const d = DEFAULT_SETTINGS;
@@ -231,6 +264,10 @@ export function sanitizeSettings(s: unknown): StudySettings & { updatedAt: numbe
     quizMaxBox: Math.round(clamp(x.quizMaxBox, 1, 5, d.quizMaxBox)),
     inboxPerDay: Math.round(clamp(x.inboxPerDay, 1, 200, d.inboxPerDay)),
     wordsUseTutorRatio: bool(x.wordsUseTutorRatio),
+    schoolTimetable: isObj(x.schoolTimetable)
+      ? Object.fromEntries(Object.entries(x.schoolTimetable).filter(([k, v]) => /^[0-6]$/.test(k) && Array.isArray(v)).map(([k, v]) => [k, (v as unknown[]).filter((i): i is string => typeof i === 'string').slice(0, 12)]))
+      : undefined,
+    gradeGoals: isObj(x.gradeGoals) ? { school: goals((x.gradeGoals as Obj).school), mock: goals((x.gradeGoals as Obj).mock) } : undefined,
     hiddenTabs: x.hiddenTabs === undefined ? undefined : arr(x.hiddenTabs).filter((t): t is string => typeof t === 'string' && t !== 'today').slice(0, 20),
     pomo: {
       work: clamp(pomo.work, 1, 180, d.pomo.work),
@@ -250,7 +287,16 @@ export function sanitizeCollections(d: Partial<StudyData>): Record<Collection, R
 
 const fixWord: Fix = (x) =>
   typeof x.term === 'string'
-    ? { ...x, ...review(x), listId: str(x.listId), meaning: str(x.meaning), day: optNum(x.day) === undefined ? undefined : Math.max(0, Math.min(999, Math.round(x.day as number))), order: num(x.order), firstSeen: optDate(x.firstSeen) }
+    ? {
+        ...x,
+        ...review(x),
+        example: isObj(x.example) && typeof x.example.s === 'string' && typeof x.example.ko === 'string' ? { s: x.example.s.slice(0, 300), ko: x.example.ko.slice(0, 300) } : undefined,
+        listId: str(x.listId),
+        meaning: str(x.meaning),
+        day: optNum(x.day) === undefined ? undefined : Math.max(0, Math.min(999, Math.round(x.day as number))),
+        order: num(x.order),
+        firstSeen: optDate(x.firstSeen),
+      }
     : null;
 
 /** 단어 묶음 다듬기 */

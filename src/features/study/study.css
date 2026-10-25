@@ -3203,3 +3203,351 @@ input[type='range'] {
 .pv-check:first-of-type {
   border-top: 0;
 }
+
+/* ===== 오늘: 수업 · 잠/컨디션 · 수행평가 ===== */
+.st-classes {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.st-cond {
+  display: grid;
+  gap: 10px;
+}
+
+.st-cond-time {
+  display: grid;
+  gap: 2px;
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
+.st-cond-done {
+  justify-self: start;
+  border: 0;
+  background: none;
+  padding: 0;
+  color: var(--muted);
+  font-size: 0.86rem;
+  text-decoration: underline;
+  text-decoration-color: var(--line-strong);
+}
+
+.st-task {
+  display: grid;
+  gap: 8px;
+}
+
+.st-task.compact {
+  padding: 8px 0;
+  border-top: 1px solid var(--line);
+}
+
+.st-task.compact:first-of-type {
+  border-top: 0;
+}
+
+.st-task-head {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  cursor: pointer;
+}
+
+.st-task-head > div {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.st-task-head small {
+  color: var(--muted);
+}
+
+.st-forecast {
+  margin: 6px 0 0;
+  font-size: 0.88rem;
+  color: var(--muted);
+}
+
+.st-forecast.bad {
+  color: var(--bad);
+}
+
+/* ===== 학교 시간표 ===== */
+.tt-edit {
+  display: grid;
+  gap: 8px;
+}
+
+.tt-row {
+  display: grid;
+  grid-template-columns: 1.6em minmax(0, 1fr);
+  gap: 8px;
+  align-items: start;
+}
+
+.tt-day {
+  padding-top: 6px;
+}
+
+.tt-cells {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.tt-cell {
+  min-height: 32px;
+  padding: 4px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--line-strong);
+  background: var(--soft);
+  font-size: 0.86rem;
+}
+
+.tt-cell small {
+  color: var(--muted);
+  margin-right: 2px;
+}
+
+.tt-cell:hover {
+  text-decoration: line-through;
+}
+
+.tt-add {
+  width: auto;
+  min-width: 84px;
+}
+
+/* ===== 성적: 틀린 번호 · 목표 ===== */
+.gr-wrong {
+  grid-column: 1 / -1;
+  font-size: 0.86rem;
+}
+
+.gr-goal {
+  font-weight: 400;
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
+/* ===== 주간 돌아보기 ===== */
+.wk-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 8px;
+}
+
+.wk-list li {
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--soft);
+  font-size: 0.9rem;
+}
+
+/* ===== 백지 복습 ===== */
+.blk-point {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: start;
+  padding: 8px 0;
+  border-top: 1px solid var(--line);
+}
+
+.blk-point.miss span {
+  font-weight: 600;
+}
+
+.blk-written {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  margin: 8px 0 0;
+}
+
+/* ===== 단어 연습 ===== */
+.pr-run {
+  display: grid;
+  gap: 14px;
+}
+
+.pr-card {
+  display: grid;
+  gap: 10px;
+  justify-items: center;
+  text-align: center;
+  padding: 32px 20px;
+  min-height: 180px;
+  align-content: center;
+  cursor: pointer;
+}
+
+.pr-front {
+  font-size: 1.8rem;
+  font-weight: 700;
+  letter-spacing: -0.4px;
+  overflow-wrap: anywhere;
+}
+
+.pr-back {
+  font-size: 1.2rem;
+}
+
+.pr-sentence {
+  font-size: 1.15rem;
+  line-height: 1.6;
+}
+
+.pr-ex {
+  font-style: italic;
+}
+
+.pr-choices {
+  display: grid;
+  gap: 8px;
+}
+
+.pr-choice {
+  min-height: 52px;
+  padding: 10px 16px;
+  border-radius: 12px;
+  border: 1px solid var(--line-strong);
+  background: var(--surface);
+  text-align: left;
+  font-size: 1rem;
+}
+
+.pr-choice:hover:not(:disabled) {
+  background: var(--soft);
+}
+
+.pr-choice.right {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--on-accent);
+}
+
+.pr-choice.wrong {
+  border-color: var(--bad);
+  color: var(--bad);
+  text-decoration: line-through;
+}
+
+.pr-choice.dim {
+  opacity: 0.5;
+}
+
+.pr-ok {
+  font-weight: 600;
+}
+
+.pr-wrong {
+  display: grid;
+  gap: 4px;
+  text-align: left;
+  margin: 8px 0;
+}
+
+/* ===== 시험지 ===== */
+.wt-paper {
+  padding: 24px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+
+.wt-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding-bottom: 12px;
+  margin-bottom: 12px;
+  border-bottom: 2px solid var(--text);
+}
+
+.wt-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 14px;
+}
+
+.wt-q {
+  display: grid;
+  gap: 4px;
+  break-inside: avoid;
+}
+
+.wt-kind {
+  font-size: 0.72rem;
+  color: var(--muted);
+}
+
+.wt-n {
+  font-size: 0.95rem;
+  color: var(--text);
+  margin-right: 4px;
+}
+
+.wt-ask {
+  font-size: 1.05rem;
+}
+
+.wt-hint {
+  color: var(--muted);
+}
+
+.wt-choices {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 18px;
+}
+
+.wt-line {
+  display: block;
+  height: 1.6em;
+  border-bottom: 1px solid var(--line-strong);
+  max-width: 320px;
+}
+
+.wt-answer {
+  font-weight: 700;
+}
+
+.wt-key {
+  margin-top: 16px;
+}
+
+@media print {
+  .topbar,
+  .st-nav,
+  .st-fab,
+  .st-toast,
+  .no-print {
+    display: none !important;
+  }
+
+  body,
+  .wt-paper {
+    background: #fff;
+    color: #000;
+  }
+
+  .wt-paper {
+    border: 0;
+    padding: 0;
+  }
+
+  .study,
+  .st-main {
+    display: block;
+    padding: 0;
+  }
+}

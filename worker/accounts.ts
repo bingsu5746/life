@@ -14,7 +14,8 @@
 //   (학교처럼 여럿이 한 주소를 같이 쓰는 곳을 생각해 넉넉하게 잡는다)
 import { DurableObject } from 'cloudflare:workers';
 import { COOKIE_NAME, cutText, Limiter, passwordProblem, readCookie, usernameKey } from './security';
-import { buildInput, buildMeaningsInput, FAST_MODEL, modelInput, parseTranslation, readMeanings, readOutput, readRequest, readWordsRequest, TRANSLATE_MODEL } from './translate';
+import { allowedEndpoint, localDate, makeVapid, nextFire, sendPush, type PushSub, type Vapid } from './push';
+import { buildExamplesInput, readExamples, readExamplesRequest, buildInput, buildMeaningsInput, FAST_MODEL, modelInput, parseTranslation, readMeanings, readOutput, readRequest, readWordsRequest, TRANSLATE_MODEL } from './translate';
 
 const ITER = 100_000;
 const SESSION_DAYS = 90;
@@ -96,6 +97,10 @@ export class Accounts extends DurableObject<Env> {
       CREATE INDEX IF NOT EXISTS sessions_user ON sessions (user_id);
       CREATE TABLE IF NOT EXISTS blobs (user_id TEXT NOT NULL, name TEXT NOT NULL, data TEXT NOT NULL, updated INTEGER NOT NULL, PRIMARY KEY (user_id, name));
       CREATE TABLE IF NOT EXISTS login_fails (key TEXT PRIMARY KEY, fails INTEGER NOT NULL, locked_until INTEGER NOT NULL, updated INTEGER NOT NULL);
+      CREATE TABLE IF NOT EXISTS push_subs (endpoint TEXT PRIMARY KEY, user_id TEXT NOT NULL, p256dh TEXT NOT NULL, auth TEXT NOT NULL, created INTEGER NOT NULL);
+      CREATE INDEX IF NOT EXISTS push_subs_user ON push_subs (user_id);
+      CREATE TABLE IF NOT EXISTS notify (user_id TEXT PRIMARY KEY, times TEXT NOT NULL, tz INTEGER NOT NULL, next_at INTEGER, digest TEXT NOT NULL DEFAULT '[]', origin TEXT NOT NULL);
+      CREATE TABLE IF NOT EXISTS vapid (id INTEGER PRIMARY KEY, pub TEXT NOT NULL, priv TEXT NOT NULL);
     `);
   }
 
@@ -128,7 +133,7 @@ export class Accounts extends DurableObject<Env> {
     if (req.method === 'POST' || req.method === 'PUT' || req.method === 'DELETE') {
       const big = path.startsWith('store/') || path.startsWith('study-photo/');
       const text = await req.text();
-      if (text.length > (big ? MAX_STORE + 1000 : path === 'translate' ? 4 * MAX_SMALL_BODY : MAX_SMALL_BODY)) return fail('보낸 내용이 너무 커요.', 413);
+      if (text.length > (big ? MAX_STORE + 1000 : path === 'translate' || path === 'notify/digest' ? 4 * MAX_SMALL_BODY : MAX_SMALL_BODY)) return fail('보낸 내용이 너무 커요.', 413);
       try {
         const parsed: unknown = text ? JSON.parse(text) : {};
         if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return fail('잘못된 요청이에요.');
@@ -173,6 +178,7 @@ export class Accounts extends DurableObject<Env> {
     }
     if (path === 'me' && req.method === 'GET') return json({ user: this.publicUser(user) });
     if (path === 'translate' && req.method === 'POST') return this.translate(user, body);
+    if (path === 'notify' || path.startsWith('notify/')) return this.notifyRoute(req, path, user, body);
     if (path === 'me/nickname' && req.method === 'PUT') {
       const nickname = cutText(String(body.nickname ?? '').normalize('NFC').trim(), 16);
       if (!nickname) return fail('닉네임을 써 주세요.');
@@ -223,10 +229,12 @@ export class Accounts extends DurableObject<Env> {
   }
 
   private async translate(user: UserRow, body: Record<string, unknown>) {
-    // { words } 이면 단어 뜻 채우기, 아니면 글 번역
-    const wr = body.words !== undefined ? readWordsRequest(body) : null;
+    // { words } 이면 단어 뜻 채우기, { examples } 면 예문 만들기, 아니면 글 번역
+    const er = body.examples !== undefined ? readExamplesRequest(body) : null;
+    if (er && 'error' in er) return fail(er.error);
+    const wr = !er && body.words !== undefined ? readWordsRequest(body) : null;
     if (wr && 'error' in wr) return fail(wr.error);
-    const r = wr ? null : readRequest(body);
+    const r = wr || er ? null : readRequest(body);
     if (r && 'error' in r) return fail(r.error);
     const wait = this.translateByUser.hit(user.id);
     if (wait) return fail(`번역을 너무 자주 했어요. ${wait}초 뒤에 다시 해 주세요.`, 429);
@@ -243,6 +251,15 @@ export class Accounts extends DurableObject<Env> {
       }
     };
     const busy = (err: string) => (quota(err) ? fail('오늘 번역 무료 한도를 다 썼어요. 한국 시간 오전 9시 뒤에 다시 해 주세요.', 503) : fail('번역 서버에 문제가 있어요. 잠시 뒤 다시 해 주세요.', 502));
+
+    if (er) {
+      const b = buildExamplesInput(er.items);
+      const res = await run(FAST_MODEL, modelInput(FAST_MODEL, { messages: b.messages, max: b.max }));
+      if ('err' in res) return busy(res.err!);
+      const examples = readExamples(res.out, er.items);
+      if (!examples.some(Boolean)) return fail('예문을 받지 못했어요. 다시 해 주세요.', 502);
+      return json({ examples });
+    }
 
     if (wr) {
       const res = await run(FAST_MODEL, buildMeaningsInput(wr.words));
@@ -366,10 +383,118 @@ export class Accounts extends DurableObject<Env> {
     return json({ ok: true });
   }
 
+  // ===== 알림 (웹 푸시) =====
+
+  /** 서버 알림 열쇠: 처음 쓸 때 만들어 이 저장소에만 둔다 */
+  private async vapid(): Promise<Vapid> {
+    const r = this.sql.exec<{ pub: string; priv: string }>('SELECT pub, priv FROM vapid WHERE id = 1').toArray()[0];
+    if (r) return { pub: r.pub, priv: JSON.parse(r.priv) as JsonWebKey };
+    const v = await makeVapid();
+    this.sql.exec('INSERT OR IGNORE INTO vapid (id, pub, priv) VALUES (1, ?, ?)', v.pub, JSON.stringify(v.priv));
+    const again = this.sql.exec<{ pub: string; priv: string }>('SELECT pub, priv FROM vapid WHERE id = 1').toArray()[0];
+    return { pub: again.pub, priv: JSON.parse(again.priv) as JsonWebKey };
+  }
+
+  /** 다음 알림 시각에 깨어나도록 */
+  private async scheduleAlarm() {
+    const r = this.sql.exec<{ at: number | null }>('SELECT MIN(next_at) AS at FROM notify WHERE next_at IS NOT NULL').toArray()[0];
+    if (r?.at) await this.ctx.storage.setAlarm(r.at);
+    else await this.ctx.storage.deleteAlarm();
+  }
+
+  private async notifyRoute(req: Request, path: string, user: UserRow, b: Record<string, unknown>): Promise<Response> {
+    const origin = new URL(req.url).origin;
+    if (path === 'notify' && req.method === 'GET') {
+      const n = this.sql.exec<{ times: string; tz: number }>('SELECT times, tz FROM notify WHERE user_id = ?', user.id).toArray()[0];
+      const subs = this.sql.exec<{ n: number }>('SELECT COUNT(*) AS n FROM push_subs WHERE user_id = ?', user.id).toArray()[0].n;
+      return json({ publicKey: (await this.vapid()).pub, times: n ? (JSON.parse(n.times) as string[]) : [], devices: subs });
+    }
+    if (path === 'notify' && req.method === 'PUT') {
+      const sub = b.subscription as { endpoint?: unknown; keys?: { p256dh?: unknown; auth?: unknown } } | undefined;
+      const endpoint = typeof sub?.endpoint === 'string' ? sub.endpoint : '';
+      const p256dh = typeof sub?.keys?.p256dh === 'string' ? sub.keys.p256dh : '';
+      const auth = typeof sub?.keys?.auth === 'string' ? sub.keys.auth : '';
+      if (!allowedEndpoint(endpoint) || endpoint.length > 1000 || !/^[A-Za-z0-9_-]{80,100}$/.test(p256dh) || !/^[A-Za-z0-9_-]{16,30}$/.test(auth)) return fail('이 브라우저의 알림 정보를 받을 수 없어요.');
+      const times = Array.isArray(b.times) ? (b.times.filter((t) => typeof t === 'string' && /^([01]\d|2[0-3]):[0-5]\d$/.test(t)) as string[]).slice(0, 3) : [];
+      const tz = typeof b.tzOffset === 'number' && Number.isInteger(b.tzOffset) && Math.abs(b.tzOffset) <= 14 * 60 ? b.tzOffset : 540;
+      const mine = this.sql.exec<{ n: number }>('SELECT COUNT(*) AS n FROM push_subs WHERE user_id = ? AND endpoint != ?', user.id, endpoint).toArray()[0].n;
+      if (mine >= 5) return fail('알림은 기기 5개까지 켤 수 있어요. 안 쓰는 기기에서 알림을 꺼 주세요.', 409);
+      this.sql.exec('INSERT OR REPLACE INTO push_subs (endpoint, user_id, p256dh, auth, created) VALUES (?, ?, ?, ?, ?)', endpoint, user.id, p256dh, auth, Date.now());
+      const old = this.sql.exec<{ digest: string }>('SELECT digest FROM notify WHERE user_id = ?', user.id).toArray()[0];
+      this.sql.exec('INSERT OR REPLACE INTO notify (user_id, times, tz, next_at, digest, origin) VALUES (?, ?, ?, ?, ?, ?)', user.id, JSON.stringify(times), tz, nextFire(times, tz), old?.digest ?? '[]', origin);
+      await this.scheduleAlarm();
+      return json({ ok: true, publicKey: (await this.vapid()).pub });
+    }
+    if (path === 'notify' && req.method === 'DELETE') {
+      const endpoint = typeof b.endpoint === 'string' ? b.endpoint : '';
+      if (endpoint) this.sql.exec('DELETE FROM push_subs WHERE user_id = ? AND endpoint = ?', user.id, endpoint);
+      else this.sql.exec('DELETE FROM push_subs WHERE user_id = ?', user.id);
+      const left = this.sql.exec<{ n: number }>('SELECT COUNT(*) AS n FROM push_subs WHERE user_id = ?', user.id).toArray()[0].n;
+      if (!left) this.sql.exec('DELETE FROM notify WHERE user_id = ?', user.id);
+      await this.scheduleAlarm();
+      return json({ ok: true });
+    }
+    if (path === 'notify/digest' && req.method === 'PUT') {
+      // 기기가 계산해 둔 날짜별 알림 글 (서버는 공부 자료를 열어 보지 않는다)
+      const entries = (Array.isArray(b.entries) ? b.entries : [])
+        .filter((e): e is { date: string; slot: number; title: string; body: string } => !!e && typeof e === 'object' && /^\d{4}-\d{2}-\d{2}$/.test((e as { date?: unknown }).date as string) && Number.isInteger((e as { slot?: unknown }).slot) && typeof (e as { title?: unknown }).title === 'string' && typeof (e as { body?: unknown }).body === 'string')
+        .slice(0, 24)
+        .map((e) => ({ date: e.date, slot: Math.max(0, Math.min(2, e.slot)), title: e.title.slice(0, 60), body: e.body.slice(0, 240) }));
+      this.sql.exec('UPDATE notify SET digest = ? WHERE user_id = ?', JSON.stringify(entries), user.id);
+      return json({ ok: true });
+    }
+    if (path === 'notify/test' && req.method === 'POST') {
+      const subs = this.sql.exec<PushSub & { [k: string]: SqlStorageValue }>('SELECT endpoint, p256dh, auth FROM push_subs WHERE user_id = ?', user.id).toArray();
+      if (!subs.length) return fail('알림을 켠 기기가 없어요.', 404);
+      const sent = await this.pushTo(subs, { title: '내 공부', body: '알림이 잘 와요. 정한 시각에 오늘 할 것을 알려 드릴게요.' }, origin);
+      return sent ? json({ ok: true, sent }) : fail('알림을 보내지 못했어요. 잠시 뒤 다시 해 주세요.', 502);
+    }
+    return fail('없는 주소예요.', 404);
+  }
+
+  /** 여러 기기에 보내기 (없어진 구독은 지운다). 보낸 수 */
+  private async pushTo(subs: PushSub[], message: { title: string; body: string }, origin: string): Promise<number> {
+    const v = await this.vapid();
+    let ok = 0;
+    for (const s of subs) {
+      try {
+        const r = await sendPush(s, message, v, origin);
+        if (r.ok) ok++;
+        else if (r.gone) this.sql.exec('DELETE FROM push_subs WHERE endpoint = ?', s.endpoint);
+        else console.error('push failed', r.status);
+      } catch (e) {
+        console.error('push error', e instanceof Error ? e.message : String(e));
+      }
+    }
+    return ok;
+  }
+
+  /** 정한 시각: 그 사람이 넣어 둔 그날 그 시각 글을 보낸다 */
+  async alarm() {
+    const now = Date.now();
+    const due = this.sql.exec<{ user_id: string; times: string; tz: number; next_at: number; digest: string; origin: string }>('SELECT * FROM notify WHERE next_at IS NOT NULL AND next_at <= ?', now + 30_000).toArray();
+    for (const n of due) {
+      const times = JSON.parse(n.times) as string[];
+      const date = localDate(n.next_at, n.tz);
+      const hhmm = new Date(n.next_at + n.tz * 60_000).toISOString().slice(11, 16);
+      const slot = Math.max(0, times.indexOf(hhmm));
+      const entries = JSON.parse(n.digest) as { date: string; slot: number; title: string; body: string }[];
+      const e = entries.find((x) => x.date === date && x.slot === slot);
+      // 기기를 오래 안 열어 날짜 글이 없으면 짧은 기본 글 (한참 지난 내용을 보내지 않게)
+      const message = e ? { title: e.title, body: e.body } : { title: '내 공부', body: '오늘 할 것을 확인해 보세요' };
+      const subs = this.sql.exec<PushSub & { [k: string]: SqlStorageValue }>('SELECT endpoint, p256dh, auth FROM push_subs WHERE user_id = ?', n.user_id).toArray();
+      if (subs.length) await this.pushTo(subs, message, n.origin);
+      this.sql.exec('UPDATE notify SET next_at = ? WHERE user_id = ?', nextFire(times, n.tz, Math.max(now, n.next_at) + 1000), n.user_id);
+    }
+    await this.scheduleAlarm();
+  }
+
   private async deleteAccount(user: UserRow, b: Record<string, unknown>, ip: string) {
     const bad = await this.verify(user, user.username, String(b.password ?? '').slice(0, 256), ip);
     if (bad) return bad.status === 401 ? fail('비밀번호가 맞지 않아요.', 403) : bad;
     this.sql.exec('DELETE FROM blobs WHERE user_id = ?', user.id);
+    this.sql.exec('DELETE FROM push_subs WHERE user_id = ?', user.id);
+    this.sql.exec('DELETE FROM notify WHERE user_id = ?', user.id);
     this.sql.exec('DELETE FROM sessions WHERE user_id = ?', user.id);
     this.sql.exec('DELETE FROM users WHERE id = ?', user.id);
     return json({ ok: true }, 200, { 'set-cookie': clearCookie() });

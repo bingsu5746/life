@@ -4,7 +4,7 @@ import { alive, newId, type DateStr, type Homework, type HwItem, type Id, type M
 import { compactMarks, compress, expand } from './pages';
 import { firstAnswer, type Mode } from './wordSession';
 import type { Via } from './review';
-import { getStudy, put, putMany, putWords, remove } from './store';
+import { getStudy, getWords, put, putMany, putWords, remove } from './store';
 import { planDue } from './plan';
 import { listWords } from './select';
 
@@ -151,4 +151,21 @@ export function removeExam(examId: Id) {
 export function finishPlan(planId: Id) {
   const p = getStudy().plans[planId];
   if (p) put('plans', { ...p, finished: true });
+}
+
+/** 예문이 없는 단어들에 AI 예문 넣기 (30개씩). 넣은 수 */
+export async function fillExamples(list: Word[], onProgress?: (done: number, total: number) => void): Promise<number> {
+  const { wordExamples } = await import('../auth/api');
+  const need = list.filter((w) => !w.example);
+  let n = 0;
+  for (let i = 0; i < need.length; i += 30) {
+    onProgress?.(i, need.length);
+    const part = need.slice(i, i + 30);
+    const r = await wordExamples(part.map((w) => ({ term: w.term, meaning: w.meaning })));
+    // 기다리는 동안 바뀐 것(외우기 등)을 덮지 않게 지금 것에 예문만 더한다
+    const upd = part.flatMap((w, j) => (r.examples[j] && getWords()[w.id] && !getWords()[w.id].deleted ? [{ ...getWords()[w.id], example: r.examples[j]! }] : []));
+    if (upd.length) putWords(upd);
+    n += upd.length;
+  }
+  return n;
 }

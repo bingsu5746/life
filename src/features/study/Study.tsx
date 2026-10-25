@@ -7,6 +7,7 @@ import { putMany, useSaveFailed, useStudy, useWords } from './store';
 import { useTimerAlarm, useTimerView } from './timerStore';
 import { clock } from './timer';
 import { Today } from './Today';
+import { localTimes, uploadDigest } from './notify';
 // 시험 화면은 오늘 화면(D-day)과 같이 쓰여 함께 받는다
 import { Exams } from './Exams';
 import { go, Icon, Toaster, useToday } from './ui';
@@ -43,6 +44,12 @@ export function Study({ path, loggedIn, syncReady = true, onLogin }: { path: str
     const locks = pendingLocks(d, words, today);
     if (locks.length) putMany(locks.map((p) => ({ c: 'plans' as const, item: p as never })));
   }, [d, words, today, syncReady]);
+  // 알림을 켜 둔 기기: 자료가 바뀌면 잠시 뒤 알림 글을 다시 올린다
+  useEffect(() => {
+    if (!loggedIn || !localTimes()) return;
+    const t = setTimeout(() => void uploadDigest().catch(() => {}), 5000);
+    return () => clearTimeout(t);
+  }, [d, words, today, loggedIn]);
   const saveFailed = useSaveFailed();
   // 다른 화면 코드는 잠시 뒤 미리 받아 둔다 (누를 때 「여는 중」이 오래 보이지 않게, 오프라인에서도 열리게)
   useEffect(() => {
@@ -53,7 +60,7 @@ export function Study({ path, loggedIn, syncReady = true, onLogin }: { path: str
   }, []);
 
   const reviewCount = reviewCountToday(d, today);
-  const running = id && (sub === 'learn' || sub === 'prep' || sub === 'weak' || (tab === 'review' && (id === 'redo' || id?.startsWith('cards-run'))));
+  const running = id && (sub === 'learn' || sub === 'prep' || sub === 'weak' || (tab === 'review' && (id === 'redo' || id?.startsWith('cards-run') || id?.startsWith('blank-run'))));
 
   let content;
   if (tab === 'books') content = <Books id={id} />;

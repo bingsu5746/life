@@ -4,6 +4,7 @@ import { addDays, daysBetween, longDate, shortDate, weekStart } from './dates';
 import { alive, newId, type Book, type Unit } from './model';
 import { compress, expand, parseRanges, rangeText } from './pages';
 import { paceOf } from './plan';
+import { forecastFor, forecastText } from './forecast';
 import { bookDone, planCtx, planViews, reservedPages } from './select';
 import { getStudy, put, remove, useStudy, useWords } from './store';
 import { parseToc, tocText, type TocRow } from './toc';
@@ -297,6 +298,10 @@ function BookDetail({ id }: { id: string }) {
               {pace !== 0 && <span className={pace > 0 ? 'ok' : 'bad'}> · 계획보다 {Math.abs(pace)}쪽 {pace > 0 ? '앞섬' : '밀림'}</span>}
             </p>
             {v.sched.warning && <PlanWarning p={v} />}
+            {(() => {
+              const f = forecastFor(d, v, today);
+              return <p className={`st-forecast ${f.state === 'short' ? 'bad' : ''}`}>끝내기 예측: {forecastText(f, '쪽', shortDate)}</p>;
+            })()}
           </>
         )}
         {reserved.size > 0 && <p className="st-hint">과외 숙제로 잡힌 p.{rangeText([...reserved])}는 이 계획에서 빠져요.</p>}

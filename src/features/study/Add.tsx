@@ -11,6 +11,8 @@ const ITEMS: { key: string; label: string; sub: string; to?: string }[] = [
   { key: 'exam', label: '시험', sub: '시험 날 · 과목별 시험 범위', to: '/exams/new' },
   { key: 'progress', label: '학교 진도', sub: '오늘 학교에서 어디까지 나갔는지', to: '/exams/progress' },
   { key: 'preview', label: '예습', sub: '내일 수업 전에 미리 볼 곳', to: '/preview/new' },
+  { key: 'task', label: '수행평가', sub: '내는 날 · 준비할 것', to: '/exams/tasks/new' },
+  { key: 'blank', label: '백지 복습', sub: '단원 이름 · 핵심 내용', to: '/review/new-blank' },
   { key: 'book', label: '문제집', sub: '목차를 넣고 하루 분량 계획', to: '/books/new' },
   { key: 'hw', label: '과외 숙제', sub: '마감은 다음 수업일로', to: '/tutor/hw' },
   { key: 'words', label: '단어 목록', sub: '단어장 · 단어 시험 (PDF·붙여넣기·사진)', to: '/words/new' },

@@ -63,3 +63,18 @@ describe('단어 뜻 채우기', () => {
     expect(readMeanings(out, 3)).toEqual(['버리다, 포기하다', '', '회복력']);
   });
 });
+
+describe('예문 만들기', () => {
+  it('요청·답 읽기', async () => {
+    const { readExamplesRequest, readExamples, buildExamplesInput } = await import('./translate');
+    expect(readExamplesRequest({ examples: [{ term: 'abandon', meaning: '버리다' }] })).toEqual({ items: [{ term: 'abandon', meaning: '버리다' }] });
+    expect(readExamplesRequest({ examples: [{ term: '버리다' }] })).toHaveProperty('error');
+    expect(buildExamplesInput([{ term: 'abandon', meaning: '버리다' }]).messages[1].content).toBe('1\tabandon\t버리다');
+    const out = { choices: [{ message: { content: '1\tThey [abandoned] the old car.\t그들은 낡은 차를 버렸다.\n2\tShe showed great resilience after the loss.\t그녀는 상실 후 큰 회복력을 보였다.\n3\tno tab here' } }] };
+    expect(readExamples(out, [{ term: 'abandon' }, { term: 'resilience' }, { term: 'x' }])).toEqual([
+      { s: 'They [abandoned] the old car.', ko: '그들은 낡은 차를 버렸다.' },
+      { s: 'She showed great [resilience] after the loss.', ko: '그녀는 상실 후 큰 회복력을 보였다.' },
+      null,
+    ]);
+  });
+});

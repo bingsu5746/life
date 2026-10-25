@@ -68,7 +68,7 @@ export interface LinePoint {
  * 꺾은선 (한 줄). invert: 작을수록 위 (등급).
  * domain 을 주지 않으면 값에 맞춘다.
  */
-export function LineChart({ points, domain, ticks: fixedTicks, invert, format = String, height = 180, label }: { points: LinePoint[]; domain?: [number, number]; ticks?: number[]; invert?: boolean; format?: (v: number) => string; height?: number; label: string }) {
+export function LineChart({ points, domain, ticks: fixedTicks, invert, format = String, height = 180, label, goal }: { points: LinePoint[]; domain?: [number, number]; ticks?: number[]; invert?: boolean; format?: (v: number) => string; height?: number; label: string; goal?: number }) {
   const [ref, width] = useWidth<HTMLDivElement>();
   const [hover, setHover] = useState<number | null>(null);
   const vals = points.map((p) => p.y).filter((v): v is number => v !== null);
@@ -118,6 +118,14 @@ export function LineChart({ points, domain, ticks: fixedTicks, invert, format = 
                 {p.label}
               </text>
             ) : null,
+          )}
+          {goal !== undefined && goal >= min && goal <= max && (
+            <g>
+              <line className="ch-avg" x1={PAD.left} x2={width - PAD.right} y1={y(goal)} y2={y(goal)} />
+              <text className="ch-axis" x={PAD.left + 4} y={y(goal) - 4}>
+                목표
+              </text>
+            </g>
           )}
           {h && h.y !== null && <line className="ch-cross" x1={x(hover!)} x2={x(hover!)} y1={PAD.top} y2={PAD.top + ih} />}
           <path className="ch-line" d={path} />

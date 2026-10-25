@@ -5,7 +5,9 @@ import { alive, newId, REASONS, type CardDeck, type MemoCard, type WrongNote, ty
 import { answer, dueText, dueToday } from './review';
 import { cardsToday } from './select';
 import { getStudy, put, putMany, remove, useStudy } from './store';
-import { addPhoto, photoUrl, removePhoto } from './photos';
+import { addPhoto, photoBlob, photoUrl, removePhoto } from './photos';
+import { BlankRun, Blanks } from './Blanks';
+import { blanksToday } from './select';
 import { requeue } from './wordSession';
 import { Bar, confirmDelete, Empty, Field, go, Menu, Sheet, SubjectDot, SubjectPicker, SubjectTag, subjectsOf, toast, useToday, tap } from './ui';
 import { KeyHelp, RunCard } from './Words';
@@ -13,16 +15,18 @@ import { KeyHelp, RunCard } from './Words';
 export function Review({ sub }: { sub?: string }) {
   if (sub === 'redo') return <NoteRun />;
   if (sub?.startsWith('cards-run')) return <CardRun />;
+  if (sub?.startsWith('blank-run-')) return <BlankRun id={sub.slice(10)} />;
   if (sub?.startsWith('deck-')) return <DeckView id={sub.slice(5)} />;
-  return <ReviewHome tab={sub === 'cards' || sub === 'new-deck' ? 'cards' : 'notes'} sub={sub} />;
+  return <ReviewHome tab={sub === 'cards' || sub === 'new-deck' ? 'cards' : sub === 'blank' || sub === 'new-blank' ? 'blank' : 'notes'} sub={sub} />;
 }
 
 /** sub: 'new-note' · 'new-deck' 이면 바로 넣기 창 (「＋」에서 올 때) */
-function ReviewHome({ tab, sub }: { tab: 'notes' | 'cards'; sub?: string }) {
+function ReviewHome({ tab, sub }: { tab: 'notes' | 'cards' | 'blank'; sub?: string }) {
   const d = useStudy();
   const today = useToday();
   const notesDue = dueToday(alive(d.notes), today);
   const cardsDue = cardsToday(d, today);
+  const blanksDue = blanksToday(d, today).length;
   return (
     <div className="st-page">
       <div className="st-page-head">
@@ -34,9 +38,12 @@ function ReviewHome({ tab, sub }: { tab: 'notes' | 'cards'; sub?: string }) {
           <button className={tab === 'cards' ? 'on' : ''} onClick={() => go('/review/cards')}>
             암기 카드 {cardsDue.length > 0 && <b className="st-count">{cardsDue.length}</b>}
           </button>
+          <button className={tab === 'blank' ? 'on' : ''} onClick={() => go('/review/blank')}>
+            백지 복습 {blanksDue > 0 && <b className="st-count">{blanksDue}</b>}
+          </button>
         </div>
       </div>
-      {tab === 'notes' ? <Notes today={today} adding={sub === 'new-note'} /> : <Cards today={today} adding={sub === 'new-deck'} />}
+      {tab === 'notes' ? <Notes today={today} adding={sub === 'new-note'} /> : tab === 'cards' ? <Cards today={today} adding={sub === 'new-deck'} /> : <Blanks today={today} adding={sub === 'new-blank'} />}
     </div>
   );
 }
@@ -165,6 +172,30 @@ function NoteSheet({ note, today, onClose }: { note?: WrongNote; today: string; 
     memo: note?.memo ?? '',
   }));
   const [busy, setBusy] = useState(false);
+  const [ocr, setOcr] = useState<string | null>(null);
+  /** 사진의 글자를 읽어 「문제」 칸에 넣는다 (기기 안에서만, 수식·그림은 못 읽음) */
+  async function readQuestion() {
+    setOcr('읽는 중…');
+    try {
+      const { readImageText } = await import('../../lib/ocr');
+      let all = '';
+      for (const [i, id] of f.photos.entries()) {
+        const blob = await photoBlob(id);
+        if (!blob) continue;
+        all += (await readImageText(blob, (_s, r) => setOcr(`읽는 중 ${i + 1}/${f.photos.length} ${Math.round(r * 100)}%`))).trim() + '\n';
+      }
+      const t = all.replace(/\n{3,}/g, '\n\n').trim();
+      if (!t) toast('사진에서 글자를 찾지 못했어요');
+      else {
+        setF((x) => ({ ...x, question: x.question.trim() ? `${x.question.trim()}\n${t}` : t }));
+        toast('읽은 글을 「문제」 칸에 넣었어요. 틀린 글자는 고쳐 주세요');
+      }
+    } catch {
+      toast('글자를 읽지 못했어요. 인터넷 연결을 확인해 주세요 (처음엔 글자 인식 자료를 받아요)');
+    } finally {
+      setOcr(null);
+    }
+  }
   // 이 창에서 넣은 사진: 저장하지 않고 닫으면 지운다 (서버 사진 수 한도를 쓰지 않게)
   const added = useRef<string[]>([]);
   const saved = useRef(false);
@@ -238,6 +269,11 @@ function NoteSheet({ note, today, onClose }: { note?: WrongNote; today: string; 
               </button>
             </div>
           ))}
+          {f.photos.length > 0 && (
+            <button type="button" className="btn btn-sm" disabled={!!ocr} onClick={() => void readQuestion()}>
+              {ocr ?? '사진 글자 읽기'}
+            </button>
+          )}
           <label className="st-photo-add">
             {busy ? '넣는 중…' : '+ 사진'}
             <input type="file" accept="image/*" multiple hidden onChange={(e) => e.target.files?.length && void addPhotos(e.target.files)} />

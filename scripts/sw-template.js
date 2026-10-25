@@ -36,3 +36,27 @@ self.addEventListener('fetch', (e) => {
   }
   e.respondWith((async () => (await caches.match(req)) ?? fetch(req))());
 });
+
+// 알림 (worker/push.ts 가 보낸 웹 푸시): 받은 제목·내용을 그대로 보여 준다
+self.addEventListener('push', (e) => {
+  let m = { title: '내 공부', body: '오늘 할 것을 확인해 보세요' };
+  try {
+    const d = e.data ? e.data.json() : null;
+    if (d && typeof d.title === 'string') m = { title: d.title.slice(0, 80), body: typeof d.body === 'string' ? d.body.slice(0, 300) : '' };
+  } catch {
+    // 모양이 틀리면 기본 글
+  }
+  e.waitUntil(self.registration.showNotification(m.title, { body: m.body, icon: '/icon-192.png', tag: 'my-study-daily', data: { url: '/' } }));
+});
+
+self.addEventListener('notificationclick', (e) => {
+  e.notification.close();
+  e.waitUntil(
+    (async () => {
+      const list = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+      const open = list.find((c) => new URL(c.url).origin === self.location.origin);
+      if (open) return open.focus();
+      return self.clients.openWindow('/');
+    })(),
+  );
+});

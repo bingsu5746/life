@@ -1,6 +1,6 @@
 // 「오늘」 화면 (설계 §7): 과외 숙제 → 문제집 오늘 분량 → 영단어 → 복습 → 할 일·습관 → 공부 시간
 import { useMemo, useState } from 'react';
-import { addDays, dday, longDate, shortDate } from './dates';
+import { addDays, dday, longDate, shortDate, weekStart } from './dates';
 import { habitOn, streak, toggleHabit } from './habits';
 import { alive, type Habit, type Todo } from './model';
 import { rangeText } from './pages';
@@ -10,6 +10,10 @@ import { put, useStudy, useWords } from './store';
 import { doneUpTo, finishPlan, markBook, markDays, markHwPages, patchHwItem, parseWrong, quickWrongNotes } from './actions';
 import { minutesText } from './timer';
 import { DdayHero } from './Exams';
+import { forecastFor } from './forecast';
+import { TaskCard, upcomingTasks } from './Assessments';
+import { ConditionCard } from './ConditionCard';
+import { classesOn } from './timetable';
 import { PreviewRow, previewsForToday } from './Preview';
 import { Bar, Check, Empty, go, Icon, SubjectDot, toast, useToday, tap } from './ui';
 
@@ -30,6 +34,10 @@ export function Today() {
     .sort((a, b) => Number(a.done) - Number(b.done) || (a.due ?? '9').localeCompare(b.due ?? '9'));
   const habits = alive(d.habits).filter((h) => !h.archived && habitOn(h, today));
   const previews = d.settings.hiddenTabs?.includes('preview') ? [] : previewsForToday(alive(d.previews), today);
+  // 일주일 안에 낼 수행평가
+  const tasks = upcomingTasks(alive(d.assessments), today).filter((a) => a.due <= addDays(today, 7));
+  const classes = classesOn(d.settings.schoolTimetable, today).filter((id) => d.subjects[id] && !d.subjects[id].deleted);
+  const weekday0 = new Date(`${today}T00:00:00Z`).getUTCDay();
   const studied = alive(d.sessions)
     .filter((s) => s.date === today)
     .reduce((a, s) => a + s.minutes, 0);
@@ -45,12 +53,13 @@ export function Today() {
   for (const p of bookPlans) if (p.sched.today.length) count(p.sched.today.every((x) => p.target.done.has(x)));
   for (const t of todos) count(t.done);
   for (const p of previews) count(p.done);
+  for (const a of tasks) if (a.due <= addDays(today, 1)) count(false);
   for (const h of habits) count(h.checks.includes(today));
   const wordsLeft = lists.reduce((a, l) => a + l.fresh.length + l.due.length, 0);
   if (wordsLeft) count(false);
   if (notesDue.length + cardsDue.length) count(false);
 
-  const empty = !hws.length && !plans.length && !lists.length && !alive(d.notes).length && !alive(d.cards).length && !todos.length && !habits.length && !previews.length;
+  const empty = !hws.length && !plans.length && !lists.length && !alive(d.notes).length && !alive(d.cards).length && !todos.length && !habits.length && !previews.length && !tasks.length;
 
   return (
     <div className="st-today">
@@ -74,6 +83,29 @@ export function Today() {
             문제집 넣기
           </button>
         </Empty>
+      )}
+
+      {classes.length > 0 && (
+        <p className="st-classes">
+          오늘 수업: {classes.map((id) => d.subjects[id].name).join(' · ')}
+        </p>
+      )}
+
+      {(weekday0 === 0 || weekday0 === 1) && (
+        <button className="st-dday-empty" onClick={() => go(`/time/week-${weekday0 === 0 ? weekStart(today) : addDays(weekStart(today), -7)}`)}>
+          {weekday0 === 0 ? '이번 주' : '지난주'} 돌아보기 <Icon name="chevron" />
+        </button>
+      )}
+
+      {!d.settings.hiddenTabs?.includes('condition') && <ConditionCard today={today} />}
+
+      {tasks.length > 0 && (
+        <section className="st-card">
+          <h3 className="st-h">수행평가</h3>
+          {tasks.map((a) => (
+            <TaskCard key={a.id} a={a} today={today} compact onEdit={() => go('/exams/tasks')} />
+          ))}
+        </section>
       )}
 
       {previews.length > 0 && (
@@ -250,6 +282,11 @@ function BookRow({ p, today }: { p: PlanView; today: string }) {
             {sched.today.length === 0 ? (!sched.remaining.length ? '다 끝났어요' : sched.warning?.kind === 'ended' ? '시험 끝' : plan.start > today ? `${shortDate(plan.start)}부터 시작` : '오늘은 쉬는 날') : `${sched.today.length}쪽${unitNames.length ? ' · ' + unitNames.join(', ') : ''}${unitEnd ? ' · 단원 끝' : ''}`}
             {sched.end && ` · ${shortDate(sched.end)}까지 ${sched.remaining.length}쪽`}
           </div>
+          {(() => {
+            // 요즘 속도로는 마감까지 못 끝낼 것 같으면 미리 알린다
+            const f = forecastFor(d, p, today);
+            return f.state === 'short' ? <div className="st-note">요즘 하루 {f.perDay}쪽으로는 {f.shortDays}일 모자라요. 하루 {f.need}쪽씩 해야 해요</div> : null;
+          })()}
           {plan.carried?.date === today && <div className="st-note">지난번 {plan.carried.count}쪽이 남아서 남은 날에 나눠 넣었어요</div>}
           {sched.warning && <PlanWarning p={p} />}
         </div>

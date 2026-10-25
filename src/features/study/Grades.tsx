@@ -3,19 +3,20 @@ import { useState } from 'react';
 import { shortDate } from './dates';
 import { examEnd, examSubjectIds } from './exams';
 import { ExamTabs } from './Exams';
-import { change, changeText, findScore, METRIC_NAME, metricsFor, MOCK_SUBJECTS, readNum, recordAverage, recordsOf, scoreValue, series, studyBefore, subjectNames, type Metric } from './grades';
-import { LineChart, TableView } from './charts';
+import { parseWrongNums, wrongFrequency, change, changeText, findScore, METRIC_NAME, metricsFor, MOCK_SUBJECTS, readNum, recordAverage, recordsOf, scoreValue, series, studyBefore, subjectNames, type Metric } from './grades';
+import { BarChart, LineChart, TableView } from './charts';
+import { addDays } from './dates';
 import { alive, newId, type GradeRecord, type GradeScore } from './model';
-import { put, remove, useStudy } from './store';
+import { put, remove, setSettings, useStudy } from './store';
 import { minutesText } from './timer';
 import { confirmDelete, Empty, Field, go, Icon, Sheet, subjectsOf, tap, toast, useToday } from './ui';
 
 const KIND_LABEL: Record<GradeRecord['kind'], string> = { school: '내신', mock: '모의고사' };
 /** 그래프 세로축: 등급은 값 둘레의 정수 칸(1~9 안), 백분위는 0~100, 그 밖은 값에 맞춘다 */
-function axis(m: Metric, ys: (number | null)[]): { domain?: [number, number]; ticks?: number[] } {
+function axis(m: Metric, ys: (number | null)[], goal?: number): { domain?: [number, number]; ticks?: number[] } {
   if (m === 'percentile') return { domain: [0, 100] };
   if (m !== 'grade') return {};
-  const v = ys.filter((x): x is number => x !== null);
+  const v = [...ys, goal ?? null].filter((x): x is number => x !== null);
   if (!v.length) return { domain: [1, 9] };
   const lo = Math.max(1, Math.floor(Math.min(...v)) - 1);
   const hi = Math.min(9, Math.ceil(Math.max(...v)) + 1);
@@ -60,6 +61,9 @@ export function Grades({ sub }: { sub?: string }) {
   const fromExam = sub?.startsWith('from-') ? d.exams[sub.slice(5)] : undefined;
 
   const avg = records.map((r) => recordAverage(r, metric));
+  const goals = d.settings.gradeGoals?.[kind] ?? {};
+  const goalOf = (name: string) => goals[Object.keys(goals).find((k) => k.replace(/\s+/g, '') === name.replace(/\s+/g, '')) ?? ''];
+  const [goalOpen, setGoalOpen] = useState(false);
   const last = records.length - 1;
 
   return (
@@ -132,10 +136,14 @@ export function Grades({ sub }: { sub?: string }) {
               const idx = ys.lastIndexOf(lastV);
               const prevV = [...ys.slice(0, idx)].reverse().find((v) => v !== null) ?? null;
               const c = change(prevV, lastV, metric);
+              const goal = metric === 'grade' ? goalOf(name) : undefined;
               return (
                 <section key={name} className="st-card gr-subject">
                   <div className="gr-subject-head">
-                    <b>{name}</b>
+                    <b>
+                      {name}
+                      {goal !== undefined && <small className="gr-goal"> 목표 {goal}등급{lastV !== null && (lastV <= goal ? ' · 달성' : ` · ${Math.round((lastV - goal) * 10) / 10}등급 남음`)}</small>}
+                    </b>
                     <span>
                       <b>{lastV === null ? '—' : fmt(metric)(lastV)}</b>
                       {c && <small className={c.better ? 'up' : c.diff ? 'down' : ''}>{changeText(c, metric)}</small>}
@@ -147,7 +155,8 @@ export function Grades({ sub }: { sub?: string }) {
                       label={`${name} ${METRIC_NAME[metric]} 흐름`}
                       points={records.map((r, i) => ({ label: shortDate(r.date).replace(/\(.\)/, ''), title: r.name, y: ys[i] }))}
                       invert={metric === 'grade'}
-                      {...axis(metric, ys)}
+                      {...axis(metric, ys, goal)}
+                      goal={goal}
                       format={fmt(metric)}
                     />
                   )}
@@ -166,6 +175,10 @@ export function Grades({ sub }: { sub?: string }) {
               }),
             ])}
           />
+
+          {metric === 'grade' && <GoalGap records={records} names={names} goalOf={goalOf} onEdit={() => setGoalOpen(true)} />}
+
+          <WrongNumbers records={records} names={names} />
 
           <StudyVsScore records={records} metric={metric} />
 
@@ -187,6 +200,7 @@ export function Grades({ sub }: { sub?: string }) {
         </>
       )}
 
+      {goalOpen && <GoalSheet kind={kind} names={names} onClose={() => setGoalOpen(false)} />}
       {editing && <GradeSheet record={editing === 'new' ? undefined : editing} kind={kind} fromExamId={fromExam?.id} onSaved={setKind} onClose={() => go('/exams/grades')} />}
     </div>
   );
@@ -236,6 +250,7 @@ interface Row {
   average: string;
   standard: string;
   percentile: string;
+  wrong: string;
   at?: number;
 }
 
@@ -248,9 +263,10 @@ const toRow = (s: GradeScore): Row => ({
   average: s.average?.toString() ?? '',
   standard: s.standard?.toString() ?? '',
   percentile: s.percentile?.toString() ?? '',
+  wrong: s.wrong?.join(', ') ?? '',
   at: s.at,
 });
-const emptyRow = (subject: string): Row => ({ id: newId(), subject, raw: '', full: '', grade: '', average: '', standard: '', percentile: '' });
+const emptyRow = (subject: string): Row => ({ id: newId(), subject, raw: '', full: '', grade: '', average: '', standard: '', percentile: '', wrong: '' });
 
 function GradeSheet({ record, kind: kind0, fromExamId, onSaved, onClose }: { record?: GradeRecord; kind: GradeRecord['kind']; fromExamId?: string; onSaved: (k: GradeRecord['kind']) => void; onClose: () => void }) {
   const d = useStudy();
@@ -269,6 +285,7 @@ function GradeSheet({ record, kind: kind0, fromExamId, onSaved, onClose }: { rec
   };
   const [rows, setRows] = useState<Row[]>(() => (record ? record.scores.map(toRow) : startNames(kind).map(emptyRow)));
   const [touched, setTouched] = useState(!!record);
+  const [showWrong, setShowWrong] = useState(record ? record.scores.some((x) => x.wrong?.length) : kind0 === 'mock');
   const school = kind === 'school';
   const cols: { k: keyof Row; label: string; lo: number; hi: number }[] = school
     ? [
@@ -283,7 +300,7 @@ function GradeSheet({ record, kind: kind0, fromExamId, onSaved, onClose }: { rec
         { k: 'grade', label: '등급', lo: 1, hi: 9 },
       ];
   const bad = rows.flatMap((r) => cols.filter((c) => r[c.k] && readNum(r[c.k] as string, c.lo, c.hi) === undefined).map((c) => `${r.subject || '과목'} ${c.label}`));
-  const filled = rows.filter((r) => r.subject.trim() && cols.some((c) => (r[c.k] as string).trim()));
+  const filled = rows.filter((r) => r.subject.trim() && (cols.some((c) => (r[c.k] as string).trim()) || parseWrongNums(r.wrong).length));
   const set = (id: string, k: keyof Row, v: string) => {
     setTouched(true);
     setRows((rs) => rs.map((r) => (r.id === id ? { ...r, [k]: v, at: Date.now() } : r)));
@@ -301,6 +318,7 @@ function GradeSheet({ record, kind: kind0, fromExamId, onSaved, onClose }: { rec
       average: school ? readNum(r.average, 0, 1000) : undefined,
       standard: school ? undefined : readNum(r.standard, 0, 300),
       percentile: school ? undefined : readNum(r.percentile, 0, 100),
+      wrong: parseWrongNums(r.wrong).length ? parseWrongNums(r.wrong) : undefined,
       at: r.at ?? now,
     }));
     put('grades', { ...(record ?? {}), id: record?.id ?? newId(), kind, name: name.trim().slice(0, 40), date, examId: record?.examId ?? exam?.id, scores, memo: memo.trim() || undefined });
@@ -321,6 +339,7 @@ function GradeSheet({ record, kind: kind0, fromExamId, onSaved, onClose }: { rec
               aria-pressed={kind === k}
               onClick={() => {
                 setKind(k);
+                if (k === 'mock') setShowWrong(true);
                 // 아직 아무것도 안 적었으면 과목도 그 종류에 맞게
                 if (!touched) setRows(startNames(k).map(emptyRow));
               }}
@@ -358,11 +377,17 @@ function GradeSheet({ record, kind: kind0, fromExamId, onSaved, onClose }: { rec
               <button type="button" className="st-x" aria-label={`${r.subject || '이 줄'} 빼기`} onClick={() => setRows((rs) => rs.filter((x) => x.id !== r.id))}>
                 ✕
               </button>
+              {showWrong && <input className="st-input gr-wrong" value={r.wrong} onChange={(e) => set(r.id, 'wrong', e.target.value.replace(/[^\d,~\-\s]/g, ''))} placeholder="틀린 번호 (예: 3, 7, 21~23)" aria-label={`${r.subject || '과목'} 틀린 번호`} />}
             </div>
           ))}
-          <button type="button" className="st-link" onClick={() => setRows((rs) => [...rs, emptyRow('')])}>
-            ＋ 과목 줄 더하기
-          </button>
+          <div className="st-inline wrap between">
+            <button type="button" className="st-link" onClick={() => setRows((rs) => [...rs, emptyRow('')])}>
+              ＋ 과목 줄 더하기
+            </button>
+            <label className="st-toggle">
+              <input type="checkbox" checked={showWrong} onChange={(e) => setShowWrong(e.target.checked)} /> 틀린 문항 번호도 넣기
+            </label>
+          </div>
         </div>
         <p className="st-hint">
           아는 칸만 채우면 돼요.{school ? ' 등급은 학교에서 받은 대로(5등급제·9등급제) 넣어요.' : ''}
@@ -390,5 +415,133 @@ function GradeSheet({ record, kind: kind0, fromExamId, onSaved, onClose }: { rec
         </div>
       </div>
     </Sheet>
+  );
+}
+
+/** 목표 등급과 지금 차이 · 최근 4주 공부 시간 */
+function GoalGap({ records, names, goalOf, onEdit }: { records: GradeRecord[]; names: string[]; goalOf: (n: string) => number | undefined; onEdit: () => void }) {
+  const d = useStudy();
+  const today = useToday();
+  const rows = names
+    .map((n) => {
+      const ys = series(records, n, 'grade');
+      const now = [...ys].reverse().find((v) => v !== null) ?? null;
+      const goal = goalOf(n);
+      return { n, now, goal, gap: now !== null && goal !== undefined ? Math.round((now - goal) * 10) / 10 : null, min: studyBefore(d, n, addDays(today, 1)) };
+    })
+    .filter((r) => r.goal !== undefined);
+  if (!rows.length)
+    return (
+      <button className="st-addline" onClick={onEdit}>
+        <Icon name="plus" /> 과목별 목표 등급 정하기
+      </button>
+    );
+  rows.sort((a, b) => (b.gap ?? -9) - (a.gap ?? -9));
+  const behind = rows.filter((r) => (r.gap ?? 0) > 0);
+  const avgMin = behind.length ? behind.reduce((a, r) => a + (r.min ?? 0), 0) / behind.length : 0;
+  return (
+    <section className="st-card">
+      <div className="st-inline between">
+        <h3 className="st-h">목표까지</h3>
+        <button className="st-link" onClick={onEdit}>
+          목표 고치기
+        </button>
+      </div>
+      <div className="st-table-wrap">
+        <table className="st-table">
+          <thead>
+            <tr>
+              <th>과목</th>
+              <th>지금</th>
+              <th>목표</th>
+              <th>차이</th>
+              <th>최근 4주 공부</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((r) => (
+              <tr key={r.n}>
+                <td>{r.n}</td>
+                <td>{r.now ?? '—'}</td>
+                <td>{r.goal}</td>
+                <td>{r.gap === null ? '—' : r.gap <= 0 ? '달성' : `${r.gap}등급`}</td>
+                <td>
+                  {r.min === null ? <span className="st-muted">과목 없음</span> : minutesText(r.min)}
+                  {r.gap !== null && r.gap > 0 && r.min !== null && r.min < avgMin && <span className="st-pill bad"> 시간 더</span>}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <p className="st-hint">「시간 더」: 목표까지 남은 과목 중 최근 4주 공부 시간이 평균보다 적은 과목이에요. 공부 시간은 이 앱의 기록에서 이름이 같은 과목끼리 셌어요.</p>
+    </section>
+  );
+}
+
+function GoalSheet({ kind, names, onClose }: { kind: GradeRecord['kind']; names: string[]; onClose: () => void }) {
+  const d = useStudy();
+  const cur = d.settings.gradeGoals?.[kind] ?? {};
+  const all = [...new Set([...names, ...Object.keys(cur)])];
+  const [vals, setVals] = useState<Record<string, string>>(() => Object.fromEntries(all.map((n) => [n, cur[n]?.toString() ?? ''])));
+  return (
+    <Sheet title={`${KIND_LABEL[kind]} 목표 등급`} onClose={onClose}>
+      <div className="st-form">
+        {all.map((n) => (
+          <div key={n} className="st-inline">
+            <span className="st-goal-name">{n}</span>
+            <input className="st-input xs" inputMode="numeric" value={vals[n] ?? ''} onChange={(e) => setVals({ ...vals, [n]: e.target.value.replace(/\D/g, '').slice(0, 1) })} placeholder="—" aria-label={`${n} 목표 등급`} />
+            등급
+          </div>
+        ))}
+        <p className="st-hint">비워 두면 목표가 없는 과목이에요.</p>
+        <div className="st-row end">
+          <button
+            className="btn btn-primary"
+            onClick={() => {
+              const g = Object.fromEntries(Object.entries(vals).flatMap(([k, v]) => (Number(v) >= 1 && Number(v) <= 9 ? [[k, Number(v)]] : [])));
+              setSettings({ gradeGoals: { ...d.settings.gradeGoals, [kind]: g } });
+              toast('목표를 저장했어요');
+              onClose();
+            }}
+          >
+            저장
+          </button>
+        </div>
+      </div>
+    </Sheet>
+  );
+}
+
+/** 자주 틀리는 문항 번호 (틀린 번호를 넣은 성적에서) */
+function WrongNumbers({ records, names }: { records: GradeRecord[]; names: string[] }) {
+  const withWrong = names.filter((n) => wrongFrequency(records, n).records > 0);
+  const [pick, setPick] = useState(withWrong[0] ?? '');
+  if (!withWrong.length) return null;
+  const name = withWrong.includes(pick) ? pick : withWrong[0];
+  const f = wrongFrequency(records, name);
+  const top = [...f.counts.entries()].sort((a, b) => b[1] - a[1] || a[0] - b[0]).slice(0, 5);
+  const groups: { label: string; n: number }[] = [];
+  for (let a = 1; a <= f.max; a += 5) {
+    let n = 0;
+    for (let q = a; q < a + 5; q++) n += f.counts.get(q) ?? 0;
+    groups.push({ label: `${a}~${a + 4}`, n });
+  }
+  return (
+    <section className="st-card">
+      <h3 className="st-h">자주 틀리는 문항</h3>
+      <div className="st-chips">
+        {withWrong.map((n) => (
+          <button key={n} type="button" className={`st-chip ${n === name ? 'on' : ''}`} aria-pressed={n === name} onClick={() => setPick(n)}>
+            {n}
+          </button>
+        ))}
+      </div>
+      <p className="st-sub">
+        틀린 번호를 넣은 시험 {f.records}번 중 가장 많이 틀린 번호: {top.map(([q, c]) => `${q}번(${c}번)`).join(' · ')}
+      </p>
+      <BarChart label={`${name} 번호대별 틀린 수`} height={150} bars={groups.map((g) => ({ label: g.label, value: g.n }))} format={(v) => `${v}개`} />
+      <TableView head={['번호', '틀린 횟수']} rows={[...f.counts.entries()].sort((a, b) => a[0] - b[0]).map(([q, c]) => [`${q}번`, `${c}번`])} />
+    </section>
   );
 }

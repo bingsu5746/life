@@ -83,3 +83,32 @@ export function readNum(v: string, lo: number, hi: number): number | undefined {
   const n = Number(t);
   return Number.isFinite(n) && n >= lo && n <= hi ? n : undefined;
 }
+
+/** 틀린 번호 글 → 번호들 (예: 「3, 7, 21~23」) */
+export function parseWrongNums(s: string): number[] {
+  const out = new Set<number>();
+  for (const m of s.matchAll(/(\d{1,3})\s*(?:[~-]\s*(\d{1,3}))?/g)) {
+    const a = Number(m[1]);
+    const b = m[2] ? Number(m[2]) : a;
+    if (a < 1 || b > 200 || b < a || b - a > 50) continue;
+    for (let i = a; i <= b; i++) out.add(i);
+  }
+  return [...out].sort((x, y) => x - y);
+}
+
+/** 그 과목에서 번호마다 몇 번 틀렸는지 (틀린 번호를 넣은 성적만) */
+export function wrongFrequency(records: GradeRecord[], subject: string): { counts: Map<number, number>; records: number; max: number } {
+  const counts = new Map<number, number>();
+  let n = 0;
+  let max = 0;
+  for (const r of records) {
+    const s = findScore(r, subject);
+    if (!s?.wrong) continue;
+    n++;
+    for (const q of s.wrong) {
+      counts.set(q, (counts.get(q) ?? 0) + 1);
+      if (q > max) max = q;
+    }
+  }
+  return { counts, records: n, max };
+}

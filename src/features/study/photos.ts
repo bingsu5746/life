@@ -101,6 +101,20 @@ export async function addPhoto(file: Blob): Promise<{ id: Id; error?: string }> 
 const urls = new Map<Id, string>();
 
 /** 화면에 보일 주소 (이 기기에 없으면 서버에서 받아 저장) */
+/** 사진 파일 그대로 (글자 읽기용). 이 기기에 없으면 서버에서 받아 둔다 */
+export async function photoBlob(id: Id): Promise<Blob | null> {
+  let blob = await idb.get<Blob>('studyPhotos', id);
+  if (!blob && isLoggedIn()) {
+    try {
+      blob = fromB64(await getStudyPhoto(id));
+      await idb.put('studyPhotos', id, blob);
+    } catch {
+      return null;
+    }
+  }
+  return blob ?? null;
+}
+
 export async function photoUrl(id: Id): Promise<string | null> {
   const cached = urls.get(id);
   if (cached) return cached;

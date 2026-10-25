@@ -180,3 +180,25 @@ export async function translate(text: string, to: 'ko' | 'en', literal = false) 
 export async function wordMeanings(words: string[]) {
   return call<{ words: string[]; meanings: string[] }>('translate', 'POST', { words });
 }
+
+// ===== 알림 (웹 푸시) =====
+export async function notifyInfo() {
+  return call<{ publicKey: string; times: string[]; devices: number }>('notify');
+}
+export async function notifyOn(subscription: PushSubscriptionJSON, times: string[], tzOffset: number) {
+  return call<{ ok: true }>('notify', 'PUT', { subscription, times, tzOffset });
+}
+export async function notifyOff(endpoint?: string) {
+  return call<{ ok: true }>('notify', 'DELETE', { endpoint });
+}
+export async function notifyDigest(entries: { date: string; slot: number; title: string; body: string }[]) {
+  return call<{ ok: true }>('notify/digest', 'PUT', { entries });
+}
+export async function notifyTest() {
+  return call<{ ok: true; sent: number }>('notify/test', 'POST', {});
+}
+
+/** 영어 낱말 예문 (로그인한 사람만, 한 번에 30개까지). 단어 순서대로, 못 만든 것은 null */
+export async function wordExamples(items: { term: string; meaning: string }[]) {
+  return call<{ examples: ({ s: string; ko: string } | null)[] }>('translate', 'POST', { examples: items });
+}

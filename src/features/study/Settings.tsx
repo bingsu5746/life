@@ -5,6 +5,9 @@ import { alive, newId, SUBJECT_COLORS, type StudyData, type Subject } from './mo
 import { exportBackup, importBackup } from './backup';
 import { getTheme, setTheme, type Theme } from '../../lib/theme';
 import { TABS } from './tabs';
+import { TimetableEditor } from './TimetableEditor';
+import { disableNotify, enableNotify, localTimes, notifySupported } from './notify';
+import { isLoggedIn, notifyTest } from '../auth/api';
 import { getStudy, put, remove, resetLocal, setSettings, useStudy } from './store';
 import { confirmDelete, Field, go, NumInput, subjectsOf, TextInput, toast, useToday, WeekdayPicker } from './ui';
 
@@ -162,6 +165,13 @@ export function Settings() {
       </section>
 
       <section className="st-card st-form">
+        <h3 className="st-h">학교 시간표</h3>
+        <TimetableEditor />
+      </section>
+
+      <NotifySettings />
+
+      <section className="st-card st-form">
         <h3 className="st-h">메뉴에 보일 칸</h3>
         <p className="st-hint">안 쓰는 칸은 꺼 두면 메뉴에서 숨겨요. 넣어 둔 자료는 지워지지 않고, 다시 켜면 그대로 보여요.</p>
         <div className="st-chips">
@@ -179,6 +189,19 @@ export function Settings() {
               </button>
             );
           })}
+          {(() => {
+            const on = !s.hiddenTabs?.includes('condition');
+            return (
+              <button
+                type="button"
+                className={`st-chip ${on ? 'on' : ''}`}
+                aria-pressed={on}
+                onClick={() => setSettings({ hiddenTabs: on ? [...(s.hiddenTabs ?? []), 'condition'] : (s.hiddenTabs ?? []).filter((k) => k !== 'condition') })}
+              >
+                잠·컨디션 (오늘 화면)
+              </button>
+            );
+          })()}
         </div>
       </section>
 
@@ -262,4 +285,71 @@ function subjectUse(d: StudyData, id: string): string {
     .filter(([, n]) => n > 0)
     .map(([label, n]) => `${label} ${n}개`);
   return parts.length ? `이 과목으로 넣은 ${parts.join(' · ')}는 지워지지 않고 과목 없이 남아요.` : '';
+}
+
+/** 폰·PC 알림: 정한 시각에 오늘 할 것 · 내일 준비 */
+function NotifySettings() {
+  const [times, setTimes] = useState<string[] | null>(localTimes);
+  const [am, setAm] = useState(times?.[0] ?? '07:30');
+  const [pm, setPm] = useState(times?.[1] ?? '21:00');
+  const [useAm, setUseAm] = useState(times ? times.includes(am) : true);
+  const [usePm, setUsePm] = useState(times ? times.includes(pm) : true);
+  const [busy, setBusy] = useState(false);
+  const want = [useAm && am, usePm && pm].filter((x): x is string => !!x);
+  async function on() {
+    if (!want.length) return toast('알림 시각을 하나 이상 골라 주세요');
+    setBusy(true);
+    try {
+      await enableNotify(want);
+      setTimes(want);
+      toast('알림을 켰어요');
+    } catch (e) {
+      toast(e instanceof Error ? e.message : '알림을 켜지 못했어요');
+    } finally {
+      setBusy(false);
+    }
+  }
+  return (
+    <section className="st-card st-form">
+      <h3 className="st-h">알림</h3>
+      {!notifySupported() ? (
+        <p className="st-hint">이 브라우저는 알림을 받을 수 없어요. 아이폰은 Safari 에서 「공유 → 홈 화면에 추가」로 사이트를 추가한 뒤, 홈 화면에서 열어 켜 주세요.</p>
+      ) : !isLoggedIn() ? (
+        <p className="st-hint">알림은 로그인한 뒤에 켤 수 있어요 (정한 시각에 서버가 보내요).</p>
+      ) : (
+        <>
+          <div className="st-inline wrap">
+            <label className="st-toggle">
+              <input type="checkbox" checked={useAm} onChange={(e) => setUseAm(e.target.checked)} /> 아침
+            </label>
+            <input className="st-input sm" type="time" value={am} onChange={(e) => setAm(e.target.value)} aria-label="아침 알림 시각" />
+            <span className="st-muted">오늘 할 것</span>
+          </div>
+          <div className="st-inline wrap">
+            <label className="st-toggle">
+              <input type="checkbox" checked={usePm} onChange={(e) => setUsePm(e.target.checked)} /> 저녁
+            </label>
+            <input className="st-input sm" type="time" value={pm} onChange={(e) => setPm(e.target.value)} aria-label="저녁 알림 시각" />
+            <span className="st-muted">내일 준비 (예습·숙제·수행평가)</span>
+          </div>
+          <div className="st-row">
+            <button className="btn btn-primary btn-sm" disabled={busy} onClick={() => void on()}>
+              {times ? '시각 바꾸기' : '이 기기에서 알림 켜기'}
+            </button>
+            {times && (
+              <>
+                <button className="btn btn-sm" disabled={busy} onClick={() => void notifyTest().then((r) => toast(`알림을 ${r.sent}곳에 보냈어요`)).catch((e: Error) => toast(e.message))}>
+                  시험 알림 보내기
+                </button>
+                <button className="btn btn-sm" disabled={busy} onClick={() => void disableNotify().then(() => (setTimes(null), toast('이 기기의 알림을 껐어요')))}>
+                  끄기
+                </button>
+              </>
+            )}
+          </div>
+          <p className="st-hint">알림 내용은 이 기기에서 계산해 두었다가 보내요. 앱을 며칠 안 열면 짧은 기본 알림만 가요. 아이폰은 홈 화면에 추가한 사이트에서만 알림을 받을 수 있어요.</p>
+        </>
+      )}
+    </section>
+  );
 }
