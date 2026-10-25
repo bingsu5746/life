@@ -38,6 +38,12 @@ export interface StudySettings {
   hiddenTabs?: string[];
   /** 학교 시간표: 요일(1=월 … 5=금, 6=토)마다 그날 수업 과목 (교시 순) */
   schoolTimetable?: Record<string, Id[]>;
+  /** 운동 목표: 일주일에 몇 번 · 몇 분 */
+  fitnessGoal?: { perWeek?: number; minutes?: number };
+  /** 한 달 지출 예산 (원) */
+  monthlyBudget?: number;
+  /** 메인 화면에서 숨긴 영역 (예: 'money') */
+  hiddenAreas?: string[];
   /** 목표 등급: 성적 종류마다 과목 이름 → 등급 */
   gradeGoals?: { school?: Record<string, number>; mock?: Record<string, number> };
 }
@@ -349,6 +355,96 @@ export interface PastPaper extends Stamp {
   created: number;
 }
 
+// ===== 공부 밖의 영역: 운동 · 돈 · 취미 =====
+
+/** 운동 한 번 */
+export interface Workout extends Stamp {
+  id: Id;
+  date: DateStr;
+  /** 종류 (예: 달리기, 헬스, 홈트) */
+  kind: string;
+  minutes?: number;
+  /** 거리 km */
+  distance?: number;
+  /** 근력 운동 내용 (예: 스쿼트 3×10 40kg) */
+  detail?: string;
+  /** 힘든 정도 1 가볍게 · 2 보통 · 3 힘들게 */
+  effort?: number;
+  memo?: string;
+  created: number;
+}
+
+/** 몸무게 (id 는 날짜) */
+export interface BodyLog extends Stamp {
+  id: DateStr;
+  weight: number;
+}
+
+/** 돈: 쓴 것 · 들어온 것 */
+export interface MoneyTx extends Stamp {
+  id: Id;
+  date: DateStr;
+  type: 'out' | 'in';
+  /** 원 */
+  amount: number;
+  category: string;
+  memo?: string;
+  created: number;
+}
+
+/** 모으기 목표 */
+export interface SavingGoal extends Stamp {
+  id: Id;
+  name: string;
+  /** 목표 금액 (원) */
+  target: number;
+  /** 모은 기록 (빼면 음수) */
+  deposits: { id: Id; date: DateStr; amount: number; at?: number }[];
+  due?: DateStr;
+  done?: boolean;
+  created: number;
+}
+
+export interface Hobby extends Stamp {
+  id: Id;
+  name: string;
+  /** 일주일 목표 시간 (분) */
+  weeklyGoal?: number;
+  order: number;
+}
+
+/** 취미 한 번 */
+export interface HobbyLog extends Stamp {
+  id: Id;
+  hobbyId: Id;
+  date: DateStr;
+  minutes?: number;
+  memo?: string;
+  created: number;
+}
+
+/** 하고 싶은 것 (책·영화·드라마·게임·장소·그 밖) */
+export interface WishItem extends Stamp {
+  id: Id;
+  kind: 'book' | 'movie' | 'show' | 'game' | 'place' | 'other';
+  title: string;
+  status: 'want' | 'doing' | 'done';
+  /** 별점 1~5 (끝낸 것) */
+  rating?: number;
+  note?: string;
+  doneDate?: DateStr;
+  created: number;
+}
+
+/** 일기 (id 는 날짜, 하루에 하나) */
+export interface DiaryEntry extends Stamp {
+  id: DateStr;
+  /** 기분 1(나쁨)~5(좋음) */
+  mood?: number;
+  title?: string;
+  text: string;
+}
+
 export interface CardDeck extends Stamp {
   id: Id;
   name: string;
@@ -453,12 +549,20 @@ export interface StudyData {
   conditions: Record<Id, DayCondition>;
   weekNotes: Record<Id, WeekNote>;
   papers: Record<Id, PastPaper>;
+  workouts: Record<Id, Workout>;
+  bodyLogs: Record<Id, BodyLog>;
+  moneyTx: Record<Id, MoneyTx>;
+  savings: Record<Id, SavingGoal>;
+  hobbies: Record<Id, Hobby>;
+  hobbyLogs: Record<Id, HobbyLog>;
+  wishes: Record<Id, WishItem>;
+  diary: Record<Id, DiaryEntry>;
 }
 
 /** 단어는 많아질 수 있어 따로 묶는다 */
 export type WordsData = Record<Id, Word>;
 
-export const COLLECTIONS = ['subjects', 'exams', 'books', 'plans', 'tutors', 'homework', 'notes', 'decks', 'cards', 'wordLists', 'sessions', 'todos', 'habits', 'grades', 'previews', 'assessments', 'blanks', 'conditions', 'weekNotes', 'papers'] as const;
+export const COLLECTIONS = ['subjects', 'exams', 'books', 'plans', 'tutors', 'homework', 'notes', 'decks', 'cards', 'wordLists', 'sessions', 'todos', 'habits', 'grades', 'previews', 'assessments', 'blanks', 'conditions', 'weekNotes', 'papers', 'workouts', 'bodyLogs', 'moneyTx', 'savings', 'hobbies', 'hobbyLogs', 'wishes', 'diary'] as const;
 export type Collection = (typeof COLLECTIONS)[number];
 
 export const DEFAULT_SETTINGS: StudySettings = {
@@ -498,6 +602,14 @@ export function emptyStudy(): StudyData {
     conditions: {},
     weekNotes: {},
     papers: {},
+    workouts: {},
+    bodyLogs: {},
+    moneyTx: {},
+    savings: {},
+    hobbies: {},
+    hobbyLogs: {},
+    wishes: {},
+    diary: {},
   };
 }
 

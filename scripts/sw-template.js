@@ -39,7 +39,7 @@ self.addEventListener('fetch', (e) => {
 
 // 알림 (worker/push.ts 가 보낸 웹 푸시): 받은 제목·내용을 그대로 보여 준다
 self.addEventListener('push', (e) => {
-  let m = { title: '내 공부', body: '오늘 할 것을 확인해 보세요' };
+  let m = { title: 'Life', body: '오늘 할 것을 확인해 보세요' };
   try {
     const d = e.data ? e.data.json() : null;
     if (d && typeof d.title === 'string') m = { title: d.title.slice(0, 80), body: typeof d.body === 'string' ? d.body.slice(0, 300) : '' };

@@ -4,7 +4,7 @@ import { shortDate } from './dates';
 import { alive, newId, SUBJECT_COLORS, type StudyData, type Subject } from './model';
 import { exportBackup, importBackup } from './backup';
 import { getTheme, setTheme, type Theme } from '../../lib/theme';
-import { TABS } from './tabs';
+import { AREAS, TABS } from './tabs';
 import { TimetableEditor } from './TimetableEditor';
 import { disableNotify, enableNotify, localTimes, notifySupported } from './notify';
 import { isLoggedIn, notifyTest } from '../auth/api';
@@ -22,7 +22,7 @@ export function Settings() {
   return (
     <div className="st-page narrow">
       <div className="st-page-head">
-        <h2>공부 설정</h2>
+        <h2>설정</h2>
       </div>
 
       <section className="st-card st-form">
@@ -172,7 +172,27 @@ export function Settings() {
       <NotifySettings />
 
       <section className="st-card st-form">
-        <h3 className="st-h">메뉴에 보일 칸</h3>
+        <h3 className="st-h">메인에 보일 영역</h3>
+        <div className="st-chips">
+          {AREAS.filter((a) => a.key !== 'home').map((a) => {
+            const on = !s.hiddenAreas?.includes(a.key);
+            return (
+              <button
+                key={a.key}
+                type="button"
+                className={`st-chip ${on ? 'on' : ''}`}
+                aria-pressed={on}
+                onClick={() => setSettings({ hiddenAreas: on ? [...(s.hiddenAreas ?? []), a.key] : (s.hiddenAreas ?? []).filter((k) => k !== a.key) })}
+              >
+                {a.label}
+              </button>
+            );
+          })}
+        </div>
+      </section>
+
+      <section className="st-card st-form">
+        <h3 className="st-h">공부 메뉴에 보일 칸</h3>
         <p className="st-hint">안 쓰는 칸은 꺼 두면 메뉴에서 숨겨요. 넣어 둔 자료는 지워지지 않고, 다시 켜면 그대로 보여요.</p>
         <div className="st-chips">
           {TABS.filter((t) => t.key !== 'today').map((t) => {

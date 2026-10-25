@@ -1,4 +1,4 @@
-// 내 공부: 맨 위 막대(이름·로그인) + 공부 도우미 화면. 주소는 #/오늘·문제집… (src/features/study/Study.tsx)
+// Life: 맨 위 막대(이름·로그인) + 메인(공부·운동·돈·취미·일기)과 각 영역 화면 (src/features/study/Study.tsx)
 import { useEffect, useState } from 'react';
 import { AccountSheet } from './features/auth/AccountSheet';
 import { LoginModal } from './features/auth/LoginModal';
@@ -6,6 +6,7 @@ import { getSyncStatus, onSyncStatus, syncAll, type SyncStatus } from './feature
 import { displayName, useAuth } from './features/auth/useAuth';
 import { isLoggedIn } from './features/auth/api';
 import { Study } from './features/study/Study';
+import { AREAS } from './features/study/tabs';
 
 const safeDecode = (s: string) => {
   try {
@@ -39,6 +40,9 @@ export default function App() {
     return () => window.removeEventListener('hashchange', on);
   }, []);
   const userId = auth.user?.id ?? null;
+  // 맨 위 막대: 지금 있는 영역 이름 (누르면 그 영역 처음으로)
+  const area = AREAS.find((a) => a.key === path[0]);
+  const crumb = !path[0] ? null : path[0] === 'settings' ? { label: '설정', to: '/settings' } : area ? { label: area.label, to: `/${area.key}` } : { label: '공부', to: '/study' };
   useEffect(() => {
     void syncAll();
   }, [userId]);
@@ -48,8 +52,13 @@ export default function App() {
       <header className="topbar">
         <button className="brand" onClick={() => (window.location.hash = '/')}>
           <img src="/icon.svg" alt="" width={30} height={30} />
-          <span>내 공부</span>
+          <span>Life</span>
         </button>
+        {crumb && (
+          <button className="crumb" onClick={() => (window.location.hash = crumb.to)}>
+            {crumb.label}
+          </button>
+        )}
         <div className="account">
           <button className="gear-btn" aria-label="설정" title="설정" onClick={() => (window.location.hash = '/settings')}>
             <svg viewBox="0 0 24 24" aria-hidden>

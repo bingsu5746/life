@@ -1,0 +1,96 @@
+// 메인: 공부 · 운동 · 돈 · 취미 · 일기를 한눈에. 누르면 그 영역으로
+import { dday, longDate, weekStart } from '../study/dates';
+import { upcomingExams } from '../study/exams';
+import { alive } from '../study/model';
+import { todaySummary } from '../study/select';
+import { useStudy, useWords } from '../study/store';
+import { minutesText } from '../study/timer';
+import { AREAS } from '../study/tabs';
+import { go, Icon, useToday } from '../study/ui';
+import { hobbyWeek, monthOf, monthSummary, weekWorkouts, won, workoutStreak } from './calc';
+
+export function Home(_: { loggedIn: boolean; onLogin: () => void }) {
+  const d = useStudy();
+  const words = useWords();
+  const today = useToday();
+  const hidden = d.settings.hiddenAreas ?? [];
+  const show = (k: string) => !hidden.includes(k);
+
+  // 공부
+  const sum = todaySummary(d, words, today);
+  const exam = upcomingExams(d, today)[0];
+  const studied = alive(d.sessions)
+    .filter((s) => s.date === today)
+    .reduce((a, s) => a + s.minutes, 0);
+  // 운동
+  const ws = weekStart(today);
+  const wk = weekWorkouts(d, ws);
+  const wkDays = new Set(wk.map((w) => w.date)).size;
+  const goal = d.settings.fitnessGoal?.perWeek;
+  const didToday = wk.some((w) => w.date === today);
+  // 돈
+  const ms = monthSummary(d, monthOf(today));
+  const budget = d.settings.monthlyBudget;
+  // 취미
+  const hw = hobbyWeek(alive(d.hobbyLogs), ws);
+  const hobbyMin = [...hw.values()].reduce((a, b) => a + b, 0);
+  const doing = alive(d.wishes).filter((w) => w.status === 'doing');
+  // 일기
+  const diaryToday = d.diary[today] && !d.diary[today].deleted;
+  const diaryMonth = alive(d.diary).filter((e) => monthOf(e.id) === monthOf(today)).length;
+
+  const cards: Record<string, { lines: string[]; action?: { label: string; to: string } }> = {
+    study: {
+      lines: [sum.total ? (sum.left ? `오늘 할 것 ${sum.left}개 남음` : '오늘 할 것 끝!') : '오늘 정해 둔 공부가 없어요', exam ? `${exam.name} ${dday(today, exam.date)}` : '', `오늘 공부 ${minutesText(studied)}`].filter(Boolean),
+    },
+    fitness: {
+      lines: [`이번 주 ${wkDays}${goal ? `/${goal}` : ''}일 운동`, didToday ? '오늘 운동했어요' : workoutStreak(alive(d.workouts), today) ? `${workoutStreak(alive(d.workouts), today)}일 연속` : '오늘은 아직'],
+      action: didToday ? undefined : { label: '운동 넣기', to: '/fitness/new' },
+    },
+    money: {
+      lines: [`이번 달 쓴 돈 ${won(ms.out)}`, budget ? (budget - ms.out >= 0 ? `예산 ${won(budget - ms.out)} 남음` : `예산 ${won(ms.out - budget)} 넘음`) : ''].filter(Boolean),
+      action: { label: '쓴 것 적기', to: '/money/new' },
+    },
+    hobby: {
+      lines: [`이번 주 취미 ${minutesText(hobbyMin)}`, doing.length ? `하는 중: ${doing.slice(0, 2).map((w) => w.title).join(', ')}` : ''].filter(Boolean),
+    },
+    diary: {
+      lines: [diaryToday ? '오늘 일기를 썼어요' : '오늘 일기를 아직 안 썼어요', `이번 달 ${diaryMonth}편`],
+      action: { label: diaryToday ? '오늘 일기 보기' : '오늘 일기 쓰기', to: `/diary/${today}` },
+    },
+  };
+
+  return (
+    <div className="hm">
+      <header className="hm-head">
+        <h2>{longDate(today)}</h2>
+        <p className="st-sub">오늘도 하나씩 해 봐요</p>
+      </header>
+      <div className="hm-grid">
+        {AREAS.filter((a) => a.key !== 'home' && show(a.key)).map((a) => {
+          const c = cards[a.key];
+          return (
+            <section key={a.key} className="hm-card">
+              <button className="hm-main" onClick={() => go(`/${a.key}`)}>
+                <span className="hm-title">
+                  <Icon name={`area-${a.key}`} /> {a.label}
+                </span>
+                {c.lines.map((l, i) => (
+                  <span key={i} className={i === 0 ? 'hm-big' : 'hm-line'}>
+                    {l}
+                  </span>
+                ))}
+              </button>
+              {c.action && (
+                <button className="btn btn-sm hm-act" onClick={() => go(c.action!.to)}>
+                  {c.action.label}
+                </button>
+              )}
+            </section>
+          );
+        })}
+      </div>
+      <p className="st-hint">메인에 보일 영역은 설정에서 고를 수 있어요.</p>
+    </div>
+  );
+}

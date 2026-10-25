@@ -151,7 +151,7 @@ export interface BarItem {
 }
 
 /** 세로 막대 (한 가지 값). avg 를 주면 평균 선 */
-export function BarChart({ bars, format = String, height = 180, avg, label, tickUnit = 1 }: { bars: BarItem[]; format?: (v: number) => string; height?: number; avg?: number; label: string; tickUnit?: number }) {
+export function BarChart({ bars, format = String, height = 180, avg, avgLabel = '평균', label, tickUnit = 1 }: { bars: BarItem[]; format?: (v: number) => string; height?: number; avg?: number; avgLabel?: string; label: string; tickUnit?: number }) {
   const [ref, width] = useWidth<HTMLDivElement>();
   const [hover, setHover] = useState<number | null>(null);
   const max = Math.max(1, ...bars.map((b) => b.value), avg ?? 0);
@@ -207,7 +207,7 @@ export function BarChart({ bars, format = String, height = 180, avg, label, tick
           {avg !== undefined && avg > 0 && <line className="ch-avg" x1={PAD.left} x2={width - PAD.right} y1={y(avg)} y2={y(avg)} />}
         </svg>
       )}
-      {avg !== undefined && avg > 0 && <small className="ch-note">점선: 평균 {format(avg)}</small>}
+      {avg !== undefined && avg > 0 && <small className="ch-note">점선: {avgLabel} {format(avg)}</small>}
       <Tooltip tip={h ? { x: PAD.left + slot * hover! + slot / 2, y: y(h.value), title: h.title ?? h.label, value: format(h.value) } : null} width={width} />
     </div>
   );

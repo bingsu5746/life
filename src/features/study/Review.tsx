@@ -424,7 +424,7 @@ function NoteRun() {
           <p>
             {total}문제 중 {[...first.values()].filter(Boolean).length}문제를 맞혔어요
           </p>
-          <button className="btn btn-primary" onClick={() => go('/')}>
+          <button className="btn btn-primary" onClick={() => go('/study')}>
             오늘 화면으로
           </button>
         </div>
@@ -738,7 +738,7 @@ function CardRun() {
           <p>
             {total}장 중 처음에 안 것 {[...first.values()].filter(Boolean).length}장
           </p>
-          <button className="btn btn-primary" onClick={() => go('/')}>
+          <button className="btn btn-primary" onClick={() => go('/study')}>
             오늘 화면으로
           </button>
         </div>

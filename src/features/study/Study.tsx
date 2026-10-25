@@ -18,14 +18,19 @@ const Life = lazy(() => import('./Life').then((m) => ({ default: m.Life })));
 const Review = lazy(() => import('./Review').then((m) => ({ default: m.Review })));
 const Settings = lazy(() => import('./Settings').then((m) => ({ default: m.Settings })));
 const Time = lazy(() => import('./Time').then((m) => ({ default: m.Time })));
+const Home = lazy(() => import('../life/Home').then((m) => ({ default: m.Home })));
+const Fitness = lazy(() => import('../life/Fitness').then((m) => ({ default: m.Fitness })));
+const Money = lazy(() => import('../life/Money').then((m) => ({ default: m.Money })));
+const Hobby = lazy(() => import('../life/Hobby').then((m) => ({ default: m.Hobby })));
+const Diary = lazy(() => import('../life/Diary').then((m) => ({ default: m.Diary })));
 const Preview = lazy(() => import('./Preview').then((m) => ({ default: m.Preview })));
 const Translate = lazy(() => import('./Translate').then((m) => ({ default: m.Translate })));
 const Tutors = lazy(() => import('./Tutors').then((m) => ({ default: m.Tutors })));
 const Words = lazy(() => import('./Words').then((m) => ({ default: m.Words })));
 
-const PRELOAD = [() => import('./Books'), () => import('./Life'), () => import('./Review'), () => import('./Settings'), () => import('./Time'), () => import('./Translate'), () => import('./Preview'), () => import('./Tutors'), () => import('./Words')];
+const PRELOAD = [() => import('../life/Home'), () => import('../life/Fitness'), () => import('../life/Money'), () => import('../life/Hobby'), () => import('../life/Diary'), () => import('./Books'), () => import('./Life'), () => import('./Review'), () => import('./Settings'), () => import('./Time'), () => import('./Translate'), () => import('./Preview'), () => import('./Tutors'), () => import('./Words')];
 
-import { TABS } from './tabs';
+import { AREAS, TABS, type AreaKey } from './tabs';
 export { TABS };
 /** 메뉴에는 없지만 열 수 있는 화면 (설정은 맨 위 막대의 톱니) */
 const HIDDEN = ['settings'];
@@ -34,8 +39,12 @@ export function Study({ path, loggedIn, syncReady = true, onLogin }: { path: str
   const d = useStudy();
   const words = useWords();
   const today = useToday();
-  const tab = TABS.some((t) => t.key === path[0]) || HIDDEN.includes(path[0]) ? path[0] : 'today';
-  const [, id, sub] = path;
+  // 영역: 주소 맨 앞이 없으면 메인, fitness·money·hobby 면 그 영역, 그 밖(study·공부 칸들·설정)은 공부
+  const p0 = path[0];
+  const area: AreaKey = !p0 ? 'home' : (AREAS.some((a) => a.key === p0) && p0 !== 'study' ? p0 : 'study') as AreaKey;
+  const spath = p0 === 'study' ? path.slice(1) : path;
+  const tab = area !== 'study' ? '' : TABS.some((t) => t.key === spath[0]) || HIDDEN.includes(spath[0]) ? spath[0] : 'today';
+  const [, id, sub] = area === 'study' ? spath : path;
 
   // 오늘 분량을 오늘 처음 볼 때 고정한다 (설계 §5.4)
   // 로그인했으면 서버 자료를 받은 뒤에 (옛 자료로 고정한 분량이 다른 기기의 것을 덮지 않게)
@@ -63,7 +72,12 @@ export function Study({ path, loggedIn, syncReady = true, onLogin }: { path: str
   const running = id && (sub === 'learn' || sub === 'prep' || sub === 'weak' || (tab === 'review' && (id === 'redo' || id?.startsWith('cards-run') || id?.startsWith('blank-run'))));
 
   let content;
-  if (tab === 'books') content = <Books id={id} sub={sub} />;
+  if (area === 'home') content = <Home loggedIn={loggedIn} onLogin={onLogin} />;
+  else if (area === 'fitness') content = <Fitness sub={path[1]} />;
+  else if (area === 'money') content = <Money sub={path[1]} />;
+  else if (area === 'hobby') content = <Hobby sub={path[1]} />;
+  else if (area === 'diary') content = <Diary sub={path[1]} />;
+  else if (tab === 'books') content = <Books id={id} sub={sub} />;
   else if (tab === 'tutor') content = <Tutors sub={id} />;
   else if (tab === 'words') content = <Words id={id} sub={sub} />;
   else if (tab === 'review') content = <Review sub={id} />;
@@ -77,10 +91,26 @@ export function Study({ path, loggedIn, syncReady = true, onLogin }: { path: str
 
   return (
     <main className={`study ${running ? 'running' : ''}`}>
-      {!running && (
+      {!running && area !== 'study' && (
+        <nav className="st-nav" aria-label="영역">
+          {AREAS.filter((a) => a.key === 'home' || a.key === area || !d.settings.hiddenAreas?.includes(a.key)).map((a) => (
+            <button key={a.key} className={`st-tab ${area === a.key ? 'on' : ''}`} aria-current={area === a.key ? 'page' : undefined} onClick={() => go(a.key === 'home' ? '/' : `/${a.key}`)}>
+              <Icon name={`area-${a.key}`} />
+              <span className="st-tab-label">{a.label}</span>
+              <span className="st-tab-short">{a.label}</span>
+            </button>
+          ))}
+        </nav>
+      )}
+      {!running && area === 'study' && (
         <nav className="st-nav" aria-label="공부 메뉴">
+          <button className="st-tab st-tab-home" onClick={() => go('/')}>
+            <Icon name="area-home" />
+            <span className="st-tab-label">메인으로</span>
+            <span className="st-tab-short">메인</span>
+          </button>
           {TABS.filter((t) => t.key === 'today' || t.key === tab || !d.settings.hiddenTabs?.includes(t.key)).map((t) => (
-            <button key={t.key} className={`st-tab ${tab === t.key ? 'on' : ''}`} aria-current={tab === t.key ? 'page' : undefined} onClick={() => go(t.key === 'today' ? '/' : `/${t.key}`)}>
+            <button key={t.key} className={`st-tab ${tab === t.key ? 'on' : ''}`} aria-current={tab === t.key ? 'page' : undefined} onClick={() => go(t.key === 'today' ? '/study' : `/${t.key}`)}>
               <Icon name={t.key} />
               <span className="st-tab-label">{t.label}</span>
               <span className="st-tab-short">{'short' in t ? t.short : t.label}</span>
@@ -96,13 +126,13 @@ export function Study({ path, loggedIn, syncReady = true, onLogin }: { path: str
             이 기기의 저장 공간이 꽉 차서 방금 고친 것을 저장하지 못했어요. 새로 고치면 사라질 수 있으니 설정에서 백업 파일을 내려받고, 쓰지 않는 단어 목록을 지워 주세요.
           </div>
         )}
-        {!loggedIn && tab === 'today' && <LoginHint onLogin={onLogin} />}
+        {!loggedIn && (tab === 'today' || area === 'home') && <LoginHint onLogin={onLogin} />}
         {/* 주소가 바뀌면 화면을 새로 연다 (「＋」에서 같은 화면의 「새로 넣기」 창을 열 때도) */}
         <div className="st-page-wrap" key={path.join('/')}>
           <Suspense fallback={<p className="st-muted">여는 중…</p>}>{content}</Suspense>
         </div>
       </div>
-      {!running && <AddButton today={today} />}
+      {!running && area === 'study' && <AddButton today={today} />}
       <Toaster />
       <TimerAlarm />
     </main>

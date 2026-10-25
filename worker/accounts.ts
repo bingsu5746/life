@@ -446,7 +446,7 @@ export class Accounts extends DurableObject<Env> {
     if (path === 'notify/test' && req.method === 'POST') {
       const subs = this.sql.exec<PushSub & { [k: string]: SqlStorageValue }>('SELECT endpoint, p256dh, auth FROM push_subs WHERE user_id = ?', user.id).toArray();
       if (!subs.length) return fail('알림을 켠 기기가 없어요.', 404);
-      const sent = await this.pushTo(subs, { title: '내 공부', body: '알림이 잘 와요. 정한 시각에 오늘 할 것을 알려 드릴게요.' }, origin);
+      const sent = await this.pushTo(subs, { title: 'Life', body: '알림이 잘 와요. 정한 시각에 오늘 할 것을 알려 드릴게요.' }, origin);
       return sent ? json({ ok: true, sent }) : fail('알림을 보내지 못했어요. 잠시 뒤 다시 해 주세요.', 502);
     }
     return fail('없는 주소예요.', 404);
@@ -481,7 +481,7 @@ export class Accounts extends DurableObject<Env> {
       const entries = JSON.parse(n.digest) as { date: string; slot: number; title: string; body: string }[];
       const e = entries.find((x) => x.date === date && x.slot === slot);
       // 기기를 오래 안 열어 날짜 글이 없으면 짧은 기본 글 (한참 지난 내용을 보내지 않게)
-      const message = e ? { title: e.title, body: e.body } : { title: '내 공부', body: '오늘 할 것을 확인해 보세요' };
+      const message = e ? { title: e.title, body: e.body } : { title: 'Life', body: '오늘 할 것을 확인해 보세요' };
       const subs = this.sql.exec<PushSub & { [k: string]: SqlStorageValue }>('SELECT endpoint, p256dh, auth FROM push_subs WHERE user_id = ?', n.user_id).toArray();
       if (subs.length) await this.pushTo(subs, message, n.origin);
       this.sql.exec('UPDATE notify SET next_at = ? WHERE user_id = ?', nextFire(times, n.tz, Math.max(now, n.next_at) + 1000), n.user_id);

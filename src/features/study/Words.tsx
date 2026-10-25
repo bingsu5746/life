@@ -816,7 +816,7 @@ function WordRun({ listId, mode }: { listId: string; mode: 'learn' | 'prep' | 'w
           </p>
           <p className="st-hint">{mode === 'prep' ? '틀린 단어는 1번 상자로 가서' : '틀린 단어는'} {d.settings.intervals[0] === 1 ? '내일' : `${d.settings.intervals[0]}일 뒤에`} 다시 나와요.</p>
           <div className="st-row">
-            <button className="btn btn-primary" onClick={() => go('/')}>
+            <button className="btn btn-primary" onClick={() => go('/study')}>
               오늘 화면으로
             </button>
             <button className="btn" onClick={() => go(`/words/${listId}`)}>

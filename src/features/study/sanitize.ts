@@ -151,6 +151,41 @@ const FIX: Record<Collection, Fix> = {
           created: num(x.created),
         }
       : null,
+  workouts: (x) =>
+    isDate(x.date)
+      ? { ...x, kind: str(x.kind, '운동').slice(0, 20), minutes: score(x.minutes, 0, 1440), distance: score(x.distance, 0, 1000), detail: optStr(x.detail)?.slice(0, 300), effort: score(x.effort, 1, 3), memo: optStr(x.memo)?.slice(0, 300), created: num(x.created) }
+      : null,
+  bodyLogs: (x) => (score(x.weight, 10, 400) !== undefined ? { ...x, weight: x.weight } : null),
+  moneyTx: (x) =>
+    isDate(x.date) && score(x.amount, 0, 1e10) !== undefined
+      ? { ...x, type: x.type === 'in' ? 'in' : 'out', amount: Math.round(x.amount as number), category: str(x.category, '기타').slice(0, 20), memo: optStr(x.memo)?.slice(0, 200), created: num(x.created) }
+      : null,
+  savings: (x) =>
+    score(x.target, 1, 1e10) !== undefined
+      ? {
+          ...x,
+          name: str(x.name, '모으기').slice(0, 40),
+          deposits: arr(x.deposits)
+            .filter((v): v is Obj => isObj(v) && typeof v.id === 'string' && isDate(v.date) && typeof v.amount === 'number' && Number.isFinite(v.amount) && Math.abs(v.amount) <= 1e10)
+            .map((v) => ({ id: v.id as string, date: v.date as DateStr, amount: Math.round(v.amount as number), at: optNum(v.at) })),
+          due: optDate(x.due),
+          done: x.done === true ? true : undefined,
+          created: num(x.created),
+        }
+      : null,
+  hobbies: (x) => ({ ...x, name: str(x.name, '취미').slice(0, 30), weeklyGoal: score(x.weeklyGoal, 1, 10080), order: num(x.order) }),
+  hobbyLogs: (x) => (isDate(x.date) && typeof x.hobbyId === 'string' ? { ...x, minutes: score(x.minutes, 0, 1440), memo: optStr(x.memo)?.slice(0, 300), created: num(x.created) } : null),
+  wishes: (x) => ({
+    ...x,
+    kind: ['book', 'movie', 'show', 'game', 'place'].includes(x.kind as string) ? x.kind : 'other',
+    title: str(x.title, '하고 싶은 것').slice(0, 80),
+    status: x.status === 'doing' || x.status === 'done' ? x.status : 'want',
+    rating: score(x.rating, 1, 5),
+    note: optStr(x.note)?.slice(0, 500),
+    doneDate: optDate(x.doneDate),
+    created: num(x.created),
+  }),
+  diary: (x) => (isDate(x.id) ? { ...x, mood: score(x.mood, 1, 5), title: optStr(x.title)?.slice(0, 60), text: str(x.text).slice(0, 20000) } : null),
   decks: (x) => ({ ...x, name: str(x.name, '카드 묶음'), subjectId: str(x.subjectId) }),
   cards: (x) => ({ ...x, ...review(x), deckId: str(x.deckId), front: str(x.front), back: str(x.back), created: optNum(x.created), firstSeen: optDate(x.firstSeen) }),
   wordLists: (x) => ({
@@ -286,6 +321,9 @@ export function sanitizeSettings(s: unknown): StudySettings & { updatedAt: numbe
     schoolTimetable: isObj(x.schoolTimetable)
       ? Object.fromEntries(Object.entries(x.schoolTimetable).filter(([k, v]) => /^[0-6]$/.test(k) && Array.isArray(v)).map(([k, v]) => [k, (v as unknown[]).filter((i): i is string => typeof i === 'string').slice(0, 12)]))
       : undefined,
+    fitnessGoal: isObj(x.fitnessGoal) ? { perWeek: score((x.fitnessGoal as Obj).perWeek, 1, 14), minutes: score((x.fitnessGoal as Obj).minutes, 1, 10080) } : undefined,
+    monthlyBudget: score(x.monthlyBudget, 1, 1e10),
+    hiddenAreas: x.hiddenAreas === undefined ? undefined : arr(x.hiddenAreas).filter((t): t is string => typeof t === 'string').slice(0, 10),
     gradeGoals: isObj(x.gradeGoals) ? { school: goals((x.gradeGoals as Obj).school), mock: goals((x.gradeGoals as Obj).mock) } : undefined,
     hiddenTabs: x.hiddenTabs === undefined ? undefined : arr(x.hiddenTabs).filter((t): t is string => typeof t === 'string' && t !== 'today').slice(0, 20),
     pomo: {

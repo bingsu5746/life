@@ -11,3 +11,14 @@ export const TABS = [
   { key: 'time', label: '기록' },
   { key: 'life', label: '할 일·습관', short: '할 일' },
 ] as const;
+
+/** 메인 화면의 영역 (공부 · 운동 · 돈 · 취미) */
+export const AREAS = [
+  { key: 'home', label: '메인' },
+  { key: 'study', label: '공부' },
+  { key: 'fitness', label: '운동' },
+  { key: 'money', label: '돈' },
+  { key: 'hobby', label: '취미' },
+  { key: 'diary', label: '일기' },
+] as const;
+export type AreaKey = (typeof AREAS)[number]['key'];

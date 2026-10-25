@@ -307,3 +307,20 @@ button:disabled {
   width: 64px;
   height: 32px;
 }
+
+/* 맨 위 막대: 지금 영역 */
+.crumb {
+  margin-right: auto;
+  margin-left: 4px;
+  border: 0;
+  background: var(--soft);
+  color: var(--muted);
+  font-weight: 600;
+  font-size: 0.86rem;
+  padding: 4px 10px;
+  border-radius: 999px;
+}
+
+.crumb:hover {
+  color: var(--text);
+}

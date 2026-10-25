@@ -124,11 +124,11 @@ export function useTimerAlarm(): { timer: TimerState | null; shown: string | nul
     // 오래전에 끝난 것(다른 앱에 갔다 온 경우)은 소리 없이 화면에만
     if (v.overMs < 10_000) beep();
     const msg = timer.phase === 'work' ? '공부 시간 끝! 쉬었다 하세요' : '쉬는 시간 끝! 다시 공부해요';
-    if (document.hidden && 'Notification' in window && Notification.permission === 'granted') void notify('내 공부', `${timer.label} · ${msg}`);
+    if (document.hidden && 'Notification' in window && Notification.permission === 'granted') void notify('Life', `${timer.label} · ${msg}`);
   }, [timer, v?.finished, v?.overMs, key]);
   const shown = timer && v ? clock(v.shownMs) : null;
   useEffect(() => {
-    document.title = shown && timer ? `${shown} ${timer.kind === 'watch' ? '공부 중' : timer.phase === 'work' ? '공부' : '휴식'} · 내 공부` : '내 공부';
+    document.title = shown && timer ? `${shown} ${timer.kind === 'watch' ? '공부 중' : timer.phase === 'work' ? '공부' : '휴식'} · Life` : 'Life';
   }, [shown, timer]);
   return { timer, shown };
 }
