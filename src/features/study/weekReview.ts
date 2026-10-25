@@ -25,6 +25,7 @@ export interface WeekSummary {
   habitPossible: number;
   newNotes: number;
   blankTries: number;
+  papers: number;
   newWords: number;
   sleepAvg: number | null;
   moodAvg: number | null;
@@ -64,6 +65,7 @@ export function weekSummary(d: StudyData, words: WordsData, from: DateStr, today
     habitChecks: habits.reduce((a, h) => a + h.checks.filter((c) => inWeek(c, from)).length, 0),
     habitPossible: possible,
     newNotes: alive(d.notes).filter((n) => tsInWeek(n.created, from)).length,
+    papers: alive(d.papers).filter((p) => inWeek(p.date, from)).length,
     blankTries: alive(d.blanks).reduce((a, b) => a + b.tries.filter((t) => inWeek(t.date, from)).length, 0),
     newWords: alive(words).filter((w) => inWeek(w.firstSeen, from)).length,
     sleepAvg: sl.length ? Math.round(sl.reduce((a, b) => a + b, 0) / sl.length) : null,

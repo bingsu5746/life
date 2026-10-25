@@ -63,7 +63,7 @@ export function Study({ path, loggedIn, syncReady = true, onLogin }: { path: str
   const running = id && (sub === 'learn' || sub === 'prep' || sub === 'weak' || (tab === 'review' && (id === 'redo' || id?.startsWith('cards-run') || id?.startsWith('blank-run'))));
 
   let content;
-  if (tab === 'books') content = <Books id={id} />;
+  if (tab === 'books') content = <Books id={id} sub={sub} />;
   else if (tab === 'tutor') content = <Tutors sub={id} />;
   else if (tab === 'words') content = <Words id={id} sub={sub} />;
   else if (tab === 'review') content = <Review sub={id} />;

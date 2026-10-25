@@ -1,13 +1,12 @@
 // 복습: 오답 노트 · 암기 카드 (설계 §9.1~9.3)
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { shortDate } from './dates';
-import { alive, newId, REASONS, type CardDeck, type MemoCard, type WrongNote, type WrongReason } from './model';
+import { alive, newId, REASONS, type CardDeck, type MemoCard, type NoteComment, type WrongNote, type WrongReason } from './model';
 import { answer, dueText, dueToday } from './review';
-import { cardsToday } from './select';
+import { blanksToday, cardsToday } from './select';
 import { getStudy, put, putMany, remove, useStudy } from './store';
 import { addPhoto, photoBlob, photoUrl, removePhoto } from './photos';
 import { BlankRun, Blanks } from './Blanks';
-import { blanksToday } from './select';
 import { requeue } from './wordSession';
 import { Bar, confirmDelete, Empty, Field, go, Menu, Sheet, SubjectDot, SubjectPicker, SubjectTag, subjectsOf, toast, useToday, tap } from './ui';
 import { KeyHelp, RunCard } from './Words';
@@ -54,7 +53,7 @@ function Notes({ today, adding }: { today: string; adding?: boolean }) {
   const d = useStudy();
   const [edit, setEdit] = useState<WrongNote | 'new' | null>(adding ? 'new' : null);
   const [subject, setSubject] = useState('');
-  const [show, setShow] = useState<'open' | 'resolved'>('open');
+  const [show, setShow] = useState<'open' | 'resolved' | 'comments'>('open');
   const all = alive(d.notes);
   const due = dueToday(all, today);
   const list = all
@@ -97,6 +96,9 @@ function Notes({ today, adding }: { today: string; adding?: boolean }) {
           <button className={show === 'resolved' ? 'on' : ''} onClick={() => setShow('resolved')}>
             해결됨
           </button>
+          <button className={show === 'comments' ? 'on' : ''} onClick={() => setShow('comments')}>
+            한마디 모아 보기
+          </button>
         </div>
         <select className="st-input sm" value={subject} onChange={(e) => setSubject(e.target.value)} aria-label="과목">
           <option value="">모든 과목</option>
@@ -107,7 +109,9 @@ function Notes({ today, adding }: { today: string; adding?: boolean }) {
           ))}
         </select>
       </div>
-      {!list.length ? (
+      {show === 'comments' ? (
+        <CommentList subject={subject} onOpen={setEdit} />
+      ) : !list.length ? (
         <Empty icon="📝" title={show === 'open' ? '오답이 없어요' : '아직 해결한 오답이 없어요'}>
           <p>문제집을 체크할 때 「틀린 번호」를 쓰거나, 사진과 함께 넣을 수 있어요.</p>
           {show === 'open' && (
@@ -127,6 +131,7 @@ function Notes({ today, adding }: { today: string; adding?: boolean }) {
               </div>
               {n.photos[0] && <Photo id={n.photos[0]} small />}
               {n.question && <p>{n.question}</p>}
+              {n.comments?.length ? <p className="nt-last">💬 {n.comments[n.comments.length - 1].text}</p> : null}
               {n.reason && <span className="st-pill">{REASONS[n.reason]}</span>}
               {n.wrong > 1 && <small className="bad"> ✕{n.wrong}</small>}
             </button>
@@ -138,9 +143,79 @@ function Notes({ today, adding }: { today: string; adding?: boolean }) {
   );
 }
 
+/** 모든 오답의 한마디를 최근 것부터 (시험 전에 훑어보기) */
+function CommentList({ subject, onOpen }: { subject: string; onOpen: (n: WrongNote) => void }) {
+  const d = useStudy();
+  const rows = alive(d.notes)
+    .filter((n) => !subject || n.subjectId === subject)
+    .flatMap((n) => (n.comments ?? []).map((c) => ({ n, c })))
+    .sort((a, b) => (b.c.at ?? 0) - (a.c.at ?? 0) || b.c.date.localeCompare(a.c.date));
+  if (!rows.length)
+    return (
+      <Empty icon="💬" title="아직 남긴 한마디가 없어요">
+        <p>오답을 열거나 다시 풀 때 「나에게 한마디」를 남기면 여기에 모여요. 시험 전에 훑어보면 같은 실수를 줄일 수 있어요.</p>
+      </Empty>
+    );
+  return (
+    <section className="st-card">
+      {rows.map(({ n, c }) => (
+        <div key={c.id} className="st-item st-tap" {...tap(() => onOpen(n))}>
+          <SubjectDot id={n.subjectId} d={d} />
+          <div className="st-item-main">
+            <div className="st-item-title">{c.text}</div>
+            <div className="st-item-sub">
+              {d.subjects[n.subjectId]?.name ?? '과목'} · {source(n) || '오답'} · {shortDate(c.date)}
+              {n.learned ? ' · 해결됨' : ''}
+            </div>
+          </div>
+        </div>
+      ))}
+    </section>
+  );
+}
+
 function source(n: WrongNote) {
   const b = n.bookId ? getStudy().books[n.bookId] : undefined;
-  return [b?.name, n.page ? `p.${n.page}` : '', n.number ? `${n.number}번` : ''].filter(Boolean).join(' ');
+  const paper = n.paperId ? getStudy().papers[n.paperId] : undefined;
+  return [paper && !paper.deleted ? paper.title : b?.name, n.page ? `p.${n.page}` : '', n.number ? `${n.number.replace(/번$/, '')}번` : ''].filter(Boolean).join(' ');
+}
+
+/** 나에게 한마디: 목록 + 새로 쓰기. onChange 로 바뀐 목록을 넘긴다 */
+function Comments({ list, today, onChange, autoFocus }: { list: NoteComment[]; today: string; onChange: (l: NoteComment[]) => void; autoFocus?: boolean }) {
+  const [text, setText] = useState('');
+  const add = () => {
+    const t = text.trim();
+    if (!t) return;
+    onChange([...list, { id: newId(), date: today, text: t.slice(0, 300), at: Date.now() }]);
+    setText('');
+  };
+  return (
+    <div className="nt-comments">
+      {list.map((c) => (
+        <div key={c.id} className="nt-comment">
+          <small className="st-muted">{shortDate(c.date)}</small>
+          <span>{c.text}</span>
+          <button type="button" className="st-x" aria-label="이 한마디 지우기" onClick={() => onChange(list.filter((x) => x.id !== c.id))}>
+            ✕
+          </button>
+        </div>
+      ))}
+      <div className="st-inline">
+        <input
+          className="st-input"
+          value={text}
+          autoFocus={autoFocus}
+          onChange={(e) => setText(e.target.value)}
+          onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), add())}
+          placeholder="예: 부호 바꿀 때 괄호 먼저 / 조건 「정수」 놓치지 않기"
+          aria-label="나에게 한마디"
+        />
+        <button type="button" className="btn btn-sm" disabled={!text.trim()} onClick={add}>
+          남기기
+        </button>
+      </div>
+    </div>
+  );
 }
 
 function Photo({ id, small }: { id: string; small?: boolean }) {
@@ -170,6 +245,7 @@ function NoteSheet({ note, today, onClose }: { note?: WrongNote; today: string; 
     answer: note?.answer ?? '',
     reason: note?.reason ?? (null as WrongReason | null),
     memo: note?.memo ?? '',
+    comments: note?.comments ?? ([] as NoteComment[]),
   }));
   const [busy, setBusy] = useState(false);
   const [ocr, setOcr] = useState<string | null>(null);
@@ -223,7 +299,7 @@ function NoteSheet({ note, today, onClose }: { note?: WrongNote; today: string; 
   function save() {
     if (!f.subjectId) return toast('과목을 골라 주세요');
     const base = note ?? { id: newId(), created: Date.now(), box: 1, due: today, wrong: 1 };
-    put('notes', { ...base, subjectId: f.subjectId, bookId: f.bookId || undefined, page: f.page ? Number(f.page) : undefined, number: f.number || undefined, question: f.question, photos: f.photos, myAnswer: f.myAnswer, answer: f.answer, reason: f.reason, memo: f.memo });
+    put('notes', { ...base, subjectId: f.subjectId, bookId: f.bookId || undefined, page: f.page ? Number(f.page) : undefined, number: f.number || undefined, question: f.question, photos: f.photos, myAnswer: f.myAnswer, answer: f.answer, reason: f.reason, memo: f.memo, comments: f.comments.length ? f.comments : undefined });
     // 뺀 사진은 저장할 때 지운다 (취소하면 그대로 남게)
     for (const p of note?.photos ?? []) if (!f.photos.includes(p)) void removePhoto(p);
     saved.current = true;
@@ -294,6 +370,9 @@ function NoteSheet({ note, today, onClose }: { note?: WrongNote; today: string; 
         </Field>
         <Field label="한 줄 메모">
           <input className="st-input" value={f.memo} onChange={(e) => setF({ ...f, memo: e.target.value })} placeholder="예: 부호 실수 조심" />
+        </Field>
+        <Field group label="나에게 한마디 (다음엔 이렇게)" hint="다시 풀 때마다 남길 수 있어요. 다시 풀기 전에 먼저 보여 드려요.">
+          <Comments list={f.comments} today={today} onChange={(l) => setF((x) => ({ ...x, comments: l }))} />
         </Field>
         {note && (
           <p className="st-hint">
@@ -385,6 +464,14 @@ function NoteRun() {
         ))}
         {n.question && <div className="st-ask-text sm">{n.question}</div>}
         {!n.photos.length && !n.question && <div className="st-ask-text sm">{source(n)} 문제를 다시 풀어 보세요</div>}
+        {n.comments?.length ? (
+          <div className="nt-remind">
+            <small>지난번 나에게 한마디</small>
+            {n.comments.slice(-3).map((c) => (
+              <div key={c.id}>💬 {c.text}</div>
+            ))}
+          </div>
+        ) : null}
         {!revealed ? (
           <div className="st-row center">
             <p className="st-hint">답을 보기 전에 직접 풀어 보세요</p>
@@ -405,6 +492,10 @@ function NoteRun() {
               {n.memo && <div>메모: {n.memo}</div>}
               {!n.answer && !n.reason && !n.memo && <div className="st-muted">적어 둔 정답·메모가 없어요. 풀이를 직접 맞춰 보세요</div>}
             </div>
+            <details className="nt-add">
+              <summary>나에게 한마디 남기기</summary>
+              <Comments list={n.comments ?? []} today={today} onChange={(l) => put('notes', { ...getStudy().notes[n.id], comments: l })} autoFocus />
+            </details>
             <div className="st-row center">
               <button className="btn btn-lg st-no" onClick={() => reply(false)}>
                 또 틀렸어요

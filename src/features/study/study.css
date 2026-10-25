@@ -3551,3 +3551,55 @@ input[type='range'] {
     padding: 0;
   }
 }
+
+/* ===== 오답: 나에게 한마디 ===== */
+.nt-comments {
+  display: grid;
+  gap: 6px;
+}
+
+.nt-comment {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+  padding: 6px 10px;
+  border-radius: 8px;
+  background: var(--soft);
+}
+
+.nt-comment span {
+  overflow-wrap: anywhere;
+}
+
+.nt-last {
+  margin: 4px 0 0;
+  font-size: 0.86rem;
+  color: var(--text);
+}
+
+.nt-remind {
+  display: grid;
+  gap: 4px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px dashed var(--line-strong);
+  text-align: left;
+  font-size: 0.92rem;
+}
+
+.nt-remind small {
+  color: var(--muted);
+}
+
+.nt-add {
+  margin-top: 8px;
+  text-align: left;
+}
+
+.nt-add summary {
+  cursor: pointer;
+  color: var(--muted);
+  font-size: 0.88rem;
+  margin-bottom: 6px;
+}

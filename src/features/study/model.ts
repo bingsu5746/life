@@ -311,6 +311,41 @@ export interface WrongNote extends Stamp, Review {
   answer: string;
   reason: WrongReason | null;
   memo: string;
+  /** 나에게 한마디 (실수 안 하려고 적어 두는 짧은 글, 오래된 것부터) */
+  comments?: NoteComment[];
+  /** 기출·모의고사 풀이에서 넣은 오답이면 그 풀이 */
+  paperId?: Id;
+  created: number;
+}
+
+export interface NoteComment {
+  id: Id;
+  date: DateStr;
+  text: string;
+  at?: number;
+}
+
+/** 기출·모의고사 풀이 기록 (옛 수능·모의고사를 찾아 풀었거나 모의고사 모음집) */
+export interface PastPaper extends Stamp {
+  id: Id;
+  subjectId: Id;
+  /** csat: 수능, kice: 평가원 모의평가, edu: 교육청 학력평가, other: 사설·기타 */
+  kind: 'csat' | 'kice' | 'edu' | 'other';
+  /** 시험 이름 (예: 2025학년도 수능, 2024년 6월 모의평가) */
+  title: string;
+  /** 모의고사 모음 문제집이면 그 문제집 */
+  bookId?: Id;
+  /** 푼 날 */
+  date: DateStr;
+  score?: number;
+  /** 만점 (없으면 100) */
+  full?: number;
+  grade?: number;
+  /** 걸린 시간 (분) */
+  minutes?: number;
+  /** 틀린 문항 번호 */
+  wrong: number[];
+  memo?: string;
   created: number;
 }
 
@@ -417,12 +452,13 @@ export interface StudyData {
   blanks: Record<Id, BlankSheet>;
   conditions: Record<Id, DayCondition>;
   weekNotes: Record<Id, WeekNote>;
+  papers: Record<Id, PastPaper>;
 }
 
 /** 단어는 많아질 수 있어 따로 묶는다 */
 export type WordsData = Record<Id, Word>;
 
-export const COLLECTIONS = ['subjects', 'exams', 'books', 'plans', 'tutors', 'homework', 'notes', 'decks', 'cards', 'wordLists', 'sessions', 'todos', 'habits', 'grades', 'previews', 'assessments', 'blanks', 'conditions', 'weekNotes'] as const;
+export const COLLECTIONS = ['subjects', 'exams', 'books', 'plans', 'tutors', 'homework', 'notes', 'decks', 'cards', 'wordLists', 'sessions', 'todos', 'habits', 'grades', 'previews', 'assessments', 'blanks', 'conditions', 'weekNotes', 'papers'] as const;
 export type Collection = (typeof COLLECTIONS)[number];
 
 export const DEFAULT_SETTINGS: StudySettings = {
@@ -461,6 +497,7 @@ export function emptyStudy(): StudyData {
     blanks: {},
     conditions: {},
     weekNotes: {},
+    papers: {},
   };
 }
 

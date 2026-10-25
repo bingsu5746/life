@@ -1,5 +1,5 @@
 // 두 기기의 공부 자료 합치기 (설계 §8.2). 합치기는 기기에서, 서버는 저장만 한다.
-import { COLLECTIONS, type Collection, type Assessment, type BlankSheet, type Exam, type ExamScope, type GradeRecord, type Habit, type Homework, type Id, type Mark, type Stamp, type StudyData, type Subject, type WordsData } from './model';
+import { COLLECTIONS, type Collection, type Assessment, type BlankSheet, type Exam, type ExamScope, type GradeRecord, type Habit, type WrongNote, type Homework, type Id, type Mark, type Stamp, type StudyData, type Subject, type WordsData } from './model';
 import { mergeHabitChecks } from './habits';
 import { compactMarks } from './pages';
 
@@ -87,6 +87,17 @@ function mergeBlank(a?: BlankSheet, b?: BlankSheet): BlankSheet | undefined {
   return { ...w, tries };
 }
 
+/** 오답: 한마디는 두 기기 것을 모두 (같은 id 는 하나) */
+function mergeNote(a?: WrongNote, b?: WrongNote): WrongNote | undefined {
+  const s = sides(a, b);
+  if (!s) return pick(a, b);
+  const [w, o] = s;
+  if (!w.comments && !o.comments) return w;
+  // 지운 한마디는 늦게 고친 쪽(w)을 따른다: o 에만 있고 w 보다 늦게 쓴 것만 더한다
+  const extra = (o.comments ?? []).filter((c) => !(w.comments ?? []).some((x) => x.id === c.id) && (c.at ?? 0) > w.updatedAt);
+  return { ...w, comments: [...(w.comments ?? []), ...extra].sort((x, y) => (x.at ?? 0) - (y.at ?? 0)) };
+}
+
 function mergeGrade(a?: GradeRecord, b?: GradeRecord): GradeRecord | undefined {
   const s = sides(a, b);
   if (!s) return pick(a, b);
@@ -125,6 +136,7 @@ const MERGERS: Partial<Record<Collection, (a?: never, b?: never) => unknown>> = 
   grades: mergeGrade as never,
   assessments: mergeAssessment as never,
   blanks: mergeBlank as never,
+  notes: mergeNote as never,
 };
 
 export function mergeRecords<T extends Stamp>(a: Record<Id, T>, b: Record<Id, T>, merge: (x?: T, y?: T) => T | undefined = pick, now = Date.now()): Record<Id, T> {

@@ -130,8 +130,27 @@ const FIX: Record<Collection, Fix> = {
     answer: str(x.answer),
     reason: typeof x.reason === 'string' ? x.reason : null,
     memo: str(x.memo),
+    comments: x.comments === undefined ? undefined : arr(x.comments).filter((c): c is Obj => isObj(c) && typeof c.id === 'string' && isDate(c.date) && typeof c.text === 'string').map((c) => ({ id: c.id as string, date: c.date as DateStr, text: (c.text as string).slice(0, 300), at: optNum(c.at) })).slice(-30),
+    paperId: optStr(x.paperId),
     created: num(x.created),
   }),
+  papers: (x) =>
+    isDate(x.date)
+      ? {
+          ...x,
+          subjectId: str(x.subjectId),
+          kind: x.kind === 'csat' || x.kind === 'kice' || x.kind === 'edu' ? x.kind : 'other',
+          title: str(x.title, '기출').slice(0, 60),
+          bookId: optStr(x.bookId),
+          score: score(x.score, 0, 1000),
+          full: score(x.full, 1, 1000),
+          grade: score(x.grade, 1, 9),
+          minutes: score(x.minutes, 0, 600),
+          wrong: ints(x.wrong, 1, 200).slice(0, 100),
+          memo: optStr(x.memo),
+          created: num(x.created),
+        }
+      : null,
   decks: (x) => ({ ...x, name: str(x.name, '카드 묶음'), subjectId: str(x.subjectId) }),
   cards: (x) => ({ ...x, ...review(x), deckId: str(x.deckId), front: str(x.front), back: str(x.back), created: optNum(x.created), firstSeen: optDate(x.firstSeen) }),
   wordLists: (x) => ({

@@ -5,15 +5,17 @@ import { alive, newId, type Book, type Unit } from './model';
 import { compress, expand, parseRanges, rangeText } from './pages';
 import { paceOf } from './plan';
 import { forecastFor, forecastText } from './forecast';
+import { BookTabs, Papers } from './Papers';
 import { bookDone, planCtx, planViews, reservedPages } from './select';
 import { getStudy, put, remove, useStudy, useWords } from './store';
 import { parseToc, tocText, type TocRow } from './toc';
 import { markBook } from './actions';
 import { PlanForm } from './PlanForm';
 import { PlanWarning } from './Today';
-import { Bar, confirmDelete, Empty, Field, go, Menu, SubjectDot, SubjectPicker, SubjectTag, toast, useToday } from './ui';
+import { Bar, confirmDelete, Empty, Field, go, Icon, Menu, SubjectDot, SubjectPicker, SubjectTag, toast, useToday } from './ui';
 
-export function Books({ id }: { id?: string }) {
+export function Books({ id, sub }: { id?: string; sub?: string }) {
+  if (id === 'papers') return <Papers sub={sub} />;
   if (id === 'new') return <BookEditor onDone={(b) => go(b ? `/books/${b}` : '/books')} />;
   if (id) return <BookDetail id={id} />;
   return <BookList />;
@@ -29,7 +31,11 @@ function BookList() {
     <div className="st-page">
       <div className="st-page-head">
         <h2>문제집</h2>
+        <button className="btn btn-sm" onClick={() => go('/books/new')}>
+          <Icon name="plus" /> 문제집 넣기
+        </button>
       </div>
+      <BookTabs on="books" />
       {!books.length && (
         <Empty icon="📖" title="아직 넣은 문제집이 없어요">
           <p>목차를 붙여 넣거나 목차 사진을 찍으면, 시험까지 하루에 풀 페이지를 정해 드려요.</p>

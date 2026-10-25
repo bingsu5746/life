@@ -88,6 +88,9 @@ export function WeekReview({ from: from0 }: { from?: string }) {
           <li>
             백지 복습 <b>{s.blankTries}</b>번
           </li>
+          <li>
+            기출·모의고사 <b>{s.papers}</b>회
+          </li>
           {s.sleepAvg !== null && (
             <li>
               평균 잠 <b>{minutesText(s.sleepAvg)}</b>
