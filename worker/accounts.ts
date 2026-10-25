@@ -341,7 +341,16 @@ export class Accounts extends DurableObject<Env> {
     const row = this.sql.exec<{ fails: number; locked_until: number }>('SELECT fails, locked_until FROM login_fails WHERE key = ?', key).toArray()[0];
     if (row && row.locked_until > now) return fail('비밀번호를 여러 번 틀렸어요. 잠시 뒤에 다시 해 주세요.', 429);
     // 없는 아이디도 같은 시간이 걸리게
-    const ok = u ? sameHex(await hashPassword(password, u.salt), u.hash) : (await hashPassword(password, 'x'.repeat(32)), false);
+    let ok = u ? sameHex(await hashPassword(password, u.salt), u.hash) : (await hashPassword(password, 'x'.repeat(32)), false);
+    // 한글이 든 비밀번호: 기기마다 글자를 합쳐 쓰거나(NFC) 풀어 쓰는(NFD) 방식이 달라 같은 글자가 다른 값이 될 수 있다
+    if (!ok && u && /[^\x00-\x7f]/.test(password))
+      for (const form of ['NFC', 'NFD'] as const) {
+        const alt = password.normalize(form);
+        if (alt !== password && sameHex(await hashPassword(alt, u.salt), u.hash)) {
+          ok = true;
+          break;
+        }
+      }
     if (!ok) {
       const fails = (row?.fails ?? 0) + 1;
       // 5번 틀릴 때마다 잠금: 1분 → 5분 → 15분 → 1시간…
