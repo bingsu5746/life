@@ -7,13 +7,12 @@
 // - 로그인 유지: 무작위 토큰을 HttpOnly·Secure·SameSite=Strict 쿠키로만 준다 (페이지의 자바스크립트가 읽을 수 없음).
 //   서버에는 토큰의 SHA-256 만 저장한다 (저장소가 새어도 토큰을 되살릴 수 없음).
 // - 다른 사이트에서 보낸 요청 막기: SameSite=Strict + 바꾸는 요청은 Origin 이 이 사이트인지, 본문이 JSON 인지 확인.
-// - 비밀번호 마구 넣어 보기 막기: (아이디, 접속 주소) 마다 5번 틀리면 잠금(점점 길게), 접속 주소(IP)마다 시도 횟수 제한.
-//   잠금을 계정 전체에 걸지 않는 것은, 남이 일부러 틀려서 내 계정을 못 쓰게 만들 수 없게 하려는 것.
-//   없는 아이디도 똑같이 세고 똑같이 답해서 어떤 아이디가 있는지 알아낼 수 없게 한다.
+// - 비밀번호 마구 넣어 보기 막기: 접속 주소(IP)마다 15분에 100번까지 (틀렸다고 계정을 잠그지는 않는다: 사용자 요청).
+//   없는 아이디도 똑같이 답하고 같은 시간이 걸려서 어떤 아이디가 있는지 알아낼 수 없게 한다.
 // - 가입 남용 막기: 접속 주소마다 하루 가입 수 제한 + 서버 전체 시간당 가입 수 제한.
 //   (학교처럼 여럿이 한 주소를 같이 쓰는 곳을 생각해 넉넉하게 잡는다)
 import { DurableObject } from 'cloudflare:workers';
-import { COOKIE_NAME, cutText, Limiter, passwordProblem, readCookie, usernameKey } from './security';
+import { COOKIE_NAME, cutText, Limiter, passwordProblem, readCookie } from './security';
 import { allowedEndpoint, localDate, makeVapid, nextFire, sendPush, type PushSub, type Vapid } from './push';
 import { buildExamplesInput, readExamples, readExamplesRequest, buildInput, buildMeaningsInput, FAST_MODEL, modelInput, parseTranslation, readMeanings, readOutput, readRequest, readWordsRequest, TRANSLATE_MODEL } from './translate';
 
@@ -334,12 +333,9 @@ export class Accounts extends DurableObject<Env> {
    * 틀린 횟수는 (아이디, 접속 주소) 마다 센다: 다른 곳에서 일부러 틀려도 내 기기의 로그인은 막히지 않는다.
    * 없는 아이디도 똑같이 세고 똑같이 답한다 (잠금 안내에 남은 시간도 알리지 않음).
    */
-  private async verify(u: UserRow | undefined, username: string, password: string, ip: string): Promise<Response | null> {
+  /** 아이디·비밀번호 확인. 틀려도 잠그지 않는다 (사용자 요청). 접속 주소마다 15분에 100번 제한만 남는다 */
+  private async verify(u: UserRow | undefined, _username: string, password: string, _ip: string): Promise<Response | null> {
     const wrong = () => fail('아이디 또는 비밀번호가 맞지 않아요.', 401);
-    const now = Date.now();
-    const key = `${usernameKey(username)}|${ip}`;
-    const row = this.sql.exec<{ fails: number; locked_until: number }>('SELECT fails, locked_until FROM login_fails WHERE key = ?', key).toArray()[0];
-    if (row && row.locked_until > now) return fail('비밀번호를 여러 번 틀렸어요. 잠시 뒤에 다시 해 주세요.', 429);
     // 없는 아이디도 같은 시간이 걸리게
     let ok = u ? sameHex(await hashPassword(password, u.salt), u.hash) : (await hashPassword(password, 'x'.repeat(32)), false);
     // 한글이 든 비밀번호: 기기마다 글자를 합쳐 쓰거나(NFC) 풀어 쓰는(NFD) 방식이 달라 같은 글자가 다른 값이 될 수 있다
@@ -351,15 +347,7 @@ export class Accounts extends DurableObject<Env> {
           break;
         }
       }
-    if (!ok) {
-      const fails = (row?.fails ?? 0) + 1;
-      // 5번 틀릴 때마다 잠금: 1분 → 5분 → 15분 → 1시간…
-      const steps = [60_000, 300_000, 900_000, 3_600_000];
-      const lock = fails % 5 === 0 ? now + steps[Math.min(fails / 5 - 1, steps.length - 1)] : 0;
-      this.sql.exec('INSERT OR REPLACE INTO login_fails (key, fails, locked_until, updated) VALUES (?, ?, ?, ?)', key, fails, lock, now);
-      return wrong();
-    }
-    if (row) this.sql.exec('DELETE FROM login_fails WHERE key = ?', key);
+    if (!ok) return wrong();
     return null;
   }
 
@@ -370,7 +358,8 @@ export class Accounts extends DurableObject<Env> {
     const username = raw.normalize('NFC');
     const password = String(b.password ?? '').slice(0, 256);
     // 오래된 틀린 횟수 기록 정리 (하루 넘게 지난 것)
-    this.sql.exec('DELETE FROM login_fails WHERE updated < ? AND locked_until < ?', Date.now() - DAY, Date.now());
+    // 예전 잠금 기록은 더 쓰지 않으므로 지운다
+    this.sql.exec('DELETE FROM login_fails');
     // 예전에 자모가 나뉜 채로 가입한 아이디도 찾을 수 있게 그대로의 글자로도 찾는다
     const u = this.sql.exec<UserRow>('SELECT * FROM users WHERE username = ? OR username = ? LIMIT 1', username, raw).toArray()[0];
     const bad = await this.verify(u, username, password, ip);
