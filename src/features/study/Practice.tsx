@@ -300,7 +300,7 @@ function Run({ items, mode, dir, onExit, onRetry }: { items: Item[]; mode: PMode
         <>
           <section className="st-card pr-card">
             <button className="btn btn-lg" onClick={() => speak(w.term)}>
-              🔊 듣기
+              다시 듣기
             </button>
             <small className="st-muted">들리는 단어를 영어로 써 보세요 (뜻 힌트: {w.meaning || '없음'})</small>
           </section>

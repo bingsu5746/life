@@ -7,14 +7,34 @@ import { put, remove, setSettings, useStudy } from '../study/store';
 import { minutesText } from '../study/timer';
 import { Bar, confirmDelete, Empty, Field, go, Icon, Sheet, tap, toast, useToday } from '../study/ui';
 import { weeklyMinutes, weekWorkouts, workoutStreak } from './calc';
+import { Basketball } from './Basketball';
 
-const KINDS = ['달리기', '걷기', '헬스', '홈트', '자전거', '수영', '구기', '요가·스트레칭'];
+const KINDS = ['달리기', '걷기', '헬스', '홈트', '자전거', '수영', '농구', '구기', '요가·스트레칭'];
 const CARDIO = ['달리기', '걷기', '자전거', '수영'];
 const EFFORT = ['', '가볍게', '보통', '힘들게'];
 const md = (x: string) => shortDate(x).replace(/\(.\)/, '');
 
-/** sub: 'new' 이면 넣기 창 */
-export function Fitness({ sub }: { sub?: string }) {
+/** 운동 · 농구 바꾸기 */
+export function FitnessTabs({ on }: { on: 'all' | 'bb' }) {
+  return (
+    <div className="st-seg" role="tablist" aria-label="운동">
+      <button role="tab" aria-selected={on === 'all'} className={on === 'all' ? 'on' : ''} onClick={() => go('/fitness')}>
+        운동
+      </button>
+      <button role="tab" aria-selected={on === 'bb'} className={on === 'bb' ? 'on' : ''} onClick={() => go('/fitness/basketball')}>
+        농구
+      </button>
+    </div>
+  );
+}
+
+/** sub: 'new' 이면 넣기 창, 'basketball' 이면 농구 */
+export function Fitness({ sub, sub2 }: { sub?: string; sub2?: string }) {
+  if (sub === 'basketball') return <Basketball sub={sub2} />;
+  return <FitnessAll sub={sub} />;
+}
+
+function FitnessAll({ sub }: { sub?: string }) {
   const d = useStudy();
   const today = useToday();
   const [edit, setEdit] = useState<Workout | 'new' | null>(sub === 'new' ? 'new' : null);
@@ -48,6 +68,7 @@ export function Fitness({ sub }: { sub?: string }) {
           <Icon name="plus" /> 운동 넣기
         </button>
       </div>
+      <FitnessTabs on="all" />
 
       <section className="st-card">
         <div className="st-inline between">
@@ -128,7 +149,7 @@ export function Fitness({ sub }: { sub?: string }) {
         </>
       )}
 
-      <WeightCard today={today} />
+      <BodyCard today={today} />
 
       {edit && <WorkoutSheet item={edit === 'new' ? undefined : edit} today={today} onClose={close} />}
       {goalOpen && <GoalSheet onClose={() => setGoalOpen(false)} />}
@@ -136,31 +157,55 @@ export function Fitness({ sub }: { sub?: string }) {
   );
 }
 
-function WeightCard({ today }: { today: string }) {
+function BodyCard({ today }: { today: string }) {
   const d = useStudy();
   const logs = alive(d.bodyLogs).sort((a, b) => a.id.localeCompare(b.id));
   const todayLog = d.bodyLogs[today]?.deleted ? undefined : d.bodyLogs[today];
-  const [v, setV] = useState(todayLog?.weight?.toString() ?? '');
-  const last = logs.slice(-30);
+  const lastH = [...logs].reverse().find((l) => l.height)?.height;
+  const lastW = [...logs].reverse().find((l) => l.weight)?.weight;
+  const [w, setW] = useState(todayLog?.weight?.toString() ?? '');
+  const [h, setH] = useState(todayLog?.height?.toString() ?? '');
+  const ws = logs.filter((l) => l.weight).slice(-30);
+  const hs = logs.filter((l) => l.height).slice(-30);
+  const bmi = lastH && lastW ? Math.round((lastW / (lastH / 100) ** 2) * 10) / 10 : null;
   const save = () => {
-    const n = Number(v.replace(',', '.'));
-    if (!Number.isFinite(n) || n < 10 || n > 400) return toast('몸무게를 확인해 주세요');
-    put('bodyLogs', { id: today, weight: Math.round(n * 10) / 10 } as never);
-    toast('오늘 몸무게를 적었어요');
+    const nw = w.trim() ? Number(w.replace(',', '.')) : undefined;
+    const nh = h.trim() ? Number(h.replace(',', '.')) : undefined;
+    if ((nw !== undefined && !(nw >= 10 && nw <= 400)) || (nh !== undefined && !(nh >= 50 && nh <= 250))) return toast('숫자를 확인해 주세요');
+    if (nw === undefined && nh === undefined) return;
+    put('bodyLogs', { ...(todayLog ?? {}), id: today, weight: nw !== undefined ? Math.round(nw * 10) / 10 : todayLog?.weight, height: nh !== undefined ? Math.round(nh * 10) / 10 : todayLog?.height } as never);
+    toast('오늘 기록을 적었어요');
   };
   return (
-    <details className="st-card st-more">
-      <summary>몸무게 (선택)</summary>
-      <div className="st-inline">
-        <input className="st-input xs" inputMode="decimal" value={v} onChange={(e) => setV(e.target.value)} placeholder="kg" aria-label="오늘 몸무게 (kg)" onKeyDown={(e) => e.key === 'Enter' && save()} />
+    <section className="st-card">
+      <h3 className="st-h">키 · 몸무게</h3>
+      <div className="st-stat-row">
+        <div>
+          <small>키</small>
+          <b>{lastH ? `${lastH}cm` : '—'}</b>
+        </div>
+        <div>
+          <small>몸무게</small>
+          <b>{lastW ? `${lastW}kg` : '—'}</b>
+        </div>
+        <div>
+          <small>BMI</small>
+          <b>{bmi ?? '—'}</b>
+        </div>
+      </div>
+      <div className="st-inline wrap">
+        <input className="st-input xs" inputMode="decimal" value={h} onChange={(e) => setH(e.target.value)} placeholder={lastH ? String(lastH) : 'cm'} aria-label="오늘 키 (cm)" />
+        cm
+        <input className="st-input xs" inputMode="decimal" value={w} onChange={(e) => setW(e.target.value)} placeholder={lastW ? String(lastW) : 'kg'} aria-label="오늘 몸무게 (kg)" onKeyDown={(e) => e.key === 'Enter' && save()} />
         kg
         <button className="btn btn-sm" onClick={save}>
           오늘 적기
         </button>
       </div>
-      {last.length > 1 && <LineChart label="몸무게 흐름" height={150} points={last.map((l) => ({ label: md(l.id), title: shortDate(l.id), y: l.weight }))} format={(x) => `${Math.round(x * 10) / 10}`} />}
-      <p className="st-hint">이 기기와 내 계정에만 저장돼요.</p>
-    </details>
+      {hs.length > 1 && <LineChart label="키 흐름" height={130} points={hs.map((l) => ({ label: md(l.id), title: shortDate(l.id), y: l.height ?? null }))} format={(x) => `${Math.round(x * 10) / 10}`} />}
+      {ws.length > 1 && <LineChart label="몸무게 흐름" height={130} points={ws.map((l) => ({ label: md(l.id), title: shortDate(l.id), y: l.weight ?? null }))} format={(x) => `${Math.round(x * 10) / 10}`} />}
+      <p className="st-hint">BMI 는 몸무게(kg) ÷ 키(m)² 로 계산한 값이에요. 청소년은 나이·성별에 따른 기준표로 봐야 해서 여기서는 숫자만 보여 드려요.</p>
+    </section>
   );
 }
 

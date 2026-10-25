@@ -7,13 +7,20 @@ import { put, remove, useStudy } from '../study/store';
 import { minutesText } from '../study/timer';
 import { Bar, confirmDelete, Empty, Field, go, Icon, Sheet, tap, toast, useToday } from '../study/ui';
 import { hobbyWeek, weeklyMinutes } from './calc';
+import { HobbyTabs, Movies } from './Movies';
 
 const WISH_KIND: Record<WishItem['kind'], string> = { book: '책', movie: '영화', show: '드라마', game: '게임', place: '가 볼 곳', other: '그 밖' };
+// 영화는 「영화」 칸에서 따로 (예전에 넣은 영화만 여기 남는다)
 const STATUS: Record<WishItem['status'], string> = { want: '하고 싶은 것', doing: '하는 중', done: '끝낸 것' };
 const md = (x: string) => shortDate(x).replace(/\(.\)/, '');
 
-/** sub: 'new' 이면 기록 넣기 창 */
-export function Hobby({ sub }: { sub?: string }) {
+/** sub: 'new' 이면 기록 넣기 창, 'movies' 면 영화 */
+export function Hobby({ sub, sub2 }: { sub?: string; sub2?: string }) {
+  if (sub === 'movies') return <Movies sub={sub2} />;
+  return <HobbyMain sub={sub} />;
+}
+
+function HobbyMain({ sub }: { sub?: string }) {
   const d = useStudy();
   const today = useToday();
   const [log, setLog] = useState<HobbyLog | 'new' | null>(sub === 'new' ? 'new' : null);
@@ -40,6 +47,7 @@ export function Hobby({ sub }: { sub?: string }) {
           <Icon name="plus" /> {hobbies.length ? '한 것 넣기' : '취미 만들기'}
         </button>
       </div>
+      <HobbyTabs on="hobby" />
 
       <section className="st-card">
         <div className="st-inline between">
@@ -96,7 +104,7 @@ export function Hobby({ sub }: { sub?: string }) {
           </button>
         </div>
         {!wishes.length ? (
-          <p className="st-hint">{status === 'want' ? '읽고 싶은 책, 보고 싶은 영화, 가 보고 싶은 곳을 적어 두세요.' : status === 'doing' ? '하는 중인 것이 없어요.' : '아직 끝낸 것이 없어요.'}</p>
+          <p className="st-hint">{status === 'want' ? '읽고 싶은 책, 보고 싶은 드라마, 가 보고 싶은 곳을 적어 두세요. 영화는 「영화」 칸에서 따로 모아요.' : status === 'doing' ? '하는 중인 것이 없어요.' : '아직 끝낸 것이 없어요.'}</p>
         ) : (
           wishes.map((w) => (
             <div key={w.id} className="st-item">
@@ -226,7 +234,7 @@ function WishSheet({ item, today, onClose }: { item?: WishItem; today: string; o
     <Sheet title={item?.id ? '고치기' : '하고 싶은 것 넣기'} onClose={onClose}>
       <div className="st-form">
         <div className="st-chips">
-          {(Object.keys(WISH_KIND) as WishItem['kind'][]).map((k) => (
+          {(Object.keys(WISH_KIND) as WishItem['kind'][]).filter((k) => k !== 'movie' || kind === 'movie').map((k) => (
             <button key={k} type="button" className={`st-chip ${kind === k ? 'on' : ''}`} aria-pressed={kind === k} onClick={() => setKind(k)}>
               {WISH_KIND[k]}
             </button>

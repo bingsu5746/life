@@ -39,9 +39,10 @@ export function Home(_: { loggedIn: boolean; onLogin: () => void }) {
   const diaryToday = d.diary[today] && !d.diary[today].deleted;
   const diaryMonth = alive(d.diary).filter((e) => monthOf(e.id) === monthOf(today)).length;
 
-  const cards: Record<string, { lines: string[]; action?: { label: string; to: string } }> = {
+  const cards: Record<string, { lines: string[]; action?: { label: string; to: string }; badge?: { big: string; small: string } }> = {
     study: {
-      lines: [sum.total ? (sum.left ? `오늘 할 것 ${sum.left}개 남음` : '오늘 할 것 끝!') : '오늘 정해 둔 공부가 없어요', exam ? `${exam.name} ${dday(today, exam.date)}` : '', `오늘 공부 ${minutesText(studied)}`].filter(Boolean),
+      lines: [sum.total ? (sum.left ? `오늘 할 것 ${sum.left}개 남음` : '오늘 할 것 끝') : '오늘 정해 둔 공부가 없어요', `오늘 공부 ${minutesText(studied)}`],
+      badge: exam ? { big: dday(today, exam.date), small: exam.name } : undefined,
     },
     fitness: {
       lines: [`이번 주 ${wkDays}${goal ? `/${goal}` : ''}일 운동`, didToday ? '오늘 운동했어요' : workoutStreak(alive(d.workouts), today) ? `${workoutStreak(alive(d.workouts), today)}일 연속` : '오늘은 아직'],
@@ -75,6 +76,12 @@ export function Home(_: { loggedIn: boolean; onLogin: () => void }) {
                 <span className="hm-title">
                   <Icon name={`area-${a.key}`} /> {a.label}
                 </span>
+                {c.badge && (
+                  <span className="hm-dday">
+                    <b>{c.badge.big}</b>
+                    <small>{c.badge.small}</small>
+                  </span>
+                )}
                 {c.lines.map((l, i) => (
                   <span key={i} className={i === 0 ? 'hm-big' : 'hm-line'}>
                     {l}

@@ -67,3 +67,37 @@ describe('운동·취미', () => {
     expect(c.wishes.k).toMatchObject({ kind: 'other', status: 'done', rating: undefined });
   });
 });
+
+describe('고정 지출·수입', () => {
+  it('매달·매주·매일·매년 날짜', async () => {
+    const { ruleDates, dueRuleTx, ruleTxId, monthlyAmount } = await import('./calc');
+    const base = { id: 'r', updatedAt: 1, name: '넷플릭스', type: 'out' as const, amount: 13500, category: '문화·여가', created: 1 };
+    expect(ruleDates({ ...base, freq: 'monthly', day: 31, start: '2026-01-01' }, '2026-02-01', '2026-04-30')).toEqual(['2026-02-28', '2026-03-31', '2026-04-30']);
+    expect(ruleDates({ ...base, freq: 'weekly', day: 1, start: '2026-10-01' }, '2026-10-19', '2026-10-31')).toEqual(['2026-10-19', '2026-10-26']);
+    expect(ruleDates({ ...base, freq: 'daily', start: '2026-10-24', end: '2026-10-25' }, '2026-10-20', '2026-10-31')).toEqual(['2026-10-24', '2026-10-25']);
+    expect(ruleDates({ ...base, freq: 'yearly', start: '2024-02-29' }, '2026-01-01', '2026-12-31')).toEqual(['2026-02-28']);
+    expect(monthlyAmount({ ...base, freq: 'weekly', start: '2026-01-01' })).toBe(58500);
+    const d = emptyStudy();
+    d.moneyRules.r = { ...base, freq: 'monthly', day: 5, start: '2026-09-01' };
+    const due = dueRuleTx(d, '2026-10-25', 7);
+    expect(due.map((t) => t.date)).toEqual(['2026-09-05', '2026-10-05']);
+    expect(due[0]).toMatchObject({ id: ruleTxId('r', '2026-09-05'), amount: 13500, memo: '넷플릭스', ruleId: 'r' });
+    // 이미 있거나 지운 것은 다시 만들지 않는다
+    d.moneyTx[due[0].id] = { ...due[0], updatedAt: 2, deleted: true };
+    expect(dueRuleTx(d, '2026-10-25').map((t) => t.date)).toEqual(['2026-10-05']);
+    d.moneyRules.r = { ...d.moneyRules.r, paused: true };
+    expect(dueRuleTx(d, '2026-10-25')).toEqual([]);
+  });
+});
+
+describe('농구·영화', () => {
+  it('합계·득점 계산·별점 글', async () => {
+    const { bbTotals, ptsFromShots } = await import('./Basketball');
+    const { starText } = await import('./Movies');
+    expect(ptsFromShots({ mode: 'game', fgm: 4, tpm: 2, ftm: 3 })).toBe(17);
+    expect(bbTotals([{ mode: 'game', fgm: 2, fga: 5 }, { mode: 'practice', fgm: 10, fga: 20, tpm: 3, tpa: 10 }])).toMatchObject({ fgm: 12, fga: 25, tpm: 3, tpa: 10 });
+    expect(starText(3.5)).toBe('★★★½☆');
+    expect(starText(5)).toBe('★★★★★');
+    expect(starText(0.5)).toBe('½☆☆☆☆');
+  });
+});

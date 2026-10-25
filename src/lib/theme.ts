@@ -17,7 +17,7 @@ export function applyTheme(t: Theme = getTheme()) {
   else root.dataset.theme = t;
   const dark = t === 'dark' || (t === 'system' && matchMedia('(prefers-color-scheme: dark)').matches);
   // 직접 고른 밝기를 두 개의 theme-color(밝은·어두운 기기용) 모두에 넣는다
-  document.querySelectorAll('meta[name="theme-color"]').forEach((m) => m.setAttribute('content', dark ? '#0a0a0a' : '#fafafa'));
+  document.querySelectorAll('meta[name="theme-color"]').forEach((m) => m.setAttribute('content', dark ? '#0c0c0d' : '#f7f7f5'));
 }
 
 export function setTheme(t: Theme) {

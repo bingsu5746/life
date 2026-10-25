@@ -371,13 +371,57 @@ export interface Workout extends Stamp {
   /** 힘든 정도 1 가볍게 · 2 보통 · 3 힘들게 */
   effort?: number;
   memo?: string;
+  /** 농구 기록 (종류가 농구일 때) */
+  bb?: BasketballStat;
   created: number;
 }
 
-/** 몸무게 (id 는 날짜) */
+/** 농구 한 번의 기록 (경기면 내 기록, 연습이면 슈팅 수 등) */
+export interface BasketballStat {
+  mode: 'game' | 'practice';
+  /** 경기 결과 */
+  result?: 'win' | 'lose' | 'draw';
+  pts?: number;
+  reb?: number;
+  ast?: number;
+  stl?: number;
+  blk?: number;
+  /** 2점슛 넣은 수 · 던진 수 */
+  fgm?: number;
+  fga?: number;
+  /** 3점슛 */
+  tpm?: number;
+  tpa?: number;
+  /** 자유투 */
+  ftm?: number;
+  fta?: number;
+}
+
+/** 몸무게·키 (id 는 날짜) */
 export interface BodyLog extends Stamp {
   id: DateStr;
-  weight: number;
+  weight?: number;
+  /** 키 cm */
+  height?: number;
+}
+
+/** 영화: 보고 싶은 것 · 본 것 (별점 · 한줄평) */
+export interface Movie extends Stamp {
+  id: Id;
+  title: string;
+  /** 개봉한 해 (같은 제목 구분용, 선택) */
+  year?: number;
+  status: 'want' | 'watched';
+  /** 0.5 ~ 5 (0.5 단위) */
+  rating?: number;
+  comment?: string;
+  /** 본 날 */
+  watched?: DateStr;
+  /** 개봉일 (보고 싶은 영화) */
+  release?: DateStr;
+  /** 어디서 (극장 · 넷플릭스 …) */
+  where?: string;
+  created: number;
 }
 
 /** 돈: 쓴 것 · 들어온 것 */
@@ -579,12 +623,13 @@ export interface StudyData {
   wishes: Record<Id, WishItem>;
   diary: Record<Id, DiaryEntry>;
   moneyRules: Record<Id, MoneyRule>;
+  movies: Record<Id, Movie>;
 }
 
 /** 단어는 많아질 수 있어 따로 묶는다 */
 export type WordsData = Record<Id, Word>;
 
-export const COLLECTIONS = ['subjects', 'exams', 'books', 'plans', 'tutors', 'homework', 'notes', 'decks', 'cards', 'wordLists', 'sessions', 'todos', 'habits', 'grades', 'previews', 'assessments', 'blanks', 'conditions', 'weekNotes', 'papers', 'workouts', 'bodyLogs', 'moneyTx', 'savings', 'hobbies', 'hobbyLogs', 'wishes', 'diary', 'moneyRules'] as const;
+export const COLLECTIONS = ['subjects', 'exams', 'books', 'plans', 'tutors', 'homework', 'notes', 'decks', 'cards', 'wordLists', 'sessions', 'todos', 'habits', 'grades', 'previews', 'assessments', 'blanks', 'conditions', 'weekNotes', 'papers', 'workouts', 'bodyLogs', 'moneyTx', 'savings', 'hobbies', 'hobbyLogs', 'wishes', 'diary', 'moneyRules', 'movies'] as const;
 export type Collection = (typeof COLLECTIONS)[number];
 
 export const DEFAULT_SETTINGS: StudySettings = {
@@ -633,6 +678,7 @@ export function emptyStudy(): StudyData {
     wishes: {},
     diary: {},
     moneyRules: {},
+    movies: {},
   };
 }
 

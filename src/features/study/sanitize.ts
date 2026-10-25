@@ -16,6 +16,17 @@ const arr = (v: unknown): unknown[] => (Array.isArray(v) ? v : []);
 const lines = (v: unknown) => arr(v).filter((l): l is Obj => isObj(l) && typeof l.id === 'string' && typeof l.text === 'string').map((l) => ({ ...l, done: bool(l.done) }));
 /** 시각 HH:MM */
 const hhmm = (v: unknown) => (typeof v === 'string' && /^([01]\d|2[0-3]):[0-5]\d$/.test(v) ? v : undefined);
+/** 농구 기록 칸 */
+function bbStat(v: unknown) {
+  if (!isObj(v)) return undefined;
+  const n = (k: string) => score(v[k], 0, 500);
+  return {
+    mode: v.mode === 'game' ? ('game' as const) : ('practice' as const),
+    result: v.result === 'win' || v.result === 'lose' || v.result === 'draw' ? v.result : undefined,
+    pts: n('pts'), reb: n('reb'), ast: n('ast'), stl: n('stl'), blk: n('blk'),
+    fgm: n('fgm'), fga: n('fga'), tpm: n('tpm'), tpa: n('tpa'), ftm: n('ftm'), fta: n('fta'),
+  };
+}
 /** 점수 칸: 범위 밖이면 버린다 */
 const score = (v: unknown, lo: number, hi: number) => (typeof v === 'number' && Number.isFinite(v) && v >= lo && v <= hi ? v : undefined);
 const optDate = (v: unknown): DateStr | undefined => (isDate(v) ? v : undefined);
@@ -153,9 +164,25 @@ const FIX: Record<Collection, Fix> = {
       : null,
   workouts: (x) =>
     isDate(x.date)
-      ? { ...x, kind: str(x.kind, '운동').slice(0, 20), minutes: score(x.minutes, 0, 1440), distance: score(x.distance, 0, 1000), detail: optStr(x.detail)?.slice(0, 300), effort: score(x.effort, 1, 3), memo: optStr(x.memo)?.slice(0, 300), created: num(x.created) }
+      ? { ...x, kind: str(x.kind, '운동').slice(0, 20), minutes: score(x.minutes, 0, 1440), distance: score(x.distance, 0, 1000), detail: optStr(x.detail)?.slice(0, 300), effort: score(x.effort, 1, 3), memo: optStr(x.memo)?.slice(0, 300), bb: bbStat(x.bb), created: num(x.created) }
       : null,
-  bodyLogs: (x) => (score(x.weight, 10, 400) !== undefined ? { ...x, weight: x.weight } : null),
+  bodyLogs: (x) => {
+    const weight = score(x.weight, 10, 400);
+    const height = score(x.height, 50, 250);
+    return weight !== undefined || height !== undefined ? { ...x, weight, height } : null;
+  },
+  movies: (x) => ({
+    ...x,
+    title: str(x.title, '영화').slice(0, 80),
+    year: score(x.year, 1880, 2200),
+    status: x.status === 'watched' ? 'watched' : 'want',
+    rating: typeof x.rating === 'number' && x.rating >= 0.5 && x.rating <= 5 ? Math.round(x.rating * 2) / 2 : undefined,
+    comment: optStr(x.comment)?.slice(0, 2000),
+    watched: optDate(x.watched),
+    release: optDate(x.release),
+    where: optStr(x.where)?.slice(0, 20),
+    created: num(x.created),
+  }),
   moneyTx: (x) =>
     isDate(x.date) && score(x.amount, 0, 1e10) !== undefined
       ? { ...x, type: x.type === 'in' ? 'in' : 'out', amount: Math.round(x.amount as number), category: str(x.category, '기타').slice(0, 20), memo: optStr(x.memo)?.slice(0, 200), ruleId: optStr(x.ruleId), created: num(x.created) }

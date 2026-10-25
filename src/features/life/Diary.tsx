@@ -6,7 +6,8 @@ import { put, remove, useStudy } from '../study/store';
 import { confirmDelete, go, tap, toast, useToday } from '../study/ui';
 import { monthLabel, monthOf, shiftMonth } from './calc';
 
-const MOOD = ['', '😞', '😕', '😐', '🙂', '😄'];
+/** 기분 점: 좋을수록 진하게 */
+const Mood = ({ m }: { m?: number }) => (m ? <i className={`dy-mood m${m}`} aria-hidden /> : null);
 const MOOD_NAME = ['', '나쁨', '별로', '보통', '좋음', '최고'];
 
 /** sub: 날짜(YYYY-MM-DD) 면 그날 쓰기, 'YYYY-MM' 이면 그 달 목록 */
@@ -48,7 +49,7 @@ function List({ month, today }: { month: string; today: string }) {
             return (
               <button key={x} className={`dy-day ${x === today ? 'today' : ''} ${x > today ? 'future' : ''}`} disabled={x > today} onClick={() => go(`/diary/${x}`)} aria-label={`${shortDate(x)} ${e ? `일기 ${e.mood ? MOOD_NAME[e.mood] : ''}` : '일기 없음'}`}>
                 <small>{Number(x.slice(8))}</small>
-                <span>{e ? (e.mood ? MOOD[e.mood] : '•') : ''}</span>
+                <span>{e ? e.mood ? <Mood m={e.mood} /> : <i className="dy-mood m0" aria-hidden /> : null}</span>
               </button>
             );
           })}
@@ -62,8 +63,7 @@ function List({ month, today }: { month: string; today: string }) {
           <section key={e.id} className="st-card dy-entry st-tap" {...tap(() => go(`/diary/${e.id}`))}>
             <div className="st-inline between">
               <b>
-                {e.mood ? `${MOOD[e.mood]} ` : ''}
-                {e.title || shortDate(e.id)}
+                <Mood m={e.mood} /> {e.title || shortDate(e.id)}
               </b>
               {e.title && <small className="st-muted">{shortDate(e.id)}</small>}
             </div>
@@ -109,7 +109,7 @@ function Write({ date, today }: { date: string; today: string }) {
         <div className="st-seg dy-moods" role="radiogroup" aria-label="오늘 기분">
           {[1, 2, 3, 4, 5].map((m) => (
             <button key={m} role="radio" aria-checked={mood === m} className={mood === m ? 'on' : ''} onClick={() => setMood(mood === m ? 0 : m)}>
-              <span aria-hidden>{MOOD[m]}</span> {MOOD_NAME[m]}
+              <Mood m={m} /> {MOOD_NAME[m]}
             </button>
           ))}
         </div>

@@ -1,24 +1,24 @@
 /* ===== 디자인 토큰: 흰색·검은색·회색, 간결하게 ===== */
 :root {
-  --bg: #fafafa;
+  --bg: #f7f7f5;
   --surface: #ffffff;
-  --soft: #f4f4f5;
-  --softer: #f9f9fa;
-  --line: #e7e7e9;
-  --line-strong: #d4d4d8;
-  --text: #0a0a0a;
-  --muted: #71717a;
-  --faint: #a1a1aa;
-  --accent: #0a0a0a;
+  --soft: #f0f0ee;
+  --softer: #fafaf9;
+  --line: #e9e9e6;
+  --line-strong: #d9d9d5;
+  --text: #111111;
+  --muted: #6c6c68;
+  --faint: #a2a29d;
+  --accent: #111111;
   --on-accent: #ffffff;
   --bad: #c2410c;
   --warn: #a16207;
-  --radius: 12px;
+  --radius: 16px;
   /* 화면 코드에서 쓰는 옛 이름 (막대 색 등) */
   --ok: var(--accent);
   --blue-2: var(--accent);
   color-scheme: light;
-  font-family: 'Noto Sans KR', 'Apple SD Gothic Neo', 'Malgun Gothic', system-ui, -apple-system, sans-serif;
+  font-family: 'Pretendard Variable', Pretendard, -apple-system, BlinkMacSystemFont, 'Apple SD Gothic Neo', 'Malgun Gothic', system-ui, sans-serif;
   font-feature-settings: 'tnum' 0;
   -webkit-font-smoothing: antialiased;
 }
@@ -26,17 +26,17 @@
 /* 어두운 화면: 기기 설정을 따르고, 설정 화면에서 직접 고를 수도 있다 (main.tsx 가 data-theme 을 붙임) */
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme='light']) {
-    --bg: #0a0a0a;
-    --surface: #141414;
-    --soft: #1f1f1f;
-    --softer: #181818;
-    --line: #262626;
-    --line-strong: #3a3a3a;
-    --text: #fafafa;
-    --muted: #a1a1aa;
-    --faint: #71717a;
-    --accent: #fafafa;
-    --on-accent: #0a0a0a;
+    --bg: #0c0c0d;
+    --surface: #151517;
+    --soft: #1e1e21;
+    --softer: #18181a;
+    --line: #26262a;
+    --line-strong: #36363b;
+    --text: #f2f2f0;
+    --muted: #9d9d98;
+    --faint: #6b6b67;
+    --accent: #f2f2f0;
+    --on-accent: #0c0c0d;
     --bad: #fb923c;
     --warn: #facc15;
     color-scheme: dark;
@@ -44,17 +44,17 @@
 }
 
 :root[data-theme='dark'] {
-  --bg: #0a0a0a;
-  --surface: #141414;
-  --soft: #1f1f1f;
-  --softer: #181818;
-  --line: #262626;
-  --line-strong: #3a3a3a;
-  --text: #fafafa;
-  --muted: #a1a1aa;
-  --faint: #71717a;
-  --accent: #fafafa;
-  --on-accent: #0a0a0a;
+  --bg: #0c0c0d;
+  --surface: #151517;
+  --soft: #1e1e21;
+  --softer: #18181a;
+  --line: #26262a;
+  --line-strong: #36363b;
+  --text: #f2f2f0;
+  --muted: #9d9d98;
+  --faint: #6b6b67;
+  --accent: #f2f2f0;
+  --on-accent: #0c0c0d;
   --bad: #fb923c;
   --warn: #facc15;
   color-scheme: dark;

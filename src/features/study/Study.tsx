@@ -80,9 +80,9 @@ export function Study({ path, loggedIn, syncReady = true, onLogin }: { path: str
 
   let content;
   if (area === 'home') content = <Home loggedIn={loggedIn} onLogin={onLogin} />;
-  else if (area === 'fitness') content = <Fitness sub={path[1]} />;
+  else if (area === 'fitness') content = <Fitness sub={path[1]} sub2={path[2]} />;
   else if (area === 'money') content = <Money sub={path[1]} />;
-  else if (area === 'hobby') content = <Hobby sub={path[1]} />;
+  else if (area === 'hobby') content = <Hobby sub={path[1]} sub2={path[2]} />;
   else if (area === 'diary') content = <Diary sub={path[1]} />;
   else if (tab === 'books') content = <Books id={id} sub={sub} />;
   else if (tab === 'tutor') content = <Tutors sub={id} />;

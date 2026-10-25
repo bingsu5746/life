@@ -3776,3 +3776,387 @@ input[type='range'] {
 .dy-moods button span {
   font-size: 1.1rem;
 }
+
+/* ===================================================================
+   디자인 다듬기: 글꼴(Pretendard) · 버튼 · 카드 · 칩 · 입력칸
+   과한 테두리·이모지·색 없이, 여백과 글자 굵기로 정리한다
+   =================================================================== */
+body {
+  letter-spacing: -0.01em;
+  font-feature-settings: 'tnum' 0;
+}
+
+.btn {
+  min-height: 38px;
+  padding: 0 14px;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  font-weight: 600;
+  font-size: 0.9rem;
+  letter-spacing: -0.01em;
+  box-shadow: 0 1px 0 rgb(0 0 0 / 0.02);
+}
+
+.btn:hover:not(:disabled) {
+  background: var(--soft);
+  border-color: var(--line-strong);
+}
+
+.btn:active:not(:disabled) {
+  transform: none;
+  opacity: 0.85;
+}
+
+.btn-primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--on-accent);
+  box-shadow: none;
+}
+
+.btn-primary:hover:not(:disabled) {
+  background: var(--accent);
+  border-color: var(--accent);
+  opacity: 0.88;
+}
+
+.btn-sm {
+  min-height: 32px;
+  padding: 0 11px;
+  border-radius: 9px;
+  font-size: 0.84rem;
+}
+
+.btn-lg {
+  min-height: 46px;
+  padding: 0 20px;
+  border-radius: 12px;
+  font-size: 0.98rem;
+}
+
+.btn .st-icon,
+.btn svg {
+  width: 16px;
+  height: 16px;
+}
+
+.st-card {
+  border-radius: var(--radius);
+  padding: 22px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+}
+
+.st-page-head h2,
+.st-today-head h2,
+.hm-head h2 {
+  font-weight: 700;
+  letter-spacing: -0.035em;
+}
+
+.st-h {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--muted);
+  letter-spacing: 0;
+}
+
+.st-chip {
+  min-height: 30px;
+  padding: 0 12px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  font-size: 0.85rem;
+  font-weight: 500;
+}
+
+.st-chip:hover {
+  border-color: var(--line-strong);
+  background: var(--softer);
+}
+
+.st-seg {
+  border-radius: 11px;
+  padding: 3px;
+  background: var(--soft);
+}
+
+.st-seg button {
+  border-radius: 8px;
+  padding: 6px 12px;
+  font-size: 0.86rem;
+}
+
+.st-seg button.on {
+  background: var(--surface);
+  box-shadow:
+    0 1px 2px rgb(0 0 0 / 0.06),
+    0 0 0 1px var(--line);
+}
+
+.st-input {
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+}
+
+.st-input:hover {
+  border-color: var(--line-strong);
+}
+
+.st-input:focus {
+  border-color: var(--text);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--text) 7%, transparent);
+}
+
+.st-stat-row {
+  border-radius: 12px;
+  border-color: var(--line);
+}
+
+.st-stat-row b {
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+}
+
+.st-link {
+  text-underline-offset: 3px;
+}
+
+.st-fab {
+  width: 52px;
+  height: 52px;
+  border-radius: 16px;
+  box-shadow: 0 8px 24px rgb(0 0 0 / 0.16);
+}
+
+.st-empty {
+  border-radius: var(--radius);
+}
+
+.ch-bar {
+  fill: var(--line-strong);
+}
+
+.ch-bar.strong {
+  fill: var(--accent);
+}
+
+/* ===== 메인: 시험 D-day 크게 ===== */
+.hm-dday {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin: 2px 0 4px;
+}
+
+.hm-dday b {
+  font-size: 2.4rem;
+  font-weight: 800;
+  letter-spacing: -0.05em;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+.hm-dday small {
+  color: var(--muted);
+  font-size: 0.9rem;
+  font-weight: 500;
+}
+
+/* ===== 오답 한마디: 이모지 대신 왼쪽 줄 ===== */
+.nt-last {
+  padding-left: 10px;
+  border-left: 2px solid var(--line-strong);
+  color: var(--muted);
+}
+
+.nt-remind-line {
+  padding-left: 10px;
+  border-left: 2px solid var(--text);
+}
+
+/* ===== 일기 기분 점 ===== */
+.dy-mood {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--text);
+  vertical-align: middle;
+}
+
+.dy-mood.m0 {
+  background: none;
+  border: 1px solid var(--line-strong);
+}
+
+.dy-mood.m1 {
+  opacity: 0.15;
+}
+
+.dy-mood.m2 {
+  opacity: 0.32;
+}
+
+.dy-mood.m3 {
+  opacity: 0.5;
+}
+
+.dy-mood.m4 {
+  opacity: 0.72;
+}
+
+.dy-mood.m5 {
+  opacity: 1;
+}
+
+/* ===== 돈: 멈춘 고정 지출 ===== */
+.mn-paused {
+  opacity: 0.5;
+}
+
+/* ===== 농구 ===== */
+.bb-shots {
+  display: grid;
+  gap: 8px;
+}
+
+.bb-shot {
+  display: grid;
+  grid-template-columns: 4.5em 64px auto 64px;
+  gap: 8px;
+  align-items: center;
+}
+
+.bb-stats b {
+  font-size: 1.5rem;
+}
+
+/* ===== 영화 ===== */
+.mv-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 12px;
+}
+
+.mv-card {
+  display: grid;
+  gap: 8px;
+  align-content: start;
+  padding: 18px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+
+.mv-card:hover {
+  border-color: var(--line-strong);
+}
+
+.mv-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.mv-top b {
+  font-size: 1.02rem;
+  letter-spacing: -0.02em;
+}
+
+.mv-meta {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.mv-stars {
+  letter-spacing: 1px;
+  font-size: 0.95rem;
+}
+
+.mv-comment {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.92rem;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 4;
+  -webkit-box-orient: vertical;
+}
+
+.mv-starinput {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.mv-star {
+  border: 0;
+  background: none;
+  padding: 2px;
+  font-size: 2rem;
+  line-height: 1;
+  color: var(--line-strong);
+  position: relative;
+}
+
+.mv-star.full {
+  color: var(--text);
+}
+
+.mv-star.half {
+  background: linear-gradient(90deg, var(--text) 50%, var(--line-strong) 50%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.mv-score {
+  margin: 0 8px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+/* 탭 묶음은 내용 너비만 (화면 폭으로 늘어나 막대처럼 보이지 않게) */
+.st-page > .st-seg,
+.st-page > div > .st-seg {
+  justify-self: start;
+  width: max-content;
+  max-width: 100%;
+}
+
+/* 카드 안 숫자 줄: 바깥 상자 없이 칸 사이 줄만 */
+.st-card .st-stat-row {
+  border: 0;
+  border-radius: 0;
+}
+
+.st-card .st-stat-row > div {
+  padding: 4px 16px;
+}
+
+.st-card .st-stat-row > div:first-child {
+  padding-left: 0;
+}
+
+.st-card .st-stat-row b {
+  font-size: 1.35rem;
+}
+
+@media (max-width: 560px) {
+  .st-card .st-stat-row b {
+    font-size: 1.08rem;
+  }
+
+  .st-card .st-stat-row > div {
+    padding: 4px 10px;
+  }
+}

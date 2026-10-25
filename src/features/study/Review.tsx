@@ -131,7 +131,7 @@ function Notes({ today, adding }: { today: string; adding?: boolean }) {
               </div>
               {n.photos[0] && <Photo id={n.photos[0]} small />}
               {n.question && <p>{n.question}</p>}
-              {n.comments?.length ? <p className="nt-last">💬 {n.comments[n.comments.length - 1].text}</p> : null}
+              {n.comments?.length ? <p className="nt-last">{n.comments[n.comments.length - 1].text}</p> : null}
               {n.reason && <span className="st-pill">{REASONS[n.reason]}</span>}
               {n.wrong > 1 && <small className="bad"> ✕{n.wrong}</small>}
             </button>
@@ -468,7 +468,7 @@ function NoteRun() {
           <div className="nt-remind">
             <small>지난번 나에게 한마디</small>
             {n.comments.slice(-3).map((c) => (
-              <div key={c.id}>💬 {c.text}</div>
+              <div key={c.id} className="nt-remind-line">{c.text}</div>
             ))}
           </div>
         ) : null}
