@@ -318,10 +318,11 @@ describe('merge', () => {
     expect(m.books.b.name).toBe('쎈');
     expect([...doneSet(m.books.b.done, m.books.b.undone)].sort((x, y) => x - y)).toEqual([1, 3, 4, 5, 6, 7, 8, 9]);
   });
-  it('60일 지난 지운 표시는 정리', () => {
+  it('180일 지난 지운 표시는 정리 (그 전에는 남김)', () => {
     const a = emptyStudy();
     a.exams.e = { id: 'e', updatedAt: 0, name: 'x', date: T0, deleted: true };
-    expect(mergeStudy(a, emptyStudy(), 61 * 86_400_000).exams.e).toBeUndefined();
+    expect(mergeStudy(a, emptyStudy(), 61 * 86_400_000).exams.e?.deleted).toBe(true);
+    expect(mergeStudy(a, emptyStudy(), 181 * 86_400_000).exams.e).toBeUndefined();
     expect(mergeWords({}, { x: { id: 'x', updatedAt: 1, listId: 'L', term: 'a', meaning: '', order: 0, box: 0, due: T0, wrong: 0 } }).x.term).toBe('a');
   });
 });
