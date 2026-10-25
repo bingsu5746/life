@@ -2701,3 +2701,95 @@ input[type='range'] {
 .st-menu > .st-iconbtn .st-icon {
   stroke-width: 2.8;
 }
+
+/* ===== 번역 ===== */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+.tr-box {
+  display: grid;
+  gap: 12px;
+}
+
+.tr-langs {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-weight: 600;
+}
+
+.tr-langs > span {
+  min-width: 3.5em;
+  text-align: center;
+}
+
+.tr-swap {
+  min-width: 40px;
+  font-size: 1rem;
+}
+
+.tr-auto {
+  margin-left: auto;
+}
+
+.tr-input {
+  width: 100%;
+  resize: vertical;
+  min-height: 120px;
+  font-size: 1.02rem;
+}
+
+.tr-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 8px;
+}
+
+.tr-row > :first-child {
+  margin-right: auto;
+}
+
+.tr-out {
+  margin: 0;
+  font-size: 1.15rem;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.tr-recent {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.tr-recent-item {
+  width: 100%;
+  display: grid;
+  gap: 2px;
+  text-align: left;
+  border: 0;
+  background: none;
+  padding: 8px 10px;
+  border-radius: 8px;
+}
+
+.tr-recent-item:hover {
+  background: var(--soft);
+}
+
+.tr-recent-item > * {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

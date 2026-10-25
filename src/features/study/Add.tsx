@@ -1,9 +1,8 @@
 // 「＋」 하나로 모든 추가하기: 누르면 넣을 수 있는 것들이 나타난다 (화면마다 추가 버튼을 늘어놓지 않으려고)
 import { useState } from 'react';
-import { addWords } from './actions';
-import { alive, newId } from './model';
-import { listWords } from './select';
-import { getStudy, put, useWords } from './store';
+import { addToInbox } from './actions';
+import { newId } from './model';
+import { put, useWords } from './store';
 import { go, Icon, Sheet, toast } from './ui';
 
 const ITEMS: { key: string; label: string; sub: string; to?: string }[] = [
@@ -45,15 +44,9 @@ function AddSheet({ today, onClose }: { today: string; onClose: () => void }) {
       put('todos', { id: newId(), title: t, due: today, done: false, created: Date.now() });
       toast('오늘 할 일에 넣었어요');
     } else {
-      const d = getStudy();
-      let inbox = alive(d.wordLists).find((l) => l.kind === 'inbox');
-      if (!inbox) {
-        inbox = { id: newId(), updatedAt: 0, name: '모르는 단어 모음', kind: 'inbox', subjectId: alive(d.subjects).find((s) => /영어/.test(s.name))?.id ?? '', done: [], undone: [] };
-        put('wordLists', inbox);
-      }
       const m = t.match(/^([A-Za-z][A-Za-z '\-.]*?)\s*(?:[:\-–]\s*)?([^A-Za-z].*)?$/);
       const term = (m?.[1] ?? t).trim();
-      addWords(inbox.id, [{ term, meaning: (m?.[2] ?? '').trim() }], listWords(words, inbox.id), today);
+      addToInbox(term, (m?.[2] ?? '').trim(), words, today);
       toast(`「${term}」를 모르는 단어 모음에 넣었어요`);
     }
     setText('');

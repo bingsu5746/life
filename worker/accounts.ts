@@ -14,6 +14,7 @@
 //   (학교처럼 여럿이 한 주소를 같이 쓰는 곳을 생각해 넉넉하게 잡는다)
 import { DurableObject } from 'cloudflare:workers';
 import { COOKIE_NAME, cutText, Limiter, passwordProblem, readCookie, usernameKey } from './security';
+import { buildInput, readOutput, readRequest, TRANSLATE_MODEL } from './translate';
 
 const ITER = 100_000;
 const SESSION_DAYS = 90;
@@ -80,6 +81,10 @@ export class Accounts extends DurableObject<Env> {
   private signupByIp = new Limiter(30, DAY);
   private signupAll = new Limiter(300, 60 * 60_000);
   private writeByUser = new Limiter(600, 60 * 60_000);
+  // 번역: 무료 한도(하루 10,000 뉴런)를 한 사람이 다 쓰지 않게
+  private translateByUser = new Limiter(30, 10 * 60_000);
+  private translateByUserDay = new Limiter(300, DAY);
+  private translateAll = new Limiter(1500, DAY);
 
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
@@ -123,7 +128,7 @@ export class Accounts extends DurableObject<Env> {
     if (req.method === 'POST' || req.method === 'PUT' || req.method === 'DELETE') {
       const big = path.startsWith('store/') || path.startsWith('study-photo/');
       const text = await req.text();
-      if (text.length > (big ? MAX_STORE + 1000 : MAX_SMALL_BODY)) return fail('보낸 내용이 너무 커요.', 413);
+      if (text.length > (big ? MAX_STORE + 1000 : path === 'translate' ? 4 * MAX_SMALL_BODY : MAX_SMALL_BODY)) return fail('보낸 내용이 너무 커요.', 413);
       try {
         const parsed: unknown = text ? JSON.parse(text) : {};
         if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return fail('잘못된 요청이에요.');
@@ -167,6 +172,7 @@ export class Accounts extends DurableObject<Env> {
       return json({ ok: true }, 200, { 'set-cookie': clearCookie() });
     }
     if (path === 'me' && req.method === 'GET') return json({ user: this.publicUser(user) });
+    if (path === 'translate' && req.method === 'POST') return this.translate(user, body);
     if (path === 'me/nickname' && req.method === 'PUT') {
       const nickname = cutText(String(body.nickname ?? '').normalize('NFC').trim(), 16);
       if (!nickname) return fail('닉네임을 써 주세요.');
@@ -214,6 +220,27 @@ export class Accounts extends DurableObject<Env> {
       }
     }
     return fail('없는 주소예요.', 404);
+  }
+
+  private async translate(user: UserRow, body: Record<string, unknown>) {
+    const r = readRequest(body);
+    if ('error' in r) return fail(r.error);
+    const wait = this.translateByUser.hit(user.id);
+    if (wait) return fail(`번역을 너무 자주 했어요. ${wait}초 뒤에 다시 해 주세요.`, 429);
+    if (this.translateByUserDay.hit(user.id)) return fail('오늘 번역할 수 있는 횟수를 다 썼어요. 내일 다시 해 주세요.', 429);
+    if (this.translateAll.hit('all')) return fail('오늘 사이트 전체의 번역 한도를 다 썼어요. 내일 다시 해 주세요.', 429);
+    let out: unknown;
+    try {
+      out = await this.env.AI.run(TRANSLATE_MODEL, buildInput(r.text, r.to) as never);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      console.error('translate error', msg);
+      if (/neuron|limit|quota|exceeded/i.test(msg)) return fail('오늘 번역 무료 한도를 다 썼어요. 한국 시간 오전 9시 뒤에 다시 해 주세요.', 503);
+      return fail('번역 서버에 문제가 있어요. 잠시 뒤 다시 해 주세요.', 502);
+    }
+    const text = readOutput(out);
+    if (!text) return fail('번역 결과를 받지 못했어요. 다시 해 주세요.', 502);
+    return json({ text, to: r.to });
   }
 
   private publicUser(u: UserRow) {

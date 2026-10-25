@@ -1,11 +1,12 @@
 // 화면에서 자주 하는 고치기 (체크·진도·숙제·기록)
 import { addDays } from './dates';
-import { newId, type DateStr, type Homework, type HwItem, type Id, type Mark, type Range, type StudySession, type Word } from './model';
+import { alive, newId, type DateStr, type Homework, type HwItem, type Id, type Mark, type Range, type StudySession, type Word, type WordsData } from './model';
 import { compactMarks, compress, expand } from './pages';
 import { firstAnswer, type Mode } from './wordSession';
 import type { Via } from './review';
 import { getStudy, put, putMany, putWords, remove } from './store';
 import { planDue } from './plan';
+import { listWords } from './select';
 
 function marks(prev: { done: Mark[]; undone: Mark[] }, items: number[], on: boolean) {
   const at = Date.now();
@@ -64,6 +65,17 @@ export function answerWord(w: Word, correct: boolean, via: Via, mode: Mode, toda
 export function addWords(listId: Id, rows: { term: string; meaning: string; day?: number }[], existing: Word[], today: DateStr) {
   let order = existing.reduce((m, w) => Math.max(m, w.order), 0);
   putWords(rows.map((r) => ({ id: newId(), updatedAt: 0, listId, term: r.term.trim(), meaning: r.meaning.trim(), day: r.day, order: ++order, box: 0, due: today, wrong: 0 })));
+}
+
+/** 모르는 단어 모음에 한 단어 넣기 (모음이 없으면 만든다) */
+export function addToInbox(term: string, meaning: string, words: WordsData, today: DateStr) {
+  const d = getStudy();
+  let inbox = alive(d.wordLists).find((l) => l.kind === 'inbox');
+  if (!inbox) {
+    inbox = { id: newId(), updatedAt: 0, name: '모르는 단어 모음', kind: 'inbox', subjectId: alive(d.subjects).find((s) => /영어/.test(s.name))?.id ?? '', done: [], undone: [] };
+    put('wordLists', inbox);
+  }
+  addWords(inbox.id, [{ term, meaning }], listWords(words, inbox.id), today);
 }
 
 /** 오답 빨리 넣기: 「틀린 번호: 3, 7, 12」 · 「p.37 5번 p.38 2번」 (한 번에 저장) */

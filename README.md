@@ -24,6 +24,7 @@ npm run build      # 배포용 빌드 (dist)
 - **할 일·습관**: 마감·⭐ 오늘 꼭, 요일별 습관과 연속 일수
 - **로그인**(선택): 아이디·비밀번호(이메일 없음). 로그인하면 폰·PC 동기화, 아니면 이 기기에만 저장
   - 계정: 닉네임·비밀번호 바꾸기, 모든 기기에서 로그아웃, 계정 지우기, 로그아웃할 때 이 기기 자료 지우기
+- **번역**(맨 위 文A 단추, 영단어 화면): 한국어 ↔ 영어, 넣은 글을 보고 방향 자동. 듣기·복사·「모르는 단어 모음」에 넣기. Cloudflare Workers AI(`@cf/google/gemma-4-26b-a4b-it`)로 번역하고, 무료 한도(하루 10,000 뉴런)를 지키려고 로그인한 사람만·한 번에 2,000자·한 사람 10분 30번·하루 300번까지
 - **설정**(맨 위 톱니): 과목·쉬는 날·복습 간격·타이머, 화면 밝기(기기·밝게·어둡게), 백업 파일 내보내기·가져오기
 
 ## 보안
@@ -41,7 +42,7 @@ npm run build      # 배포용 빌드 (dist)
 ## 배포 (Cloudflare Workers, 무료 플랜 가능)
 
 `wrangler.jsonc` 그대로 씁니다. Cloudflare 대시보드 → Workers & Pages → 만들기 → 이 GitHub 저장소 연결
-(빌드 명령 `npm run build`, 배포 명령 `npx wrangler deploy`). `worker/` 의 로그인·저장 서버(Durable Object + SQLite)가 같이 올라갑니다.
+(빌드 명령 `npm run build`, 배포 명령 `npx wrangler deploy`). `worker/` 의 로그인·저장 서버(Durable Object + SQLite)와 번역용 Workers AI 연결(`ai` 바인딩)이 같이 올라갑니다.
 
 ## 구조
 

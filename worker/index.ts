@@ -11,7 +11,7 @@ interface Env {
 export default {
   async fetch(req: Request, env: Env): Promise<Response> {
     const url = new URL(req.url);
-    if (/^\/api\/(auth\/(signup|login|logout|logout-all)|me(\/(nickname|password))?|store\/(study|words)|study-photo\/[a-z0-9]{6,32})$/.test(url.pathname)) {
+    if (/^\/api\/(auth\/(signup|login|logout|logout-all)|me(\/(nickname|password))?|translate|store\/(study|words)|study-photo\/[a-z0-9]{6,32})$/.test(url.pathname)) {
       try {
         return await env.ACCOUNTS.get(env.ACCOUNTS.idFromName('global')).fetch(req);
       } catch (e) {

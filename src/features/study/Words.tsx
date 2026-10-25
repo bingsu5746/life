@@ -30,6 +30,9 @@ function ListIndex() {
     <div className="st-page">
       <div className="st-page-head">
         <h2>영단어</h2>
+        <button className="btn btn-sm" onClick={() => go('/translate')}>
+          번역
+        </button>
       </div>
       {!views.length && (
         <Empty icon="🔤" title="단어 목록을 만들어 보세요">

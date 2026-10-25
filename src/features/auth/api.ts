@@ -159,3 +159,8 @@ export async function putStore(name: StoreName, value: unknown) {
 export const putStudyPhoto = (id: string, data: string) => call('study-photo/' + id, 'PUT', { data });
 export const getStudyPhoto = (id: string) => call<{ data: string }>('study-photo/' + id).then((r) => r.data);
 export const deleteStudyPhoto = (id: string) => call('study-photo/' + id, 'DELETE');
+
+/** 한국어 ↔ 영어 번역 (로그인한 사람만, worker/translate.ts) */
+export async function translate(text: string, to: 'ko' | 'en') {
+  return call<{ text: string; to: 'ko' | 'en' }>('translate', 'POST', { text, to });
+}
