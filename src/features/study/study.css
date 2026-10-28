@@ -4177,3 +4177,284 @@ body {
   min-width: 4.5em;
   line-height: 1.3;
 }
+
+/* ---------- 넘기는 카드 (SwipeCard) ---------- */
+.sw {
+  --sw-no: 229, 72, 77;
+  --sw-yes: 48, 164, 108;
+  display: grid;
+  gap: 14px;
+  width: 100%;
+  max-width: 520px;
+  margin: 0 auto;
+  perspective: 1400px;
+}
+.sw-card {
+  position: relative;
+  min-height: 300px;
+  border-radius: 22px;
+  cursor: pointer;
+  touch-action: pan-y;
+  user-select: none;
+  -webkit-user-select: none;
+  transition: transform 0.26s cubic-bezier(0.2, 0.8, 0.2, 1);
+  outline: none;
+}
+.sw-card.dragging {
+  transition: none;
+  cursor: grabbing;
+}
+.sw-card:focus-visible .sw-face {
+  box-shadow: 0 0 0 2px var(--accent);
+}
+.sw-inner {
+  position: absolute;
+  inset: 0;
+  transform-style: preserve-3d;
+  transition: transform 0.5s cubic-bezier(0.3, 0.7, 0.2, 1);
+}
+.sw-inner.flipped {
+  transform: rotateY(180deg);
+}
+.sw-face {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 28px 22px;
+  border-radius: 22px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.06);
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  overflow: hidden;
+  text-align: center;
+}
+.sw-back {
+  transform: rotateY(180deg);
+  background: var(--softer);
+}
+/* 미는 쪽 색으로 물든다 (--tint: 0 ~ 1) */
+.sw-face::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  opacity: 0;
+}
+.sw-card.no .sw-face::after {
+  background: rgba(var(--sw-no), 0.9);
+  opacity: calc(var(--tint) * 0.85);
+}
+.sw-card.yes .sw-face::after {
+  background: rgba(var(--sw-yes), 0.9);
+  opacity: calc(var(--tint) * 0.85);
+}
+.sw-card.no .sw-face {
+  border-color: rgb(var(--sw-no));
+}
+.sw-card.yes .sw-face {
+  border-color: rgb(var(--sw-yes));
+}
+.sw-text {
+  position: relative;
+  z-index: 1;
+  font-size: clamp(1.5rem, 6vw, 2.1rem);
+  font-weight: 650;
+  letter-spacing: -0.02em;
+  line-height: 1.3;
+  word-break: keep-all;
+  overflow-wrap: anywhere;
+  max-height: 100%;
+  overflow: auto;
+}
+.sw-back .sw-text {
+  font-size: clamp(1.15rem, 4.6vw, 1.5rem);
+  font-weight: 550;
+  white-space: pre-wrap;
+}
+.sw-ex {
+  display: block;
+  margin-top: 12px;
+  font-size: 0.92rem;
+  font-weight: 400;
+  color: var(--muted);
+}
+.sw-sub,
+.sw-tap {
+  position: absolute;
+  z-index: 1;
+  left: 0;
+  right: 0;
+  font-size: 0.8rem;
+  color: var(--faint);
+}
+.sw-sub {
+  top: 16px;
+}
+.sw-tap {
+  bottom: 16px;
+}
+.sw-label {
+  position: absolute;
+  z-index: 2;
+  top: 18px;
+  padding: 5px 12px;
+  border-radius: 999px;
+  border: 2px solid currentColor;
+  font-weight: 700;
+  font-size: 0.95rem;
+  background: rgba(255, 255, 255, 0.92);
+  opacity: 0;
+  pointer-events: none;
+}
+.sw-label.no {
+  right: 18px;
+  color: rgb(var(--sw-no));
+  transform: rotate(8deg);
+}
+.sw-label.yes {
+  left: 18px;
+  color: rgb(var(--sw-yes));
+  transform: rotate(-8deg);
+}
+.sw-card.no .sw-label.no,
+.sw-card.yes .sw-label.yes {
+  opacity: min(1, calc(var(--tint) * 1.6));
+}
+.sw-card.no .sw-text,
+.sw-card.yes .sw-text,
+.sw-card.no .sw-ex,
+.sw-card.yes .sw-ex {
+  color: color-mix(in srgb, var(--text) clamp(0%, calc((1 - var(--tint) * 2) * 100%), 100%), #fff);
+}
+.sw-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.sw-btn {
+  flex: 0 0 auto;
+  min-width: 108px;
+  padding: 11px 16px;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+.sw-btn.no:hover {
+  border-color: rgb(var(--sw-no));
+  color: rgb(var(--sw-no));
+  background: rgba(var(--sw-no), 0.07);
+}
+.sw-btn.yes:hover {
+  border-color: rgb(var(--sw-yes));
+  color: rgb(var(--sw-yes));
+  background: rgba(var(--sw-yes), 0.07);
+}
+@media (prefers-reduced-motion: reduce) {
+  .sw-inner,
+  .sw-card {
+    transition: none;
+  }
+}
+
+/* 영화: 감상평 · 리뷰 */
+.mv-comment {
+  color: var(--text);
+}
+.mv-review {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.88rem;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+}
+.mv-view {
+  display: grid;
+  gap: 16px;
+}
+.mv-stars.big {
+  font-size: 1.3rem;
+}
+.mv-stars.big b {
+  margin-left: 6px;
+  font-size: 1rem;
+  letter-spacing: 0;
+}
+.mv-quote {
+  margin: 0;
+  padding: 4px 0 4px 14px;
+  border-left: 3px solid var(--text);
+  font-size: 1.05rem;
+  font-weight: 550;
+  line-height: 1.6;
+  white-space: pre-wrap;
+}
+.mv-review-full {
+  display: grid;
+  gap: 6px;
+}
+.mv-review-full p {
+  margin: 0;
+  line-height: 1.8;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.mv-review-input {
+  min-height: 180px;
+  line-height: 1.7;
+}
+.mv-acts {
+  display: flex;
+  gap: 6px;
+  flex-shrink: 0;
+}
+.mv-mine {
+  flex-shrink: 0;
+  padding: 6px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: var(--soft);
+  color: var(--text);
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.mv-mine.watched {
+  background: var(--text);
+  color: var(--surface);
+  border-color: var(--text);
+}
+@media (max-width: 560px) {
+  .mv-acts {
+    flex-direction: column;
+  }
+}
+
+/* 고른 칩은 마우스를 올려도 그대로 (위의 :hover 가 덮어써 글자가 안 보이던 것) */
+.st-chip.on:hover {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--on-accent);
+}
+.mv-sort {
+  justify-self: end;
+  width: auto;
+}

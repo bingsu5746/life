@@ -10,6 +10,7 @@ import { addWords, answerWord, fillExamples, markDays } from './actions';
 import { parseWords, wordsText, type ParsedWord } from './wordParse';
 import { choicesFor, requeue, type Mode } from './wordSession';
 import { PlanForm } from './PlanForm';
+import { SwipeCard } from './SwipeCard';
 import { Practice } from './Practice';
 import { WordTestSheet } from './WordTestSheet';
 import { isLoggedIn, wordMeanings } from '../auth/api';
@@ -732,7 +733,7 @@ function WordRun({ listId, mode }: { listId: string; mode: 'learn' | 'prep' | 'w
   // 세션을 시작할 때의 단어 목록 (도중에 상자가 바뀌어도 그대로)
   const [queue, setQueue] = useState<string[] | null>(null);
   const [answered, setAnswered] = useState<Map<string, boolean>>(new Map());
-  const [shown, setShown] = useState(false);
+  // (뜻 보기는 넘기는 카드가 스스로 한다)
   const [picked, setPicked] = useState<string | null>(null);
   const [total, setTotal] = useState(0);
   // 객관식 보기는 한 번 정하면 그 카드 동안 그대로 (다시 그릴 때마다 섞이지 않게). step: 지금까지 답한 횟수
@@ -844,7 +845,6 @@ function WordRun({ listId, mode }: { listId: string; mode: 'learn' | 'prep' | 'w
     }
     setQueue(requeue(queue!, correct));
     setStep((x) => x + 1);
-    setShown(false);
     setPicked(null);
   }
 
@@ -859,45 +859,39 @@ function WordRun({ listId, mode }: { listId: string; mode: 'learn' | 'prep' | 'w
           {firstTry}/{total}
         </span>
       </div>
-      <RunCard key={`${cur.id}:${step}`} ask={ask} sub={dir === 'en' && cur.day !== undefined ? `Day ${cur.day}` : answered.has(cur.id) ? '다시 나온 단어' : boxLabel(cur.box, d.settings.intervals)}>
-        {useQuiz ? (
-          <div className="st-choices">
-            {choices!.map((c, i) => {
-              const state = picked ? (c === ans ? 'right' : c === picked ? 'wrong' : '') : '';
-              return (
-                <button
-                  key={c + i}
-                  className={`st-choice ${state}`}
-                  disabled={!!picked}
-                  onClick={() => {
-                    setPicked(c);
-                    setTimeout(() => reply(c === ans), c === ans ? 450 : 1300);
-                  }}
-                >
-                  <b>{i + 1}</b> {c}
-                </button>
-              );
-            })}
-          </div>
-        ) : shown ? (
-          <>
-            <div className="st-answer">{ans || '(뜻 없음)'}</div>
-            <div className="st-row center">
-              <button className="btn btn-lg st-no" onClick={() => reply(false)}>
-                몰랐다
-              </button>
-              <button className="btn btn-lg st-yes" onClick={() => reply(true)}>
-                알았다
-              </button>
+      {useQuiz ? (
+        <>
+          <RunCard key={`${cur.id}:${step}`} ask={ask} sub={dir === 'en' && cur.day !== undefined ? `Day ${cur.day}` : answered.has(cur.id) ? '다시 나온 단어' : boxLabel(cur.box, d.settings.intervals)}>
+            <div className="st-choices">
+              {choices!.map((c, i) => {
+                const state = picked ? (c === ans ? 'right' : c === picked ? 'wrong' : '') : '';
+                return (
+                  <button
+                    key={c + i}
+                    className={`st-choice ${state}`}
+                    disabled={!!picked}
+                    onClick={() => {
+                      setPicked(c);
+                      setTimeout(() => reply(c === ans), c === ans ? 450 : 1300);
+                    }}
+                  >
+                    <b>{i + 1}</b> {c}
+                  </button>
+                );
+              })}
             </div>
-          </>
-        ) : (
-          <button className="btn btn-lg btn-primary" onClick={() => setShown(true)}>
-            {dir === 'en' ? '뜻 보기' : '단어 보기'}
-          </button>
-        )}
-      </RunCard>
-      <KeyHelp quiz={!!useQuiz} shown={shown} onShow={() => setShown(true)} onReply={reply} onPick={(i) => choices && !picked && document.querySelectorAll<HTMLButtonElement>('.st-choice')[i]?.click()} />
+          </RunCard>
+          <KeyHelp quiz shown={false} onShow={() => {}} onReply={reply} onPick={(i) => choices && !picked && document.querySelectorAll<HTMLButtonElement>('.st-choice')[i]?.click()} />
+        </>
+      ) : (
+        <SwipeCard
+          key={`${cur.id}:${step}`}
+          front={ask}
+          back={ans || '(뜻 없음)'}
+          sub={dir === 'en' && cur.day !== undefined ? `Day ${cur.day}` : answered.has(cur.id) ? '다시 나온 단어' : boxLabel(cur.box, d.settings.intervals)}
+          onAnswer={reply}
+        />
+      )}
     </div>
   );
 }

@@ -415,6 +415,8 @@ export interface Movie extends Stamp {
   /** 0.5 ~ 5 (0.5 단위) */
   rating?: number;
   comment?: string;
+  /** 긴 리뷰 */
+  review?: string;
   /** 본 날 */
   watched?: DateStr;
   /** 개봉일 (보고 싶은 영화) */

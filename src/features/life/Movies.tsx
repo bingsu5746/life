@@ -1,4 +1,4 @@
-// 영화: 본 영화에 별점(0.5 단위)과 한줄평, 보고 싶은 영화(개봉일 D-day). 내 기록만 (외부 영화 정보는 쓰지 않음)
+// 영화: 극장가(KOBIS 박스오피스·개봉 예정), 본 영화(별점 0.5 단위 · 한줄 감상평 · 리뷰), 보고 싶은 영화(개봉일 D-day)
 import { useEffect, useState } from 'react';
 import { kobisInfo, type KobisInfo } from '../auth/api';
 import { BarChart } from '../study/charts';
@@ -16,47 +16,52 @@ export function starText(r?: number) {
   return '★'.repeat(full) + (r % 1 ? '½' : '') + '☆'.repeat(5 - full - (r % 1 ? 1 : 0));
 }
 
-export function HobbyTabs({ on }: { on: 'hobby' | 'movies' }) {
-  return (
-    <div className="st-seg" role="tablist" aria-label="취미">
-      <button role="tab" aria-selected={on === 'hobby'} className={on === 'hobby' ? 'on' : ''} onClick={() => go('/hobby')}>
-        취미
-      </button>
-      <button role="tab" aria-selected={on === 'movies'} className={on === 'movies' ? 'on' : ''} onClick={() => go('/hobby/movies')}>
-        영화
-      </button>
-    </div>
-  );
-}
+type Tab = 'now' | 'watched' | 'want';
+const TAB_OF: Record<string, Tab> = { watched: 'watched', want: 'want' };
+const norm = (t: string) => t.replace(/\s+/g, '').toLowerCase();
 
-/** sub: 'new' 이면 넣기 창 */
+/** sub: 없으면 극장가, 'watched' 본 영화, 'want' 보고 싶어요, 'new' 넣기 창 */
 export function Movies({ sub }: { sub?: string }) {
   const d = useStudy();
   const today = useToday();
-  const [tab, setTab] = useState<'watched' | 'want' | 'now'>('watched');
+  const tab: Tab = (sub && TAB_OF[sub]) || 'now';
   const [sort, setSort] = useState<'recent' | 'rating'>('recent');
-  const [edit, setEdit] = useState<Movie | 'new' | null>(sub === 'new' ? 'new' : null);
+  const [edit, setEdit] = useState<Partial<Movie> | null>(sub === 'new' ? {} : null);
+  const [view, setView] = useState<string | null>(null);
   const all = alive(d.movies);
   const watched = all.filter((m) => m.status === 'watched').sort((a, b) => (sort === 'rating' ? (b.rating ?? 0) - (a.rating ?? 0) : 0) || (b.watched ?? '').localeCompare(a.watched ?? '') || b.created - a.created);
   const want = all.filter((m) => m.status === 'want').sort((a, b) => (a.release ?? '9999').localeCompare(b.release ?? '9999') || b.created - a.created);
   const rated = watched.filter((m) => m.rating);
   const avg = rated.length ? Math.round((rated.reduce((a, m) => a + m.rating!, 0) / rated.length) * 10) / 10 : null;
   const year = today.slice(0, 4);
-  const dist = [0.5, 1, 1.5, 2, 2.5, 3, 3.5, 4, 4.5, 5].map((r) => ({ label: String(r), value: rated.filter((m) => m.rating === r).length }));
+  const dist = [0.5, 1, 1.5, 2, 2.5, 3, 3.5, 4, 4.5, 5].map((r) => ({
+    label: String(r),
+    value: rated.filter((m) => m.rating === r).length,
+  }));
   const oldWishes = alive(d.wishes).filter((w) => w.kind === 'movie');
+  const viewing = view ? d.movies[view] : undefined;
   const close = () => {
     setEdit(null);
-    if (sub) go('/hobby/movies');
+    if (sub === 'new') go('/movies');
   };
+  const tabBtn = (k: Tab, label: string) => (
+    <button role="tab" aria-selected={tab === k} className={tab === k ? 'on' : ''} onClick={() => go(k === 'now' ? '/movies' : `/movies/${k}`)}>
+      {label}
+    </button>
+  );
   return (
     <div className="st-page">
       <div className="st-page-head">
         <h2>영화</h2>
-        <button className="btn btn-sm btn-primary" onClick={() => setEdit('new')}>
+        <button className="btn btn-sm btn-primary" onClick={() => setEdit({})}>
           <Icon name="plus" /> 영화 넣기
         </button>
       </div>
-      <HobbyTabs on="movies" />
+      <div className="st-seg" role="tablist" aria-label="영화">
+        {tabBtn('now', '극장가')}
+        {tabBtn('watched', `본 영화${watched.length ? ` ${watched.length}` : ''}`)}
+        {tabBtn('want', `보고 싶어요${want.length ? ` ${want.length}` : ''}`)}
+      </div>
 
       {oldWishes.length > 0 && (
         <p className="st-hint">
@@ -66,8 +71,22 @@ export function Movies({ sub }: { sub?: string }) {
             onClick={() => {
               const now = Date.now();
               putMany([
-                ...oldWishes.map((w, i) => ({ c: 'movies' as const, item: { id: newId(), title: w.title, status: w.status === 'done' ? 'watched' : 'want', rating: w.rating, comment: w.note, watched: w.doneDate, created: now + i } as never })),
-                ...oldWishes.map((w) => ({ c: 'wishes' as const, item: { ...w, deleted: true } as never })),
+                ...oldWishes.map((w, i) => ({
+                  c: 'movies' as const,
+                  item: {
+                    id: newId(),
+                    title: w.title,
+                    status: w.status === 'done' ? 'watched' : 'want',
+                    rating: w.rating,
+                    comment: w.note,
+                    watched: w.doneDate,
+                    created: now + i,
+                  } as never,
+                })),
+                ...oldWishes.map((w) => ({
+                  c: 'wishes' as const,
+                  item: { ...w, deleted: true } as never,
+                })),
               ]);
               toast(`영화 ${oldWishes.length}편을 옮겼어요`);
             }}
@@ -77,102 +96,136 @@ export function Movies({ sub }: { sub?: string }) {
         </p>
       )}
 
-      {!all.length ? (
-        <Empty title="본 영화를 기록해 보세요">
-          <p>본 영화에 별점과 한줄평을 남기고, 보고 싶은 영화는 개봉일과 함께 모아 두세요.</p>
-          <button className="btn btn-primary" onClick={() => setEdit('new')}>
-            영화 넣기
-          </button>
-        </Empty>
-      ) : null}
-      {!all.length ? (
-        <section className="st-card">
-          <h3 className="st-h">극장가</h3>
-          <NowShowing today={today} />
-        </section>
-      ) : (
-        <>
-          <section className="st-card">
-            <div className="st-stat-row">
-              <div>
-                <small>본 영화</small>
-                <b>{watched.length}편</b>
-              </div>
-              <div>
-                <small>올해</small>
-                <b>{watched.filter((m) => m.watched?.startsWith(year)).length}편</b>
-              </div>
-              <div>
-                <small>평균 별점</small>
-                <b>{avg ?? '—'}</b>
-              </div>
-            </div>
-            {rated.length > 2 && <BarChart label="별점 분포" height={120} bars={dist} format={(v) => `${v}편`} />}
-          </section>
+      {tab === 'now' && <NowShowing today={today} onWatched={(m) => setEdit(m)} onOpen={(m) => (m.status === 'watched' ? setView(m.id) : setEdit(m))} />}
 
-          <div className="st-inline between wrap">
-            <div className="st-seg">
-              <button className={tab === 'watched' ? 'on' : ''} aria-pressed={tab === 'watched'} onClick={() => setTab('watched')}>
-                본 영화 {watched.length || ''}
-              </button>
-              <button className={tab === 'want' ? 'on' : ''} aria-pressed={tab === 'want'} onClick={() => setTab('want')}>
-                보고 싶어요 {want.length || ''}
-              </button>
-              <button className={tab === 'now' ? 'on' : ''} aria-pressed={tab === 'now'} onClick={() => setTab('now')}>
-                극장가
-              </button>
+      {tab === 'watched' &&
+        (!watched.length ? (
+          <Empty title="본 영화를 기록해 보세요">
+            <p>별점과 한줄 감상평, 긴 리뷰를 남길 수 있어요.</p>
+            <button className="btn btn-primary" onClick={() => setEdit({ status: 'watched' })}>
+              본 영화 넣기
+            </button>
+          </Empty>
+        ) : (
+          <>
+            <section className="st-card">
+              <div className="st-stat-row">
+                <div>
+                  <small>본 영화</small>
+                  <b>{watched.length}편</b>
+                </div>
+                <div>
+                  <small>올해</small>
+                  <b>{watched.filter((m) => m.watched?.startsWith(year)).length}편</b>
+                </div>
+                <div>
+                  <small>평균 별점</small>
+                  <b>{avg ?? '—'}</b>
+                </div>
+              </div>
+              {rated.length > 2 && <BarChart label="별점 분포" height={120} bars={dist} format={(v) => `${v}편`} />}
+            </section>
+            <select className="st-input sm mv-sort" value={sort} onChange={(e) => setSort(e.target.value as 'recent' | 'rating')} aria-label="정렬">
+              <option value="recent">최근 본 순</option>
+              <option value="rating">별점 높은 순</option>
+            </select>
+            <div className="mv-list">
+              {watched.map((m) => (
+                <article key={m.id} className="mv-card st-tap" {...tap(() => setView(m.id))}>
+                  <div className="mv-top">
+                    <b>{m.title}</b>
+                    {m.year && <small className="st-muted">{m.year}</small>}
+                  </div>
+                  <div className="mv-meta">
+                    <span className="mv-stars" aria-label={m.rating ? `별점 ${m.rating}` : '별점 없음'}>
+                      {starText(m.rating) || '별점 없음'}
+                    </span>
+                    <small className="st-muted">{[m.watched && shortDate(m.watched), m.where].filter(Boolean).join(' · ')}</small>
+                  </div>
+                  {m.comment && <p className="mv-comment">“{m.comment}”</p>}
+                  {m.review && <p className="mv-review">{m.review}</p>}
+                  {!m.comment && !m.review && <small className="st-muted">감상평 없음 · 눌러서 쓰기</small>}
+                </article>
+              ))}
             </div>
-            {tab === 'watched' && (
-              <select className="st-input sm" value={sort} onChange={(e) => setSort(e.target.value as 'recent' | 'rating')} aria-label="정렬">
-                <option value="recent">최근 본 순</option>
-                <option value="rating">별점 높은 순</option>
-              </select>
-            )}
-          </div>
+          </>
+        ))}
 
-          {tab === 'now' ? (
-            <NowShowing today={today} />
-          ) : (
+      {tab === 'want' &&
+        (!want.length ? (
+          <Empty title="보고 싶은 영화가 없어요">
+            <p>「극장가」에서 개봉 예정 영화를 담거나 직접 넣어 보세요.</p>
+            <button className="btn btn-primary" onClick={() => setEdit({ status: 'want' })}>
+              보고 싶은 영화 넣기
+            </button>
+          </Empty>
+        ) : (
           <div className="mv-list">
-            {(tab === 'watched' ? watched : want).map((m) => (
+            {want.map((m) => (
               <article key={m.id} className="mv-card st-tap" {...tap(() => setEdit(m))}>
                 <div className="mv-top">
                   <b>{m.title}</b>
                   {m.year && <small className="st-muted">{m.year}</small>}
                 </div>
-                {m.status === 'watched' ? (
-                  <>
-                    <div className="mv-meta">
-                      <span className="mv-stars" aria-label={m.rating ? `별점 ${m.rating}` : '별점 없음'}>
-                        {starText(m.rating) || '별점 없음'}
-                      </span>
-                      <small className="st-muted">{[m.watched && shortDate(m.watched), m.where].filter(Boolean).join(' · ')}</small>
-                    </div>
-                    {m.comment && <p className="mv-comment">{m.comment}</p>}
-                  </>
-                ) : (
-                  <div className="mv-meta">
-                    <small className="st-muted">{m.release ? `${shortDate(m.release)} 개봉${m.release >= today ? ` · ${dday(today, m.release)}` : ''}` : '개봉일 모름'}</small>
-                    <button
-                      className="btn btn-sm"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setEdit({ ...m, status: 'watched', watched: today });
-                      }}
-                    >
-                      봤어요
-                    </button>
-                  </div>
-                )}
+                <div className="mv-meta">
+                  <small className="st-muted">{m.release ? `${shortDate(m.release)} 개봉${m.release >= today ? ` · ${dday(today, m.release)}` : ''}` : '개봉일 모름'}</small>
+                  <button
+                    className="btn btn-sm"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setEdit({ ...m, status: 'watched', watched: today });
+                    }}
+                  >
+                    봤어요
+                  </button>
+                </div>
               </article>
             ))}
           </div>
-          )}
-        </>
+        ))}
+
+      {viewing && !viewing.deleted && (
+        <MovieView
+          item={viewing}
+          onClose={() => setView(null)}
+          onEdit={() => {
+            setEdit(viewing);
+            setView(null);
+          }}
+        />
       )}
-      <p className="st-hint">「극장가」의 박스오피스·개봉 예정 정보는 영화진흥위원회(KOBIS) 오픈 API 에서 받아요. 왓챠피디아와는 연결하지 않았어요.</p>
-      {edit && <MovieSheet item={edit === 'new' ? undefined : edit} today={today} onClose={close} />}
+      {edit && <MovieSheet item={edit} today={today} onClose={close} />}
     </div>
+  );
+}
+
+/** 본 영화 하나: 별점 · 한줄 감상평 · 리뷰 전체 */
+function MovieView({ item, onClose, onEdit }: { item: Movie; onClose: () => void; onEdit: () => void }) {
+  return (
+    <Sheet title={item.title} onClose={onClose}>
+      <div className="mv-view">
+        <div className="mv-meta">
+          <span className="mv-stars big" aria-label={item.rating ? `별점 ${item.rating}` : '별점 없음'}>
+            {starText(item.rating) || '별점 없음'} {item.rating ? <b>{item.rating.toFixed(1)}</b> : null}
+          </span>
+          <small className="st-muted">{[item.year && `${item.year}년 작`, item.watched && `${shortDate(item.watched)}에 봄`, item.where].filter(Boolean).join(' · ')}</small>
+        </div>
+        {item.comment && <blockquote className="mv-quote">{item.comment}</blockquote>}
+        {item.review ? (
+          <div className="mv-review-full">
+            <small className="st-muted">리뷰</small>
+            <p>{item.review}</p>
+          </div>
+        ) : (
+          !item.comment && <p className="st-muted">아직 감상평이 없어요.</p>
+        )}
+        <div className="st-row end">
+          <button className="btn btn-primary" onClick={onEdit}>
+            {item.comment || item.review ? '고치기' : '감상평 쓰기'}
+          </button>
+        </div>
+      </div>
+    </Sheet>
   );
 }
 
@@ -198,21 +251,22 @@ function StarInput({ value, onChange }: { value: number; onChange: (v: number) =
   );
 }
 
-function MovieSheet({ item, today, onClose }: { item?: Movie; today: string; onClose: () => void }) {
+function MovieSheet({ item, today, onClose }: { item: Partial<Movie>; today: string; onClose: () => void }) {
   const [title, setTitle] = useState(item?.title ?? '');
   const [year, setYear] = useState(item?.year?.toString() ?? '');
   const [status, setStatus] = useState<Movie['status']>(item?.status ?? 'watched');
   const [rating, setRating] = useState(item?.rating ?? 0);
   const [comment, setComment] = useState(item?.comment ?? '');
+  const [review, setReview] = useState(item?.review ?? '');
   const [watched, setWatched] = useState(item?.watched ?? today);
   const [release, setRelease] = useState(item?.release ?? '');
   const [where, setWhere] = useState(item?.where ?? '');
-  const isNew = !item;
+  const isNew = !item.id;
   return (
-    <Sheet title={isNew ? '영화 넣기' : '영화 고치기'} onClose={onClose}>
+    <Sheet title={isNew ? (item.title ? `「${item.title}」` : '영화 넣기') : '영화 고치기'} onClose={onClose}>
       <div className="st-form">
         <div className="st-inline">
-          <input className="st-input" autoFocus={!item} value={title} onChange={(e) => setTitle(e.target.value)} placeholder="영화 제목" aria-label="영화 제목" />
+          <input className="st-input" autoFocus={!item.title} value={title} onChange={(e) => setTitle(e.target.value)} placeholder="영화 제목" aria-label="영화 제목" />
           <input className="st-input xs" inputMode="numeric" value={year} onChange={(e) => setYear(e.target.value.replace(/\D/g, '').slice(0, 4))} placeholder="연도" aria-label="개봉 연도 (선택)" />
         </div>
         <div className="st-seg">
@@ -226,7 +280,12 @@ function MovieSheet({ item, today, onClose }: { item?: Movie; today: string; onC
         {status === 'watched' ? (
           <>
             <StarInput value={rating} onChange={setRating} />
-            <textarea className="st-input" rows={4} value={comment} onChange={(e) => setComment(e.target.value)} placeholder="한줄평 · 느낀 점" aria-label="코멘트" />
+            <Field label="한줄 감상평">
+              <textarea className="st-input" rows={2} value={comment} onChange={(e) => setComment(e.target.value)} placeholder="한 문장으로 남기기" aria-label="한줄 감상평" />
+            </Field>
+            <Field label={`리뷰${review.trim() ? ` · ${review.trim().length.toLocaleString('ko-KR')}자` : ''}`}>
+              <textarea className="st-input mv-review-input" rows={8} value={review} onChange={(e) => setReview(e.target.value)} placeholder="줄거리, 좋았던 장면, 아쉬운 점… 길게 써도 돼요" aria-label="리뷰" />
+            </Field>
             <div className="st-inline wrap">
               <label className="st-cond-time">
                 본 날
@@ -250,8 +309,8 @@ function MovieSheet({ item, today, onClose }: { item?: Movie; today: string; onC
           </label>
         )}
         <div className="st-row end">
-          {item && (
-            <button className="btn btn-sm st-danger" onClick={() => confirmDelete(`「${item.title}」`) && (remove('movies', item.id), onClose())}>
+          {item.id && (
+            <button className="btn btn-sm st-danger" onClick={() => confirmDelete(`「${item.title}」`) && (remove('movies', item.id!), onClose())}>
               지우기
             </button>
           )}
@@ -261,13 +320,15 @@ function MovieSheet({ item, today, onClose }: { item?: Movie; today: string; onC
             onClick={() => {
               const y = Number(year);
               put('movies', {
-                ...(item ?? { created: Date.now() }),
-                id: item?.id ?? newId(),
+                ...item,
+                created: item.created ?? Date.now(),
+                id: item.id ?? newId(),
                 title: title.trim().slice(0, 80),
                 year: y >= 1880 && y <= 2200 ? y : undefined,
                 status,
                 rating: status === 'watched' && rating ? rating : undefined,
-                comment: status === 'watched' ? comment.trim() || undefined : item?.comment,
+                comment: status === 'watched' ? comment.trim() || undefined : item.comment,
+                review: status === 'watched' ? review.trim() || undefined : item.review,
                 watched: status === 'watched' ? watched || undefined : undefined,
                 release: release || undefined,
                 where: status === 'watched' ? where || undefined : undefined,
@@ -284,8 +345,8 @@ function MovieSheet({ item, today, onClose }: { item?: Movie; today: string; onC
   );
 }
 
-/** 어제 박스오피스 · 앞으로 90일 개봉 예정 (KOBIS) */
-function NowShowing({ today }: { today: string }) {
+/** 어제 박스오피스 · 앞으로 90일 개봉 예정 (KOBIS). 내 목록에 있으면 그 상태를 보여 준다 */
+function NowShowing({ today, onWatched, onOpen }: { today: string; onWatched: (m: Partial<Movie>) => void; onOpen: (m: Movie) => void }) {
   const d = useStudy();
   const [info, setInfo] = useState<KobisInfo | null>(null);
   const [err, setErr] = useState('');
@@ -298,10 +359,46 @@ function NowShowing({ today }: { today: string }) {
       on = false;
     };
   }, []);
-  const have = new Set(alive(d.movies).map((m) => m.title.replace(/\s+/g, '')));
+  const mine = new Map(alive(d.movies).map((m) => [norm(m.title), m]));
   const add = (title: string, release?: string) => {
-    put('movies', { id: newId(), title, status: 'want', release, created: Date.now() } as Movie);
+    put('movies', {
+      id: newId(),
+      title,
+      status: 'want',
+      release,
+      created: Date.now(),
+    } as Movie);
     toast(`「${title}」 보고 싶어요에 넣었어요`);
+  };
+  const actions = (title: string, open?: string) => {
+    const m = mine.get(norm(title));
+    if (m)
+      return (
+        <button className={`mv-mine ${m.status}`} onClick={() => onOpen(m)}>
+          {m.status === 'watched' ? (m.rating ? `★ ${m.rating.toFixed(1)}` : '봤어요') : '보고 싶어요 ✓'}
+        </button>
+      );
+    return (
+      <div className="mv-acts">
+        <button className="btn btn-sm" onClick={() => add(title, open)}>
+          보고 싶어요
+        </button>
+        <button
+          className="btn btn-sm"
+          onClick={() =>
+            onWatched({
+              title,
+              release: open,
+              status: 'watched',
+              watched: today,
+              where: '극장',
+            })
+          }
+        >
+          봤어요
+        </button>
+      </div>
+    );
   };
   if (err) return <p className="st-hint bad">{err}</p>;
   if (!info) return <p className="st-muted">영화 정보를 받는 중…</p>;
@@ -318,20 +415,16 @@ function NowShowing({ today }: { today: string }) {
                 <div className="st-item-title">{m.title}</div>
                 <div className="st-item-sub">{[m.open && `${shortDate(m.open)} 개봉`, m.audience && `누적 ${m.audience.toLocaleString('ko-KR')}명`].filter(Boolean).join(' · ')}</div>
               </div>
-              {!have.has(m.title.replace(/\s+/g, '')) && (
-                <button className="btn btn-sm" onClick={() => add(m.title, m.open)}>
-                  보고 싶어요
-                </button>
-              )}
+              {actions(m.title, m.open)}
             </div>
           ))}
         </section>
       )}
       {info.upcoming && (
         <section className="st-card">
-          <h3 className="st-h">개봉 예정 (90일 안)</h3>
+          <h3 className="st-h">개봉 예정 (90일 안) · {info.upcoming.length}편</h3>
           {!info.upcoming.length && <p className="st-hint">찾은 개봉 예정 영화가 없어요.</p>}
-          {info.upcoming.slice(0, 60).map((m) => (
+          {info.upcoming.map((m) => (
             <div key={m.code} className="st-item">
               <small className="st-muted nowrap mv-open">
                 {shortDate(m.open)}
@@ -342,7 +435,9 @@ function NowShowing({ today }: { today: string }) {
                 <div className="st-item-title">{m.title}</div>
                 <div className="st-item-sub">{[m.genre, m.nation, m.director].filter(Boolean).join(' · ')}</div>
               </div>
-              {!have.has(m.title.replace(/\s+/g, '')) && (
+              {mine.has(norm(m.title)) ? (
+                actions(m.title, m.open)
+              ) : (
                 <button className="btn btn-sm" onClick={() => add(m.title, m.open)}>
                   보고 싶어요
                 </button>

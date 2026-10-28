@@ -64,6 +64,29 @@ export function makeQuestions(words: Word[], kinds: QKind[], count: number, pool
   });
 }
 
+/** 같은 씨앗이면 같은 순서가 나오는 난수 */
+export function seeded(seed: number): () => number {
+  let x = (seed * 9301 + 49297) % 233280;
+  return () => (x = (x * 9301 + 49297) % 233280) / 233280;
+}
+
+/**
+ * 단어를 한 번 섞어 size 개씩 시험지로 나눈다: 모든 단어가 어느 시험지엔가 꼭 한 번 나온다.
+ * 마지막 시험지가 모자라면 다른 시험지의 단어로 채운다. size 가 0 이거나 전체보다 크면 한 장에 전부.
+ */
+export function splitSets<T>(items: T[], size: number, rand: () => number): T[][] {
+  const order = shuffle(items, rand);
+  if (!size || size >= order.length) return [order];
+  const sets: T[][] = [];
+  for (let i = 0; i < order.length; i += size) sets.push(order.slice(i, i + size));
+  const last = sets[sets.length - 1];
+  if (last.length < size) {
+    const inLast = new Set(last);
+    last.push(...shuffle(order.filter((x) => !inLast.has(x)), rand).slice(0, size - last.length));
+  }
+  return sets;
+}
+
 /** 쓴 답이 맞는지 (영어: 대소문자·앞뒤 공백·끝 문장부호 무시) */
 export function sameAnswer(given: string, answer: string): boolean {
   const n = (s: string) => s.trim().toLowerCase().replace(/[.!?,;]+$/, '').replace(/\s+/g, ' ');

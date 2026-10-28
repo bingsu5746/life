@@ -5,7 +5,7 @@ import { isLoggedIn } from '../auth/api';
 import { alive } from './model';
 import { listWords } from './select';
 import { useStudy, useWords } from './store';
-import { makeQuestions, QKIND_NAME, type QKind } from './wordTest';
+import { makeQuestions, QKIND_NAME, seeded, splitSets, type QKind } from './wordTest';
 import { go, toast } from './ui';
 
 export function WordTestSheet({ listId }: { listId: string }) {
@@ -19,18 +19,25 @@ export function WordTestSheet({ listId }: { listId: string }) {
   const [from, setFrom] = useState(days[0] ?? 0);
   const [to, setTo] = useState(days[days.length - 1] ?? 0);
   const [seed, setSeed] = useState(1);
+  const [setNo, setSetNo] = useState(0);
   const [answers, setAnswers] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
   const picked = days.length ? ws.filter((w) => w.day === undefined || (w.day >= from && w.day <= to)) : ws;
   const withEx = picked.filter((w) => w.example).length;
   const wantsEx = kinds.some((k) => k === 'blank' || k === 'blankChoice');
-  // 다시 만들기를 누를 때만 섞는다 (그리는 동안 문제가 바뀌지 않게)
-  const qs = useMemo(() => {
-    let x = seed * 9301 + 49297;
-    const rand = () => ((x = (x * 9301 + 49297) % 233280) / 233280);
-    return makeQuestions(picked, kinds, count, alive(words), rand);
+  // 다시 섞기를 누를 때만 섞는다 (그리는 동안 문제가 바뀌지 않게).
+  // 단어를 한 번 섞어 count 개씩 시험지 여러 장으로 나누므로, 모든 장을 풀면 모든 단어가 한 번씩은 나온다
+  const sets = useMemo(
+    () => splitSets(picked, count, seeded(seed)),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [seed, kinds, count, from, to, listId, picked.length]);
+    [seed, count, from, to, listId, picked.length],
+  );
+  const cur = Math.min(setNo, sets.length - 1);
+  const qs = useMemo(
+    () => makeQuestions(sets[cur] ?? [], kinds, Infinity, alive(words), seeded(seed * 31 + cur)),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [sets, cur, kinds],
+  );
 
   if (!list || list.deleted) return null;
 
@@ -69,19 +76,43 @@ export function WordTestSheet({ listId }: { listId: string }) {
         </div>
         <div className="st-inline wrap">
           <span>문제 수</span>
-          {[10, 20, 30, 50].map((n) => (
-            <button key={n} type="button" className={`st-chip ${count === n ? 'on' : ''}`} aria-pressed={count === n} onClick={() => setCount(n)}>
-              {n}
+          {[10, 20, 30, 50, 100, 0].map((n) => (
+            <button
+              key={n}
+              type="button"
+              className={`st-chip ${count === n ? 'on' : ''}`}
+              aria-pressed={count === n}
+              onClick={() => {
+                setCount(n);
+                setSetNo(0);
+              }}
+            >
+              {n || `전부 ${picked.length}`}
             </button>
           ))}
           {days.length > 1 && (
             <>
               <span>Day</span>
-              <input className="st-input xs" inputMode="numeric" value={from} onChange={(e) => setFrom(Number(e.target.value.replace(/\D/g, '')) || 0)} aria-label="시작 Day" />~
+              <input className="st-input xs" inputMode="numeric" value={from} onChange={(e) => setFrom(Number(e.target.value.replace(/\D/g, '')) || 0)} aria-label="시작 Day" />
+              ~
               <input className="st-input xs" inputMode="numeric" value={to} onChange={(e) => setTo(Number(e.target.value.replace(/\D/g, '')) || 0)} aria-label="끝 Day" />
             </>
           )}
         </div>
+        {sets.length > 1 && (
+          <div className="st-inline wrap">
+            <span>시험지</span>
+            {sets.map((_, i) => (
+              <button key={i} type="button" className={`st-chip ${cur === i ? 'on' : ''}`} aria-pressed={cur === i} onClick={() => setSetNo(i)}>
+                {i + 1}
+              </button>
+            ))}
+            <small className="st-muted">
+              {picked.length}단어를 {sets.length}장에 나눴어요. 모두 풀면 모든 단어가 한 번씩 나와요
+              {picked.length % count ? ` (마지막 장은 앞 장 단어로 ${count - (picked.length % count)}개를 채움)` : ''}.
+            </small>
+          </div>
+        )}
         {wantsEx && (
           <p className="st-hint">
             예문이 있는 단어 {withEx}/{picked.length}개. 예문이 없는 단어의 빈칸 문제는 뜻 쓰기로 바뀌어요.{' '}
@@ -93,7 +124,13 @@ export function WordTestSheet({ listId }: { listId: string }) {
           </p>
         )}
         <div className="st-row">
-          <button className="btn btn-sm" onClick={() => setSeed(seed + 1)}>
+          <button
+            className="btn btn-sm"
+            onClick={() => {
+              setSeed(seed + 1);
+              setSetNo(0);
+            }}
+          >
             다시 섞기
           </button>
           <label className="st-toggle">
@@ -107,7 +144,10 @@ export function WordTestSheet({ listId }: { listId: string }) {
 
       <article className="wt-paper">
         <header className="wt-head">
-          <b>{list.name}</b>
+          <b>
+            {list.name}
+            {sets.length > 1 ? ` · ${cur + 1}/${sets.length}` : ''}
+          </b>
           <span>
             {qs.length}문제 · 이름 ________ · 점수 ____/{qs.length}
           </span>

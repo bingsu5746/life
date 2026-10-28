@@ -88,7 +88,7 @@ export async function fetchBoxOffice(key: string, yesterday: string): Promise<Bo
 }
 
 /** 개봉 예정: 올해·내년 개봉 영화 목록을 몇 쪽 받아 오늘부터 days 일 안의 것 */
-export async function fetchUpcoming(key: string, today: string, to: string, pages = 5): Promise<UpcomingItem[]> {
+export async function fetchUpcoming(key: string, today: string, to: string, pages = 30): Promise<UpcomingItem[]> {
   const y = Number(today.slice(0, 4));
   const seen = new Map<string, UpcomingItem>();
   for (let p = 1; p <= pages; p++) {

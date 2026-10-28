@@ -206,6 +206,7 @@ const ICON_PATHS: Record<string, string> = {
   'area-fitness': 'M3 10v4M6 7v10M18 7v10M21 10v4M6 12h12',
   'area-money': 'M3 7h18v10H3zM12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM6 10v.01M18 14v.01',
   'area-hobby': 'M12 3l2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1-4.4-4.3 6.1-.9z',
+  'area-movies': 'M4 5h16v14H4zM8 5v14M16 5v14M4 9h4M4 15h4M16 9h4M16 15h4',
   'area-diary': 'M6 3h11a1 1 0 0 1 1 1v16a1 1 0 0 1-1 1H6a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2zM8 8h7M8 12h7M8 16h4',
   translate: 'M4 5h8M8 3v2M10 5c-.5 3.5-2.5 6-5.5 7.5M6 8c1 2 2.6 3.4 4.5 4.2M13 20l4-9 4 9M14.4 17h5.2',
   preview: 'M4 6h16M4 12h9M4 18h6M15 15l3 3-3 3M13 18h5',

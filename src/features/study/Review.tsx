@@ -9,7 +9,7 @@ import { addPhoto, photoBlob, photoUrl, removePhoto } from './photos';
 import { BlankRun, Blanks } from './Blanks';
 import { requeue } from './wordSession';
 import { Bar, confirmDelete, Empty, Field, go, Menu, Sheet, SubjectDot, SubjectPicker, SubjectTag, subjectsOf, toast, useToday, tap } from './ui';
-import { KeyHelp, RunCard } from './Words';
+import { SwipeCard } from './SwipeCard';
 
 export function Review({ sub }: { sub?: string }) {
   if (sub === 'redo') return <NoteRun />;
@@ -201,15 +201,7 @@ function Comments({ list, today, onChange, autoFocus }: { list: NoteComment[]; t
         </div>
       ))}
       <div className="st-inline">
-        <input
-          className="st-input"
-          value={text}
-          autoFocus={autoFocus}
-          onChange={(e) => setText(e.target.value)}
-          onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), add())}
-          placeholder="예: 부호 바꿀 때 괄호 먼저 / 조건 「정수」 놓치지 않기"
-          aria-label="나에게 한마디"
-        />
+        <input className="st-input" value={text} autoFocus={autoFocus} onChange={(e) => setText(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), add())} placeholder="예: 부호 바꿀 때 괄호 먼저 / 조건 「정수」 놓치지 않기" aria-label="나에게 한마디" />
         <button type="button" className="btn btn-sm" disabled={!text.trim()} onClick={add}>
           남기기
         </button>
@@ -263,7 +255,10 @@ function NoteSheet({ note, today, onClose }: { note?: WrongNote; today: string; 
       const t = all.replace(/\n{3,}/g, '\n\n').trim();
       if (!t) toast('사진에서 글자를 찾지 못했어요');
       else {
-        setF((x) => ({ ...x, question: x.question.trim() ? `${x.question.trim()}\n${t}` : t }));
+        setF((x) => ({
+          ...x,
+          question: x.question.trim() ? `${x.question.trim()}\n${t}` : t,
+        }));
         toast('읽은 글을 「문제」 칸에 넣었어요. 틀린 글자는 고쳐 주세요');
       }
     } catch {
@@ -298,8 +293,27 @@ function NoteSheet({ note, today, onClose }: { note?: WrongNote; today: string; 
   }
   function save() {
     if (!f.subjectId) return toast('과목을 골라 주세요');
-    const base = note ?? { id: newId(), created: Date.now(), box: 1, due: today, wrong: 1 };
-    put('notes', { ...base, subjectId: f.subjectId, bookId: f.bookId || undefined, page: f.page ? Number(f.page) : undefined, number: f.number || undefined, question: f.question, photos: f.photos, myAnswer: f.myAnswer, answer: f.answer, reason: f.reason, memo: f.memo, comments: f.comments.length ? f.comments : undefined });
+    const base = note ?? {
+      id: newId(),
+      created: Date.now(),
+      box: 1,
+      due: today,
+      wrong: 1,
+    };
+    put('notes', {
+      ...base,
+      subjectId: f.subjectId,
+      bookId: f.bookId || undefined,
+      page: f.page ? Number(f.page) : undefined,
+      number: f.number || undefined,
+      question: f.question,
+      photos: f.photos,
+      myAnswer: f.myAnswer,
+      answer: f.answer,
+      reason: f.reason,
+      memo: f.memo,
+      comments: f.comments.length ? f.comments : undefined,
+    });
     // 뺀 사진은 저장할 때 지운다 (취소하면 그대로 남게)
     for (const p of note?.photos ?? []) if (!f.photos.includes(p)) void removePhoto(p);
     saved.current = true;
@@ -468,7 +482,9 @@ function NoteRun() {
           <div className="nt-remind">
             <small>지난번 나에게 한마디</small>
             {n.comments.slice(-3).map((c) => (
-              <div key={c.id} className="nt-remind-line">{c.text}</div>
+              <div key={c.id} className="nt-remind-line">
+                {c.text}
+              </div>
             ))}
           </div>
         ) : null}
@@ -605,7 +621,10 @@ export function parseCards(text: string): { front: string; back: string }[] {
     .filter(Boolean)
     .map((l) => {
       const m = l.split(/\t|\s*\|\s*|\s+[-–—]\s+/);
-      return { front: (m[0] ?? '').trim(), back: m.slice(1).join(' / ').trim() };
+      return {
+        front: (m[0] ?? '').trim(),
+        back: m.slice(1).join(' / ').trim(),
+      };
     })
     .filter((c) => c.front && c.back);
 }
@@ -646,7 +665,14 @@ function DeckView({ id }: { id: string }) {
         />
       </div>
       <section className="st-card st-form">
-        <Field label="카드 한꺼번에 넣기" hint={<>한 줄에 카드 하나: <code>앞면 | 뒷면</code> · 엑셀·시트에서 두 칸 복사 · <code>앞 - 뒤</code></>}>
+        <Field
+          label="카드 한꺼번에 넣기"
+          hint={
+            <>
+              한 줄에 카드 하나: <code>앞면 | 뒷면</code> · 엑셀·시트에서 두 칸 복사 · <code>앞 - 뒤</code>
+            </>
+          }
+        >
           <textarea className="st-input mono" rows={5} value={text} onChange={(e) => setText(e.target.value)} placeholder={'임진왜란 | 1592\n광합성 장소 | 엽록체'} />
         </Field>
         <div className="st-row end">
@@ -656,7 +682,21 @@ function DeckView({ id }: { id: string }) {
             onClick={() => {
               {
                 const now = Date.now();
-                putMany(parsed.map((c, i) => ({ c: 'cards' as const, item: { id: newId(), deckId: id, front: c.front, back: c.back, box: 0, due: today, wrong: 0, created: now + i } })));
+                putMany(
+                  parsed.map((c, i) => ({
+                    c: 'cards' as const,
+                    item: {
+                      id: newId(),
+                      deckId: id,
+                      front: c.front,
+                      back: c.back,
+                      box: 0,
+                      due: today,
+                      wrong: 0,
+                      created: now + i,
+                    },
+                  })),
+                );
               }
               setText('');
               toast(`${parsed.length}장을 넣었어요`);
@@ -727,7 +767,6 @@ function CardRun() {
   });
   const [total] = useState(queue.length);
   const [first, setFirst] = useState<Map<string, boolean>>(new Map());
-  const [shown, setShown] = useState(false);
   const d = useStudy();
   const c = queue.length ? d.cards[queue[0]] : null;
   if (!c)
@@ -747,11 +786,13 @@ function CardRun() {
   function reply(ok: boolean) {
     if (!first.has(c!.id)) {
       const s = getStudy().settings;
-      put('cards', { ...answer(c!, ok, 'card', today, s.intervals, s.quizMaxBox), firstSeen: c!.firstSeen ?? today });
+      put('cards', {
+        ...answer(c!, ok, 'card', today, s.intervals, s.quizMaxBox),
+        firstSeen: c!.firstSeen ?? today,
+      });
       setFirst(new Map(first).set(c!.id, ok));
     }
     setQueue(requeue(queue, ok));
-    setShown(false);
   }
   return (
     <div className="st-run">
@@ -764,26 +805,7 @@ function CardRun() {
           <input type="checkbox" checked={flip} onChange={(e) => setFlip(e.target.checked)} /> 뒤→앞
         </label>
       </div>
-      <RunCard key={c.id + queue.length} ask={flip ? c.back : c.front} sub={d.decks[c.deckId]?.name}>
-        {shown ? (
-          <>
-            <div className="st-answer">{flip ? c.front : c.back}</div>
-            <div className="st-row center">
-              <button className="btn btn-lg st-no" onClick={() => reply(false)}>
-                몰랐다
-              </button>
-              <button className="btn btn-lg st-yes" onClick={() => reply(true)}>
-                알았다
-              </button>
-            </div>
-          </>
-        ) : (
-          <button className="btn btn-lg btn-primary" onClick={() => setShown(true)}>
-            답 보기
-          </button>
-        )}
-      </RunCard>
-      <KeyHelp quiz={false} shown={shown} onShow={() => setShown(true)} onReply={reply} onPick={() => {}} />
+      <SwipeCard key={`${c.id}:${queue.length}`} front={flip ? c.back : c.front} back={(flip ? c.front : c.back) || '(내용 없음)'} sub={d.decks[c.deckId]?.name} onAnswer={reply} />
     </div>
   );
 }

@@ -19,6 +19,7 @@ export const AREAS = [
   { key: 'fitness', label: '운동' },
   { key: 'money', label: '돈' },
   { key: 'hobby', label: '취미' },
+  { key: 'movies', label: '영화' },
   { key: 'diary', label: '일기' },
 ] as const;
 export type AreaKey = (typeof AREAS)[number]['key'];

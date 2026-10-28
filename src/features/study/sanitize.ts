@@ -178,6 +178,7 @@ const FIX: Record<Collection, Fix> = {
     status: x.status === 'watched' ? 'watched' : 'want',
     rating: typeof x.rating === 'number' && x.rating >= 0.5 && x.rating <= 5 ? Math.round(x.rating * 2) / 2 : undefined,
     comment: optStr(x.comment)?.slice(0, 2000),
+    review: optStr(x.review)?.slice(0, 20000),
     watched: optDate(x.watched),
     release: optDate(x.release),
     where: optStr(x.where)?.slice(0, 20),

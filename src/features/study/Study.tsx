@@ -23,13 +23,14 @@ const Home = lazy(() => import('../life/Home').then((m) => ({ default: m.Home })
 const Fitness = lazy(() => import('../life/Fitness').then((m) => ({ default: m.Fitness })));
 const Money = lazy(() => import('../life/Money').then((m) => ({ default: m.Money })));
 const Hobby = lazy(() => import('../life/Hobby').then((m) => ({ default: m.Hobby })));
+const Movies = lazy(() => import('../life/Movies').then((m) => ({ default: m.Movies })));
 const Diary = lazy(() => import('../life/Diary').then((m) => ({ default: m.Diary })));
 const Preview = lazy(() => import('./Preview').then((m) => ({ default: m.Preview })));
 const Translate = lazy(() => import('./Translate').then((m) => ({ default: m.Translate })));
 const Tutors = lazy(() => import('./Tutors').then((m) => ({ default: m.Tutors })));
 const Words = lazy(() => import('./Words').then((m) => ({ default: m.Words })));
 
-const PRELOAD = [() => import('../life/Home'), () => import('../life/Fitness'), () => import('../life/Money'), () => import('../life/Hobby'), () => import('../life/Diary'), () => import('./Books'), () => import('./Life'), () => import('./Review'), () => import('./Settings'), () => import('./Time'), () => import('./Translate'), () => import('./Preview'), () => import('./Tutors'), () => import('./Words')];
+const PRELOAD = [() => import('../life/Home'), () => import('../life/Fitness'), () => import('../life/Money'), () => import('../life/Hobby'), () => import('../life/Movies'), () => import('../life/Diary'), () => import('./Books'), () => import('./Life'), () => import('./Review'), () => import('./Settings'), () => import('./Time'), () => import('./Translate'), () => import('./Preview'), () => import('./Tutors'), () => import('./Words')];
 
 import { AREAS, TABS, type AreaKey } from './tabs';
 export { TABS };
@@ -40,7 +41,7 @@ export function Study({ path, loggedIn, syncReady = true, onLogin }: { path: str
   const d = useStudy();
   const words = useWords();
   const today = useToday();
-  // 영역: 주소 맨 앞이 없으면 메인, fitness·money·hobby 면 그 영역, 그 밖(study·공부 칸들·설정)은 공부
+  // 영역: 주소 맨 앞이 없으면 메인, fitness·money·hobby·movies 면 그 영역, 그 밖(study·공부 칸들·설정)은 공부
   const p0 = path[0];
   const area: AreaKey = !p0 ? 'home' : (AREAS.some((a) => a.key === p0) && p0 !== 'study' ? p0 : 'study') as AreaKey;
   const spath = p0 === 'study' ? path.slice(1) : path;
@@ -83,6 +84,7 @@ export function Study({ path, loggedIn, syncReady = true, onLogin }: { path: str
   else if (area === 'fitness') content = <Fitness sub={path[1]} sub2={path[2]} />;
   else if (area === 'money') content = <Money sub={path[1]} />;
   else if (area === 'hobby') content = <Hobby sub={path[1]} sub2={path[2]} />;
+  else if (area === 'movies') content = <Movies sub={path[1]} />;
   else if (area === 'diary') content = <Diary sub={path[1]} />;
   else if (tab === 'books') content = <Books id={id} sub={sub} />;
   else if (tab === 'tutor') content = <Tutors sub={id} />;

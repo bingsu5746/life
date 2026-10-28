@@ -7,6 +7,7 @@ import { getWords, putWords, useStudy, useWords } from './store';
 import { makeQuestions, sameAnswer, splitExample, type Question } from './wordTest';
 import { choicesFor } from './wordSession';
 import { go, toast } from './ui';
+import { SwipeCard } from './SwipeCard';
 
 type PMode = 'card' | 'choice' | 'blank' | 'listen';
 const MODE_NAME: Record<PMode, string> = { card: '카드 넘기기', choice: '4지선다', blank: '예문 빈칸', listen: '듣고 쓰기' };
@@ -140,7 +141,6 @@ export function Practice({ listId }: { listId?: string }) {
 function Run({ items, mode, dir, onExit, onRetry }: { items: Item[]; mode: PMode; dir: 'en' | 'ko'; onExit: () => void; onRetry: (ws: Word[]) => void }) {
   const [i, setI] = useState(0);
   const [result, setResult] = useState<boolean[]>([]);
-  const [shown, setShown] = useState(false);
   const [picked, setPicked] = useState<string | null>(null);
   const [typed, setTyped] = useState('');
   const input = useRef<HTMLInputElement>(null);
@@ -157,7 +157,6 @@ function Run({ items, mode, dir, onExit, onRetry }: { items: Item[]; mode: PMode
   }
   function next() {
     setI(i + 1);
-    setShown(false);
     setPicked(null);
     setTyped('');
     if (mode === 'listen' && items[i + 1]) setTimeout(() => speak(items[i + 1].w.term), 200);
@@ -217,23 +216,17 @@ function Run({ items, mode, dir, onExit, onRetry }: { items: Item[]; mode: PMode
       </div>
 
       {mode === 'card' && (
-        <section className="st-card pr-card" onClick={() => setShown(true)}>
-          <div className="pr-front" lang={dir === 'en' ? 'en' : 'ko'}>
-            {front}
-          </div>
-          {shown ? <div className="pr-back">{back}</div> : <small className="st-muted">눌러서 뒤집기</small>}
-          {w.example && shown && <small className="st-muted pr-ex">{w.example.s.replace(/\[|\]/g, '')}</small>}
-        </section>
-      )}
-      {mode === 'card' && shown && (
-        <div className="st-row center">
-          <button className="btn btn-lg" onClick={() => (record(false), next())}>
-            몰랐어요
-          </button>
-          <button className="btn btn-primary btn-lg" onClick={() => (record(true), next())}>
-            알았어요
-          </button>
-        </div>
+        <SwipeCard
+          key={`${w.id}:${i}`}
+          front={<span lang={dir === 'en' ? 'en' : 'ko'}>{front}</span>}
+          back={
+            <>
+              <span>{back}</span>
+              {w.example && <small className="sw-ex">{w.example.s.replace(/\[|\]/g, '')}</small>}
+            </>
+          }
+          onAnswer={(ok) => (record(ok), next())}
+        />
       )}
 
       {(mode === 'choice' || mode === 'blank') && (

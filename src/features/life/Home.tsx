@@ -35,11 +35,22 @@ export function Home(_: { loggedIn: boolean; onLogin: () => void }) {
   const hw = hobbyWeek(alive(d.hobbyLogs), ws);
   const hobbyMin = [...hw.values()].reduce((a, b) => a + b, 0);
   const doing = alive(d.wishes).filter((w) => w.status === 'doing');
+  // 영화
+  const movies = alive(d.movies);
+  const seen = movies.filter((m) => m.status === 'watched');
+  const nextOpen = movies.filter((m) => m.status === 'want' && m.release && m.release >= today).sort((a, b) => a.release!.localeCompare(b.release!))[0];
   // 일기
   const diaryToday = d.diary[today] && !d.diary[today].deleted;
   const diaryMonth = alive(d.diary).filter((e) => monthOf(e.id) === monthOf(today)).length;
 
-  const cards: Record<string, { lines: string[]; action?: { label: string; to: string }; badge?: { big: string; small: string } }> = {
+  const cards: Record<
+    string,
+    {
+      lines: string[];
+      action?: { label: string; to: string };
+      badge?: { big: string; small: string };
+    }
+  > = {
     study: {
       lines: [sum.total ? (sum.left ? `오늘 할 것 ${sum.left}개 남음` : '오늘 할 것 끝') : '오늘 정해 둔 공부가 없어요', `오늘 공부 ${minutesText(studied)}`],
       badge: exam ? { big: dday(today, exam.date), small: exam.name } : undefined,
@@ -53,11 +64,27 @@ export function Home(_: { loggedIn: boolean; onLogin: () => void }) {
       action: { label: '쓴 것 적기', to: '/money/new' },
     },
     hobby: {
-      lines: [`이번 주 취미 ${minutesText(hobbyMin)}`, doing.length ? `하는 중: ${doing.slice(0, 2).map((w) => w.title).join(', ')}` : ''].filter(Boolean),
+      lines: [
+        `이번 주 취미 ${minutesText(hobbyMin)}`,
+        doing.length
+          ? `하는 중: ${doing
+              .slice(0, 2)
+              .map((w) => w.title)
+              .join(', ')}`
+          : '',
+      ].filter(Boolean),
+    },
+    movies: {
+      lines: [`본 영화 ${seen.length}편 · 올해 ${seen.filter((m) => m.watched?.startsWith(today.slice(0, 4))).length}편`, `보고 싶어요 ${movies.length - seen.length}편`],
+      badge: nextOpen ? { big: dday(today, nextOpen.release!), small: nextOpen.title } : undefined,
+      action: { label: '극장가', to: '/movies' },
     },
     diary: {
       lines: [diaryToday ? '오늘 일기를 썼어요' : '오늘 일기를 아직 안 썼어요', `이번 달 ${diaryMonth}편`],
-      action: { label: diaryToday ? '오늘 일기 보기' : '오늘 일기 쓰기', to: `/diary/${today}` },
+      action: {
+        label: diaryToday ? '오늘 일기 보기' : '오늘 일기 쓰기',
+        to: `/diary/${today}`,
+      },
     },
   };
 

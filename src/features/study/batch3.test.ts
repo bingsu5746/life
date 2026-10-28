@@ -159,3 +159,28 @@ describe('새 자료 다듬기·합치기', () => {
     expect(mergeStudy(a, b, 10).assessments.t.steps.map((s) => s.done)).toEqual([true, false]);
   });
 });
+
+describe('시험지 나누기 (splitSets)', () => {
+  it('100개를 50개씩 → 2장, 모든 단어가 정확히 한 번', async () => {
+    const { splitSets, seeded } = await import('./wordTest');
+    const items = Array.from({ length: 100 }, (_, i) => i);
+    const sets = splitSets(items, 50, seeded(3));
+    expect(sets.map((s) => s.length)).toEqual([50, 50]);
+    expect([...sets.flat()].sort((a, b) => a - b)).toEqual(items);
+  });
+  it('110개를 50개씩 → 3장, 마지막 장은 다른 단어로 채우고 모든 단어가 한 번 이상', async () => {
+    const { splitSets, seeded } = await import('./wordTest');
+    const items = Array.from({ length: 110 }, (_, i) => i);
+    const sets = splitSets(items, 50, seeded(7));
+    expect(sets.map((s) => s.length)).toEqual([50, 50, 50]);
+    expect(new Set(sets.flat()).size).toBe(110);
+    for (const s of sets) expect(new Set(s).size).toBe(s.length);
+  });
+  it('0(전부) 이거나 크면 한 장, 같은 씨앗이면 같은 순서', async () => {
+    const { splitSets, seeded } = await import('./wordTest');
+    const items = Array.from({ length: 30 }, (_, i) => i);
+    expect(splitSets(items, 0, seeded(1))).toHaveLength(1);
+    expect(splitSets(items, 50, seeded(1))[0]).toHaveLength(30);
+    expect(splitSets(items, 10, seeded(5))).toEqual(splitSets(items, 10, seeded(5)));
+  });
+});

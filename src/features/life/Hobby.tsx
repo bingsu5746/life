@@ -1,5 +1,5 @@
 // 취미: 내 취미와 한 시간 기록 · 하고 싶은 것 (책·영화·드라마·게임·장소)
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { BarChart } from '../study/charts';
 import { shortDate, weekStart } from '../study/dates';
 import { alive, newId, type Hobby as HobbyT, type HobbyLog, type WishItem } from '../study/model';
@@ -7,17 +7,32 @@ import { put, remove, useStudy } from '../study/store';
 import { minutesText } from '../study/timer';
 import { Bar, confirmDelete, Empty, Field, go, Icon, Sheet, tap, toast, useToday } from '../study/ui';
 import { hobbyWeek, weeklyMinutes } from './calc';
-import { HobbyTabs, Movies } from './Movies';
 
-const WISH_KIND: Record<WishItem['kind'], string> = { book: '책', movie: '영화', show: '드라마', game: '게임', place: '가 볼 곳', other: '그 밖' };
+const WISH_KIND: Record<WishItem['kind'], string> = {
+  book: '책',
+  movie: '영화',
+  show: '드라마',
+  game: '게임',
+  place: '가 볼 곳',
+  other: '그 밖',
+};
 // 영화는 「영화」 칸에서 따로 (예전에 넣은 영화만 여기 남는다)
-const STATUS: Record<WishItem['status'], string> = { want: '하고 싶은 것', doing: '하는 중', done: '끝낸 것' };
+const STATUS: Record<WishItem['status'], string> = {
+  want: '하고 싶은 것',
+  doing: '하는 중',
+  done: '끝낸 것',
+};
 const md = (x: string) => shortDate(x).replace(/\(.\)/, '');
 
-/** sub: 'new' 이면 기록 넣기 창, 'movies' 면 영화 */
+/** sub: 'new' 이면 기록 넣기 창. 예전 주소 /hobby/movies 는 영화 영역으로 */
 export function Hobby({ sub, sub2 }: { sub?: string; sub2?: string }) {
-  if (sub === 'movies') return <Movies sub={sub2} />;
+  if (sub === 'movies') return <MovedToMovies sub={sub2} />;
   return <HobbyMain sub={sub} />;
+}
+
+function MovedToMovies({ sub }: { sub?: string }) {
+  useEffect(() => window.location.replace(sub ? `#/movies/${sub}` : '#/movies'), [sub]);
+  return null;
 }
 
 function HobbyMain({ sub }: { sub?: string }) {
@@ -47,7 +62,6 @@ function HobbyMain({ sub }: { sub?: string }) {
           <Icon name="plus" /> {hobbies.length ? '한 것 넣기' : '취미 만들기'}
         </button>
       </div>
-      <HobbyTabs on="hobby" />
 
       <section className="st-card">
         <div className="st-inline between">
@@ -69,7 +83,20 @@ function HobbyMain({ sub }: { sub?: string }) {
             </small>
           </div>
         ))}
-        {logs.length > 0 && <BarChart label="주별 취미 시간" height={130} bars={weeks.map((w, i) => ({ label: md(w.start), title: `${shortDate(w.start)} 주`, value: w.min, strong: i === weeks.length - 1 }))} format={h} tickUnit={Math.max(...weeks.map((w) => w.min)) >= 120 ? 60 : 1} />}
+        {logs.length > 0 && (
+          <BarChart
+            label="주별 취미 시간"
+            height={130}
+            bars={weeks.map((w, i) => ({
+              label: md(w.start),
+              title: `${shortDate(w.start)} 주`,
+              value: w.min,
+              strong: i === weeks.length - 1,
+            }))}
+            format={h}
+            tickUnit={Math.max(...weeks.map((w) => w.min)) >= 120 ? 60 : 1}
+          />
+        )}
       </section>
 
       {logs.length > 0 && (
@@ -173,7 +200,14 @@ function LogSheet({ item, today, onClose }: { item?: HobbyLog; today: string; on
             disabled={!hobbyId || !date}
             onClick={() => {
               const m = Number(minutes);
-              put('hobbyLogs', { ...(item ?? { created: Date.now() }), id: item?.id ?? newId(), hobbyId, date, minutes: m > 0 && m <= 1440 ? m : undefined, memo: memo.trim() || undefined } as HobbyLog);
+              put('hobbyLogs', {
+                ...(item ?? { created: Date.now() }),
+                id: item?.id ?? newId(),
+                hobbyId,
+                date,
+                minutes: m > 0 && m <= 1440 ? m : undefined,
+                memo: memo.trim() || undefined,
+              } as HobbyLog);
               toast(item ? '고쳤어요' : '기록했어요');
               onClose();
             }}
@@ -189,7 +223,7 @@ function LogSheet({ item, today, onClose }: { item?: HobbyLog; today: string; on
 function HobbySheet({ item, onClose }: { item?: HobbyT; onClose: () => void }) {
   const d = useStudy();
   const [name, setName] = useState(item?.name ?? '');
-  const [goal, setGoal] = useState(item?.weeklyGoal ? String(Math.round(item.weeklyGoal / 60 * 10) / 10) : '');
+  const [goal, setGoal] = useState(item?.weeklyGoal ? String(Math.round((item.weeklyGoal / 60) * 10) / 10) : '');
   return (
     <Sheet title={item ? '취미 고치기' : '취미 만들기'} onClose={onClose}>
       <div className="st-form">
@@ -212,7 +246,12 @@ function HobbySheet({ item, onClose }: { item?: HobbyT; onClose: () => void }) {
             disabled={!name.trim()}
             onClick={() => {
               const g = Number(goal);
-              put('hobbies', { ...(item ?? { order: alive(d.hobbies).length }), id: item?.id ?? newId(), name: name.trim().slice(0, 30), weeklyGoal: g > 0 ? Math.round(g * 60) : undefined } as HobbyT);
+              put('hobbies', {
+                ...(item ?? { order: alive(d.hobbies).length }),
+                id: item?.id ?? newId(),
+                name: name.trim().slice(0, 30),
+                weeklyGoal: g > 0 ? Math.round(g * 60) : undefined,
+              } as HobbyT);
               onClose();
             }}
           >
@@ -234,11 +273,13 @@ function WishSheet({ item, today, onClose }: { item?: WishItem; today: string; o
     <Sheet title={item?.id ? '고치기' : '하고 싶은 것 넣기'} onClose={onClose}>
       <div className="st-form">
         <div className="st-chips">
-          {(Object.keys(WISH_KIND) as WishItem['kind'][]).filter((k) => k !== 'movie' || kind === 'movie').map((k) => (
-            <button key={k} type="button" className={`st-chip ${kind === k ? 'on' : ''}`} aria-pressed={kind === k} onClick={() => setKind(k)}>
-              {WISH_KIND[k]}
-            </button>
-          ))}
+          {(Object.keys(WISH_KIND) as WishItem['kind'][])
+            .filter((k) => k !== 'movie' || kind === 'movie')
+            .map((k) => (
+              <button key={k} type="button" className={`st-chip ${kind === k ? 'on' : ''}`} aria-pressed={kind === k} onClick={() => setKind(k)}>
+                {WISH_KIND[k]}
+              </button>
+            ))}
         </div>
         <input className="st-input" autoFocus={!item} value={title} onChange={(e) => setTitle(e.target.value)} placeholder="제목 · 이름" aria-label="제목" />
         <div className="st-seg">
@@ -288,4 +329,3 @@ function WishSheet({ item, today, onClose }: { item?: WishItem; today: string; o
     </Sheet>
   );
 }
-
