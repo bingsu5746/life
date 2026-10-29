@@ -5,7 +5,9 @@ import { alive, newId, type MusicRecord } from '../study/model';
 import { put, remove, useStudy } from '../study/store';
 import { confirmDelete, Empty, Field, Icon, Sheet, tap, toast, useToday } from '../study/ui';
 import { won } from './calc';
+import { isLoggedIn, musicSimilar } from '../auth/api';
 import { StarInput, starText } from './MovieParts';
+import { NameSearch } from './NameSearch';
 
 const FORMAT: Record<MusicRecord['format'], string> = { lp: 'LP', cd: 'CD', tape: '카세트', digital: '디지털' };
 const CONDITIONS = ['미개봉', '민트', '아주 좋음', '좋음', '보통'];
@@ -132,8 +134,54 @@ export function Music(_: { sub?: string }) {
           ))}
         </div>
       )}
+      {tab === 'have' && have.length > 0 && <MusicRec onPick={(artist) => setEdit({ status: 'want', format: 'lp', artist })} />}
       {edit && <RecordSheet item={edit} today={today} onClose={() => setEdit(null)} />}
     </div>
+  );
+}
+
+/** 별점 높은(없으면 많이 들은) 음반의 아티스트와 비슷한 아티스트 (Last.fm) */
+function MusicRec({ onPick }: { onPick: (artist: string) => void }) {
+  const d = useStudy();
+  const [items, setItems] = useState<{ name: string; because: string[] }[] | null>(null);
+  const [busy, setBusy] = useState(false);
+  const have = alive(d.records).filter((r) => r.status === 'have');
+  const liked = [...have].sort((a, b) => (b.rating ?? 0) - (a.rating ?? 0) || (b.listens?.length ?? 0) - (a.listens?.length ?? 0)).filter((r) => (r.rating ?? 0) >= 4 || (r.listens?.length ?? 0) > 0 || !have.some((x) => x.rating));
+  const artists = [...new Set(liked.map((r) => r.artist))].slice(0, 8);
+  if (!artists.length) return null;
+  return (
+    <section className="st-card">
+      <div className="st-inline between">
+        <h3 className="st-h">비슷한 아티스트</h3>
+        <button
+          className="btn btn-sm"
+          disabled={busy}
+          onClick={async () => {
+            if (!isLoggedIn()) return toast('추천은 로그인한 뒤에 쓸 수 있어요');
+            setBusy(true);
+            try {
+              setItems((await musicSimilar(artists, [...new Set(have.map((r) => r.artist))])).items);
+            } catch (e) {
+              toast(e instanceof Error ? e.message : '추천을 받지 못했어요');
+            } finally {
+              setBusy(false);
+            }
+          }}
+        >
+          {busy ? '찾는 중…' : items ? '다시' : '추천받기'}
+        </button>
+      </div>
+      {items?.map((x) => (
+        <div key={x.name} className="st-item st-tap" onClick={() => onPick(x.name)}>
+          <div className="st-item-main">
+            <div className="st-item-title">{x.name}</div>
+            <div className="st-item-sub">{x.because.join(' · ')}와 비슷해요</div>
+          </div>
+          <span className="st-link">담기</span>
+        </div>
+      ))}
+      {items && !items.length && <p className="st-muted">찾은 아티스트가 없어요.</p>}
+    </section>
   );
 }
 
@@ -174,7 +222,19 @@ function RecordSheet({ item, today, onClose }: { item: Partial<MusicRecord>; tod
   return (
     <Sheet title={item.id ? '음반 고치기' : '음반 넣기'} onClose={onClose}>
       <div className="st-form">
-        <input className="st-input" autoFocus={!item.id} value={title} onChange={(e) => setTitle(e.target.value)} placeholder="앨범 이름" aria-label="앨범 이름" />
+        <NameSearch
+          type="music"
+          value={title}
+          onChange={setTitle}
+          picked={!!item.id}
+          onPick={(f) => {
+            setTitle(f.title);
+            if (f.by) setArtist(f.by);
+            if (f.year) setYear(String(f.year));
+          }}
+          placeholder="앨범 이름 (아티스트와 함께 치면 더 잘 찾아요)"
+          label="앨범 이름"
+        />
         <input className="st-input" value={artist} onChange={(e) => setArtist(e.target.value)} placeholder="아티스트" aria-label="아티스트" />
         <div className="st-seg">
           {(Object.keys(FORMAT) as MusicRecord['format'][]).map((f) => (

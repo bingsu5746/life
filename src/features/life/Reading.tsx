@@ -5,6 +5,7 @@ import { alive, newId, type Reading } from '../study/model';
 import { put, remove, setSettings, useStudy } from '../study/store';
 import { Bar, confirmDelete, Empty, Field, Icon, Sheet, tap, toast, useToday } from '../study/ui';
 import { StarInput, starText } from './MovieParts';
+import { NameSearch } from './NameSearch';
 import { goalPace, pagesBetween, withProgress } from './readingCalc';
 
 export { goalPace, pagesBetween, withProgress };
@@ -93,7 +94,18 @@ function ReadSheet({ item, today, onClose }: { item: Partial<Reading>; today: st
   return (
     <Sheet title={item.id ? '책 고치기' : '책 넣기'} onClose={onClose}>
       <div className="st-form">
-        <input className="st-input" autoFocus={!item.title} value={title} onChange={(e) => setTitle(e.target.value)} placeholder="책 제목" aria-label="책 제목" />
+        <NameSearch
+          type="book"
+          value={title}
+          onChange={setTitle}
+          picked={!!item.title}
+          onPick={(f) => {
+            setTitle(f.title);
+            if (f.by) setAuthor(f.by);
+          }}
+          placeholder="책 제목"
+          label="책 제목"
+        />
         <input className="st-input" value={author} onChange={(e) => setAuthor(e.target.value)} placeholder="지은이 (선택)" aria-label="지은이" />
         <div className="st-seg">
           {(Object.keys(TAB_NAME) as Tab[]).map((k) => (

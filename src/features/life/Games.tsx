@@ -5,6 +5,7 @@ import { alive, newId, type Game } from '../study/model';
 import { put, remove, useStudy } from '../study/store';
 import { confirmDelete, Empty, Field, Icon, Sheet, tap, toast, useToday } from '../study/ui';
 import { StarInput, starText } from './MovieParts';
+import { NameSearch } from './NameSearch';
 
 type Tab = Game['status'];
 const TAB_NAME: Record<Tab, string> = { playing: '하는 중', want: '하고 싶어요', done: '끝낸 것' };
@@ -105,7 +106,19 @@ function GameSheet({ item, today, onClose }: { item: Partial<Game>; today: strin
   return (
     <Sheet title={item.id ? '게임 고치기' : '게임 넣기'} onClose={onClose}>
       <div className="st-form">
-        <input className="st-input" autoFocus={!item.id} value={title} onChange={(e) => setTitle(e.target.value)} placeholder="게임 이름" aria-label="게임 이름" />
+        <NameSearch
+          type="game"
+          value={title}
+          onChange={setTitle}
+          picked={!!item.id}
+          onPick={(f) => {
+            setTitle(f.title);
+            const p = f.by?.split(', ').find((x) => /PC|Switch|PlayStation|Xbox|iOS|Android/.test(x));
+            if (p && !platform) setPlatform(/Switch/.test(p) ? '스위치' : /PlayStation/.test(p) ? '플레이스테이션' : /Xbox/.test(p) ? 'Xbox' : /iOS|Android/.test(p) ? '폰' : 'PC');
+          }}
+          placeholder="게임 이름"
+          label="게임 이름"
+        />
         <div className="st-seg">
           {(Object.keys(TAB_NAME) as Game['status'][]).map((k) => (
             <button key={k} type="button" className={status === k ? 'on' : ''} aria-pressed={status === k} onClick={() => setStatus(k)}>

@@ -299,3 +299,18 @@ export async function schoolInfo(body: { name: string; grade?: number; cls?: str
 export async function dictKo(word: string) {
   return call<{ senses: { word: string; pos?: string; definition: string }[] }>('dict/ko', 'POST', { word });
 }
+
+// ===== 이름으로 찾기 (게임 · 책 · 음반) · 음악 추천 =====
+export interface Found {
+  title: string;
+  by?: string;
+  year?: number;
+  image?: string;
+  extra?: string;
+}
+export async function lookup(type: 'game' | 'book' | 'music', q: string) {
+  return call<{ items: Found[] }>('lookup', 'POST', { type, q });
+}
+export async function musicSimilar(artists: string[], have: string[]) {
+  return call<{ items: { name: string; because: string[] }[] }>('music/similar', 'POST', { artists, have });
+}

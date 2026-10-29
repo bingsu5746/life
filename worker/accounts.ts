@@ -16,6 +16,7 @@ import { COOKIE_NAME, cutText, Limiter, passwordProblem, readCookie } from './se
 import { fetchBoxOffice, fetchCatalogPage, fetchUpcoming } from './kobis';
 import { fetchEvents, fetchMeals, fetchTimetable, findSchool } from './neis';
 import { lookupKo } from './stdict';
+import { findBooksAladin, findBooksKakao, findGames, findRecords, similarArtists } from './lookup';
 import { fetchProviders } from './ott';
 import { buildRecommendInput, normTitle, readRecommendations, readRecommendRequest } from './recommend';
 import { allowedEndpoint, localDate, makeVapid, nextFire, sendPush, type PushSub, type Vapid } from './push';
@@ -200,6 +201,8 @@ export class Accounts extends DurableObject<Env> {
     if (path === 'movies/ott' && req.method === 'POST') return this.ott(body);
     if (path === 'school' && req.method === 'POST') return this.school(body);
     if (path === 'dict/ko' && req.method === 'POST') return this.dictKo(body);
+    if (path === 'lookup' && req.method === 'POST') return this.lookup(body);
+    if (path === 'music/similar' && req.method === 'POST') return this.musicSimilar(body);
     if (path === 'movies/catalog/sync' && req.method === 'POST') return this.catalogSync(req.headers.get('x-life-kobis-key') ?? undefined);
     if (path === 'notify' || path.startsWith('notify/')) return this.notifyRoute(req, path, user, body);
     if (path === 'me/nickname' && req.method === 'PUT') {
@@ -617,6 +620,57 @@ export class Accounts extends DurableObject<Env> {
       console.error('neis failed', msg);
       return fail(msg.startsWith('나이스') ? msg : '나이스에서 정보를 받지 못했어요. 잠시 뒤 다시 해 주세요.', 502);
     }
+  }
+
+  /** 이름으로 찾기: 게임 · 책 · 음반 (하루 저장) */
+  private async lookup(b: Record<string, unknown>): Promise<Response> {
+    const env = this.env as unknown as Record<string, string | undefined>;
+    const type = b.type === 'game' || b.type === 'book' || b.type === 'music' ? b.type : null;
+    const q = typeof b.q === 'string' ? b.q.normalize('NFC').trim().slice(0, 60) : '';
+    if (!type || !q) return fail('찾을 이름을 써 주세요.');
+    const need = type === 'game' ? env.RAWG_KEY : type === 'book' ? env.KAKAO_KEY || env.ALADIN_KEY : env.DISCOGS_TOKEN;
+    if (!need) return fail(type === 'game' ? '게임 찾기에는 RAWG 키(RAWG_KEY)가 필요해요.' : type === 'book' ? '책 찾기에는 카카오 키(KAKAO_KEY)나 알라딘 키(ALADIN_KEY)가 필요해요.' : '음반 찾기에는 Discogs 토큰(DISCOGS_TOKEN)이 필요해요.', 503);
+    const ck = `lookup:${type}:${q.toLowerCase()}`;
+    const c = this.sql.exec<{ data: string; at: number }>('SELECT data, at FROM cache WHERE key = ?', ck).toArray()[0];
+    if (c && Date.now() - c.at < 86_400_000) return json({ items: JSON.parse(c.data) });
+    try {
+      const items = type === 'game' ? await findGames(need, q) : type === 'book' ? (env.KAKAO_KEY ? await findBooksKakao(env.KAKAO_KEY, q) : await findBooksAladin(need, q)) : await findRecords(need, q);
+      this.sql.exec('INSERT OR REPLACE INTO cache (key, data, at) VALUES (?, ?, ?)', ck, JSON.stringify(items), Date.now());
+      return json({ items });
+    } catch (e) {
+      console.error('lookup failed', type, e instanceof Error ? e.message : String(e));
+      return fail('찾지 못했어요. 잠시 뒤 다시 해 주세요.', 502);
+    }
+  }
+
+  /** 좋아하는 아티스트들과 비슷한 아티스트 (Last.fm, 7일 저장) → 많이 겹치는 순 */
+  private async musicSimilar(b: Record<string, unknown>): Promise<Response> {
+    const key = (this.env as unknown as { LASTFM_KEY?: string }).LASTFM_KEY;
+    if (!key) return fail('음악 추천에는 Last.fm 키(LASTFM_KEY)가 필요해요.', 503);
+    const artists = Array.isArray(b.artists) ? [...new Set(b.artists.filter((a): a is string => typeof a === 'string' && !!a.trim()).map((a) => a.trim().slice(0, 60)))].slice(0, 8) : [];
+    const have = new Set((Array.isArray(b.have) ? b.have : []).filter((a): a is string => typeof a === 'string').map((a) => a.trim().toLowerCase()));
+    if (!artists.length) return fail('별점을 준 음반이 있어야 추천할 수 있어요.');
+    const score = new Map<string, { n: number; from: string[] }>();
+    for (const a of artists) {
+      const ck = `similar:${a.toLowerCase()}`;
+      const c = this.sql.exec<{ data: string; at: number }>('SELECT data, at FROM cache WHERE key = ?', ck).toArray()[0];
+      let list: string[];
+      if (c && Date.now() - c.at < 7 * 86_400_000) list = JSON.parse(c.data) as string[];
+      else {
+        try {
+          list = await similarArtists(key, a);
+          this.sql.exec('INSERT OR REPLACE INTO cache (key, data, at) VALUES (?, ?, ?)', ck, JSON.stringify(list), Date.now());
+        } catch {
+          continue;
+        }
+      }
+      list.forEach((name, i) => {
+        if (have.has(name.toLowerCase())) return;
+        const e = score.get(name) ?? { n: 0, from: [] };
+        score.set(name, { n: e.n + (12 - i), from: [...e.from, a] });
+      });
+    }
+    return json({ items: [...score].sort((x, y) => y[1].n - x[1].n).slice(0, 12).map(([name, e]) => ({ name, because: e.from.slice(0, 2) })) });
   }
 
   /** 국어 낱말 뜻 (표준국어대사전, 30일 저장) */
