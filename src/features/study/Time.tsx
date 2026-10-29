@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { addDays, daysBetween, shortDate, weekStart, WEEKDAYS } from './dates';
 import { BarChart, TableView } from './charts';
 import { WeekReview } from './WeekReview';
+import { FocusTimer, MockExamPage } from './Focus';
 import { sleepMinutes, splitStudy } from './condition';
 import { bySubject, compare, daily, minutesByDate, studyStreak, weekdayAverage, weekly } from './timeStats';
 import { alive, type StudySession } from './model';
@@ -17,6 +18,7 @@ import { Bar, confirmDelete, Field, go, Icon, NumInput, Sheet, SubjectDot, Subje
 /** sub: 'manual' 이면 공부 시간 직접 넣기 창 (「＋」에서 올 때) */
 export function Time({ sub }: { sub?: string }) {
   if (sub?.startsWith('week')) return <WeekReview from={sub.slice(5) || undefined} />;
+  if (sub === 'mock') return <MockExamPage />;
   return <TimeHome sub={sub} />;
 }
 
@@ -26,6 +28,9 @@ function TimeHome({ sub }: { sub?: string }) {
   const [timer, setTimer] = useState<TimerState | null>(loadTimer);
   const [subjectId, setSubjectId] = useState(timer?.subjectId ?? subjectsOf(d)[0]?.id ?? '');
   const [kind, setKind] = useState<TimerState['kind']>(timer?.kind ?? 'pomo');
+  // 뽀모도로 길이: 0 이면 설정 값(보통 25분)
+  const [len, setLen] = useState(0);
+  const [focus, setFocus] = useState(!!timer);
   const [place, setPlace] = useState<string>(() => {
     try {
       return localStorage.getItem('my-study.study.place') ?? '';
@@ -43,7 +48,7 @@ function TimeHome({ sub }: { sub?: string }) {
   };
   const [manual, setManual] = useState(sub === 'manual');
   const [memoFor, setMemoFor] = useState<string | null>(null);
-  const pomo = d.settings.pomo;
+  const pomo = timer?.pomo ?? d.settings.pomo;
   const update = (t: TimerState | null) => {
     setTimer(t);
     saveTimer(t);
@@ -52,7 +57,8 @@ function TimeHome({ sub }: { sub?: string }) {
   function begin() {
     if (!subjectId) return toast('과목을 골라 주세요');
     askNotify();
-    update({ ...start(kind, d.subjects[subjectId]?.name ?? '', Date.now(), subjectId), place: place || undefined });
+    update({ ...start(kind, d.subjects[subjectId]?.name ?? '', Date.now(), subjectId), place: place || undefined, pomo: kind === 'pomo' && len ? { ...d.settings.pomo, work: len, short: Math.round(len / 6), long: Math.round(len / 3) } : undefined });
+    setFocus(true);
   }
   function stop() {
     if (!timer) return;
@@ -95,11 +101,13 @@ function TimeHome({ sub }: { sub?: string }) {
             <Field group label="과목">
               <SubjectPicker value={subjectId} onChange={setSubjectId} />
             </Field>
-            <div className="st-seg">
-              <button className={kind === 'pomo' ? 'on' : ''} onClick={() => setKind('pomo')}>
-                뽀모도로 {pomo.work}/{pomo.short}분
-              </button>
-              <button className={kind === 'watch' ? 'on' : ''} onClick={() => setKind('watch')}>
+            <div className="st-chips">
+              {[0, 60, 90, 120].map((m) => (
+                <button key={m} className={`st-chip ${kind === 'pomo' && len === m ? 'on' : ''}`} onClick={() => (setKind('pomo'), setLen(m))}>
+                  {m ? `${m}분` : `${d.settings.pomo.work}분`}
+                </button>
+              ))}
+              <button className={`st-chip ${kind === 'watch' ? 'on' : ''}`} onClick={() => setKind('watch')}>
                 스톱워치
               </button>
             </div>
@@ -107,11 +115,15 @@ function TimeHome({ sub }: { sub?: string }) {
             <button className="btn btn-primary btn-lg" onClick={begin}>
               공부 시작
             </button>
+            <button className="st-link center" onClick={() => go('/time/mock')}>
+              모의고사 보기 (수능 시간)
+            </button>
           </div>
         ) : (
-          <RunningTimer timer={timer} update={update} onStop={stop} />
+          <RunningTimer timer={timer} update={update} onStop={stop} onFocus={() => setFocus(true)} />
         )}
       </section>
+      {timer && focus && <FocusTimer timer={timer} update={update} onStop={() => (setFocus(false), stop())} onExit={() => setFocus(false)} />}
 
       <Stats sessions={sessions} today={today} todayMin={todayMin} />
       {sessions.length > 0 && <Analysis sessions={sessions} today={today} />}
@@ -132,10 +144,10 @@ function TimeHome({ sub }: { sub?: string }) {
 }
 
 /** 돌고 있는 타이머 (이 부품만 0.5초마다 다시 그린다) */
-function RunningTimer({ timer, update, onStop }: { timer: TimerState; update: (t: TimerState | null) => void; onStop: () => void }) {
+function RunningTimer({ timer, update, onStop, onFocus }: { timer: TimerState; update: (t: TimerState | null) => void; onStop: () => void; onFocus: () => void }) {
   const d = useStudy();
   const now = useNow(500);
-  const pomo = d.settings.pomo;
+  const pomo = timer.pomo ?? d.settings.pomo;
   const v = view(timer, now, pomo);
   return (
           <div className="st-timer-run">
@@ -172,7 +184,9 @@ function RunningTimer({ timer, update, onStop }: { timer: TimerState; update: (t
                 끝내고 기록
               </button>
             </div>
-            <p className="st-hint center">폰에서 다른 앱에 가 있으면 알림음이 늦게 날 수 있어요. 돌아오면 시간은 맞게 보여요.</p>
+            <button className="st-link center" onClick={onFocus}>
+              집중 화면
+            </button>
           </div>
   );
 }

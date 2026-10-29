@@ -143,7 +143,7 @@ export function Today() {
 
       {todayLists.length > 0 && (
         <section className="st-card">
-          <h3 className="st-h">영단어</h3>
+          <h3 className="st-h">단어</h3>
           {todayLists.map((l) => {
             const n = l.fresh.length + l.due.length;
             const paper = paperDays(l);

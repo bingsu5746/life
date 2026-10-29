@@ -21,6 +21,8 @@ export interface TimerState {
   studiedMs: number;
   /** 처음 시작한 시각 */
   startedAt: number;
+  /** 이 타이머만의 뽀모도로 길이 (60·90·120분 등, 없으면 설정 값) */
+  pomo?: StudySettings['pomo'];
 }
 
 export function phaseLength(phase: Phase, pomo: StudySettings['pomo']): number {

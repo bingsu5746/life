@@ -73,7 +73,15 @@ export function splitWordLine(raw: string): { term: string; meaning: string } | 
 }
 
 /** 여러 줄 → 단어 표. 이미 있는 단어(소문자 비교)는 「중복」 표시 */
-export function parseWords(text: string, existing: Iterable<string> = []): ParsedWord[] {
+/** 국어 낱말 한 줄: 탭 · 「 - 」 · 「:」 · 「|」 · 「=」 로 나누고, 없으면 첫 빈칸에서 */
+export function splitKoLine(raw: string): { term: string; meaning: string } | null {
+  const s = raw.replace(/^(?:\d{1,4}\s*[.)\]:]?|[①-⑳])\s+/, '').trim();
+  if (!s) return null;
+  const m = s.match(/^(.+?)\s*(?:\t+|\s[-–—]\s|:|\||=)\s*(.+)$/) ?? s.match(/^(\S+)\s+(.+)$/);
+  return m ? { term: m[1].trim(), meaning: m[2].trim() } : { term: s, meaning: '' };
+}
+
+export function parseWords(text: string, existing: Iterable<string> = [], lang: 'en' | 'ko' = 'en'): ParsedWord[] {
   const seen = new Set([...existing].map((t) => t.toLowerCase()));
   const out: ParsedWord[] = [];
   let day: number | undefined;
@@ -84,10 +92,10 @@ export function parseWords(text: string, existing: Iterable<string> = []): Parse
       day = d;
       continue;
     }
-    const w = splitWordLine(line);
+    const w = lang === 'ko' ? splitKoLine(line) : splitWordLine(line);
     if (!w) continue;
     let problem: string | undefined;
-    if (!TERM_OK.test(w.term)) problem = '영어 단어가 아닌 것 같아요';
+    if (lang === 'en' && !TERM_OK.test(w.term)) problem = '영어 단어가 아닌 것 같아요';
     else if (w.term.length > 40) problem = '너무 길어요';
     else if (!w.meaning) problem = '뜻이 비어 있어요';
     const key = w.term.toLowerCase();

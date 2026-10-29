@@ -100,10 +100,10 @@ export function Practice({ listId }: { listId?: string }) {
         {(mode === 'card' || mode === 'choice') && (
           <div className="st-seg" aria-label="방향">
             <button className={dir === 'en' ? 'on' : ''} aria-pressed={dir === 'en'} onClick={() => setDir('en')}>
-              영어 → 뜻
+              단어 → 뜻
             </button>
             <button className={dir === 'ko' ? 'on' : ''} aria-pressed={dir === 'ko'} onClick={() => setDir('ko')}>
-              뜻 → 영어
+              뜻 → 단어
             </button>
           </div>
         )}

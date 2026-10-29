@@ -333,7 +333,7 @@ function HomeworkSheet({ tutor, hw, today, onClose }: { tutor: Tutor; hw?: Homew
                   ))}
                 </select>
                 <input className="st-input sm" placeholder="예: Day 5~6" value={x.text} onChange={(e) => set(i, { text: e.target.value })} />
-                {!lists.length && <span className="st-hint">영단어 탭에서 목록을 먼저 만들어 주세요</span>}
+                {!lists.length && <span className="st-hint">단어 탭에서 목록을 먼저 만들어 주세요</span>}
               </div>
             )}
             {items.length > 1 && (

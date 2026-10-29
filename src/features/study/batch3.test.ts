@@ -749,3 +749,36 @@ describe('나이스 학교 정보 → 앱 자료 (school.ts)', () => {
     expect(offDays([E('2026-12-25', '성탄절', true), E('2026-11-20', '재량휴업일', true), E('2026-11-10', '체육대회')])).toEqual(['2026-11-20', '2026-12-25']);
   });
 });
+
+describe('날씨 (Open-Meteo 응답)', () => {
+  it('필요한 값만 꺼내고, 모양이 다르면 null', async () => {
+    const { parseWeather, weatherText } = await import('../life/weather');
+    expect(parseWeather({ current: { temperature_2m: 12.6, weather_code: 61 }, daily: { temperature_2m_max: [15.2], temperature_2m_min: [8.4], precipitation_probability_max: [70] } }, 1)).toEqual({ temp: 13, code: 61, max: 15, min: 8, rain: 70, at: 1 });
+    expect(parseWeather({ current: {} })).toBeNull();
+    expect(weatherText(61).text).toBe('비');
+    expect(weatherText(0).text).toBe('맑음');
+  });
+});
+
+describe('국어 단어장 읽기 (splitKoLine)', () => {
+  it('구분자 · 첫 빈칸으로 나눈다', async () => {
+    const { splitKoLine, parseWords } = await import('./wordParse');
+    expect(splitKoLine('어엿브다 - 불쌍하다')).toEqual({ term: '어엿브다', meaning: '불쌍하다' });
+    expect(splitKoLine('1. 나랏말ᄊᆞ미: 나라의 말이')).toEqual({ term: '나랏말ᄊᆞ미', meaning: '나라의 말이' });
+    expect(splitKoLine('하놀 하늘')).toEqual({ term: '하놀', meaning: '하늘' });
+    expect(parseWords('어리다 어리석다\n어리다 어리석다', [], 'ko').map((r) => r.problem)).toEqual([undefined, '중복']);
+  });
+});
+
+describe('모의고사 보기 (mockView)', () => {
+  it('수능 시각으로 흐르고, 탐구 2과목은 사이 회수 시간까지', async () => {
+    const { mockView, hhmm } = await import('./mockExam');
+    const v = mockView({ key: 'korean', startedAt: 0 }, 30 * 60_000)!;
+    expect(hhmm(v.clockMin)).toBe('09:10');
+    expect(v.leftMs).toBe(50 * 60_000);
+    expect(mockView({ key: 'korean', startedAt: 0 }, 90 * 60_000)!.done).toBe(true);
+    const t = mockView({ key: 'inquiry2', startedAt: 0 }, 31 * 60_000)!;
+    expect(t.part.label).toBe('제1선택 답안지 회수');
+    expect(mockView({ key: 'inquiry2', startedAt: 0 }, 33 * 60_000)!.part.label).toBe('탐구 영역 · 제2선택');
+  });
+});

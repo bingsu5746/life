@@ -109,7 +109,7 @@ export function useTimerView() {
     const t = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(t);
   }, [timer]);
-  const v = timer ? view(timer, now, getStudy().settings.pomo) : null;
+  const v = timer ? view(timer, now, timer.pomo ?? getStudy().settings.pomo) : null;
   return { timer, v };
 }
 

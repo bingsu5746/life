@@ -619,7 +619,7 @@ function Cards({ today, adding: add }: { today: string; adding?: boolean }) {
           <p className="st-sub">
             오늘 볼 카드 <b>{due.length}</b> · 전체 {cards.length}장 · 외움 {cards.filter((c) => c.learned).length}
           </p>
-          <p className="st-hint">영어 단어는 「영단어」 탭이 더 좋아요 (단어장 계획·객관식).</p>
+          <p className="st-hint">단어는 「단어」 탭이 더 좋아요 (단어장 계획·객관식).</p>
         </div>
         {due.length > 0 && (
           <button className="btn btn-primary btn-lg" onClick={() => go('/review/cards-run')}>

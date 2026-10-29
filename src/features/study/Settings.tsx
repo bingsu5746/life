@@ -96,7 +96,7 @@ export function Settings() {
       </section>
 
       <section className="st-card st-form">
-        <h3 className="st-h">복습 · 영단어</h3>
+        <h3 className="st-h">복습 · 단어</h3>
         <Field label="단계별 다시 보기 간격 (일)" hint="맞히면 다음 단계, 틀리면 1단계로 돌아가요. 마지막 단계에서 맞히면 「외움」이에요.">
           <div className="st-inline wrap st-intervals">
             {s.intervals.map((v, i) => (

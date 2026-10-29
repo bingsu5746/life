@@ -5822,3 +5822,233 @@ body {
   max-width: 100%;
   overflow-x: auto;
 }
+
+.hm-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.hm-weather {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 14px 6px 10px;
+  border-radius: 999px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  animation: st-fade 0.3s var(--ease);
+}
+.hm-weather-icon {
+  font-size: 1.3rem;
+}
+.hm-weather b {
+  font-size: 1.15rem;
+  font-variant-numeric: tabular-nums;
+}
+.hm-weather small {
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+/* ===== 집중 화면 (공부 타이머 · 모의고사) ===== */
+body.focus-on {
+  overflow: hidden;
+}
+.focus {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: grid;
+  grid-template-rows: auto 1fr auto auto;
+  justify-items: center;
+  padding: max(28px, env(safe-area-inset-top)) 24px max(24px, env(safe-area-inset-bottom));
+  background: #050505;
+  color: #f2f2f0;
+  animation: st-bg 0.5s var(--ease);
+  user-select: none;
+  -webkit-user-select: none;
+}
+.focus-top {
+  display: grid;
+  justify-items: center;
+  gap: 4px;
+  text-align: center;
+}
+.focus-top span {
+  font-size: 1.15rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+.focus-top small,
+.focus-bottom {
+  color: rgba(242, 242, 240, 0.55);
+  font-size: 0.92rem;
+}
+.focus-main {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: min(78vw, 62vh, 460px);
+  aspect-ratio: 1;
+  align-self: center;
+}
+.focus-ring {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+.focus-ring .track {
+  fill: none;
+  stroke: rgba(255, 255, 255, 0.08);
+  stroke-width: 6;
+}
+.focus-ring .fill {
+  fill: none;
+  stroke: #f2f2f0;
+  stroke-width: 6;
+  stroke-linecap: round;
+  transition: stroke-dashoffset 0.5s linear;
+}
+.focus.rest .focus-ring .fill {
+  stroke: #7dd3a8;
+}
+.focus-time {
+  display: grid;
+  justify-items: center;
+  gap: 6px;
+}
+.focus-time b {
+  font-size: clamp(3rem, 14vw, 6.5rem);
+  font-weight: 300;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.03em;
+  transition: opacity 0.3s;
+}
+.focus-time b.paused {
+  opacity: 0.45;
+}
+.focus-time small {
+  color: rgba(242, 242, 240, 0.5);
+}
+.focus-bottom {
+  margin-bottom: 12px;
+}
+.focus-ctl {
+  display: grid;
+  justify-items: center;
+  gap: 14px;
+  opacity: 0;
+  transform: translateY(10px);
+  pointer-events: none;
+  transition: opacity 0.35s var(--ease), transform 0.35s var(--ease);
+}
+.focus.show .focus-ctl {
+  opacity: 1;
+  transform: none;
+  pointer-events: auto;
+}
+.focus-noise,
+.focus-btns {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+  gap: 8px;
+}
+.focus-noise span {
+  color: rgba(242, 242, 240, 0.6);
+  font-size: 0.85rem;
+}
+.focus-noise input[type='range'] {
+  width: 160px;
+  accent-color: #f2f2f0;
+}
+.focus button {
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: rgba(255, 255, 255, 0.06);
+  color: #f2f2f0;
+  padding: 9px 16px;
+  border-radius: 999px;
+  font: inherit;
+  font-size: 0.9rem;
+  transition: background 0.2s var(--ease), transform 0.16s var(--ease);
+}
+.focus button:active {
+  transform: scale(0.96);
+}
+.focus button.on,
+.focus button.primary {
+  background: #f2f2f0;
+  color: #050505;
+}
+/* 모의고사: 아날로그 시계 */
+.mk-clock {
+  width: 100%;
+  height: 100%;
+}
+.mk-clock .face {
+  fill: #fafaf7;
+  stroke: #d4d4cf;
+  stroke-width: 2;
+}
+.mk-clock .tick {
+  stroke: #9a9a95;
+  stroke-width: 1;
+}
+.mk-clock .tick.big {
+  stroke: #1a1a1a;
+  stroke-width: 2.5;
+}
+.mk-clock .num {
+  font-size: 15px;
+  font-weight: 600;
+  fill: #1a1a1a;
+}
+.mk-clock .hand {
+  stroke: #1a1a1a;
+  stroke-linecap: round;
+}
+.mk-clock .hand.h {
+  stroke-width: 5;
+}
+.mk-clock .hand.m {
+  stroke-width: 3.5;
+}
+.mk-clock .hand.s {
+  stroke: #c2410c;
+  stroke-width: 1.5;
+}
+.mk-clock .pin {
+  fill: #c2410c;
+}
+.mk-list {
+  display: grid;
+  gap: 8px;
+}
+.mk-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 18px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  transition: transform 0.16s var(--ease), background 0.18s var(--ease);
+}
+.mk-item:active {
+  transform: scale(0.99);
+  background: var(--soft);
+}
+.mk-item small {
+  color: var(--muted);
+}
+.mk-sound {
+  justify-self: start;
+  cursor: pointer;
+}

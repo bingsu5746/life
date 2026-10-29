@@ -52,6 +52,8 @@ export interface StudySettings {
   sleepGoal?: number;
   /** 일주일에 쓸 돈 한도 (넘으면 저녁 알림) */
   weeklyLimit?: number;
+  /** 날씨 위치 (없으면 노원구) */
+  weatherPlace?: { lat: number; lon: number; name: string };
   /** 내 학교 (나이스에서 급식·학사일정·시간표를 받을 때) */
   school?: { name: string; grade?: number; cls?: string };
   /** 마지막으로 백업 파일을 내려받은 날 */
@@ -742,6 +744,8 @@ export interface WordList extends Stamp {
   name: string;
   /** book: 단어장 (Day), test: 단어 시험, inbox: 모르는 단어 모음 */
   kind: 'book' | 'test' | 'inbox';
+  /** 국어 단어장이면 'ko' (없으면 영어) */
+  lang?: 'ko';
   subjectId: Id;
   /** 단어장의 Day 수 */
   days?: number;

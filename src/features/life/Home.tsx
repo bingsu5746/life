@@ -5,6 +5,8 @@ import { upcomingExams } from '../study/exams';
 import { alive } from '../study/model';
 import { todaySummary } from '../study/select';
 import { put, useStudy, useWords } from '../study/store';
+import { useEffect, useState } from 'react';
+import { DEFAULT_PLACE, getWeather, weatherText, type Weather } from './weather';
 import { minutesText } from '../study/timer';
 import { AREAS } from '../study/tabs';
 import { go, Icon, useToday } from '../study/ui';
@@ -106,7 +108,10 @@ export function Home(_: { loggedIn: boolean; onLogin: () => void }) {
   return (
     <div className="hm">
       <header className="hm-head">
-        <h2>{longDate(today)}</h2>
+        <div className="hm-top">
+          <h2>{longDate(today)}</h2>
+          <WeatherChip />
+        </div>
         <p className="st-sub">
           오늘도 하나씩 해 봐요 ·{' '}
           <button className="st-link" onClick={() => go('/week')}>
@@ -198,5 +203,34 @@ function ChangeBanner({ today }: { today: string }) {
         )
       )}
     </section>
+  );
+}
+
+/** 오늘 날씨 (지금 기온 · 최고/최저 · 비 올 확률) */
+function WeatherChip() {
+  const d = useStudy();
+  const p = d.settings.weatherPlace ?? DEFAULT_PLACE;
+  const [w, setW] = useState<Weather | null>(null);
+  useEffect(() => {
+    let on = true;
+    getWeather(p.lat, p.lon)
+      .then((x) => on && setW(x))
+      .catch(() => {});
+    return () => {
+      on = false;
+    };
+  }, [p.lat, p.lon]);
+  if (!w) return null;
+  const t = weatherText(w.code);
+  return (
+    <div className="hm-weather" title={`${p.name} · Open-Meteo`}>
+      <span className="hm-weather-icon" aria-hidden>
+        {t.icon}
+      </span>
+      <b>{w.temp}°</b>
+      <small>
+        {t.text} · {w.max}° / {w.min}°{w.rain !== null && w.rain >= 30 ? ` · 비 ${w.rain}%` : ''}
+      </small>
+    </div>
   );
 }

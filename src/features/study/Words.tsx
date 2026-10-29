@@ -15,7 +15,7 @@ import { SwipeCard } from './SwipeCard';
 import { WithSpeak } from './Speak';
 import { Practice } from './Practice';
 import { WordTestSheet } from './WordTestSheet';
-import { isLoggedIn, wordMeanings } from '../auth/api';
+import { dictKo, isLoggedIn, wordMeanings } from '../auth/api';
 import { Bar, confirmDelete, Empty, Field, go, Menu, Sheet, SubjectDot, toast, useToday, tap } from './ui';
 
 const KIND_LABEL: Record<WordList['kind'], string> = { book: '단어장', test: '단어 시험', inbox: '모르는 단어 모음' };
@@ -37,7 +37,7 @@ function ListIndex() {
   return (
     <div className="st-page">
       <div className="st-page-head">
-        <h2>영단어</h2>
+        <h2>단어</h2>
         {alive(words).length > 0 && (
           <button className="btn btn-sm" onClick={() => go('/words/practice')}>
             연습
@@ -84,13 +84,14 @@ function NewList() {
   const [kind, setKind] = useState<WordList['kind']>('book');
   const [name, setName] = useState('');
   const [days, setDays] = useState('');
+  const [lang, setLang] = useState<'en' | 'ko'>('en');
   const [testDate, setTestDate] = useState(addDays(today, 7));
   function save() {
     if (!name.trim()) return;
     const id = newId();
     // 과목은 따로 고르지 않는다: 「영어」 과목이 있으면 거기에 (시험 날짜·공부 시간을 영어로 셀 수 있게)
-    const subjectId = alive(d.subjects).find((s) => /영어|english/i.test(s.name))?.id ?? '';
-    put('wordLists', { id, name: name.trim(), kind, subjectId, days: kind === 'book' && Number(days) > 0 ? Math.min(MAX_DAYS, Number(days)) : undefined, testDate: kind === 'test' ? testDate : undefined, done: [], undone: [] });
+    const subjectId = alive(d.subjects).find((s) => (lang === 'ko' ? /국어|문학|언어/ : /영어|english/i).test(s.name))?.id ?? '';
+    put('wordLists', { id, name: name.trim(), kind, lang: lang === 'ko' ? 'ko' : undefined, subjectId, days: kind === 'book' && Number(days) > 0 ? Math.min(MAX_DAYS, Number(days)) : undefined, testDate: kind === 'test' ? testDate : undefined, done: [], undone: [] });
     go(`/words/${id}`);
   }
   return (
@@ -102,6 +103,14 @@ function NewList() {
         </button>
       </div>
       <div className="st-card st-form">
+        <div className="st-seg">
+          <button type="button" className={lang === 'en' ? 'on' : ''} onClick={() => setLang('en')}>
+            영어
+          </button>
+          <button type="button" className={lang === 'ko' ? 'on' : ''} onClick={() => setLang('ko')}>
+            국어
+          </button>
+        </div>
         <Field group label="종류">
           <div className="st-seg">
             {(['book', 'test', 'inbox'] as const).map((k) => (
@@ -119,7 +128,7 @@ function NewList() {
               : '문제 풀다 만난 모르는 단어: 하루에 정한 수만큼 새로 익혀요.'}
         </p>
         <Field label="이름">
-          <input className="st-input" value={name} onChange={(e) => setName(e.target.value)} placeholder={kind === 'book' ? '예: 수능 영단어 2000' : kind === 'test' ? '예: 학원 단어 시험 Day 5~8' : '모르는 단어 모음'} />
+          <input className="st-input" value={name} onChange={(e) => setName(e.target.value)} placeholder={lang === 'ko' ? '예: 중세 국어 낱말' : kind === 'book' ? '예: 수능 영단어 2000' : kind === 'test' ? '예: 학원 단어 시험 Day 5~8' : '모르는 단어 모음'} />
         </Field>
         {kind === 'book' && (
           <Field label="Day 수" hint="PDF·붙여넣기로 단어를 넣으면 Day 수는 자동으로 맞춰져요">
@@ -157,7 +166,7 @@ function ListDetail({ id }: { id: string }) {
     return (
       <Empty icon="🤔" title="단어 목록을 찾을 수 없어요">
         <button className="btn" onClick={() => go('/words')}>
-          영단어
+          단어
         </button>
       </Empty>
     );
@@ -171,7 +180,7 @@ function ListDetail({ id }: { id: string }) {
   return (
     <div className="st-page">
       <div className="st-page-head">
-        <button className="st-back" onClick={() => go('/words')} aria-label="영단어">
+        <button className="st-back" onClick={() => go('/words')} aria-label="단어">
           ‹
         </button>
         <h2>
@@ -471,7 +480,7 @@ function ImportSheet({ list, existing, onClose }: { list: WordList; existing: Wo
   const [keepSentences, setKeepSentences] = useState(false);
   const [skip, setSkip] = useState<Set<number>>(new Set());
   const abort = useRef<AbortController | null>(null);
-  const rows: ParsedWord[] = useMemo(() => parseWords(text, existing.map((w) => w.term)), [text, existing]);
+  const rows: ParsedWord[] = useMemo(() => parseWords(text, existing.map((w) => w.term), list.lang ?? 'en'), [text, existing, list.lang]);
   const good = rows.filter((r, i) => !skip.has(i) && (!r.problem || r.problem === '뜻이 비어 있어요'));
   useEffect(() => () => abort.current?.abort(), []);
 
@@ -554,6 +563,14 @@ function ImportSheet({ list, existing, onClose }: { list: WordList; existing: Wo
     if (!isLoggedIn()) return toast('뜻 자동 채우기는 로그인한 뒤에 쓸 수 있어요');
     const replace = new Map<string, string>();
     try {
+      // 국어 단어장: 표준국어대사전에서 첫 뜻
+      if (list.lang === 'ko')
+        for (const [i, x] of empty.entries()) {
+          setBusy(`뜻 찾는 중… ${i}/${empty.length}`);
+          const s = (await dictKo(x.term)).senses[0];
+          if (s) replace.set(x.line, `${x.term}\t${s.definition}`);
+        }
+      else
       for (let i = 0; i < empty.length; i += 60) {
         const part = empty.slice(i, i + 60);
         setBusy(`뜻 찾는 중… ${i}/${empty.length}`);
@@ -787,10 +804,10 @@ function WordRun({ listId, mode }: { listId: string; mode: 'learn' | 'prep' | 'w
           <Field group label="방향">
             <div className="st-seg">
               <button className={dir === 'en' ? 'on' : ''} onClick={() => setDir('en')}>
-                영어 → 뜻
+                {list.lang === "ko" ? "낱말 → 뜻" : "영어 → 뜻"}
               </button>
               <button className={dir === 'ko' ? 'on' : ''} onClick={() => setDir('ko')}>
-                뜻 → 영어
+                {list.lang === "ko" ? "뜻 → 낱말" : "뜻 → 영어"}
               </button>
             </div>
           </Field>

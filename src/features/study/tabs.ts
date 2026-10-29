@@ -5,7 +5,7 @@ export const TABS = [
   { key: 'books', label: '문제집' },
   { key: 'preview', label: '예습' },
   { key: 'tutor', label: '과외' },
-  { key: 'words', label: '영단어' },
+  { key: 'words', label: '단어' },
   { key: 'translate', label: '번역' },
   { key: 'review', label: '복습' },
   { key: 'time', label: '기록' },
