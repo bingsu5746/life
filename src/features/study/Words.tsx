@@ -792,7 +792,7 @@ function WordRun({ listId, mode }: { listId: string; mode: 'learn' | 'prep' | 'w
             </div>
           </Field>
           <p className="st-hint">
-            {method === 'card' ? '먼저 떠올린 뒤 뜻을 보고 「알았다 / 몰랐다」를 눌러요. 상자 1~5번을 모두 오를 수 있어요.' : '보기 4개 중 고르기. 고르기는 떠올리기보다 쉬워서 3번 상자까지만 올라요.'}
+            {method === 'card' ? '카드를 눌러 뒤집어 뜻을 보고, 왼쪽으로 밀면 「모른다」 오른쪽으로 밀면 「안다」예요. 상자 1~5번을 모두 오를 수 있어요.' : '보기 4개 중 고르기. 고르기는 떠올리기보다 쉬워서 3번 상자까지만 올라요.'}
             {mode === 'prep' && ' 시험 대비는 상자를 올리지 않고, 틀린 단어만 1번 상자로 보내요.'} 틀린 단어는 몇 장 뒤에 다시 나와요.
           </p>
           <button className="btn btn-primary btn-lg" onClick={begin}>
@@ -817,7 +817,21 @@ function WordRun({ listId, mode }: { listId: string; mode: 'learn' | 'prep' | 'w
           </p>
           <p className="st-hint">{mode === 'prep' ? '틀린 단어는 1번 상자로 가서' : '틀린 단어는'} {d.settings.intervals[0] === 1 ? '내일' : `${d.settings.intervals[0]}일 뒤에`} 다시 나와요.</p>
           <div className="st-row">
-            <button className="btn btn-primary" onClick={() => go('/study')}>
+            {right < total && (
+              <button
+                className="btn btn-primary"
+                onClick={() => {
+                  const missed = [...answered].filter(([, ok]) => !ok).map(([id]) => id);
+                  setQueue(missed);
+                  setTotal(missed.length);
+                  setAnswered(new Map());
+                  setStep((x) => x + 1);
+                }}
+              >
+                모른 {total - right}개만 다시
+              </button>
+            )}
+            <button className={`btn ${right < total ? '' : 'btn-primary'}`} onClick={() => go('/study')}>
               오늘 화면으로
             </button>
             <button className="btn" onClick={() => go(`/words/${listId}`)}>

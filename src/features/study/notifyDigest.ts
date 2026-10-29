@@ -40,6 +40,8 @@ export function morning(d: StudyData, words: WordsData, today: DateStr, date: Da
   if (books) parts.push(`문제집·단어장 ${books}개 (${items}쪽·Day)`);
   const pv = alive(d.previews).filter((p) => !p.done && p.date === date);
   if (pv.length) parts.push(`오늘 수업 예습 ${pv.length}개`);
+  const opens = alive(d.movies).filter((m) => m.status === 'want' && m.release === date);
+  if (opens.length) parts.push(`오늘 개봉: ${opens.map((m) => m.title).join('·')}`);
   const rv = reviewCount(d, words, date);
   if (rv) parts.push(`복습 ${rv}개`);
   return parts.length ? parts.join(' · ') : '오늘 정해 둔 것이 없어요. 공부 기록을 남겨 보세요';
@@ -63,6 +65,8 @@ export function evening(d: StudyData, today: DateStr, date: DateStr): string {
   for (const a of alive(d.assessments).filter((a) => !a.done && a.due === next)) parts.push(`내일 수행평가: ${d.subjects[a.subjectId]?.name ?? ''} ${a.title}`.replace(/\s+/g, ' '));
   const hw = homeworkViews(d, today).filter((h) => !h.finished && h.due === next);
   if (hw.length) parts.push(`내일 마감 숙제 ${hw.length}개`);
+  const opens = alive(d.movies).filter((m) => m.status === 'want' && m.release === next);
+  if (opens.length) parts.push(`내일 개봉: ${opens.map((m) => m.title).join('·')}`);
   const pv = alive(d.previews).filter((p) => !p.done && p.date === next);
   if (pv.length) parts.push(`내일 수업 예습 ${pv.length}개`);
   else {

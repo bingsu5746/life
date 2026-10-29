@@ -1,9 +1,9 @@
 // 영화 찾기(제목·감독 + 장르·나라·연도·유형 거르기) · 추천(내 별점 / 오늘 보고 싶은 것) · 넷플릭스·Apple TV 표시
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { catalogSearch, movieProviders, recommendMovies, type CatalogFilm } from '../auth/api';
 import { alive, newId, type Movie } from '../study/model';
 import { put, useStudy } from '../study/store';
-import { toast } from '../study/ui';
+import { tap, toast } from '../study/ui';
 
 export const norm = (t: string) => t.replace(/\s+/g, '').toLowerCase();
 
@@ -83,40 +83,56 @@ export function Badges({ p }: { p: string[] | null | undefined }) {
 
 const sub = (f: CatalogFilm) => [f.open.slice(0, 4), f.type && f.type !== '장편' ? f.type : '', f.genre, f.nation, f.director].filter(Boolean).join(' · ');
 
-function Row({ f, reason, mine, p, onWatched, onOpen }: { f: CatalogFilm; reason?: string; mine?: Movie; p?: string[] | null; onWatched: (m: Partial<Movie>) => void; onOpen: (m: Movie) => void }) {
-  const year = Number(f.open.slice(0, 4)) || undefined;
+export interface FilmInfo {
+  title: string;
+  year?: number;
+  release?: string;
+  sub?: string;
+  genre?: string | null;
+  nation?: string | null;
+  director?: string | null;
+}
+
+/** 영화 한 줄: 누르면 「보고 싶어요 · 봤어요」가 펼쳐진다 (평소엔 단추가 안 보인다). 내 목록에 있으면 상태만 */
+export function FilmRow({ film, lead, reason, mine, p, onWatched, onOpen }: { film: FilmInfo; lead?: ReactNode; reason?: string; mine?: Movie; p?: string[] | null; onWatched: (m: Partial<Movie>) => void; onOpen: (m: Movie) => void }) {
+  const [open, setOpen] = useState(false);
+  const extra = { genre: film.genre ?? undefined, nation: film.nation ?? undefined, director: film.director ?? undefined };
   return (
-    <div className="st-item mv-row">
-      <div className="st-item-main">
+    <div className={`st-item mv-row ${open ? 'open' : ''}`}>
+      {lead}
+      <div className="st-item-main st-tap" {...(mine ? {} : tap(() => setOpen(!open)))}>
         <div className="st-item-title">
-          {f.title} <Badges p={p} />
+          {film.title} <Badges p={p} />
         </div>
-        <div className="st-item-sub">{sub(f)}</div>
+        {film.sub && <div className="st-item-sub">{film.sub}</div>}
         {reason && <div className="mv-reason">{reason}</div>}
       </div>
-      {mine ? (
+      {mine && (
         <button className={`mv-mine ${mine.status}`} onClick={() => onOpen(mine)}>
           {mine.status === 'watched' ? (mine.rating ? `★ ${mine.rating.toFixed(1)}` : '봤어요') : '보고 싶어요 ✓'}
         </button>
-      ) : (
+      )}
+      {open && !mine && (
         <div className="mv-acts">
           <button
-            className="btn btn-sm"
+            className="st-link"
             onClick={() => {
-              put('movies', { id: newId(), title: f.title, year, status: 'want', release: f.open, created: Date.now() } as Movie);
-              toast(`「${f.title}」 보고 싶어요에 넣었어요`);
+              put('movies', { id: newId(), title: film.title, year: film.year, status: 'want', release: film.release, ...extra, created: Date.now() } as Movie);
+              toast(`「${film.title}」 보고 싶어요에 넣었어요`);
             }}
           >
             보고 싶어요
           </button>
-          <button className="btn btn-sm" onClick={() => onWatched({ title: f.title, year, release: f.open, status: 'watched', watched: undefined })}>
-            봤어요
+          <button className="st-link" onClick={() => onWatched({ title: film.title, year: film.year, release: film.release, status: 'watched', ...extra })}>
+            봤어요 · 별점 남기기
           </button>
         </div>
       )}
     </div>
   );
 }
+
+const filmOf = (f: CatalogFilm): FilmInfo => ({ title: f.title, year: Number(f.open.slice(0, 4)) || undefined, release: f.open, sub: sub(f), genre: f.genre, nation: f.nation, director: f.director });
 
 interface Common {
   onWatched: (m: Partial<Movie>) => void;
@@ -211,7 +227,7 @@ export function FindTab({ onWatched, onOpen }: Common) {
       {active && !busy && !items.length && !err && <p className="st-muted">찾은 영화가 없어요.</p>}
       <div>
         {items.map((x) => (
-          <Row key={x.code} f={x} mine={mine.get(norm(x.title))} p={ott.of({ title: x.title, year: Number(x.open.slice(0, 4)) || undefined })} onWatched={onWatched} onOpen={onOpen} />
+          <FilmRow key={x.code} film={filmOf(x)} mine={mine.get(norm(x.title))} p={ott.of({ title: x.title, year: Number(x.open.slice(0, 4)) || undefined })} onWatched={onWatched} onOpen={onOpen} />
         ))}
       </div>
       {more && (
@@ -315,7 +331,7 @@ export function RecTab({ onWatched, onOpen }: Common) {
       {items && items.length > 0 && (
         <div>
           {items.map((x) => (
-            <Row key={x.code} f={x} reason={x.reason} mine={mine.get(norm(x.title))} p={ott.of({ title: x.title, year: Number(x.open.slice(0, 4)) || undefined })} onWatched={onWatched} onOpen={onOpen} />
+            <FilmRow key={x.code} film={filmOf(x)} reason={x.reason} mine={mine.get(norm(x.title))} p={ott.of({ title: x.title, year: Number(x.open.slice(0, 4)) || undefined })} onWatched={onWatched} onOpen={onOpen} />
           ))}
         </div>
       )}

@@ -59,7 +59,9 @@ export function Basketball({ sub }: { sub?: string }) {
       ) : (
         <>
           <section className="st-card">
-            <h3 className="st-h">경기 {games.length}번{games.length ? ` · ${wins}승 ${losses}패` : ''}</h3>
+            <h3 className="st-h">
+              경기 {games.length}번{games.length ? ` · ${wins}승 ${losses}패` : ''}
+            </h3>
             <div className="st-stat-row bb-stats">
               <div>
                 <small>평균 득점</small>
@@ -115,14 +117,7 @@ export function Basketball({ sub }: { sub?: string }) {
                     {w.minutes ? ` · ${minutesText(w.minutes)}` : ''}
                   </div>
                   <div className="st-item-sub">
-                    {[
-                      w.bb?.reb !== undefined && `리바운드 ${w.bb.reb}`,
-                      w.bb?.ast !== undefined && `어시스트 ${w.bb.ast}`,
-                      w.bb?.fga ? `2점 ${w.bb.fgm ?? 0}/${w.bb.fga}` : '',
-                      w.bb?.tpa ? `3점 ${w.bb.tpm ?? 0}/${w.bb.tpa}` : '',
-                      w.bb?.fta ? `자유투 ${w.bb.ftm ?? 0}/${w.bb.fta}` : '',
-                      w.memo,
-                    ]
+                    {[w.bb?.reb !== undefined && `리바운드 ${w.bb.reb}`, w.bb?.ast !== undefined && `어시스트 ${w.bb.ast}`, w.bb?.fga ? `2점 ${w.bb.fgm ?? 0}/${w.bb.fga}` : '', w.bb?.tpa ? `3점 ${w.bb.tpm ?? 0}/${w.bb.tpa}` : '', w.bb?.fta ? `자유투 ${w.bb.ftm ?? 0}/${w.bb.fta}` : '', w.memo]
                       .filter(Boolean)
                       .join(' · ')}
                   </div>
@@ -166,7 +161,15 @@ function BbSheet({ item, today, onClose }: { item?: Workout; today: string; onCl
     if (bad || !date) return;
     const m = Number(minutes);
     const pts = num('pts') ?? (mode === 'game' && ptsFromShots(shots) > 0 ? ptsFromShots(shots) : undefined);
-    const bb: BasketballStat = { ...shots, result: mode === 'game' ? result : undefined, pts: mode === 'game' ? pts : undefined, reb: mode === 'game' ? num('reb') : undefined, ast: mode === 'game' ? num('ast') : undefined, stl: mode === 'game' ? num('stl') : undefined, blk: mode === 'game' ? num('blk') : undefined };
+    const bb: BasketballStat = {
+      ...shots,
+      result: mode === 'game' ? result : undefined,
+      pts: mode === 'game' ? pts : undefined,
+      reb: mode === 'game' ? num('reb') : undefined,
+      ast: mode === 'game' ? num('ast') : undefined,
+      stl: mode === 'game' ? num('stl') : undefined,
+      blk: mode === 'game' ? num('blk') : undefined,
+    };
     put('workouts', { ...(item ?? { created: Date.now() }), id: item?.id ?? newId(), date, kind: '농구', minutes: m > 0 && m <= 1440 ? Math.round(m) : undefined, memo: memo.trim() || undefined, bb } as Workout);
     toast(item ? '고쳤어요' : '농구 기록을 넣었어요');
     onClose();

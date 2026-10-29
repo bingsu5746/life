@@ -4544,3 +4544,215 @@ body {
 .st-seg {
   flex-wrap: wrap;
 }
+
+/* 눈에 띄지 않게: 별은 켜졌을 때나 마우스를 올렸을 때만 */
+.st-star.quiet {
+  opacity: 0;
+}
+.st-item:hover .st-star.quiet,
+.st-item:focus-within .st-star.quiet {
+  opacity: 1;
+}
+@media (hover: none) {
+  .st-star.quiet {
+    display: none;
+  }
+}
+.st-sub-panel {
+  display: grid;
+  gap: 10px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: var(--soft);
+}
+
+/* 영화 시상식 */
+.aw {
+  display: grid;
+  gap: 12px;
+}
+.aw-years {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+.aw-years button {
+  padding: 5px 12px;
+  border-radius: 999px;
+  border: 0;
+  background: none;
+  color: var(--muted);
+  font: inherit;
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+.aw-years button.on {
+  background: var(--soft);
+  color: var(--text);
+  font-weight: 650;
+}
+.aw-hero {
+  text-align: center;
+  padding: 32px 20px;
+  display: grid;
+  gap: 8px;
+  justify-items: center;
+}
+.aw-hero small,
+.aw-label {
+  color: var(--muted);
+  font-size: 0.78rem;
+  letter-spacing: 0.08em;
+}
+.aw-hero h3 {
+  margin: 0;
+  font-size: clamp(1.5rem, 6vw, 2rem);
+  letter-spacing: -0.03em;
+  line-height: 1.25;
+}
+.aw-stars {
+  letter-spacing: 3px;
+  font-size: 1.1rem;
+}
+.aw-hero p {
+  margin: 0;
+  color: var(--muted);
+  max-width: 28em;
+  line-height: 1.6;
+}
+.aw-film {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 2px 12px;
+  align-items: baseline;
+  width: 100%;
+  padding: 10px 0;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  background: none;
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.aw-film:last-child {
+  border-bottom: 0;
+}
+.aw-film span {
+  font-size: 0.85rem;
+  letter-spacing: 1px;
+}
+.aw-film small {
+  grid-column: 1 / -1;
+  color: var(--muted);
+}
+.aw-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 18px 16px;
+}
+.aw-cat {
+  display: grid;
+  gap: 2px;
+}
+.aw-cat small {
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+.aw-cat b {
+  font-size: 1.15rem;
+  letter-spacing: -0.02em;
+}
+.aw-cat span {
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+.mv-tags {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+.mv-tagedit {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+  padding: 6px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface);
+}
+.mv-taginput {
+  flex: 1;
+  min-width: 8em;
+  border: 0;
+  outline: none;
+  background: none;
+  color: var(--text);
+  font: inherit;
+  padding: 4px 6px;
+}
+/* 영화 한 줄: 펼치면 아래에 글자 단추 */
+.mv-row {
+  flex-wrap: wrap;
+}
+.mv-row .mv-acts {
+  flex: 1 0 100%;
+  display: flex;
+  gap: 18px;
+  padding: 2px 0 6px;
+}
+.mv-row.open {
+  background: var(--softer);
+}
+
+.mv-sub {
+  display: flex;
+  gap: 18px;
+  font-size: 0.92rem;
+}
+.mv-sub button {
+  padding: 2px 0;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: none;
+  color: var(--muted);
+  font: inherit;
+  cursor: pointer;
+}
+.mv-sub button.on {
+  color: var(--text);
+  border-bottom-color: var(--text);
+  font-weight: 650;
+}
+.mv-summary {
+  display: flex;
+  align-items: baseline;
+  gap: 16px;
+  flex-wrap: wrap;
+  color: var(--muted);
+  font-size: 0.92rem;
+}
+.mv-summary b {
+  color: var(--text);
+  font-size: 1.1rem;
+}
+.mv-summary .st-link {
+  margin-left: auto;
+}
+.mv-dist summary {
+  cursor: pointer;
+  color: var(--muted);
+  font-size: 0.88rem;
+}
+.mv-row .mv-acts {
+  flex-direction: row;
+  justify-content: flex-start;
+  align-items: center;
+}
+.mv-row .st-item-main,
+.mv-row .st-item-main * {
+  text-decoration: none;
+}

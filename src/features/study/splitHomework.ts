@@ -36,3 +36,10 @@ export function splitHomework(total: number, start: number, today: DateStr, due:
   });
   return out;
 }
+
+/** 남은 번호들을 오늘부터 마감까지 다시 나눈다 (한 몫의 from~to 는 남은 번호의 처음~끝) */
+export function resplit(remaining: number[], today: DateStr, due: DateStr, includeDue: boolean, off: DateStr[]): HwPart[] {
+  const nums = [...new Set(remaining)].sort((a, b) => a - b);
+  if (!nums.length) return [];
+  return splitHomework(nums.length, 0, today, due, includeDue, off).map((p) => ({ date: p.date, from: nums[p.from], to: nums[p.to] }));
+}

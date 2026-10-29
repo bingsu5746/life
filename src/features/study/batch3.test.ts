@@ -201,3 +201,43 @@ describe('숙제 나누기 (splitHomework)', () => {
     expect(splitHomework(7, 1, '2026-10-01', '2026-10-01', false, [])).toEqual([{ date: '2026-10-01', from: 1, to: 7 }]);
   });
 });
+
+describe('숙제 다시 나누기 (resplit)', () => {
+  it('안 한 번호만 새 마감까지 다시 나눈다', async () => {
+    const { resplit } = await import('./splitHomework');
+    const p = resplit([11, 12, 13, 14, 21, 22], '2026-10-10', '2026-10-13', false, []);
+    expect(p.map((x) => [x.date, x.from, x.to])).toEqual([['2026-10-10', 11, 12], ['2026-10-11', 13, 14], ['2026-10-12', 21, 22]]);
+  });
+});
+
+describe('지난달 비교 (compareMonths)', () => {
+  it('이번 달 진행 중이면 지난달 같은 날까지만', async () => {
+    const { compareMonths } = await import('../life/calc');
+    const tx = (id: string, date: string, amount: number, category: string) => ({ id, date, amount, category, type: 'out', created: 1, updatedAt: 1 });
+    const d = { moneyTx: Object.fromEntries([tx('a', '2026-09-03', 10000, '식비'), tx('b', '2026-09-25', 50000, '쇼핑'), tx('c', '2026-10-02', 30000, '식비')].map((t) => [t.id, t])) } as never;
+    const c = compareMonths(d, '2026-10', '2026-10-10')!;
+    expect(c.partial).toBe(true);
+    expect(c.prevOut).toBe(10000);
+    expect(c.diff).toBe(20000);
+    expect(c.byCategory).toEqual([{ category: '식비', diff: 20000 }]);
+    expect(compareMonths(d, '2026-08', '2026-10-10')).toBeNull();
+  });
+});
+
+describe('영화 시상식 (awards)', () => {
+  it('올해의 영화 · 후보 · 많이 본 장르·장소', async () => {
+    const { awards, watchedYears } = await import('../life/awards');
+    const mv = (id: string, rating: number, watched: string, extra = {}) => ({ id, title: id, status: 'watched', rating, watched, created: 1, updatedAt: 1, ...extra });
+    const d = { movies: Object.fromEntries([mv('a', 4.5, '2026-03-01', { genre: '액션,범죄', where: '영화관' }), mv('b', 5, '2026-05-01', { genre: '액션', where: '집', again: [{ date: '2026-06-01', where: '집' }] }), mv('c', 2, '2026-07-09', { genre: '드라마', where: '집' }), mv('d', 3, '2025-01-01')].map((m) => [m.id, m])) } as never;
+    const a = awards(d, 2026);
+    expect(a.count).toBe(3);
+    expect(a.best?.id).toBe('b');
+    expect(a.nominees.map((m) => m.id)).toEqual(['a', 'c']);
+    expect(a.worst?.id).toBe('c');
+    expect(a.genre).toEqual({ name: '액션', count: 2 });
+    expect(a.place).toEqual({ name: '집', count: 3 });
+    expect(a.rewatch).toBe(1);
+    expect(awards(d, null).count).toBe(4);
+    expect(watchedYears(d)).toEqual([2026, 2025]);
+  });
+});

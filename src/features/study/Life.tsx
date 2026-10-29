@@ -3,8 +3,9 @@ import { useState } from 'react';
 import { addDays, shortDate, WEEKDAYS } from './dates';
 import { bestStreak, habitOn, streak, toggleHabit } from './habits';
 import { alive, newId, type Habit, type Todo } from './model';
-import { put, remove, useStudy } from './store';
-import { Check, confirmDelete, Empty, Field, Icon, Sheet, useToday, WeekdayPicker, tap } from './ui';
+import { resplit } from './splitHomework';
+import { getStudy, put, remove, useStudy } from './store';
+import { Check, confirmDelete, Empty, Field, Icon, Sheet, toast, useToday, WeekdayPicker, tap } from './ui';
 
 const ICONS = ['📖', '🏃', '💧', '😴', '🧘', '✍️', '🎧', '🥗', '🧹', '💊', '📵', '🌅'];
 
@@ -78,7 +79,7 @@ function Todos({ today }: { today: string }) {
                     <div className="st-item-title">{t.title}</div>
                     {t.due && <div className="st-item-sub">{t.due === today ? '오늘' : shortDate(t.due)}</div>}
                   </div>
-                  <button className={`st-star ${t.star ? 'on' : ''}`} aria-pressed={!!t.star} aria-label="오늘 꼭 할 것" onClick={() => put('todos', { ...t, star: !t.star })}>
+                  <button className={`st-star ${t.star ? 'on' : 'quiet'}`} aria-pressed={!!t.star} aria-label="오늘 꼭 할 것" onClick={() => put('todos', { ...t, star: !t.star })}>
                     ★
                   </button>
                 </div>
@@ -111,6 +112,27 @@ function Todos({ today }: { today: string }) {
 function TodoSheet({ t, onClose }: { t: Todo; onClose: () => void }) {
   const [title, setTitle] = useState(t.title);
   const [due, setDue] = useState(t.due ?? '');
+  const [star, setStar] = useState(!!t.star);
+  const d = useStudy();
+  const today = useToday();
+  // 같은 숙제에서 나온 할 일들
+  const mates = t.group ? alive(d.todos).filter((x) => x.group === t.group) : [];
+  const left = mates.filter((x) => !x.done && x.split);
+  const [more, setMore] = useState(false);
+  const [end, setEnd] = useState(mates.map((x) => x.due ?? '').sort().pop() || addDays(today, 3));
+  const [incl, setIncl] = useState(false);
+  const base = t.split?.base ?? '';
+  const unit = t.split?.unit ?? '쪽';
+  function again() {
+    const nums = left.flatMap((x) => Array.from({ length: x.split!.to - x.split!.from + 1 }, (_, k) => x.split!.from + k));
+    const parts = resplit(nums, today, end, incl, getStudy().settings.offDates);
+    if (!parts.length) return;
+    left.forEach((x) => remove('todos', x.id));
+    const now = Date.now();
+    parts.forEach((p, i) => put('todos', { id: newId(), title: `${base} · ${p.from === p.to ? p.from : `${p.from}~${p.to}`}${unit}`, due: p.date, done: false, group: t.group, split: { base, unit, from: p.from, to: p.to }, created: now + i }));
+    toast(`남은 ${nums.length}${unit}을 ${parts.length}일에 다시 나눴어요`);
+    onClose();
+  }
   return (
     <Sheet title="할 일 고치기" onClose={onClose}>
       <div className="st-form">
@@ -120,11 +142,41 @@ function TodoSheet({ t, onClose }: { t: Todo; onClose: () => void }) {
         <Field label="마감 (선택)">
           <input className="st-input sm" type="date" value={due} onChange={(e) => setDue(e.target.value)} />
         </Field>
+        <label className="st-toggle">
+          <input type="checkbox" checked={star} onChange={(e) => setStar(e.target.checked)} /> 오늘 꼭 할 것 ★
+        </label>
+        {t.split && left.length > 0 && (
+          <div className="st-sub-panel">
+            {!more ? (
+              <button className="st-link" onClick={() => setMore(true)}>
+                「{base}」 남은 {left.length}번을 다시 나누기
+              </button>
+            ) : (
+              <>
+                <label className="st-cond-time">
+                  새 마감
+                  <input className="st-input sm" type="date" value={end} min={today} onChange={(e) => setEnd(e.target.value)} />
+                </label>
+                <label className="st-toggle">
+                  <input type="checkbox" checked={incl} onChange={(e) => setIncl(e.target.checked)} /> 마감 날에도 넣기
+                </label>
+                <div className="st-row end">
+                  <button className="btn btn-sm st-danger" onClick={() => (mates.forEach((x) => remove('todos', x.id)), onClose())}>
+                    이 숙제 전부 지우기
+                  </button>
+                  <button className="btn btn-sm btn-primary" disabled={end < today} onClick={again}>
+                    다시 나누기
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        )}
         <div className="st-row end">
           <button className="btn btn-sm st-danger" onClick={() => (remove('todos', t.id), onClose())}>
             지우기
           </button>
-          <button className="btn btn-primary" onClick={() => (put('todos', { ...t, title: title.trim() || t.title, due: due || undefined }), onClose())}>
+          <button className="btn btn-primary" onClick={() => (put('todos', { ...t, title: title.trim() || t.title, due: due || undefined, star: star || undefined }), onClose())}>
             저장
           </button>
         </div>

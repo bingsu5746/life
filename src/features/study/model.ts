@@ -417,6 +417,14 @@ export interface Movie extends Stamp {
   comment?: string;
   /** 긴 리뷰 */
   review?: string;
+  /** 영화 목록에서 골랐을 때 따라오는 정보 (시상식 요약용) */
+  genre?: string;
+  nation?: string;
+  director?: string;
+  /** 태그 (혼자 · 울었다 …) */
+  tags?: string[];
+  /** 처음 본 뒤에 또 본 기록 */
+  again?: { date: DateStr; where?: string }[];
   /** 본 날 */
   watched?: DateStr;
   /** 개봉일 (보고 싶은 영화) */
@@ -579,6 +587,8 @@ export interface Todo extends Stamp {
   star?: boolean;
   /** 「숙제 나누기」로 만든 할 일이면 같은 숙제끼리 묶는 id */
   group?: string;
+  /** 나눈 숙제 한 몫: 이름 · 단위 · 번호 범위 (다시 나눌 때 씀) */
+  split?: { base: string; unit: string; from: number; to: number };
   created: number;
 }
 

@@ -162,3 +162,28 @@ export function upcomingRules(d: StudyData, today: DateStr, days = 30): { date: 
 export function monthlyAmount(r: MoneyRule): number {
   return r.freq === 'daily' ? r.amount * 30 : r.freq === 'weekly' ? Math.round((r.amount * 52) / 12) : r.freq === 'yearly' ? Math.round(r.amount / 12) : r.amount;
 }
+
+export interface MonthCompare {
+  /** 비교 대상 (지난달) 쓴 돈. 이번 달이 진행 중이면 지난달 같은 날까지 */
+  prevOut: number;
+  diff: number;
+  /** 분류별 차이 (양수면 더 씀), 차이가 큰 순 */
+  byCategory: { category: string; diff: number }[];
+  partial: boolean;
+}
+
+/** 지난달과 비교. month 가 오늘이 든 달이면 지난달 같은 날(일)까지만 견준다 */
+export function compareMonths(d: StudyData, month: string, today: DateStr): MonthCompare | null {
+  const prevMonth = shiftMonth(month, -1);
+  const partial = month === monthOf(today);
+  const upto = partial ? Number(today.slice(8)) : 31;
+  const prev = alive(d.moneyTx).filter((t) => t.type === 'out' && monthOf(t.date) === prevMonth && Number(t.date.slice(8)) <= upto);
+  if (!prev.length) return null;
+  const cur = monthSummary(d, month);
+  const p = new Map<string, number>();
+  for (const t of prev) p.set(t.category, (p.get(t.category) ?? 0) + t.amount);
+  const prevOut = prev.reduce((a, t) => a + t.amount, 0);
+  const cats = new Set([...p.keys(), ...cur.byCategory.map((c) => c.category)]);
+  const byCategory = [...cats].map((category) => ({ category, diff: (cur.byCategory.find((c) => c.category === category)?.amount ?? 0) - (p.get(category) ?? 0) })).filter((c) => c.diff !== 0).sort((a, b) => Math.abs(b.diff) - Math.abs(a.diff));
+  return { prevOut, diff: cur.out - prevOut, byCategory, partial };
+}

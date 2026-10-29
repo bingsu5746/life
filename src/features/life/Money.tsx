@@ -5,7 +5,7 @@ import { shortDate } from '../study/dates';
 import { alive, newId, type MoneyRule, type MoneyTx, type SavingGoal } from '../study/model';
 import { put, remove, setSettings, useStudy } from '../study/store';
 import { Bar, confirmDelete, Empty, Field, go, Icon, Sheet, tap, toast, useToday } from '../study/ui';
-import { budgetView, monthlyAmount, monthLabel, monthlyOut, monthOf, monthSummary, readWon, saved, shiftMonth, upcomingRules, won } from './calc';
+import { budgetView, compareMonths, monthlyAmount, monthLabel, monthlyOut, monthOf, monthSummary, readWon, saved, shiftMonth, upcomingRules, won } from './calc';
 import { WEEKDAYS } from '../study/dates';
 
 const OUT = ['식비', '간식·카페', '교통', '쇼핑', '문화·여가', '교육·책', '통신', '선물', '기타'];
@@ -28,6 +28,8 @@ export function Money({ sub }: { sub?: string }) {
   const budget = d.settings.monthlyBudget;
   const bv = budget ? budgetView(budget, s.out, month, today) : null;
   const months = monthlyOut(d, today, 6);
+  const cmp = compareMonths(d, month, today);
+  const delta = (n: number) => `${n > 0 ? '+' : '−'}${won(Math.abs(n))}`;
   const catMax = Math.max(1, ...s.byCategory.map((x) => x.amount));
   const goals = alive(d.savings).sort((a, b) => Number(!!a.done) - Number(!!b.done) || a.created - b.created);
   const byDate = new Map<string, MoneyTx[]>();
@@ -71,6 +73,11 @@ export function Money({ sub }: { sub?: string }) {
             <b className={s.in - s.out < 0 ? 'bad' : ''}>{won(s.in - s.out)}</b>
           </div>
         </div>
+        {cmp && (
+          <p className={`st-hint ${cmp.diff > 0 ? 'bad' : ''}`}>
+            {cmp.partial ? '지난달 같은 날까지보다' : '지난달보다'} {cmp.diff === 0 ? '똑같이 썼어요' : `${won(Math.abs(cmp.diff))} ${cmp.diff > 0 ? '더' : '덜'} 썼어요`}
+          </p>
+        )}
         {budget ? (
           <>
             <Bar value={Math.min(s.out, budget)} max={budget} label="예산 쓴 정도" />
@@ -106,7 +113,7 @@ export function Money({ sub }: { sub?: string }) {
                   <span>{c.category}</span>
                   <Bar value={c.amount} max={catMax} label={`${c.category} 지출`} />
                   <small>
-                    {won(c.amount)} · {s.out ? Math.round((c.amount / s.out) * 100) : 0}%
+                    {won(c.amount)} · {s.out ? Math.round((c.amount / s.out) * 100) : 0}%{cmp?.byCategory.find((x) => x.category === c.category) && ` · ${delta(cmp.byCategory.find((x) => x.category === c.category)!.diff)}`}
                   </small>
                 </div>
               ))}
@@ -173,11 +180,7 @@ export function Money({ sub }: { sub?: string }) {
                 </b>
               </div>
             ))}
-            {soon.length > 0 && (
-              <p className="st-hint">
-                다가오는 것: {soon.map((x) => `${shortDate(x.date)} ${x.rule.name}`).join(' · ')}
-              </p>
-            )}
+            {soon.length > 0 && <p className="st-hint">다가오는 것: {soon.map((x) => `${shortDate(x.date)} ${x.rule.name}`).join(' · ')}</p>}
           </>
         )}
       </section>
@@ -457,8 +460,7 @@ function RuleSheet({ item, today, onClose }: { item?: MoneyRule; today: string; 
           {freq === 'monthly' && (
             <div className="st-inline">
               매달
-              <input className="st-input xs" inputMode="numeric" value={mday} onChange={(e) => setMday(e.target.value.replace(/\D/g, '').slice(0, 2))} aria-label="매달 며칠" />
-              일 <small className="st-muted">(31일처럼 없는 날은 그 달 마지막 날)</small>
+              <input className="st-input xs" inputMode="numeric" value={mday} onChange={(e) => setMday(e.target.value.replace(/\D/g, '').slice(0, 2))} aria-label="매달 며칠" />일 <small className="st-muted">(31일처럼 없는 날은 그 달 마지막 날)</small>
             </div>
           )}
         </Field>

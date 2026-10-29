@@ -182,7 +182,7 @@ function SplitSheet({ today, onClose }: { today: string; onClose: () => void }) 
             onClick={() => {
               const group = newId();
               const now = Date.now();
-              parts.forEach((p, i) => put('todos', { id: newId(), title: `${title.trim()} · ${label(p)}`, due: p.date, done: false, group, created: now + i }));
+              parts.forEach((p, i) => put('todos', { id: newId(), title: `${title.trim()} · ${label(p)}`, due: p.date, done: false, group, split: { base: title.trim(), unit, from: p.from, to: p.to }, created: now + i }));
               toast(`${parts.length}일치 할 일로 넣었어요`);
               onClose();
             }}
