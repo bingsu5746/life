@@ -29,6 +29,6 @@ describe('KOBIS 응답 읽기', () => {
         ],
       },
     };
-    expect(parseUpcoming(j, '2026-10-25', '2027-01-31')).toEqual([{ code: '1', title: '곧 개봉', titleEn: 'Soon', open: '2026-11-20', genre: '드라마', nation: '한국', director: '감독' }]);
+    expect(parseUpcoming(j, '2026-10-25', '2027-01-31')).toEqual([{ code: '1', title: '곧 개봉', titleEn: 'Soon', type: '장편', open: '2026-11-20', genre: '드라마', nation: '한국', director: '감독' }]);
   });
 });

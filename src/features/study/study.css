@@ -4485,3 +4485,62 @@ body {
 .mv-found-item:hover {
   background: var(--soft);
 }
+
+.st-split {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 4px;
+  font-size: 0.9rem;
+}
+.st-split li {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 4px 0;
+  border-bottom: 1px solid var(--line);
+}
+.st-split li:last-child {
+  border-bottom: 0;
+}
+
+/* 영화 찾기·추천·OTT */
+.mv-find {
+  display: grid;
+  gap: 12px;
+}
+.mv-filters {
+  display: grid;
+  gap: 8px;
+}
+.mv-reason {
+  margin-top: 4px;
+  font-size: 0.85rem;
+  color: var(--muted);
+  line-height: 1.5;
+}
+.mv-ott {
+  display: inline-flex;
+  gap: 4px;
+  margin-left: 4px;
+  vertical-align: middle;
+  flex-wrap: wrap;
+}
+.mv-ott b {
+  padding: 1px 7px;
+  border-radius: 999px;
+  border: 1px solid var(--line-strong);
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--muted);
+  white-space: nowrap;
+}
+.mv-ott b.main {
+  background: var(--text);
+  border-color: var(--text);
+  color: var(--surface);
+}
+.st-seg {
+  flex-wrap: wrap;
+}

@@ -184,3 +184,20 @@ describe('시험지 나누기 (splitSets)', () => {
     expect(splitSets(items, 10, seeded(5))).toEqual(splitSets(items, 10, seeded(5)));
   });
 });
+
+describe('숙제 나누기 (splitHomework)', () => {
+  it('40쪽을 10/1 ~ 10/5(마감 전날 10/4)까지 → 4일 10쪽씩, 이어지는 번호', async () => {
+    const { splitHomework } = await import('./splitHomework');
+    const p = splitHomework(40, 1, '2026-10-01', '2026-10-05', false, []);
+    expect(p.map((x) => [x.date, x.from, x.to])).toEqual([['2026-10-01', 1, 10], ['2026-10-02', 11, 20], ['2026-10-03', 21, 30], ['2026-10-04', 31, 40]]);
+  });
+  it('쉬는 날은 건너뛰고, 분량이 날수보다 적으면 하루 1개', async () => {
+    const { splitHomework } = await import('./splitHomework');
+    const p = splitHomework(3, 5, '2026-10-01', '2026-10-31', true, ['2026-10-02']);
+    expect(p.map((x) => [x.date, x.from, x.to])).toEqual([['2026-10-01', 5, 5], ['2026-10-03', 6, 6], ['2026-10-04', 7, 7]]);
+  });
+  it('마감이 오늘이면 오늘 한 번에', async () => {
+    const { splitHomework } = await import('./splitHomework');
+    expect(splitHomework(7, 1, '2026-10-01', '2026-10-01', false, [])).toEqual([{ date: '2026-10-01', from: 1, to: 7 }]);
+  });
+});

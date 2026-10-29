@@ -1,5 +1,6 @@
 // 영화: 극장가(KOBIS 박스오피스·개봉 예정), 본 영화(별점 0.5 단위 · 한줄 감상평 · 리뷰), 보고 싶은 영화(개봉일 D-day)
 import { useEffect, useRef, useState } from 'react';
+import { Badges, FindTab, RecTab, useOtt } from './MovieFind';
 import { catalogSearch, catalogSync, kobisInfo, type CatalogFilm, type CatalogState, type KobisInfo } from '../auth/api';
 import { BarChart } from '../study/charts';
 import { dday, shortDate } from '../study/dates';
@@ -16,8 +17,8 @@ export function starText(r?: number) {
   return '★'.repeat(full) + (r % 1 ? '½' : '') + '☆'.repeat(5 - full - (r % 1 ? 1 : 0));
 }
 
-type Tab = 'now' | 'watched' | 'want';
-const TAB_OF: Record<string, Tab> = { watched: 'watched', want: 'want' };
+type Tab = 'now' | 'watched' | 'want' | 'find' | 'rec';
+const TAB_OF: Record<string, Tab> = { watched: 'watched', want: 'want', find: 'find', rec: 'rec' };
 const norm = (t: string) => t.replace(/\s+/g, '').toLowerCase();
 
 /** sub: 없으면 극장가, 'watched' 본 영화, 'want' 보고 싶어요, 'new' 넣기 창 */
@@ -38,6 +39,7 @@ export function Movies({ sub }: { sub?: string }) {
     label: String(r),
     value: rated.filter((m) => m.rating === r).length,
   }));
+  const wantOtt = useOtt(tab === 'want' ? want.slice(0, 24).map((m) => ({ title: m.title, year: m.year })) : []);
   const oldWishes = alive(d.wishes).filter((w) => w.kind === 'movie');
   const viewing = view ? d.movies[view] : undefined;
   const close = () => {
@@ -61,6 +63,8 @@ export function Movies({ sub }: { sub?: string }) {
         {tabBtn('now', '극장가')}
         {tabBtn('watched', `본 영화${watched.length ? ` ${watched.length}` : ''}`)}
         {tabBtn('want', `보고 싶어요${want.length ? ` ${want.length}` : ''}`)}
+        {tabBtn('find', '찾기')}
+        {tabBtn('rec', '추천')}
       </div>
 
       {oldWishes.length > 0 && (
@@ -96,6 +100,8 @@ export function Movies({ sub }: { sub?: string }) {
         </p>
       )}
 
+      {tab === 'find' && <FindTab onWatched={(m) => setEdit(m)} onOpen={(m) => (m.status === 'watched' ? setView(m.id) : setEdit(m))} />}
+      {tab === 'rec' && <RecTab onWatched={(m) => setEdit(m)} onOpen={(m) => (m.status === 'watched' ? setView(m.id) : setEdit(m))} />}
       {tab === 'now' && <CatalogBar />}
       {tab === 'now' && <NowShowing today={today} onWatched={(m) => setEdit(m)} onOpen={(m) => (m.status === 'watched' ? setView(m.id) : setEdit(m))} />}
 
@@ -168,6 +174,7 @@ export function Movies({ sub }: { sub?: string }) {
                   <b>{m.title}</b>
                   {m.year && <small className="st-muted">{m.year}</small>}
                 </div>
+                <Badges p={wantOtt.of({ title: m.title, year: m.year })} />
                 <div className="mv-meta">
                   <small className="st-muted">{m.release ? `${shortDate(m.release)} 개봉${m.release >= today ? ` · ${dday(today, m.release)}` : ''}` : '개봉일 모름'}</small>
                   <button
@@ -399,6 +406,7 @@ function NowShowing({ today, onWatched, onOpen }: { today: string; onWatched: (m
     };
   }, []);
   const mine = new Map(alive(d.movies).map((m) => [norm(m.title), m]));
+  const ott = useOtt((info?.boxOffice ?? []).map((m) => ({ title: m.title, year: m.open ? Number(m.open.slice(0, 4)) : undefined })));
   const add = (title: string, release?: string) => {
     put('movies', {
       id: newId(),
@@ -451,7 +459,9 @@ function NowShowing({ today, onWatched, onOpen }: { today: string; onWatched: (m
             <div key={m.rank} className="st-item">
               <b className="mv-rank">{m.rank}</b>
               <div className="st-item-main">
-                <div className="st-item-title">{m.title}</div>
+                <div className="st-item-title">
+                  {m.title} <Badges p={ott.of({ title: m.title, year: m.open ? Number(m.open.slice(0, 4)) : undefined })} />
+                </div>
                 <div className="st-item-sub">{[m.open && `${shortDate(m.open)} 개봉`, m.audience && `누적 ${m.audience.toLocaleString('ko-KR')}명`].filter(Boolean).join(' · ')}</div>
               </div>
               {actions(m.title, m.open)}
@@ -485,7 +495,7 @@ function NowShowing({ today, onWatched, onOpen }: { today: string; onWatched: (m
           ))}
         </section>
       )}
-      <p className="st-hint">자료: 영화진흥위원회 영화관입장권통합전산망(KOBIS). 6시간마다 새로 받아요.</p>
+      <p className="st-hint">자료: 영화진흥위원회 영화관입장권통합전산망(KOBIS). 6시간마다 새로 받아요. 넷플릭스·Apple TV 등 OTT 표시는 TMDB(JustWatch) 자료예요.</p>
     </div>
   );
 }
@@ -531,7 +541,7 @@ function CatalogBar() {
     <section className="st-card">
       <div className="st-inline between wrap">
         <div>
-          <h3 className="st-h">영화 목록 (1990년~)</h3>
+          <h3 className="st-h">영화 목록 (1990년~, 단편·성인물 포함)</h3>
           <small className="st-muted">{state.count ? `${state.count.toLocaleString('ko-KR')}편 저장됨 · 「영화 넣기」에서 제목을 치면 찾아 줘요` : '아직 안 받았어요'}</small>
         </div>
         {state.done ? (

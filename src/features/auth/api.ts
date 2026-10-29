@@ -227,12 +227,49 @@ export interface CatalogFilm {
   genre: string | null;
   nation: string | null;
   director: string | null;
+  type?: string | null;
 }
-/** 서버에 쌓아 둔 영화 목록(1990년~)에서 제목으로 찾기 */
-export async function catalogSearch(q: string) {
-  return call<{ items: CatalogFilm[]; state: CatalogState }>(`movies/catalog?q=${encodeURIComponent(q)}`);
+export interface CatalogQuery {
+  q?: string;
+  genre?: string;
+  nation?: string;
+  from?: number;
+  to?: number;
+  type?: '' | '장편' | '단편';
+  adult?: boolean;
+  offset?: number;
+  facets?: boolean;
+}
+/** 서버에 쌓아 둔 영화 목록(1990년~)에서 제목·감독으로 찾고 장르·나라·연도·유형으로 거르기 */
+export async function catalogSearch(q: string | CatalogQuery) {
+  const o: CatalogQuery = typeof q === 'string' ? { q } : q;
+  const sp = new URLSearchParams();
+  if (o.q) sp.set('q', o.q);
+  if (o.genre) sp.set('genre', o.genre);
+  if (o.nation) sp.set('nation', o.nation);
+  if (o.from) sp.set('from', String(o.from));
+  if (o.to) sp.set('to', String(o.to));
+  if (o.type) sp.set('type', o.type);
+  if (o.adult) sp.set('adult', '1');
+  if (o.offset) sp.set('offset', String(o.offset));
+  if (o.facets) sp.set('facets', '1');
+  return call<{ items: CatalogFilm[]; more?: boolean; state: CatalogState; facets?: { genres: string[]; nations: string[] } }>(`movies/catalog?${sp}`);
 }
 /** 영화 목록을 몇 쪽 더 받는다 (done 이 될 때까지 되풀이) */
 export async function catalogSync() {
   return call<{ state: CatalogState; last?: number; error?: string; busy?: boolean }>('movies/catalog/sync', 'POST', {});
+}
+export interface RecommendInput {
+  wish?: string;
+  liked: { title: string; rating: number; note?: string }[];
+  disliked: { title: string; rating: number; note?: string }[];
+  seen: string[];
+}
+/** 내 별점·감상이나 지금 보고 싶은 것으로 영화 추천 (영화 목록에서 확인된 것만) */
+export async function recommendMovies(input: RecommendInput) {
+  return call<{ items: (CatalogFilm & { reason: string })[] }>('movies/recommend', 'POST', input);
+}
+/** 영화마다 한국에서 구독으로 볼 수 있는 서비스 이름들 (모르면 null) */
+export async function movieProviders(items: { title: string; year?: number }[]) {
+  return call<{ providers: (string[] | null)[] }>('movies/ott', 'POST', { items });
 }

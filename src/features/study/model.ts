@@ -577,6 +577,8 @@ export interface Todo extends Stamp {
   doneAt?: number;
   /** 오늘 꼭 할 것 ⭐ */
   star?: boolean;
+  /** 「숙제 나누기」로 만든 할 일이면 같은 숙제끼리 묶는 id */
+  group?: string;
   created: number;
 }
 

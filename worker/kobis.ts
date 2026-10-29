@@ -21,6 +21,8 @@ export interface UpcomingItem {
   genre?: string;
   nation?: string;
   director?: string;
+  /** 장편 · 단편 · 옴니버스 … */
+  type?: string;
 }
 
 /** YYYYMMDD 또는 YYYY-MM-DD → YYYY-MM-DD (아니면 undefined) */
@@ -46,7 +48,7 @@ export function parseBoxOffice(j: unknown): BoxOfficeItem[] | null {
 }
 
 /** 영화 목록 응답 → 개봉 예정 (from 이후 개봉, 성인물 빼고) */
-export function parseUpcoming(j: unknown, from: string, to: string): UpcomingItem[] | null {
+export function parseUpcoming(j: unknown, from: string, to: string, all = false): UpcomingItem[] | null {
   const list = (j as { movieListResult?: { movieList?: unknown } })?.movieListResult?.movieList;
   if (!Array.isArray(list)) return null;
   const out: UpcomingItem[] = [];
@@ -55,8 +57,8 @@ export function parseUpcoming(j: unknown, from: string, to: string): UpcomingIte
     const open = kDate(x.openDt);
     if (!open || open < from || open > to) continue;
     const genre = typeof x.genreAlt === 'string' ? x.genreAlt : '';
-    if (/성인/.test(genre)) continue;
-    if (typeof x.typeNm === 'string' && x.typeNm && x.typeNm !== '장편') continue;
+    if (!all && /성인/.test(genre)) continue;
+    if (!all && typeof x.typeNm === 'string' && x.typeNm && x.typeNm !== '장편') continue;
     const dirs = Array.isArray(x.directors) ? (x.directors as { peopleNm?: unknown }[]) : [];
     out.push({
       code: x.movieCd,
@@ -66,6 +68,7 @@ export function parseUpcoming(j: unknown, from: string, to: string): UpcomingIte
       genre: genre || undefined,
       nation: typeof x.nationAlt === 'string' && x.nationAlt ? x.nationAlt : undefined,
       director: typeof dirs[0]?.peopleNm === 'string' ? (dirs[0].peopleNm as string) : undefined,
+      type: typeof x.typeNm === 'string' && x.typeNm ? x.typeNm : undefined,
     });
   }
   return out;
@@ -104,12 +107,12 @@ export async function fetchUpcoming(key: string, today: string, to: string, page
   return [...seen.values()].sort((a, b) => a.open.localeCompare(b.open) || a.title.localeCompare(b.title));
 }
 
-/** 목록 전체 받기용: 한 해의 영화 목록 한 쪽 (100개). 장편만 남기고, 개봉일이 그 해인 것 */
+/** 목록 전체 받기용: 한 해의 영화 목록 한 쪽 (100개). 단편·성인물까지 전부, 개봉일이 그 해인 것 */
 export async function fetchCatalogPage(key: string, year: number, page: number): Promise<{ items: UpcomingItem[]; total: number }> {
   const j = await getJson(`${BASE}/movie/searchMovieList.json?key=${encodeURIComponent(key)}&openStartDt=${year}&openEndDt=${year}&itemPerPage=100&curPage=${page}`);
   const fault = kobisFault(j);
   if (fault) throw new Error(fault);
-  const items = parseUpcoming(j, `${year}-01-01`, `${year}-12-31`);
+  const items = parseUpcoming(j, `${year}-01-01`, `${year}-12-31`, true);
   if (!items) throw new Error('KOBIS 영화 목록 응답 모양이 예상과 달라요');
   const total = Number((j as { movieListResult?: { totCnt?: unknown } }).movieListResult?.totCnt);
   return { items, total: Number.isFinite(total) ? total : 0 };

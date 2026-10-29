@@ -242,7 +242,7 @@ const FIX: Record<Collection, Fix> = {
     todayLock: isObj(x.todayLock) && isDate(x.todayLock.date) ? { date: x.todayLock.date, ids: arr(x.todayLock.ids).filter((i) => typeof i === 'string') } : undefined,
   }),
   sessions: (x) => (isDate(x.date) ? { ...x, subjectId: optStr(x.subjectId), bookId: optStr(x.bookId), start: num(x.start), end: num(x.end), minutes: Math.max(0, num(x.minutes)), kind: x.kind === 'pomo' || x.kind === 'watch' ? x.kind : 'manual' } : null),
-  todos: (x) => ({ ...x, title: str(x.title), due: optDate(x.due), done: bool(x.done), doneAt: optNum(x.doneAt), star: x.star === true ? true : undefined, created: num(x.created) }),
+  todos: (x) => ({ ...x, title: str(x.title), due: optDate(x.due), done: bool(x.done), doneAt: optNum(x.doneAt), star: x.star === true ? true : undefined, group: optStr(x.group)?.slice(0, 40), created: num(x.created) }),
   habits: (x) => ({
     ...x,
     name: str(x.name, '습관'),

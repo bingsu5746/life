@@ -141,7 +141,7 @@ export function Study({ path, loggedIn, syncReady = true, onLogin }: { path: str
           <Suspense fallback={<p className="st-muted">여는 중…</p>}>{content}</Suspense>
         </div>
       </div>
-      {!running && area === 'study' && <AddButton today={today} />}
+      {!running && area === 'study' && <AddButton today={today} tab={tab} />}
       <Toaster />
       <TimerAlarm />
     </main>
