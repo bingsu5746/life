@@ -16,8 +16,8 @@ import { Bar, confirmDelete, Empty, Field, go, Icon, Menu, SubjectDot, SubjectPi
 
 export function Books({ id, sub }: { id?: string; sub?: string }) {
   if (id === 'papers') return <Papers sub={sub} />;
-  if (id === 'new') return <BookEditor onDone={(b) => go(b ? `/books/${b}` : '/books')} />;
-  if (id) return <BookDetail id={id} />;
+  if (id === 'new') return <BookEditor onDone={(b, plan) => go(b ? `/books/${b}${plan ? '/plan' : ''}` : '/books')} />;
+  if (id) return <BookDetail id={id} plan={sub === 'plan'} />;
   return <BookList />;
 }
 
@@ -89,7 +89,7 @@ function unitKeys(units: { name: string }[]): string[] {
 }
 
 /** 문제집 넣기·고치기: 이름 · 과목 · 목차 */
-function BookEditor({ book, onDone }: { book?: Book; onDone: (id?: string) => void }) {
+function BookEditor({ book, onDone }: { book?: Book; onDone: (id?: string, plan?: boolean) => void }) {
   const [name, setName] = useState(book?.name ?? '');
   const [subjectId, setSubjectId] = useState(book?.subjectId ?? '');
   const [text, setText] = useState(book ? tocText(book.units) : '');
@@ -121,7 +121,7 @@ function BookEditor({ book, onDone }: { book?: Book; onDone: (id?: string) => vo
     toast('읽은 글을 넣었어요. 틀린 곳을 고쳐 주세요');
   }
 
-  function save() {
+  function save(plan = false) {
     if (!name.trim() || !subjectId || !good.length) return;
     const units: Unit[] = rows.flatMap((r, i) => (r.problem ? [] : [{ name: r.name, from: r.from, to: r.to, skip: skips.has(keys[i]) || undefined }]));
     const id = book?.id ?? newId();
@@ -133,7 +133,7 @@ function BookEditor({ book, onDone }: { book?: Book; onDone: (id?: string) => vo
       const after = compress(expand(units.filter((u) => !u.skip).map((u) => [u.from, u.to])));
       for (const p of alive(getStudy().plans)) if (p.target === 'book' && p.targetId === id && !p.finished && JSON.stringify(compress(expand(p.range))) === before && before !== JSON.stringify(after)) put('plans', { ...p, range: after, todayLock: undefined });
     }
-    onDone(id);
+    onDone(id, plan);
   }
 
   return (
@@ -146,7 +146,37 @@ function BookEditor({ book, onDone }: { book?: Book; onDone: (id?: string) => vo
       </div>
       <div className="st-card st-form">
         <Field label="이름">
-          <input className="st-input" value={name} onChange={(e) => setName(e.target.value)} placeholder="예: 쎈 수학 상" />
+          <div className="st-inline">
+            <input className="st-input" value={name} onChange={(e) => setName(e.target.value)} placeholder="예: 쎈 수학 상" />
+            <label className="btn btn-sm" title="표지 사진에서 이름 읽기">
+              {ocr === 'title' ? '읽는 중…' : '표지 사진'}
+              <input
+                type="file"
+                accept="image/*"
+                hidden
+                onChange={async (e) => {
+                  const f = e.target.files?.[0];
+                  if (!f) return;
+                  setOcr('title');
+                  try {
+                    const { readImageText } = await import('../../lib/ocr');
+                    const lines = (await readImageText(f, () => {}))
+                      .split(/\n/)
+                      .map((x) => x.trim())
+                      .filter((x) => /[가-힣A-Za-z]{2,}/.test(x) && x.length <= 30);
+                    // 가장 굵게 쓰인 제목은 대개 글자가 많은 짧은 줄
+                    const best = lines.sort((a, b) => b.replace(/[^가-힣A-Za-z]/g, '').length - a.replace(/[^가-힣A-Za-z]/g, '').length)[0];
+                    if (best) setName(best);
+                    else toast('표지에서 이름을 찾지 못했어요');
+                  } catch {
+                    toast('사진을 읽지 못했어요');
+                  } finally {
+                    setOcr(null);
+                  }
+                }}
+              />
+            </label>
+          </div>
         </Field>
         <Field group label="과목">
           <SubjectPicker value={subjectId} onChange={setSubjectId} />
@@ -163,12 +193,11 @@ function BookEditor({ book, onDone }: { book?: Book; onDone: (id?: string) => vo
         </Field>
         <div className="st-row">
           <button type="button" className="btn btn-sm" onClick={() => fileRef.current?.click()} disabled={!!ocr}>
-            목차 사진으로 채우기
+            목차 사진으로 채우기 (여러 장 가능)
           </button>
           <input ref={fileRef} type="file" accept="image/*" multiple hidden onChange={(e) => e.target.files?.length && void readPhotos(e.target.files)} />
-          {ocr && <span className="st-muted">{ocr}</span>}
+          {ocr && ocr !== 'title' && <span className="st-muted">{ocr}</span>}
         </div>
-        <p className="st-hint">사진은 이 기기 안에서만 읽고 저장하지 않아요. 처음 쓸 때 글자 인식 자료를 인터넷에서 받아요.</p>
         {needsLast && (
           <Field label="마지막 단원의 끝 쪽">
             <input className="st-input xs" inputMode="numeric" value={last} onChange={(e) => setLast(e.target.value.replace(/\D/g, ''))} />
@@ -209,21 +238,32 @@ function BookEditor({ book, onDone }: { book?: Book; onDone: (id?: string) => vo
         )}
         {rows.some((r) => r.guessedEnd) && <p className="st-hint">* 끝 쪽은 다음 단원 시작에서 짐작했어요</p>}
         <div className="st-row end">
-          <button className="btn btn-primary" disabled={!name.trim() || !subjectId || !good.length} onClick={save}>
-            저장하고 계획 세우기
-          </button>
+          {book ? (
+            <button className="btn btn-primary" disabled={!name.trim() || !subjectId || !good.length} onClick={() => save()}>
+              저장
+            </button>
+          ) : (
+            <>
+              <button className="btn" disabled={!name.trim() || !subjectId || !good.length} onClick={() => save()}>
+                등록만
+              </button>
+              <button className="btn btn-primary" disabled={!name.trim() || !subjectId || !good.length} onClick={() => save(true)}>
+                계획까지 세우기
+              </button>
+            </>
+          )}
         </div>
       </div>
     </div>
   );
 }
 
-function BookDetail({ id }: { id: string }) {
+function BookDetail({ id, plan }: { id: string; plan?: boolean }) {
   const d = useStudy();
   const words = useWords();
   const today = useToday();
   const [editing, setEditing] = useState(false);
-  const [planning, setPlanning] = useState(false);
+  const [planning, setPlanning] = useState(!!plan);
   const [pages, setPages] = useState('');
   const b = d.books[id];
   if (!b || b.deleted)
@@ -241,7 +281,7 @@ function BookDetail({ id }: { id: string }) {
   const all = expand(b.units.filter((u) => !u.skip).map((u) => [u.from, u.to]));
   const n = all.filter((p) => done.has(p)).length;
   const pace = v ? paceOf(v.plan, v.target, planCtx(d, today)) : 0;
-  const showPlan = planning || (!v && !alive(d.plans).some((p) => p.targetId === b.id));
+  const showPlan = planning;
 
   function markPages(on: boolean) {
     const r = expand(parseRanges(pages));
@@ -309,6 +349,14 @@ function BookDetail({ id }: { id: string }) {
               return <p className={`st-forecast ${f.state === 'short' ? 'bad' : ''}`}>끝내기 예측: {forecastText(f, '쪽', shortDate)}</p>;
             })()}
           </>
+        )}
+        {!v && !showPlan && (
+          <p className="st-sub">
+            아직 계획 없이 등록만 해 둔 문제집이에요.{' '}
+            <button className="st-link" onClick={() => setPlanning(true)}>
+              계획 세우기
+            </button>
+          </p>
         )}
         {reserved.size > 0 && <p className="st-hint">과외 숙제로 잡힌 p.{rangeText([...reserved])}는 이 계획에서 빠져요.</p>}
       </section>

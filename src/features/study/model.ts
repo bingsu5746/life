@@ -256,6 +256,8 @@ export interface WeekNote extends Stamp {
 export interface GradeRecord extends Stamp {
   id: Id;
   kind: 'school' | 'mock';
+  /** 모의고사 학년 (학교에서 보는 것 · 혼자 푸는 고3·수능) */
+  level?: '고1' | '고2' | '고3';
   /** 예: 1학년 2학기 기말고사, 6월 모의고사 */
   name: string;
   date: DateStr;
@@ -396,6 +398,8 @@ export interface PastPaper extends Stamp {
   subjectId: Id;
   /** csat: 수능, kice: 평가원 모의평가, edu: 교육청 학력평가, other: 사설·기타 */
   kind: 'csat' | 'kice' | 'edu' | 'other';
+  /** 학년 (고2 · 고3 수능) */
+  level?: '고1' | '고2' | '고3';
   /** 시험 이름 (예: 2025학년도 수능, 2024년 6월 모의평가) */
   title: string;
   /** 모의고사 모음 문제집이면 그 문제집 */

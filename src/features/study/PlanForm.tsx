@@ -3,7 +3,7 @@ import { useMemo, useState } from 'react';
 import { addDays, shortDate } from './dates';
 import { alive, newId, type Id, type Plan, type Range, type Unit } from './model';
 import { compress, expand, parseRanges, rangeText } from './pages';
-import { baselineOf, schedule } from './plan';
+import { baselineOf, paceEnd, schedule, studyDays } from './plan';
 import { planCtx } from './select';
 import { put, remove, useStudy } from './store';
 import { Field, WeekdayPicker } from './ui';
@@ -34,7 +34,10 @@ export function PlanForm({ target, targetId, units, done, reserved, existing, to
     return new Set(usable.map((u, i) => (expand([[u.from, u.to]]).some((p) => inPlan.has(p)) ? i : -1)).filter((i) => i >= 0));
   });
   const [custom, setCustom] = useState('');
-  const [mode, setMode] = useState<'exam' | 'date'>(existing ? (existing.examId ? 'exam' : 'date') : target === 'book' ? 'exam' : 'date');
+  const [mode, setMode] = useState<'exam' | 'date' | 'pace'>(existing ? (existing.examId ? 'exam' : 'date') : target === 'book' ? 'pace' : 'date');
+  // 하루 몫: 단원 몇 개 · 쪽 몇 개
+  const [paceN, setPaceN] = useState(1);
+  const [paceUnit, setPaceUnit] = useState<'unit' | 'page'>('unit');
   const [examId, setExamId] = useState(existing?.examId ?? exams[0]?.id ?? '');
   const [due, setDue] = useState(existing?.due ?? addDays(today, 14));
   const [includeDue, setIncludeDue] = useState(existing?.includeDue ?? false);
@@ -50,6 +53,12 @@ export function PlanForm({ target, targetId, units, done, reserved, existing, to
     return compress(usable.filter((_, i) => picked.has(i)).flatMap((u) => expand([[u.from, u.to]])));
   }, [custom, picked, usable]);
 
+  // 하루 몫으로 정하면 마감은 거기서 계산한다
+  const leftUnits = usable.filter((u, i) => picked.has(i) && expand([[u.from, u.to]]).some((x) => !done.has(x))).length;
+  const leftItems = expand(range).filter((x) => !done.has(x) && !reserved.has(x)).length;
+  const ctx0 = planCtx(d, today);
+  const paceDays = Math.max(1, Math.ceil((paceUnit === 'unit' && !custom.trim() ? leftUnits : leftItems) / Math.max(1, paceN)));
+  const paceDue = paceEnd(start > today ? start : today, paceDays, { target, restDays: ownRest ? rest : undefined } as Plan, ctx0);
   const draft: Plan = {
     id: existing?.id ?? newId(),
     updatedAt: 0,
@@ -58,8 +67,8 @@ export function PlanForm({ target, targetId, units, done, reserved, existing, to
     range,
     start,
     examId: mode === 'exam' ? examId || undefined : undefined,
-    due: mode === 'date' ? due : undefined,
-    includeDue: mode === 'date' ? true : includeDue,
+    due: mode === 'date' ? due : mode === 'pace' ? paceDue : undefined,
+    includeDue: mode === 'exam' ? includeDue : true,
     restDays: ownRest ? rest : undefined,
     dailyMax: max ? Number(max) : null,
     baseline: 0,
@@ -123,9 +132,41 @@ export function PlanForm({ target, targetId, units, done, reserved, existing, to
           <button type="button" className={mode === 'date' ? 'on' : ''} onClick={() => setMode('date')}>
             날짜 고르기
           </button>
+          {target === 'book' && (
+            <button type="button" className={mode === 'pace' ? 'on' : ''} onClick={() => setMode('pace')}>
+              하루 몫으로
+            </button>
+          )}
         </div>
       </Field>
-      {mode === 'exam' ? (
+      {mode === 'pace' && (
+        <div className="st-inline wrap">
+          하루에
+          <select className="st-input xs" value={paceN} onChange={(e) => setPaceN(Number(e.target.value))} aria-label="하루 몫">
+            {(paceUnit === 'unit' ? [1, 2, 3, 4, 5] : [2, 4, 5, 6, 8, 10, 15, 20, 30]).map((n) => (
+              <option key={n} value={n}>
+                {n}
+              </option>
+            ))}
+          </select>
+          <div className="st-seg sm">
+            <button type="button" className={paceUnit === 'unit' ? 'on' : ''} onClick={() => (setPaceUnit('unit'), setPaceN(1))}>
+              {/모의|기출|회/.test(usable.map((x) => x.name).join(' ')) ? '회(단원)' : '단원'}
+            </button>
+            <button type="button" className={paceUnit === 'page' ? 'on' : ''} onClick={() => (setPaceUnit('page'), setPaceN(5))}>
+              쪽
+            </button>
+          </div>
+          <span className="st-muted">→ {shortDate(paceDue)}까지 ({paceDays}일)</span>
+        </div>
+      )}
+      {mode !== 'pace' && leftUnits > 1 && (() => {
+        const end = mode === 'exam' ? alive(d.exams).find((e) => e.id === examId)?.date : due;
+        if (!end) return null;
+        const n = studyDays(start > today ? start : today, mode === 'exam' && !includeDue ? addDays(end, -1) : end, { target, restDays: ownRest ? rest : undefined } as Plan, ctx0);
+        return n > 0 ? <small className="st-muted">추천: 하루 {Math.ceil(leftUnits / n) > 1 ? `${Math.ceil(leftUnits / n)}단원` : n >= leftUnits * 2 ? `${Math.floor(n / leftUnits)}일에 1단원` : '1단원'} 정도 (공부하는 날 {n}일)</small> : null;
+      })()}
+      {mode === 'pace' ? null : mode === 'exam' ? (
         <>
           {exams.length > 0 && (
             <div className="st-chips">

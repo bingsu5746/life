@@ -175,6 +175,7 @@ const FIX: Record<Collection, Fix> = {
           ...x,
           subjectId: str(x.subjectId),
           kind: x.kind === 'csat' || x.kind === 'kice' || x.kind === 'edu' ? x.kind : 'other',
+          level: x.level === '고1' || x.level === '고2' || x.level === '고3' ? x.level : undefined,
           title: str(x.title, '기출').slice(0, 60),
           bookId: optStr(x.bookId),
           score: score(x.score, 0, 1000),
@@ -390,6 +391,7 @@ const FIX: Record<Collection, Fix> = {
       ? {
           ...x,
           kind: x.kind === 'mock' ? 'mock' : 'school',
+          level: x.level === '고1' || x.level === '고2' || x.level === '고3' ? x.level : undefined,
           name: str(x.name, '시험'),
           examId: optStr(x.examId),
           memo: optStr(x.memo),

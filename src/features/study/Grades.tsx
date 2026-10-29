@@ -55,7 +55,25 @@ export function Grades({ sub }: { sub?: string }) {
       // 저장할 수 없는 환경
     }
   };
-  const records = recordsOf(d, kind);
+  const [level, setLevelState] = useState<'고1' | '고2' | '고3'>(() => {
+    try {
+      const v = localStorage.getItem('my-study.grades.level');
+      return v === '고1' || v === '고3' ? v : '고2';
+    } catch {
+      return '고2';
+    }
+  });
+  const setLevel = (v: '고1' | '고2' | '고3') => {
+    setLevelState(v);
+    try {
+      localStorage.setItem('my-study.grades.level', v);
+    } catch {
+      /* 무시 */
+    }
+  };
+  const allMock = recordsOf(d, 'mock');
+  const levels = (['고1', '고2', '고3'] as const).filter((l) => l !== '고1' || allMock.some((r) => r.level === '고1'));
+  const records = recordsOf(d, kind).filter((r) => kind !== 'mock' || (r.level ?? '고2') === level);
   const names = subjectNames(records);
   const editing = sub === 'new' || sub?.startsWith('from-') ? 'new' : sub && d.grades[sub] && !d.grades[sub].deleted ? d.grades[sub] : null;
   const fromExam = sub?.startsWith('from-') ? d.exams[sub.slice(5)] : undefined;
@@ -95,8 +113,18 @@ export function Grades({ sub }: { sub?: string }) {
         )}
       </div>
 
+      {kind === 'mock' && (
+        <div className="st-seg sm" aria-label="학년">
+          {levels.map((l) => (
+            <button key={l} className={level === l ? 'on' : ''} aria-pressed={level === l} onClick={() => setLevel(l)}>
+              {l === '고3' ? '고3·수능' : l} {allMock.filter((r) => (r.level ?? '고2') === l).length || ''}
+            </button>
+          ))}
+        </div>
+      )}
+
       {!records.length ? (
-        <Empty title={`${KIND_LABEL[kind]} 성적이 아직 없어요`}>
+        <Empty title={`${kind === 'mock' ? `${level} 모의고사` : KIND_LABEL[kind]} 성적이 아직 없어요`}>
           <p>{kind === 'school' ? '학기별 중간·기말고사 점수와 등급을 넣으면' : '모의고사 원점수·백분위·등급을 넣으면'} 과목별로 오르내림을 그래프로 보여 드려요.</p>
           <button className="btn btn-primary" onClick={() => go('/exams/grades/new')}>
             성적 넣기
@@ -202,7 +230,7 @@ export function Grades({ sub }: { sub?: string }) {
       )}
 
       {goalOpen && <GoalSheet kind={kind} names={names} onClose={() => setGoalOpen(false)} />}
-      {editing && <GradeSheet record={editing === 'new' ? undefined : editing} kind={kind} fromExamId={fromExam?.id} onSaved={setKind} onClose={() => go('/exams/grades')} />}
+      {editing && <GradeSheet record={editing === 'new' ? undefined : editing} kind={kind} level={level} fromExamId={fromExam?.id} onSaved={setKind} onClose={() => go('/exams/grades')} />}
     </div>
   );
 }
@@ -303,7 +331,7 @@ const toRow = (s: GradeScore): Row => ({
 });
 const emptyRow = (subject: string): Row => ({ id: newId(), subject, raw: '', full: '', grade: '', average: '', standard: '', percentile: '', wrong: '' });
 
-function GradeSheet({ record, kind: kind0, fromExamId, onSaved, onClose }: { record?: GradeRecord; kind: GradeRecord['kind']; fromExamId?: string; onSaved: (k: GradeRecord['kind']) => void; onClose: () => void }) {
+function GradeSheet({ record, kind: kind0, level: level0, fromExamId, onSaved, onClose }: { record?: GradeRecord; kind: GradeRecord['kind']; level?: GradeRecord['level']; fromExamId?: string; onSaved: (k: GradeRecord['kind']) => void; onClose: () => void }) {
   const d = useStudy();
   const today = useToday();
   const exam = fromExamId ? d.exams[fromExamId] : undefined;
@@ -311,6 +339,7 @@ function GradeSheet({ record, kind: kind0, fromExamId, onSaved, onClose }: { rec
   const [name, setName] = useState(record?.name ?? exam?.name ?? '');
   const [date, setDate] = useState(record?.date ?? (exam ? examEnd(exam) : today));
   const [memo, setMemo] = useState(record?.memo ?? '');
+  const [lv, setLv] = useState<GradeRecord['level']>(record?.level ?? level0 ?? '고2');
   const startNames = (k: GradeRecord['kind']) => {
     if (exam) {
       const ids = examSubjectIds(exam);
@@ -356,7 +385,7 @@ function GradeSheet({ record, kind: kind0, fromExamId, onSaved, onClose }: { rec
       wrong: parseWrongNums(r.wrong).length ? parseWrongNums(r.wrong) : undefined,
       at: r.at ?? now,
     }));
-    put('grades', { ...(record ?? {}), id: record?.id ?? newId(), kind, name: name.trim().slice(0, 40), date, examId: record?.examId ?? exam?.id, scores, memo: memo.trim() || undefined });
+    put('grades', { ...(record ?? {}), id: record?.id ?? newId(), kind, level: kind === 'mock' ? lv : undefined, name: name.trim().slice(0, 40), date, examId: record?.examId ?? exam?.id, scores, memo: memo.trim() || undefined });
     toast(record ? '성적을 고쳤어요' : '성적을 넣었어요');
     onSaved(kind);
     onClose();
@@ -383,8 +412,17 @@ function GradeSheet({ record, kind: kind0, fromExamId, onSaved, onClose }: { rec
             </button>
           ))}
         </div>
+        {!school && (
+          <div className="st-seg sm" aria-label="학년">
+            {(['고1', '고2', '고3'] as const).map((l) => (
+              <button key={l} type="button" className={lv === l ? 'on' : ''} aria-pressed={lv === l} onClick={() => setLv(l)}>
+                {l === '고3' ? '고3·수능' : l}
+              </button>
+            ))}
+          </div>
+        )}
         <div className="st-inline wrap">
-          <input className="st-input" value={name} onChange={(e) => setName(e.target.value)} placeholder={school ? '예: 1학년 2학기 기말고사' : '예: 고2 6월 모의고사'} aria-label="시험 이름" />
+          <input className="st-input" value={name} onChange={(e) => setName(e.target.value)} placeholder={school ? '예: 1학년 2학기 기말고사' : `예: ${lv === '고3' ? '2026학년도 수능' : `${lv} 6월 모의고사`}`} aria-label="시험 이름" />
           <input className="st-input sm" type="date" value={date} max={today} onChange={(e) => setDate(e.target.value)} aria-label="시험 날" />
         </div>
 

@@ -31,12 +31,16 @@ const md = (x: string) => shortDate(x).replace(/\(.\)/, '');
 export function Papers({ sub }: { sub?: string }) {
   const d = useStudy();
   const [picked, setSubject] = useState('');
-  const all = papersOf(d);
+  const [lv, setLv] = useState<'' | '고1' | '고2' | '고3'>('');
+  const everything = papersOf(d);
+  const lvs = (['고1', '고2', '고3'] as const).filter((l) => everything.some((p) => (p.level ?? (p.kind === 'csat' ? '고3' : '')) === l));
+  const ofLv = (p: PastPaper) => !lv || (p.level ?? (p.kind === 'csat' ? '고3' : '')) === lv;
+  const all = everything.filter(ofLv);
   const editing = sub === 'new' ? 'new' : sub && d.papers[sub] && !d.papers[sub].deleted ? d.papers[sub] : null;
   const subjects = subjectsOf(d).filter((s) => all.some((p) => p.subjectId === s.id));
   // 과목이 하나뿐이면 그 과목으로 (그래프·번호 분석을 바로 보이게)
   const subject = picked || (subjects.length === 1 ? subjects[0].id : '');
-  const list = papersOf(d, subject || undefined);
+  const list = papersOf(d, subject || undefined).filter(ofLv);
   const pts = list.filter((p) => percent(p) !== null);
   const totalMin = list.reduce((a, p) => a + (p.minutes ?? 0), 0);
   const freq = numberFrequency(list.map((p) => p.wrong));
@@ -57,7 +61,7 @@ export function Papers({ sub }: { sub?: string }) {
       </div>
       <BookTabs on="papers" />
 
-      {!all.length ? (
+      {!everything.length ? (
         <Empty icon="📄" title="푼 기출·모의고사를 기록해 보세요">
           <p>옛 수능·모의평가·학력평가를 찾아 풀었거나 모의고사 모음집을 풀었으면, 점수·걸린 시간·틀린 번호를 남겨요. 틀린 번호는 오답 노트로 바로 넣을 수 있어요.</p>
           <button className="btn btn-primary" onClick={() => go('/books/papers/new')}>
@@ -66,6 +70,18 @@ export function Papers({ sub }: { sub?: string }) {
         </Empty>
       ) : (
         <>
+          {lvs.length > 1 && (
+            <div className="st-seg sm" aria-label="학년">
+              <button className={!lv ? 'on' : ''} onClick={() => setLv('')}>
+                전체
+              </button>
+              {lvs.map((l) => (
+                <button key={l} className={lv === l ? 'on' : ''} onClick={() => setLv(l)}>
+                  {l === '고3' ? '고3·수능' : l}
+                </button>
+              ))}
+            </div>
+          )}
           {subjects.length > 1 && (
             <div className="st-chips">
               <button type="button" className={`st-chip ${!subject ? 'on' : ''}`} aria-pressed={!subject} onClick={() => setSubject('')}>
@@ -145,6 +161,7 @@ function PaperSheet({ item, onClose }: { item?: PastPaper; onClose: () => void }
   const today = useToday();
   const [subjectId, setSubjectId] = useState(item?.subjectId ?? subjectsOf(d)[0]?.id ?? '');
   const [kind, setKind] = useState<PastPaper['kind']>(item?.kind ?? 'csat');
+  const [level, setLevel] = useState<NonNullable<PastPaper['level']>>(item?.level ?? '고3');
   const [year, setYear] = useState('');
   const [month, setMonth] = useState('');
   const [title, setTitle] = useState(item?.title ?? '');
@@ -177,6 +194,7 @@ function PaperSheet({ item, onClose }: { item?: PastPaper; onClose: () => void }
       updatedAt: item?.updatedAt ?? 0,
       subjectId,
       kind,
+      level,
       title: name.trim().slice(0, 60),
       bookId: bookId || undefined,
       date,
@@ -198,6 +216,13 @@ function PaperSheet({ item, onClose }: { item?: PastPaper; onClose: () => void }
   return (
     <Sheet title={item ? '풀이 기록 고치기' : '푼 기출·모의고사 넣기'} onClose={onClose} wide>
       <div className="st-form">
+        <div className="st-seg sm" aria-label="학년">
+          {(['고1', '고2', '고3'] as const).map((l) => (
+            <button key={l} type="button" className={level === l ? 'on' : ''} aria-pressed={level === l} onClick={() => setLevel(l)}>
+              {l === '고3' ? '고3·수능' : l}
+            </button>
+          ))}
+        </div>
         <Field group label="과목">
           <SubjectPicker value={subjectId} onChange={setSubjectId} />
         </Field>

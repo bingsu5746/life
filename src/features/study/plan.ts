@@ -195,3 +195,22 @@ export function paceOf(plan: Plan, target: Target, ctx: PlanCtx): number {
   const done = expand(plan.range).filter((p) => target.done.has(p)).length;
   return done - expected;
 }
+
+/** 하루 몫으로 정할 때: 시작일부터 공부하는 날(쉬는 날 빼고)을 days 일 세었을 때의 마지막 날 */
+export function paceEnd(start: DateStr, days: number, plan: Plan, ctx: PlanCtx): DateStr {
+  let d = start;
+  let n = 0;
+  for (let i = 0; i < 3650; i++) {
+    if (dayWeight(d, plan, ctx) > 0) n++;
+    if (n >= Math.max(1, days)) return d;
+    d = addDays(d, 1);
+  }
+  return d;
+}
+
+/** 시작일부터 끝날까지 공부하는 날 수 */
+export function studyDays(start: DateStr, end: DateStr, plan: Plan, ctx: PlanCtx): number {
+  let n = 0;
+  for (let d = start; d <= end; d = addDays(d, 1)) if (dayWeight(d, plan, ctx) > 0) n++;
+  return n;
+}

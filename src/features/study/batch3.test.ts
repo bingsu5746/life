@@ -782,3 +782,14 @@ describe('모의고사 보기 (mockView)', () => {
     expect(mockView({ key: 'inquiry2', startedAt: 0 }, 33 * 60_000)!.part.label).toBe('탐구 영역 · 제2선택');
   });
 });
+
+describe('하루 몫으로 계획 (paceEnd · studyDays)', () => {
+  it('쉬는 요일을 빼고 센다', async () => {
+    const { paceEnd, studyDays } = await import('./plan');
+    const ctx = { today: '2026-10-29', settings: { ...emptyStudy().settings, restDays: [0], offDates: ['2026-10-31'] }, exams: {}, tutors: [] } as unknown as PlanCtx;
+    const plan = { target: 'book' } as Plan;
+    // 목 29 · 금 30 · (토 31 빼는 날) · (일 1 쉬는 요일) · 월 2
+    expect(paceEnd('2026-10-29', 3, plan, ctx)).toBe('2026-11-02');
+    expect(studyDays('2026-10-29', '2026-11-02', plan, ctx)).toBe(3);
+  });
+});
