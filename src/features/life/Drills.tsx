@@ -4,7 +4,7 @@ import { addDays, shortDate } from '../study/dates';
 import { alive, newId, type BasketballStat, type Workout } from '../study/model';
 import { putMany, useStudy } from '../study/store';
 import { Check, Empty, go, toast, useToday } from '../study/ui';
-import { ShotCounter, ShotSummary } from './ShotCounter';
+import { ShotSummary } from './ShotCounter';
 import { AREA_NAME, buildSession, DRILLS, recentStats, totalMinutes, weaknesses, type Drill, type Need } from './drills';
 
 const MIN = [20, 30, 45, 60];
@@ -74,7 +74,6 @@ export function DrillsPage() {
       <div className="st-page-head">
         <h2>농구 연습</h2>
       </div>
-      <ShotCounter />
       <ShotSummary />
       <section className="st-card dr-opts">
         <div className="st-chips" aria-label="시간">
