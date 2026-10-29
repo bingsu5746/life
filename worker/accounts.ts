@@ -69,7 +69,6 @@ function sessionCookie(token: string, maxAgeSec: number) {
 }
 const clearCookie = () => sessionCookie('', 0);
 
-
 interface UserRow {
   id: string;
   username: string;
@@ -206,7 +205,12 @@ export class Accounts extends DurableObject<Env> {
     if (path === 'movies/catalog/sync' && req.method === 'POST') return this.catalogSync(req.headers.get('x-life-kobis-key') ?? undefined);
     if (path === 'notify' || path.startsWith('notify/')) return this.notifyRoute(req, path, user, body);
     if (path === 'me/nickname' && req.method === 'PUT') {
-      const nickname = cutText(String(body.nickname ?? '').normalize('NFC').trim(), 16);
+      const nickname = cutText(
+        String(body.nickname ?? '')
+          .normalize('NFC')
+          .trim(),
+        16,
+      );
       if (!nickname) return fail('닉네임을 써 주세요.');
       this.sql.exec('UPDATE users SET nickname = ? WHERE id = ?', nickname, user.id);
       return json({ user: { ...this.publicUser(user), nickname } });
@@ -269,7 +273,7 @@ export class Accounts extends DurableObject<Env> {
     const quota = (msg: string) => /neuron|quota|exceeded|daily|limit/i.test(msg);
     const run = async (model: string, input: unknown) => {
       try {
-        return { out: await this.env.AI.run(model as never, input as never) as unknown };
+        return { out: (await this.env.AI.run(model as never, input as never)) as unknown };
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
         console.error('translate error', model, msg);
@@ -325,16 +329,22 @@ export class Accounts extends DurableObject<Env> {
     const token = readCookie(req) ?? '';
     if (!/^[0-9a-f]{64}$/.test(token)) return null;
     const tokenHash = await sha256(token);
-    const row = this.sql
-      .exec<UserRow & { expires: number }>('SELECT u.*, s.expires AS expires FROM sessions s JOIN users u ON u.id = s.user_id WHERE s.token_hash = ? AND s.expires > ?', tokenHash, Date.now())
-      .toArray()[0];
+    const row = this.sql.exec<UserRow & { expires: number }>('SELECT u.*, s.expires AS expires FROM sessions s JOIN users u ON u.id = s.user_id WHERE s.token_hash = ? AND s.expires > ?', tokenHash, Date.now()).toArray()[0];
     return row ? { user: row, token, tokenHash, expires: row.expires } : null;
   }
 
   private async signup(b: Record<string, unknown>, ip: string) {
-    const username = String(b.username ?? '').normalize('NFC').trim();
+    const username = String(b.username ?? '')
+      .normalize('NFC')
+      .trim();
     const password = String(b.password ?? '');
-    const nickname = cutText(String(b.nickname ?? '').normalize('NFC').trim(), 16) || username;
+    const nickname =
+      cutText(
+        String(b.nickname ?? '')
+          .normalize('NFC')
+          .trim(),
+        16,
+      ) || username;
     if (!USERNAME.test(username)) return fail('아이디는 3~16자의 한글·영문·숫자·_ 로 정해 주세요.');
     const bad = passwordProblem(password, username);
     if (bad) return fail(bad);
@@ -381,7 +391,9 @@ export class Accounts extends DurableObject<Env> {
   private async login(b: Record<string, unknown>, ip: string) {
     const wait = this.loginByIp.hit(ip);
     if (wait) return fail(`로그인 시도가 너무 많아요. ${wait}초 뒤에 다시 해 주세요.`, 429);
-    const raw = String(b.username ?? '').trim().slice(0, 32);
+    const raw = String(b.username ?? '')
+      .trim()
+      .slice(0, 32);
     const username = raw.normalize('NFC');
     const password = String(b.password ?? '').slice(0, 256);
     // 오래된 틀린 횟수 기록 정리 (하루 넘게 지난 것)
@@ -439,11 +451,17 @@ export class Accounts extends DurableObject<Env> {
   // ===== 영화 목록 (1990년부터 KOBIS 에 올라 있는 장편) =====
 
   private catalogBusy = false;
+  /** 영화 목록 수 (전체를 세면 줄을 다 읽어서, 한 번 센 것을 기억해 둔다) */
+  private filmCount: number | null = null;
+  private films(): number {
+    if (this.filmCount === null) this.filmCount = this.sql.exec<{ n: number }>('SELECT COUNT(*) AS n FROM films').one().n;
+    return this.filmCount;
+  }
 
   private catalogState(): { year: number; page: number; done: boolean; count: number } {
     // catalog2: 단편·성인물까지 모두 받는 두 번째 판 (처음 판은 장편만이라 다시 처음부터)
     const r = this.sql.exec<{ data: string }>("SELECT data FROM cache WHERE key = 'catalog2'").toArray()[0];
-    const count = this.sql.exec<{ n: number }>('SELECT COUNT(*) AS n FROM films').one().n;
+    const count = this.films();
     const s = r ? (JSON.parse(r.data) as { year: number; page: number; done: boolean }) : { year: 1990, page: 1, done: false };
     return { ...s, count };
   }
@@ -477,19 +495,32 @@ export class Accounts extends DurableObject<Env> {
     const order = norm ? `(norm = ?) DESC, (norm LIKE ? ESCAPE '\\') DESC, open DESC` : 'open DESC';
     const orderArgs = norm ? [norm, `${esc(norm)}%`] : [];
     const items = this.sql
-      .exec<{ code: string; title: string; open: string; genre: string | null; nation: string | null; director: string | null; type: string | null }>(`SELECT code, title, open, genre, nation, director, type FROM films WHERE ${where.join(' AND ')} ORDER BY ${order} LIMIT 61 OFFSET ?`, ...args, ...orderArgs, offset)
+      .exec<{
+        code: string;
+        title: string;
+        open: string;
+        genre: string | null;
+        nation: string | null;
+        director: string | null;
+        type: string | null;
+      }>(`SELECT code, title, open, genre, nation, director, type FROM films WHERE ${where.join(' AND ')} ORDER BY ${order} LIMIT 61 OFFSET ?`, ...args, ...orderArgs, offset)
       .toArray();
     return json({ items: items.slice(0, 60), more: items.length > 60, state, facets });
   }
 
   /** 거르기 칸에 보일 장르·나라 (많은 순) */
   private catalogFacets(): { genres: string[]; nations: string[] } {
+    // 전체를 훑는 계산이라 하루 동안 저장해 둔 것을 쓴다
+    const c = this.sql.exec<{ data: string; at: number }>("SELECT data, at FROM cache WHERE key = 'facets'").toArray()[0];
+    if (c && Date.now() - c.at < DAY) return JSON.parse(c.data) as { genres: string[]; nations: string[] };
     const tally = (col: 'genre' | 'nation') => {
       const m = new Map<string, number>();
       for (const r of this.sql.exec<{ v: string; n: number }>(`SELECT ${col} AS v, COUNT(*) AS n FROM films WHERE ${col} IS NOT NULL AND ${col} != '' GROUP BY ${col}`)) for (const t of r.v.split(',')) if (t.trim()) m.set(t.trim(), (m.get(t.trim()) ?? 0) + r.n);
       return [...m].sort((a, b) => b[1] - a[1]).map(([t]) => t);
     };
-    return { genres: tally('genre').slice(0, 40), nations: tally('nation').slice(0, 30) };
+    const out = { genres: tally('genre').slice(0, 40), nations: tally('nation').slice(0, 30) };
+    this.sql.exec("INSERT OR REPLACE INTO cache (key, data, at) VALUES ('facets', ?, ?)", JSON.stringify(out), Date.now());
+    return out;
   }
 
   /** 한 번에 몇 쪽씩 받아 저장하고, 어디까지 했는지 돌려준다. 화면이 다 될 때까지 되풀이해서 부른다 */
@@ -517,6 +548,8 @@ export class Accounts extends DurableObject<Env> {
       error = e instanceof Error ? e.message : String(e);
     } finally {
       this.sql.exec("INSERT OR REPLACE INTO cache (key, data, at) VALUES ('catalog2', ?, ?)", JSON.stringify({ year, page, done }), Date.now());
+      this.filmCount = null;
+      this.sql.exec("DELETE FROM cache WHERE key = 'facets'");
       this.catalogBusy = false;
     }
     return json({ state: this.catalogState(), last, error: error || undefined });
@@ -526,7 +559,7 @@ export class Accounts extends DurableObject<Env> {
   private async recommend(user: UserRow, body: Record<string, unknown>): Promise<Response> {
     const r = readRecommendRequest(body);
     if ('error' in r) return fail(r.error);
-    const total = this.sql.exec<{ n: number }>('SELECT COUNT(*) AS n FROM films').one().n;
+    const total = this.films();
     if (!total) return fail('영화 목록이 아직 비어 있어요. 극장가 탭에서 「영화 목록 받기」를 먼저 해 주세요.');
     if (this.recommendByUser.hit(user.id)) return fail('추천을 너무 자주 했어요. 잠시 뒤에 다시 해 주세요.', 429);
     if (this.translateAll.hit('all')) return fail('오늘 사이트 전체의 AI 한도를 다 썼어요. 내일 다시 해 주세요.', 429);
@@ -670,7 +703,12 @@ export class Accounts extends DurableObject<Env> {
         score.set(name, { n: e.n + (12 - i), from: [...e.from, a] });
       });
     }
-    return json({ items: [...score].sort((x, y) => y[1].n - x[1].n).slice(0, 12).map(([name, e]) => ({ name, because: e.from.slice(0, 2) })) });
+    return json({
+      items: [...score]
+        .sort((x, y) => y[1].n - x[1].n)
+        .slice(0, 12)
+        .map(([name, e]) => ({ name, because: e.from.slice(0, 2) })),
+    });
   }
 
   /** 국어 낱말 뜻 (표준국어대사전, 30일 저장) */
@@ -748,9 +786,12 @@ export class Accounts extends DurableObject<Env> {
     if (path === 'notify/digest' && req.method === 'PUT') {
       // 기기가 계산해 둔 날짜별 알림 글 (서버는 공부 자료를 열어 보지 않는다)
       const entries = (Array.isArray(b.entries) ? b.entries : [])
-        .filter((e): e is { date: string; slot: number; title: string; body: string } => !!e && typeof e === 'object' && /^\d{4}-\d{2}-\d{2}$/.test((e as { date?: unknown }).date as string) && Number.isInteger((e as { slot?: unknown }).slot) && typeof (e as { title?: unknown }).title === 'string' && typeof (e as { body?: unknown }).body === 'string')
+        .filter(
+          (e): e is { date: string; slot: number; title: string; body: string } =>
+            !!e && typeof e === 'object' && /^\d{4}-\d{2}-\d{2}$/.test((e as { date?: unknown }).date as string) && Number.isInteger((e as { slot?: unknown }).slot) && typeof (e as { title?: unknown }).title === 'string' && typeof (e as { body?: unknown }).body === 'string',
+        )
         .slice(0, 24)
-                .map((e) => {
+        .map((e) => {
           const u = (e as { url?: unknown }).url;
           return { date: e.date, slot: Math.max(0, Math.min(2, e.slot)), title: e.title.slice(0, 60), body: e.body.slice(0, 240), url: typeof u === 'string' && /^\/[\w/-]{0,60}$/.test(u) ? u : undefined };
         });

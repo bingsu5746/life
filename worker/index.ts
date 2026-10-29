@@ -19,11 +19,26 @@ export default {
         const headers = new Headers(req.headers);
         headers.delete('x-life-kobis-key');
         if ((url.pathname === '/api/movies/kobis' || url.pathname === '/api/movies/catalog/sync') && env.KOBIS_KEY) headers.set('x-life-kobis-key', env.KOBIS_KEY);
-        return await env.ACCOUNTS.get(env.ACCOUNTS.idFromName('global')).fetch(new Request(req, { headers }));
+        const stub = () => env.ACCOUNTS.get(env.ACCOUNTS.idFromName('global'));
+        const first = new Request(req, { headers });
+        // 서버가 막 새 판으로 바뀌는 중이면 한 번 더 해 본다 (본문은 미리 복사)
+        const again = first.clone();
+        try {
+          return await stub().fetch(first);
+        } catch (e) {
+          const msg = e instanceof Error ? e.message : String(e);
+          if (/exceeded|limit|quota/i.test(msg)) throw e;
+          console.error('accounts retry', msg);
+          return await stub().fetch(again);
+        }
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
         console.error('accounts unavailable', msg);
-        return new Response(JSON.stringify({ error: '계정 서버에 연결할 수 없어요. 잠시 뒤 다시 해 주세요.' }), { status: 503, headers: { 'content-type': 'application/json', 'cache-control': 'no-store' } });
+        const quota = /exceeded|free tier|limit|quota/i.test(msg);
+        return new Response(JSON.stringify({ error: quota ? '오늘 서버 무료 사용 한도를 다 써서 한국 시간 오전 9시까지 로그인·저장을 쓸 수 없어요.' : '계정 서버에 연결할 수 없어요. 잠시 뒤 다시 해 주세요.' }), {
+          status: 503,
+          headers: { 'content-type': 'application/json', 'cache-control': 'no-store' },
+        });
       }
     }
     if (url.pathname.startsWith('/api/')) return new Response('not found', { status: 404, headers: { 'cache-control': 'no-store' } });
