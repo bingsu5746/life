@@ -588,6 +588,26 @@ export interface DiaryEntry extends Stamp {
   photos?: Id[];
 }
 
+/** 국어·영어 지문 (헷갈리는 지문을 다시 보려고 모아 둔다) */
+export interface Passage extends Stamp {
+  id: Id;
+  lang: 'ko' | 'en';
+  title: string;
+  /** 출처: 교재·쪽·시험 */
+  source?: string;
+  text: string;
+  /** 헷갈린 점 · 핵심 · 주제 */
+  note?: string;
+  /** 영어 지문 해석 */
+  translation?: string;
+  /** 헷갈려서 다시 볼 지문 */
+  confusing: boolean;
+  /** 다시 본 날들 */
+  seen?: DateStr[];
+  photos?: Id[];
+  created: number;
+}
+
 /** 반복 할 일: 정한 요일마다 그날 할 일이 생긴다 */
 export interface TodoRule extends Stamp {
   id: Id;
@@ -754,12 +774,13 @@ export interface StudyData {
   reads: Record<Id, Reading>;
   drillLogs: Record<Id, DrillLog>;
   todoRules: Record<Id, TodoRule>;
+  passages: Record<Id, Passage>;
 }
 
 /** 단어는 많아질 수 있어 따로 묶는다 */
 export type WordsData = Record<Id, Word>;
 
-export const COLLECTIONS = ['subjects', 'exams', 'books', 'plans', 'tutors', 'homework', 'notes', 'decks', 'cards', 'wordLists', 'sessions', 'todos', 'habits', 'grades', 'previews', 'assessments', 'blanks', 'conditions', 'weekNotes', 'papers', 'workouts', 'bodyLogs', 'moneyTx', 'savings', 'hobbies', 'hobbyLogs', 'wishes', 'diary', 'moneyRules', 'movies', 'reads', 'drillLogs', 'todoRules'] as const;
+export const COLLECTIONS = ['subjects', 'exams', 'books', 'plans', 'tutors', 'homework', 'notes', 'decks', 'cards', 'wordLists', 'sessions', 'todos', 'habits', 'grades', 'previews', 'assessments', 'blanks', 'conditions', 'weekNotes', 'papers', 'workouts', 'bodyLogs', 'moneyTx', 'savings', 'hobbies', 'hobbyLogs', 'wishes', 'diary', 'moneyRules', 'movies', 'reads', 'drillLogs', 'todoRules', 'passages'] as const;
 export type Collection = (typeof COLLECTIONS)[number];
 
 export const DEFAULT_SETTINGS: StudySettings = {
@@ -812,6 +833,7 @@ export function emptyStudy(): StudyData {
     reads: {},
     drillLogs: {},
     todoRules: {},
+    passages: {},
   };
 }
 

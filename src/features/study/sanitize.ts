@@ -193,6 +193,7 @@ const FIX: Record<Collection, Fix> = {
     const height = score(x.height, 50, 250);
     return weight !== undefined || height !== undefined ? { ...x, weight, height } : null;
   },
+  passages: (x) => ({ ...x, lang: x.lang === 'en' ? 'en' : 'ko', title: str(x.title, '지문').slice(0, 100), source: optStr(x.source)?.slice(0, 100), text: str(x.text).slice(0, 30000), note: optStr(x.note)?.slice(0, 5000), translation: optStr(x.translation)?.slice(0, 30000), confusing: bool(x.confusing), seen: x.seen === undefined ? undefined : dates(x.seen).slice(-100), photos: Array.isArray(x.photos) ? x.photos.filter((p): p is string => typeof p === 'string').slice(0, 6) : undefined, created: num(x.created) }),
   todoRules: (x) => (isDate(x.start) ? { ...x, title: str(x.title, '할 일').slice(0, 100), weekdays: ints(x.weekdays, 0, 6), paused: x.paused === true ? true : undefined, created: num(x.created) } : null),
   drillLogs: (x) =>
     isDate(x.date) && typeof x.drillId === 'string'

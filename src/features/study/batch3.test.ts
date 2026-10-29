@@ -544,3 +544,29 @@ describe('일기 알림', () => {
     expect(e[1].title).toBe('내일 준비');
   });
 });
+
+describe('예문 저절로 (needExamples)', () => {
+  it('뜻 있는 영어 단어 중 예문 없고 하루 안에 시도 안 한 것', async () => {
+    const { needExamples } = await import('./autoExamples');
+    const w = (id: string, term: string, meaning: string, example?: object) => ({ id, term, meaning, example, listId: 'l', order: 1, box: 0, due: '2026-10-01', wrong: 0, updatedAt: 1 });
+    const words = Object.fromEntries([w('a', 'abandon', '버리다'), w('b', 'vivid', '생생한', { s: 'x', ko: 'y' }), w('c', '사과', 'apple'), w('d', 'ample', ''), w('e', 'keen', '예리한')].map((x) => [x.id, x])) as never;
+    expect(needExamples(words, { e: Date.now() - 1000 }).map((x) => x.id)).toEqual(['a']);
+    expect(needExamples(words, { e: Date.now() - 2 * 86_400_000 }).map((x) => x.id)).toEqual(['a', 'e']);
+  });
+});
+
+describe('지문 (dueAgain · chunkText)', () => {
+  it('헷갈린 지문은 사흘마다 다시', async () => {
+    const { dueAgain } = await import('./passages');
+    expect(dueAgain({ confusing: true }, '2026-10-29')).toBe(true);
+    expect(dueAgain({ confusing: true, seen: ['2026-10-27'] }, '2026-10-29')).toBe(false);
+    expect(dueAgain({ confusing: true, seen: ['2026-10-26'] }, '2026-10-29')).toBe(true);
+    expect(dueAgain({ confusing: false }, '2026-10-29')).toBe(false);
+  });
+  it('문단을 지키며 나눈다', async () => {
+    const { chunkText } = await import('./passages');
+    const p = 'a'.repeat(50);
+    expect(chunkText(`${p}\n\n${p}\n\n${p}`, 120)).toEqual([`${p}\n\n${p}`, p]);
+    expect(chunkText('One. Two. Three.', 8).length).toBeGreaterThan(1);
+  });
+});

@@ -5320,3 +5320,57 @@ body {
 .st-page-head > .st-inline:last-child {
   margin-left: auto;
 }
+
+/* 지문 */
+.ps-list {
+  display: grid;
+  gap: 10px;
+}
+.ps-flag {
+  color: var(--bad);
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+.ps-view {
+  display: grid;
+  gap: 12px;
+  max-width: 720px;
+}
+.ps-title {
+  margin: 0;
+  font-size: 1.35rem;
+  letter-spacing: -0.02em;
+}
+.ps-note {
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: var(--soft);
+}
+.ps-note p {
+  margin: 4px 0 0;
+  white-space: pre-wrap;
+  line-height: 1.6;
+}
+.ps-text {
+  white-space: pre-wrap;
+  line-height: 1.95;
+  font-size: 1.04rem;
+  padding: 18px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+  word-break: keep-all;
+  overflow-wrap: anywhere;
+}
+.ps-tr {
+  color: var(--muted);
+  font-size: 0.98rem;
+}
+.ps-input {
+  line-height: 1.8;
+  min-height: 200px;
+}
+.ps-photo {
+  justify-self: start;
+  cursor: pointer;
+}

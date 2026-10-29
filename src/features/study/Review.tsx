@@ -10,6 +10,8 @@ import { BlankRun, Blanks } from './Blanks';
 import { requeue } from './wordSession';
 import { Bar, confirmDelete, Empty, Field, go, Menu, Sheet, SubjectDot, SubjectPicker, SubjectTag, subjectsOf, toast, useToday, tap } from './ui';
 import { SwipeCard } from './SwipeCard';
+import { Passages } from './Passages';
+import { dueAgain } from './passages';
 import { isCareless, mistakePatterns } from './mistakes';
 
 export function Review({ sub }: { sub?: string }) {
@@ -17,16 +19,17 @@ export function Review({ sub }: { sub?: string }) {
   if (sub?.startsWith('cards-run')) return <CardRun />;
   if (sub?.startsWith('blank-run-')) return <BlankRun id={sub.slice(10)} />;
   if (sub?.startsWith('deck-')) return <DeckView id={sub.slice(5)} />;
-  return <ReviewHome tab={sub === 'cards' || sub === 'new-deck' ? 'cards' : sub === 'blank' || sub === 'new-blank' ? 'blank' : 'notes'} sub={sub} />;
+  return <ReviewHome tab={sub === 'cards' || sub === 'new-deck' ? 'cards' : sub === 'blank' || sub === 'new-blank' ? 'blank' : sub === 'passages' || sub === 'new-passage' || sub?.startsWith('passage-') ? 'passages' : 'notes'} sub={sub} />;
 }
 
 /** sub: 'new-note' · 'new-deck' 이면 바로 넣기 창 (「＋」에서 올 때) */
-function ReviewHome({ tab, sub }: { tab: 'notes' | 'cards' | 'blank'; sub?: string }) {
+function ReviewHome({ tab, sub }: { tab: 'notes' | 'cards' | 'blank' | 'passages'; sub?: string }) {
   const d = useStudy();
   const today = useToday();
   const notesDue = dueToday(alive(d.notes), today);
   const cardsDue = cardsToday(d, today);
   const blanksDue = blanksToday(d, today).length;
+  const passDue = alive(d.passages).filter((x) => dueAgain(x, today)).length;
   return (
     <div className="st-page">
       <div className="st-page-head">
@@ -41,9 +44,20 @@ function ReviewHome({ tab, sub }: { tab: 'notes' | 'cards' | 'blank'; sub?: stri
           <button className={tab === 'blank' ? 'on' : ''} onClick={() => go('/review/blank')}>
             백지 복습 {blanksDue > 0 && <b className="st-count">{blanksDue}</b>}
           </button>
+          <button className={tab === 'passages' ? 'on' : ''} onClick={() => go('/review/passages')}>
+            지문 {passDue > 0 && <b className="st-count">{passDue}</b>}
+          </button>
         </div>
       </div>
-      {tab === 'notes' ? <Notes today={today} adding={sub === 'new-note'} /> : tab === 'cards' ? <Cards today={today} adding={sub === 'new-deck'} /> : <Blanks today={today} adding={sub === 'new-blank'} />}
+      {tab === 'passages' ? (
+        <Passages open={sub === 'new-passage' ? 'new' : sub?.startsWith('passage-') ? sub.slice(8) : undefined} />
+      ) : tab === 'notes' ? (
+        <Notes today={today} adding={sub === 'new-note'} />
+      ) : tab === 'cards' ? (
+        <Cards today={today} adding={sub === 'new-deck'} />
+      ) : (
+        <Blanks today={today} adding={sub === 'new-blank'} />
+      )}
     </div>
   );
 }

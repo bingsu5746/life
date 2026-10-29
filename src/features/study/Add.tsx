@@ -21,6 +21,7 @@ const ITEMS: { key: string; label: string; sub: string; to?: string }[] = [
   { key: 'hw', label: '과외 숙제', sub: '마감은 다음 수업일로', to: '/tutor/hw' },
   { key: 'words', label: '단어 목록', sub: '단어장 · 단어 시험 (PDF·붙여넣기·사진)', to: '/words/new' },
   { key: 'note', label: '오답', sub: '사진·정답·틀린 이유', to: '/review/new-note' },
+  { key: 'passage', label: '지문', sub: '국어·영어 지문 (헷갈린 점·해석)', to: '/review/new-passage' },
   { key: 'deck', label: '암기 카드 묶음', sub: '앞면 | 뒷면', to: '/review/new-deck' },
   { key: 'habit', label: '습관', sub: '매일 또는 요일마다', to: '/life/new-habit' },
   { key: 'tutor', label: '과외', sub: '수업 요일 · 휴강 · 보강', to: '/tutor/new' },
@@ -36,7 +37,7 @@ const BY_TAB: Record<string, string[]> = {
   tutor: ['hw', 'tutor', 'split'],
   words: ['words', 'word'],
   translate: ['word', 'words'],
-  review: ['note', 'blank', 'deck'],
+  review: ['note', 'passage', 'blank', 'deck'],
   time: ['time'],
   life: ['todo', 'split', 'habit'],
 };

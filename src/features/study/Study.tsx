@@ -87,6 +87,12 @@ export function Study({ path, loggedIn, syncReady = true, onLogin }: { path: str
     const t = setTimeout(() => void uploadDigest().catch(() => {}), 5000);
     return () => clearTimeout(t);
   }, [d, words, today, loggedIn]);
+  // 새 영단어에 예문을 저절로 (로그인했을 때, 단어가 바뀌고 잠시 뒤)
+  useEffect(() => {
+    if (!loggedIn || !syncReady) return;
+    const t = setTimeout(() => void import('./autoExamples').then((m) => m.autoFillExamples(words)).catch(() => {}), 4000);
+    return () => clearTimeout(t);
+  }, [words, loggedIn, syncReady]);
   const saveFailed = useSaveFailed();
   // 다른 화면 코드는 잠시 뒤 미리 받아 둔다 (누를 때 「여는 중」이 오래 보이지 않게, 오프라인에서도 열리게)
   useEffect(() => {
