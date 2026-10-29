@@ -88,8 +88,11 @@ export function CatalogBar() {
     setRun(true);
     setErr('');
     try {
+      // 다 받은 뒤에는 올해 것만 다시 본다
+      let recent = !!state?.done;
       for (;;) {
-        const r = await catalogSync();
+        const r = await catalogSync(recent);
+        recent = false;
         setState(r.state);
         if (r.error) {
           setErr(r.error);

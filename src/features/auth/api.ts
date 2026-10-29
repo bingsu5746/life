@@ -256,8 +256,8 @@ export async function catalogSearch(q: string | CatalogQuery) {
   return call<{ items: CatalogFilm[]; more?: boolean; state: CatalogState; facets?: { genres: string[]; nations: string[] } }>(`movies/catalog?${sp}`);
 }
 /** 영화 목록을 몇 쪽 더 받는다 (done 이 될 때까지 되풀이) */
-export async function catalogSync() {
-  return call<{ state: CatalogState; last?: number; error?: string; busy?: boolean }>('movies/catalog/sync', 'POST', {});
+export async function catalogSync(recent = false) {
+  return call<{ state: CatalogState; last?: number; error?: string; busy?: boolean }>('movies/catalog/sync', 'POST', recent ? { recent: true } : {});
 }
 export interface RecommendInput {
   wish?: string;
