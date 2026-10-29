@@ -546,6 +546,18 @@ export interface DiaryEntry extends Stamp {
   parts?: Record<string, string>;
 }
 
+/** 농구 혼자 연습 드릴 한 번 (드릴 목록은 life/drills.ts) */
+export interface DrillLog extends Stamp {
+  id: Id;
+  date: DateStr;
+  drillId: string;
+  /** 슛 연습이면 넣은 수 · 던진 수 */
+  made?: number;
+  shots?: number;
+  minutes?: number;
+  created: number;
+}
+
 /** 읽은 책 · 읽는 중 · 읽고 싶은 책 */
 export interface Reading extends Stamp {
   id: Id;
@@ -685,12 +697,13 @@ export interface StudyData {
   moneyRules: Record<Id, MoneyRule>;
   movies: Record<Id, Movie>;
   reads: Record<Id, Reading>;
+  drillLogs: Record<Id, DrillLog>;
 }
 
 /** 단어는 많아질 수 있어 따로 묶는다 */
 export type WordsData = Record<Id, Word>;
 
-export const COLLECTIONS = ['subjects', 'exams', 'books', 'plans', 'tutors', 'homework', 'notes', 'decks', 'cards', 'wordLists', 'sessions', 'todos', 'habits', 'grades', 'previews', 'assessments', 'blanks', 'conditions', 'weekNotes', 'papers', 'workouts', 'bodyLogs', 'moneyTx', 'savings', 'hobbies', 'hobbyLogs', 'wishes', 'diary', 'moneyRules', 'movies', 'reads'] as const;
+export const COLLECTIONS = ['subjects', 'exams', 'books', 'plans', 'tutors', 'homework', 'notes', 'decks', 'cards', 'wordLists', 'sessions', 'todos', 'habits', 'grades', 'previews', 'assessments', 'blanks', 'conditions', 'weekNotes', 'papers', 'workouts', 'bodyLogs', 'moneyTx', 'savings', 'hobbies', 'hobbyLogs', 'wishes', 'diary', 'moneyRules', 'movies', 'reads', 'drillLogs'] as const;
 export type Collection = (typeof COLLECTIONS)[number];
 
 export const DEFAULT_SETTINGS: StudySettings = {
@@ -741,6 +754,7 @@ export function emptyStudy(): StudyData {
     moneyRules: {},
     movies: {},
     reads: {},
+    drillLogs: {},
   };
 }
 

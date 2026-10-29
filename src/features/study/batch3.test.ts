@@ -335,3 +335,29 @@ describe('통합 검색 (searchAll)', () => {
     expect(snippet('가나다라마바사아자차카타파하', '마바', 3)).toBe('…나다라마바사아자…');
   });
 });
+
+describe('농구 혼자 연습 (drills)', () => {
+  it('최근 기록으로 약점을 찾는다', async () => {
+    const { recentStats, weaknesses } = await import('../life/drills');
+    const w = (id: string, date: string, bb: object) => ({ id, kind: '농구', date, bb, updatedAt: 1 });
+    const d = { workouts: Object.fromEntries([w('a', '2026-10-20', { mode: 'practice', ftm: 5, fta: 20, tpm: 3, tpa: 10, fgm: 20, fga: 30 }), w('b', '2026-09-01', { mode: 'practice', ftm: 20, fta: 20 })].map((x) => [x.id, x])) } as never;
+    const s = recentStats(d, '2026-10-28', 30);
+    expect(s.ft).toEqual({ m: 5, a: 20 });
+    const weak = weaknesses(s).map((x) => x.area);
+    expect(weak[0]).toBe('ft');
+    expect(weak).toContain('three');
+    expect(weak).not.toContain('shoot');
+    expect(weaknesses({ ft: { m: 0, a: 3 }, fg: { m: 0, a: 0 }, tp: { m: 0, a: 0 }, sessions: 1, games: 0, ast: 0, reb: 0 })).toEqual([]);
+  });
+  it('시간 안에서 오늘의 연습을 짜고, 골대가 없으면 골대 드릴을 뺀다', async () => {
+    const { buildSession, totalMinutes } = await import('../life/drills');
+    const hoop = buildSession({ minutes: 45, have: 'hoop', weak: [{ area: 'ft', why: '' }, { area: 'three', why: '' }], salt: 1, maxLevel: 2 });
+    expect(hoop.some((x) => x.id === 'ft')).toBe(true);
+    expect(hoop.some((x) => x.area === 'three')).toBe(true);
+    expect(totalMinutes(hoop)).toBeLessThanOrEqual(55);
+    const none = buildSession({ minutes: 30, have: 'any', weak: [{ area: 'ft', why: '' }], salt: 2, maxLevel: 3 });
+    expect(none.every((x) => x.need === 'any')).toBe(true);
+    expect(none.length).toBeGreaterThan(0);
+    expect(buildSession({ minutes: 30, have: 'hoop', weak: [], salt: 5, maxLevel: 2 }).map((x) => x.id)).toEqual(buildSession({ minutes: 30, have: 'hoop', weak: [], salt: 5, maxLevel: 2 }).map((x) => x.id));
+  });
+});

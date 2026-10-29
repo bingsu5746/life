@@ -184,6 +184,10 @@ const FIX: Record<Collection, Fix> = {
     const height = score(x.height, 50, 250);
     return weight !== undefined || height !== undefined ? { ...x, weight, height } : null;
   },
+  drillLogs: (x) =>
+    isDate(x.date) && typeof x.drillId === 'string'
+      ? { ...x, drillId: str(x.drillId).slice(0, 30), made: score(x.made, 0, 1000), shots: score(x.shots, 0, 1000), minutes: score(x.minutes, 0, 600), created: num(x.created) }
+      : null,
   reads: (x) => ({
     ...x,
     title: str(x.title, '책').slice(0, 100),

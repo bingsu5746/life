@@ -8,6 +8,7 @@ import { minutesText } from '../study/timer';
 import { Bar, confirmDelete, Empty, Field, go, Icon, Sheet, tap, toast, useToday } from '../study/ui';
 import { weeklyMinutes, weekWorkouts, workoutStreak } from './calc';
 import { Basketball } from './Basketball';
+import { DrillsPage } from './Drills';
 
 const KINDS = ['달리기', '걷기', '헬스', '홈트', '자전거', '수영', '농구', '구기', '요가·스트레칭'];
 const CARDIO = ['달리기', '걷기', '자전거', '수영'];
@@ -18,6 +19,7 @@ const md = (x: string) => shortDate(x).replace(/\(.\)/, '');
 export function Fitness({ sub, sub2 }: { sub?: string; sub2?: string }) {
   if (sub === 'basketball') return <Basketball sub={sub2} />;
   if (sub === 'body') return <BodyPage />;
+  if (sub === 'drills') return <DrillsPage />;
   return <FitnessAll sub={sub} />;
 }
 
