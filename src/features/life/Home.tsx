@@ -8,7 +8,7 @@ import { useStudy, useWords } from '../study/store';
 import { minutesText } from '../study/timer';
 import { AREAS } from '../study/tabs';
 import { go, Icon, useToday } from '../study/ui';
-import { hobbyWeek, monthOf, monthSummary, weekWorkouts, won, workoutStreak } from './calc';
+import { dayStreak, hobbyWeek, monthOf, monthSummary, weekWorkouts, won, workoutStreak } from './calc';
 
 export function Home(_: { loggedIn: boolean; onLogin: () => void }) {
   const d = useStudy();
@@ -50,15 +50,23 @@ export function Home(_: { loggedIn: boolean; onLogin: () => void }) {
       lines: string[];
       action?: { label: string; to: string };
       badge?: { big: string; small: string };
+      streak?: number;
     }
   > = {
     study: {
       lines: [sum.total ? (sum.left ? `오늘 할 것 ${sum.left}개 남음` : '오늘 할 것 끝') : '오늘 정해 둔 공부가 없어요', `오늘 공부 ${minutesText(studied)}`],
       badge: exam ? { big: dday(today, exam.date), small: exam.name } : undefined,
+      streak: dayStreak(
+        alive(d.sessions)
+          .filter((s) => s.minutes > 0)
+          .map((s) => s.date),
+        today,
+      ),
     },
     fitness: {
       lines: [`이번 주 ${wkDays}${goal ? `/${goal}` : ''}일 운동`, didToday ? '오늘 운동했어요' : workoutStreak(alive(d.workouts), today) ? `${workoutStreak(alive(d.workouts), today)}일 연속` : '오늘은 아직'],
       action: didToday ? undefined : { label: '운동 넣기', to: '/fitness/new' },
+      streak: workoutStreak(alive(d.workouts), today),
     },
     money: {
       lines: [`이번 달 쓴 돈 ${won(ms.out)}`, budget ? (budget - ms.out >= 0 ? `예산 ${won(budget - ms.out)} 남음` : `예산 ${won(ms.out - budget)} 넘음`) : ''].filter(Boolean),
@@ -82,6 +90,10 @@ export function Home(_: { loggedIn: boolean; onLogin: () => void }) {
     },
     diary: {
       lines: [diaryToday ? '오늘 일기를 썼어요' : '오늘 일기를 아직 안 썼어요', `이번 달 ${diaryMonth}편`],
+      streak: dayStreak(
+        alive(d.diary).map((e) => e.id),
+        today,
+      ),
       action: {
         label: diaryToday ? '오늘 일기 보기' : '오늘 일기 쓰기',
         to: `/diary/${today}`,
@@ -112,6 +124,11 @@ export function Home(_: { loggedIn: boolean; onLogin: () => void }) {
               <button className="hm-main" onClick={() => go(`/${a.key}`)}>
                 <span className="hm-title">
                   <Icon name={`area-${a.key}`} /> {a.label}
+                  {(c.streak ?? 0) >= 2 && (
+                    <span className="hm-streak" title={`${c.streak}일 연속`}>
+                      🔥 {c.streak}
+                    </span>
+                  )}
                 </span>
                 {c.badge && (
                   <span className="hm-dday">

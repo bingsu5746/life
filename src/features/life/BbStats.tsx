@@ -3,7 +3,7 @@ import { addDays, weekStart } from '../study/dates';
 import { useState } from 'react';
 import { setSettings, useStudy } from '../study/store';
 import { Bar, useToday } from '../study/ui';
-import { shotsBetween, type ShotLine } from './bb';
+import { shotsBetween, shotsByCourt, type ShotLine } from './bb';
 
 type Kind = 'fg' | 'tp' | 'ft';
 const NAME: Record<Kind, string> = { fg: '2점', tp: '3점', ft: '자유투' };
@@ -20,6 +20,7 @@ export function ShotSummary() {
     ['이번 주', shotsBetween(d, weekStart(today), today)],
     ['30일', shotsBetween(d, addDays(today, -29), today)],
   ];
+  const courts = shotsByCourt(d, addDays(today, -89), today).filter((c) => c.s.fg.a || c.s.tp.a || c.s.ft.a);
   if (rows.every(([, s]) => !s.fg.a && !s.tp.a && !s.ft.a)) return null;
   return (
     <section className="st-card">
@@ -41,6 +42,23 @@ export function ShotSummary() {
         ))}
       </div>
       <small className="st-muted">경기 기록과 드릴 기록에 적은 것만 세요.</small>
+      {courts.length > 1 && (
+        <>
+          <h4 className="st-group">코트별 · 90일</h4>
+          <div className="sc-table" role="table">
+            {courts.map((c) => (
+              <div key={c.court} role="row">
+                <small className="st-muted">
+                  {c.court} · {c.times}번
+                </small>
+                {(Object.keys(NAME) as Kind[]).map((k) => (
+                  <b key={k}>{line(c.s[k])}</b>
+                ))}
+              </div>
+            ))}
+          </div>
+        </>
+      )}
     </section>
   );
 }

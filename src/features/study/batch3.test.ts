@@ -570,3 +570,66 @@ describe('지문 (dueAgain · chunkText)', () => {
     expect(chunkText('One. Two. Three.', 8).length).toBeGreaterThan(1);
   });
 });
+
+describe('연속 기록 (dayStreak)', () => {
+  it('오늘 안 했으면 어제까지 이어진 날', async () => {
+    const { dayStreak } = await import('../life/calc');
+    expect(dayStreak(['2026-10-27', '2026-10-28', '2026-10-29'], '2026-10-29')).toBe(3);
+    expect(dayStreak(['2026-10-27', '2026-10-28'], '2026-10-29')).toBe(2);
+    expect(dayStreak(['2026-10-26', '2026-10-28'], '2026-10-29')).toBe(1);
+    expect(dayStreak([], '2026-10-29')).toBe(0);
+  });
+});
+
+describe('용돈 자동 모으기 (autoSaves)', () => {
+  it('시작한 날부터 들어온 용돈의 비율만큼 한 번씩, 지운 용돈은 뺀다', async () => {
+    const { autoSaves } = await import('../life/calc');
+    const d = emptyStudy();
+    const tx = (id: string, date: string, amount: number, category = '용돈', deleted?: boolean) => ({ id, updatedAt: 1, date, type: 'in' as const, amount, category, created: 1, deleted });
+    d.moneyTx = { a: tx('a', '2026-10-01', 50000), b: tx('b', '2026-10-20', 30000), c: tx('c', '2026-10-21', 10000, '알바') } as never;
+    d.savings = { g: { id: 'g', updatedAt: 1, name: '이어폰', target: 100000, deposits: [{ id: 'm', date: '2026-10-02', amount: 5000 }], autoPct: 20, autoSince: '2026-10-10', created: 1 } } as never;
+    const [g] = autoSaves(d);
+    expect(g.deposits).toEqual([{ id: 'm', date: '2026-10-02', amount: 5000 }, { id: 'auto-b', date: '2026-10-20', amount: 6000 }]);
+    d.savings = { g } as never;
+    expect(autoSaves(d)).toEqual([]);
+    d.moneyTx.b = { ...d.moneyTx.b, deleted: true } as never;
+    expect(autoSaves(d)[0].deposits.map((x) => x.id)).toEqual(['m']);
+  });
+});
+
+describe('코트별 슛 (shotsByCourt)', () => {
+  it('코트를 적은 기록만 모아 많이 간 순', async () => {
+    const { shotsByCourt, courtNames } = await import('../life/bb');
+    const w = (id: string, date: string, court: string | undefined, ftm: number, fta: number) => ({ id, updatedAt: 1, date, kind: '농구', created: 1, bb: { mode: 'practice', court, ftm, fta } });
+    const d = { workouts: { a: w('a', '2026-10-01', '공원', 7, 10), b: w('b', '2026-10-05', '공원', 8, 10), c: w('c', '2026-10-06', '체육관', 9, 10), e: w('e', '2026-10-07', undefined, 1, 10) } } as never;
+    const r = shotsByCourt(d, '2026-10-01', '2026-10-31');
+    expect(r.map((x) => [x.court, x.times, x.s.ft.m, x.s.ft.a])).toEqual([
+      ['공원', 2, 15, 20],
+      ['체육관', 1, 9, 10],
+    ]);
+    expect(courtNames(d)).toEqual(['체육관', '공원']);
+  });
+});
+
+describe('오답 과목 추천 (guessNoteSubject)', () => {
+  it('영어 글 → 타이머 → 방금 공부 → 없음', async () => {
+    const { guessNoteSubject } = await import('./mistakes');
+    const now = Date.UTC(2026, 9, 29, 10);
+    const s = (id: string, name: string) => ({ id, name, color: '#000', order: 1, updatedAt: 1 });
+    const d = { subjects: { en: s('en', '영어'), ma: s('ma', '수학') }, sessions: { x: { id: 'x', updatedAt: 1, subjectId: 'ma', start: now - 3600_000, end: now - 600_000, minutes: 50, date: '2026-10-29', kind: 'watch' } }, notes: {} } as never;
+    expect(guessNoteSubject(d, now, undefined, 'The author argues that the most important thing is to read carefully.')?.id).toBe('en');
+    expect(guessNoteSubject(d, now, 'en')?.id).toBe('en');
+    expect(guessNoteSubject(d, now)).toEqual({ id: 'ma', why: '방금 공부한 과목' });
+    expect(guessNoteSubject(d, now + 5 * 3600_000)).toBeNull();
+  });
+});
+
+describe('타이머 한 줄 메모 → 일기 오늘 한 것', () => {
+  it('메모가 과목 이름과 함께 들어간다', async () => {
+    const { daySummary } = await import('../life/diaryForm');
+    const d = emptyStudy();
+    d.subjects = { ma: { id: 'ma', name: '수학', color: '#000', order: 1, updatedAt: 1 } } as never;
+    d.sessions = { x: { id: 'x', updatedAt: 1, subjectId: 'ma', start: 1, end: 2, minutes: 40, date: '2026-10-29', kind: 'watch', memo: '미적분 3단원' } } as never;
+    expect(daySummary(d, '2026-10-29')).toEqual(['공부 40분', '- 수학: 미적분 3단원']);
+  });
+});

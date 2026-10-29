@@ -446,6 +446,8 @@ export interface BasketballStat {
   fta?: number;
   /** 연습: 무엇을 연습했고 몇 개 중 몇 개 넣었는지 */
   items?: PracticeItem[];
+  /** 코트 (어디서 했는지) */
+  court?: string;
 }
 
 export interface PracticeItem {
@@ -541,6 +543,9 @@ export interface SavingGoal extends Stamp {
   deposits: { id: Id; date: DateStr; amount: number; at?: number }[];
   due?: DateStr;
   done?: boolean;
+  /** 용돈이 들어오면 이 비율(%)만큼 저절로 모으기 · 이 날부터 들어온 용돈만 */
+  autoPct?: number;
+  autoSince?: DateStr;
   created: number;
 }
 
@@ -708,6 +713,8 @@ export interface StudySession extends Stamp {
   kind: 'pomo' | 'watch' | 'manual';
   /** 공부한 곳 (집 · 독서실 …) */
   place?: string;
+  /** 무엇을 했는지 한 줄 (타이머를 멈출 때) */
+  memo?: string;
 }
 
 export interface Todo extends Stamp {

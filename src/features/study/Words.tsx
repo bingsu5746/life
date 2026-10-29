@@ -12,6 +12,7 @@ import { parseWords, wordsText, type ParsedWord } from './wordParse';
 import { choicesFor, requeue, type Mode } from './wordSession';
 import { PlanForm } from './PlanForm';
 import { SwipeCard } from './SwipeCard';
+import { WithSpeak } from './Speak';
 import { Practice } from './Practice';
 import { WordTestSheet } from './WordTestSheet';
 import { isLoggedIn, wordMeanings } from '../auth/api';
@@ -882,7 +883,7 @@ function WordRun({ listId, mode }: { listId: string; mode: 'learn' | 'prep' | 'w
       </div>
       {useQuiz ? (
         <>
-          <RunCard key={`${cur.id}:${step}`} ask={ask} sub={dir === 'en' && cur.day !== undefined ? `Day ${cur.day}` : answered.has(cur.id) ? '다시 나온 단어' : boxLabel(cur.box, d.settings.intervals)}>
+          <RunCard key={`${cur.id}:${step}`} ask={ask} say={dir === 'en' ? cur.term : undefined} sub={dir === 'en' && cur.day !== undefined ? `Day ${cur.day}` : answered.has(cur.id) ? '다시 나온 단어' : boxLabel(cur.box, d.settings.intervals)}>
             <div className="st-choices">
               {choices!.map((c, i) => {
                 const state = picked ? (c === ans ? 'right' : c === picked ? 'wrong' : '') : '';
@@ -907,8 +908,8 @@ function WordRun({ listId, mode }: { listId: string; mode: 'learn' | 'prep' | 'w
       ) : (
         <SwipeCard
           key={`${cur.id}:${step}`}
-          front={ask}
-          back={ans || '(뜻 없음)'}
+          front={dir === 'en' ? <WithSpeak text={cur.term}>{ask}</WithSpeak> : ask}
+          back={dir === 'ko' ? <WithSpeak text={cur.term}>{ans}</WithSpeak> : ans || '(뜻 없음)'}
           sub={dir === 'en' && cur.day !== undefined ? `Day ${cur.day}` : answered.has(cur.id) ? '다시 나온 단어' : boxLabel(cur.box, d.settings.intervals)}
           onAnswer={reply}
         />
@@ -918,11 +919,11 @@ function WordRun({ listId, mode }: { listId: string; mode: 'learn' | 'prep' | 'w
 }
 
 /** 문제 카드 (폰: 좌우로 밀어서 몰랐다/알았다) */
-export function RunCard({ ask, sub, children }: { ask: string; sub?: string; children: React.ReactNode }) {
+export function RunCard({ ask, say, sub, children }: { ask: string; say?: string; sub?: string; children: React.ReactNode }) {
   return (
     <div className="st-runcard">
       {sub && <small className="st-muted">{sub}</small>}
-      <div className="st-ask-text">{ask}</div>
+      <div className="st-ask-text">{say ? <WithSpeak text={say}>{ask}</WithSpeak> : ask}</div>
       {children}
     </div>
   );

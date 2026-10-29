@@ -7,6 +7,7 @@ import { DRILLS, guessKind, practiceTotals } from './drills';
 import { put, remove, useStudy } from '../study/store';
 import { minutesText } from '../study/timer';
 import { BbGoals, ShotSummary } from './BbStats';
+import { courtNames } from './bb';
 import { confirmDelete, Empty, go, Icon, Sheet, tap, toast, useToday } from '../study/ui';
 
 const md = (x: string) => shortDate(x).replace(/\(.\)/, '');
@@ -117,6 +118,7 @@ export function Basketball({ sub }: { sub?: string }) {
                     {w.bb?.result ? ` · ${RESULT[w.bb.result]}` : ''}
                     {w.bb?.pts !== undefined ? ` · ${w.bb.pts}점` : ''}
                     {w.minutes ? ` · ${minutesText(w.minutes)}` : ''}
+                    {w.bb?.court ? ` · ${w.bb.court}` : ''}
                   </div>
                   <div className="st-item-sub">
                     {[
@@ -150,6 +152,8 @@ function BbSheet({ item, today, onClose }: { item?: Workout; today: string; onCl
   const [result, setResult] = useState<BasketballStat['result']>(b?.result);
   const [v, setV] = useState<Record<string, string>>(() => Object.fromEntries((['pts', 'reb', 'ast', 'stl', 'blk', 'fgm', 'fga', 'tpm', 'tpa', 'ftm', 'fta'] as const).map((k) => [k, b?.[k]?.toString() ?? ''])));
   const [memo, setMemo] = useState(item?.memo ?? '');
+  const d = useStudy();
+  const [court, setCourt] = useState(b?.court ?? courtNames(d)[0] ?? '');
   // 연습: 무엇을 · 몇 개 중 몇 개 (예전 기록은 슛 칸을 항목으로 바꿔 보여 준다)
   type Row = { name: string; kind?: 'fg' | 'tp' | 'ft'; made: string; att: string };
   const [rows, setRows] = useState<Row[]>(() => {
@@ -196,6 +200,7 @@ function BbSheet({ item, today, onClose }: { item?: Workout; today: string; onCl
       ast: mode === 'game' ? num('ast') : undefined,
       stl: mode === 'game' ? num('stl') : undefined,
       blk: mode === 'game' ? num('blk') : undefined,
+      court: court.trim().slice(0, 30) || undefined,
     };
     put('workouts', { ...(item ?? { created: Date.now() }), id: item?.id ?? newId(), date, kind: '농구', minutes: m > 0 && m <= 1440 ? Math.round(m) : undefined, memo: memo.trim() || undefined, bb } as Workout);
     toast(item ? '고쳤어요' : '농구 기록을 넣었어요');
@@ -220,6 +225,15 @@ function BbSheet({ item, today, onClose }: { item?: Workout; today: string; onCl
           <label className="st-cond-time">
             시간(분)
             <input className="st-input xs" inputMode="numeric" value={minutes} onChange={(e) => setMinutes(e.target.value.replace(/\D/g, '').slice(0, 4))} />
+          </label>
+          <label className="st-cond-time">
+            코트
+            <input className="st-input sm" list="bb-courts" value={court} onChange={(e) => setCourt(e.target.value)} placeholder="예: 동네 공원" maxLength={30} />
+            <datalist id="bb-courts">
+              {courtNames(d).map((c) => (
+                <option key={c} value={c} />
+              ))}
+            </datalist>
           </label>
         </div>
         {mode === 'game' && (

@@ -12,7 +12,8 @@ import { Bar, confirmDelete, Empty, Field, go, Menu, Sheet, SubjectDot, SubjectP
 import { SwipeCard } from './SwipeCard';
 import { Passages } from './Passages';
 import { dueAgain } from './passages';
-import { isCareless, mistakePatterns } from './mistakes';
+import { guessNoteSubject, isCareless, mistakePatterns } from './mistakes';
+import { loadTimer } from './timerStore';
 
 export function Review({ sub }: { sub?: string }) {
   if (sub === 'redo' || sub?.startsWith('redo?')) return <NoteRun />;
@@ -242,8 +243,10 @@ function Photo({ id, small }: { id: string; small?: boolean }) {
 
 function NoteSheet({ note, today, onClose }: { note?: WrongNote; today: string; onClose: () => void }) {
   const d = useStudy();
+  // 새 오답: 과목을 미리 골라 둔다 (사람이 바꾸면 그대로 둔다)
+  const [guess, setGuess] = useState(() => (note ? null : guessNoteSubject(d, Date.now(), loadTimer()?.subjectId)));
   const [f, setF] = useState(() => ({
-    subjectId: note?.subjectId ?? '',
+    subjectId: note?.subjectId ?? guess?.id ?? '',
     bookId: note?.bookId ?? '',
     page: note?.page ? String(note.page) : '',
     number: note?.number ?? '',
@@ -271,8 +274,11 @@ function NoteSheet({ note, today, onClose }: { note?: WrongNote; today: string; 
       const t = all.replace(/\n{3,}/g, '\n\n').trim();
       if (!t) toast('사진에서 글자를 찾지 못했어요');
       else {
+        const g = !note && (!f.subjectId || guess) ? guessNoteSubject(d, Date.now(), loadTimer()?.subjectId, t) : null;
+        if (g) setGuess(g);
         setF((x) => ({
           ...x,
+          subjectId: g ? g.id : x.subjectId,
           question: x.question.trim() ? `${x.question.trim()}\n${t}` : t,
         }));
         toast('읽은 글을 「문제」 칸에 넣었어요. 틀린 글자는 고쳐 주세요');
@@ -339,7 +345,14 @@ function NoteSheet({ note, today, onClose }: { note?: WrongNote; today: string; 
     <Sheet title={note ? '오답 고치기' : '오답 넣기'} onClose={close} wide>
       <div className="st-form">
         <Field group label="과목">
-          <SubjectPicker value={f.subjectId} onChange={(id) => setF({ ...f, subjectId: id })} />
+          <SubjectPicker
+            value={f.subjectId}
+            onChange={(id) => {
+              setGuess(null);
+              setF({ ...f, subjectId: id });
+            }}
+          />
+          {guess && guess.id === f.subjectId && <small className="st-muted">추천: {guess.why}</small>}
         </Field>
         <div className="st-inline wrap">
           <select className="st-input sm" value={f.bookId} onChange={(e) => setF({ ...f, bookId: e.target.value })} aria-label="문제집">

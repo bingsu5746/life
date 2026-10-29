@@ -10,7 +10,7 @@ import { useTimerAlarm, useTimerView } from './timerStore';
 import { clock } from './timer';
 import { Today } from './Today';
 import { localTimes, uploadDigest } from './notify';
-import { dueRuleTx } from '../life/calc';
+import { autoSaves, dueRuleTx } from '../life/calc';
 // 시험 화면은 오늘 화면(D-day)과 같이 쓰여 함께 받는다
 import { Exams } from './Exams';
 import { go, Icon, Toaster, useToday } from './ui';
@@ -80,6 +80,8 @@ export function Study({ path, loggedIn, syncReady = true, onLogin }: { path: str
     if (!syncReady) return;
     const due = dueRuleTx(d, today);
     if (due.length) putMany(due.map((t) => ({ c: 'moneyTx' as const, item: t as never })));
+    const saves = autoSaves(d);
+    if (saves.length) putMany(saves.map((g) => ({ c: 'savings' as const, item: g as never })));
   }, [d, today, syncReady]);
   // 알림을 켜 둔 기기: 자료가 바뀌면 잠시 뒤 알림 글을 다시 올린다
   useEffect(() => {

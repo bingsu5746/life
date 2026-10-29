@@ -19,7 +19,12 @@ export function weekWorkouts(d: StudyData, from: DateStr): Workout[] {
 
 /** 오늘(오늘 안 했으면 어제)까지 연속으로 운동한 날 */
 export function workoutStreak(list: Workout[], today: DateStr): number {
-  const days = new Set(list.map((w) => w.date));
+  return dayStreak(list.map((w) => w.date), today);
+}
+
+/** 오늘(또는 아직 안 했으면 어제)까지 끊기지 않고 이어진 날 수 */
+export function dayStreak(dates: Iterable<DateStr>, today: DateStr): number {
+  const days = new Set(dates);
   let d = days.has(today) ? today : addDays(today, -1);
   let n = 0;
   while (days.has(d) && n < 3650) {
@@ -224,4 +229,23 @@ export function savingPace(g: { target: number; deposits: { date: DateStr; amoun
   const weeksToDue = g.due && g.due > today ? (Date.parse(g.due) - Date.parse(today)) / (7 * 86_400_000) : null;
   const faster = days === null || left === 0 ? [] : [5000, 10000].map((extra) => ({ extra, days: days - (etaIn(perWeek + extra) ?? days) })).filter((x) => x.days > 0);
   return { left, perWeek, eta, needPerWeek: weeksToDue ? Math.ceil(left / weeksToDue / 100) * 100 : null, faster };
+}
+
+/** 용돈 자동 모으기: 들어온 용돈마다 목표의 비율만큼 넣는다 (같은 용돈은 한 번만: 기록 id 「auto-용돈id」).
+ *  용돈 기록을 지우면 그 몫도 뺀다. 바뀐 목표만 돌려준다. */
+export function autoSaves(d: StudyData, cat = '용돈'): SavingGoal[] {
+  const ins = alive(d.moneyTx).filter((t) => t.type === 'in' && t.category === cat);
+  const out: SavingGoal[] = [];
+  for (const g of alive(d.savings)) {
+    if (!g.autoPct || !g.autoSince) continue;
+    const want = new Map(ins.filter((t) => t.date >= g.autoSince!).map((t) => [`auto-${t.id}`, t]));
+    const kept = g.deposits.filter((x) => !x.id.startsWith('auto-') || want.has(x.id));
+    const have = new Set(kept.map((x) => x.id));
+    const add = g.done ? [] : [...want].filter(([id]) => !have.has(id)).map(([id, t]) => ({ id, date: t.date, amount: Math.round((t.amount * g.autoPct!) / 100) })).filter((x) => x.amount > 0);
+    if (!add.length && kept.length === g.deposits.length) continue;
+    const deposits = [...kept, ...add];
+    const sum = deposits.reduce((a, x) => a + x.amount, 0);
+    out.push({ ...g, deposits, done: sum >= g.target ? true : g.done });
+  }
+  return out;
 }

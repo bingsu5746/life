@@ -5,7 +5,7 @@ import { bestStreak, habitOn, streak, toggleHabit, weekdayRates } from './habits
 import { BarChart } from './charts';
 import { alive, newId, type Habit, type Todo } from './model';
 import { resplit } from './splitHomework';
-import { getStudy, put, remove, useStudy } from './store';
+import { getStudy, put, putMany, remove, useStudy } from './store';
 import { Check, confirmDelete, Empty, Field, Icon, Sheet, toast, useToday, WeekdayPicker, tap } from './ui';
 
 const ICONS = ['📖', '🏃', '💧', '😴', '🧘', '✍️', '🎧', '🥗', '🧹', '💊', '📵', '🌅'];
@@ -78,7 +78,21 @@ function Todos({ today }: { today: string }) {
         ([label, ts]) =>
           ts.length > 0 && (
             <div key={label}>
-              <h4 className={`st-group ${label === '마감 지남' ? 'bad' : ''}`}>{label}</h4>
+              <div className="st-inline between">
+                <h4 className={`st-group ${label === '마감 지남' ? 'bad' : ''}`}>{label}</h4>
+                {(label === '마감 지남' || label === '오늘') && (
+                  <button
+                    className="st-link st-group-act"
+                    onClick={() => {
+                      const tm = addDays(today, 1);
+                      putMany(ts.map((t) => ({ c: 'todos' as const, item: { ...t, due: tm, star: false } })));
+                      toast(`${ts.length}개를 내일로 미뤘어요`);
+                    }}
+                  >
+                    {ts.length > 1 ? '모두 ' : ''}내일로
+                  </button>
+                )}
+              </div>
               {ts.map((t) => (
                 <div key={t.id} className="st-item">
                   <Check on={false} label="했어요" onClick={() => put('todos', { ...t, done: true, doneAt: Date.now() })} />

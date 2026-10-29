@@ -42,6 +42,7 @@ function TimeHome({ sub }: { sub?: string }) {
     }
   };
   const [manual, setManual] = useState(sub === 'manual');
+  const [memoFor, setMemoFor] = useState<string | null>(null);
   const pomo = d.settings.pomo;
   const update = (t: TimerState | null) => {
     setTimer(t);
@@ -65,8 +66,9 @@ function TimeHome({ sub }: { sub?: string }) {
       min = Math.min(n, min);
     }
     if (min > 0) {
-      addSession({ subjectId: timer.subjectId, bookId: timer.bookId, start: timer.startedAt, end: Date.now(), minutes: min, date: today, kind: timer.kind, place: timer.place });
+      const id = addSession({ subjectId: timer.subjectId, bookId: timer.bookId, start: timer.startedAt, end: Date.now(), minutes: min, date: today, kind: timer.kind, place: timer.place });
       toast(`${minutesText(min)} 기록했어요`);
+      if (id) setMemoFor(id);
     } else toast('1분이 안 돼서 기록하지 않았어요');
     update(null);
   }
@@ -115,6 +117,7 @@ function TimeHome({ sub }: { sub?: string }) {
       {sessions.length > 0 && <Analysis sessions={sessions} today={today} />}
       {sessions.some((s) => s.place) && <PlaceTime sessions={sessions} today={today} />}
       <SleepStudy today={today} />
+      {memoFor && d.sessions[memoFor] && <MemoSheet id={memoFor} onClose={() => setMemoFor(null)} />}
       {manual && (
         <ManualSheet
           today={today}
@@ -270,6 +273,7 @@ function Stats({ sessions, today, todayMin }: { sessions: StudySession[]; today:
                 <div className="st-item-sub">
                   {shortDate(s.date)} {new Date(s.start).toTimeString().slice(0, 5)} · {s.kind === 'pomo' ? '뽀모도로' : s.kind === 'watch' ? '스톱워치' : '직접 넣음'}
                 </div>
+                {s.memo && <div className="st-item-sub">{s.memo}</div>}
               </div>
             </div>
           ))}
@@ -645,5 +649,38 @@ function SleepBuckets({ today }: { today: string }) {
         )}
       </div>
     </div>
+  );
+}
+
+/** 타이머를 멈춘 뒤: 무엇을 했는지 한 줄 (일기 「오늘 한 것」에 들어간다) */
+function MemoSheet({ id, onClose }: { id: string; onClose: () => void }) {
+  const d = useStudy();
+  const s = d.sessions[id];
+  const [v, setV] = useState(s?.memo ?? '');
+  const save = () => {
+    if (s && v.trim()) put('sessions', { ...s, memo: v.trim().slice(0, 100) });
+    onClose();
+  };
+  return (
+    <Sheet title="무엇을 했나요?" onClose={onClose}>
+      <form
+        className="st-form"
+        onSubmit={(e) => {
+          e.preventDefault();
+          save();
+        }}
+      >
+        <input className="st-input" autoFocus value={v} onChange={(e) => setV(e.target.value)} maxLength={100} placeholder="예: 미적분 3단원 문제 20개" aria-label="한 일 한 줄" />
+        <small className="st-muted">적어 두면 일기의 「오늘 한 것」에 들어가요. 안 적어도 돼요.</small>
+        <div className="st-row end">
+          <button type="button" className="btn btn-sm" onClick={onClose}>
+            건너뛰기
+          </button>
+          <button className="btn btn-primary" disabled={!v.trim()}>
+            저장
+          </button>
+        </div>
+      </form>
+    </Sheet>
   );
 }

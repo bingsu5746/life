@@ -64,7 +64,7 @@ export const AREA_ITEMS: Record<Exclude<AreaKey, 'home' | 'study'>, AreaItem[]> 
 
 /** 지금 주소의 두 번째 칸에서 어느 메뉴가 켜져 있는지 */
 export function activeItem(area: keyof typeof AREA_ITEMS, sub?: string): string {
-  if (area === 'movies') return sub === 'watched' || sub === 'want' || sub === 'awards' || sub === 'ceremony' ? 'watched' : sub === 'find' || sub === 'rec' ? sub : '';
+  if (area === 'movies') return sub === 'watched' || sub === 'want' || sub === 'quotes' || sub === 'awards' || sub === 'ceremony' ? 'watched' : sub === 'find' || sub === 'rec' ? sub : '';
   if (area === 'diary') return sub === 'dream' || sub === 'form' ? sub : '';
   if (area === 'money') return sub === 'fixed' || sub === 'saving' ? sub : '';
   if (area === 'fitness') return sub === 'body' || sub === 'basketball' || sub === 'drills' ? sub : '';

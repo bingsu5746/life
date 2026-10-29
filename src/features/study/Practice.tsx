@@ -8,6 +8,7 @@ import { makeQuestions, sameAnswer, splitExample, type Question } from './wordTe
 import { choicesFor } from './wordSession';
 import { go, toast } from './ui';
 import { SwipeCard } from './SwipeCard';
+import { WithSpeak } from './Speak';
 
 type PMode = 'card' | 'choice' | 'blank' | 'listen';
 const MODE_NAME: Record<PMode, string> = { card: '카드 넘기기', choice: '4지선다', blank: '예문 빈칸', listen: '듣고 쓰기' };
@@ -218,10 +219,24 @@ function Run({ items, mode, dir, onExit, onRetry }: { items: Item[]; mode: PMode
       {mode === 'card' && (
         <SwipeCard
           key={`${w.id}:${i}`}
-          front={<span lang={dir === 'en' ? 'en' : 'ko'}>{front}</span>}
+          front={
+            dir === 'en' ? (
+              <WithSpeak text={w.term}>
+                <span lang="en">{front}</span>
+              </WithSpeak>
+            ) : (
+              <span lang="ko">{front}</span>
+            )
+          }
           back={
             <>
-              <span>{back}</span>
+              {dir === 'en' ? (
+                <span>{back}</span>
+              ) : (
+                <WithSpeak text={w.term}>
+                  <span>{back}</span>
+                </WithSpeak>
+              )}
               {w.example && <small className="sw-ex">{w.example.s.replace(/\[|\]/g, '')}</small>}
             </>
           }

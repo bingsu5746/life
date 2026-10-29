@@ -28,6 +28,7 @@ function bbStat(v: unknown) {
     result: v.result === 'win' || v.result === 'lose' || v.result === 'draw' ? v.result : undefined,
     pts: n('pts'), reb: n('reb'), ast: n('ast'), stl: n('stl'), blk: n('blk'),
     fgm: s('fgm'), fga: s('fga'), tpm: s('tpm'), tpa: s('tpa'), ftm: s('ftm'), fta: s('fta'),
+    court: typeof v.court === 'string' && v.court.trim() ? v.court.trim().slice(0, 30) : undefined,
     items: Array.isArray(v.items)
       ? v.items
           .filter((i): i is Obj => isObj(i) && typeof i.name === 'string' && !!i.name.trim())
@@ -263,6 +264,8 @@ const FIX: Record<Collection, Fix> = {
             .map((v) => ({ id: v.id as string, date: v.date as DateStr, amount: Math.round(v.amount as number), at: optNum(v.at) })),
           due: optDate(x.due),
           done: x.done === true ? true : undefined,
+          autoPct: score(x.autoPct, 1, 100),
+          autoSince: optDate(x.autoSince),
           created: num(x.created),
         }
       : null,
@@ -292,7 +295,7 @@ const FIX: Record<Collection, Fix> = {
     testDate: optDate(x.testDate),
     todayLock: isObj(x.todayLock) && isDate(x.todayLock.date) ? { date: x.todayLock.date, ids: arr(x.todayLock.ids).filter((i) => typeof i === 'string') } : undefined,
   }),
-  sessions: (x) => (isDate(x.date) ? { ...x, subjectId: optStr(x.subjectId), bookId: optStr(x.bookId), start: num(x.start), end: num(x.end), minutes: Math.max(0, num(x.minutes)), kind: x.kind === 'pomo' || x.kind === 'watch' ? x.kind : 'manual', place: optStr(x.place)?.slice(0, 20) } : null),
+  sessions: (x) => (isDate(x.date) ? { ...x, subjectId: optStr(x.subjectId), bookId: optStr(x.bookId), start: num(x.start), end: num(x.end), minutes: Math.max(0, num(x.minutes)), kind: x.kind === 'pomo' || x.kind === 'watch' ? x.kind : 'manual', place: optStr(x.place)?.slice(0, 20), memo: optStr(x.memo)?.slice(0, 100) } : null),
   todos: (x) => ({ ...x, title: str(x.title), due: optDate(x.due), done: bool(x.done), doneAt: optNum(x.doneAt), star: x.star === true ? true : undefined, group: optStr(x.group)?.slice(0, 40), split: isObj(x.split) && typeof x.split.base === 'string' && Number.isFinite(x.split.from) && Number.isFinite(x.split.to) ? { base: String(x.split.base).slice(0, 80), unit: str(x.split.unit, '쪽').slice(0, 6), from: Number(x.split.from), to: Number(x.split.to) } : undefined, created: num(x.created) }),
   habits: (x) => ({
     ...x,

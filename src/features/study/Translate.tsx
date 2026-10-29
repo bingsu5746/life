@@ -1,6 +1,7 @@
 // 한국어 ↔ 영어 번역기. 번역은 서버(worker/translate.ts)가 하고, 로그인한 사람만 쓸 수 있다 (무료 한도를 지키려고).
 // 영어 낱말을 한국어로 바꾸면 「모르는 단어 모음」에 바로 넣을 수 있다.
 import { useEffect, useRef, useState } from 'react';
+import { canSpeak, speak } from '../../lib/speak';
 import { translate, type TranslateResult } from '../auth/api';
 import { addToInbox } from './actions';
 import { useWords } from './store';
@@ -54,18 +55,6 @@ function saveRecent(list: Recent[]) {
   } catch {
     // 저장할 수 없는 환경
   }
-}
-
-/** 기기의 읽어 주기 (있을 때만) */
-function canSpeak() {
-  return typeof window !== 'undefined' && 'speechSynthesis' in window;
-}
-function speak(text: string, lang: Lang) {
-  if (!canSpeak()) return;
-  window.speechSynthesis.cancel();
-  const u = new SpeechSynthesisUtterance(text);
-  u.lang = lang === 'en' ? 'en-US' : 'ko-KR';
-  window.speechSynthesis.speak(u);
 }
 
 export function Translate({ loggedIn, onLogin }: { loggedIn: boolean; onLogin: () => void }) {

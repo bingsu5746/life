@@ -14,13 +14,13 @@ import { Empty, go, Icon, tap, toast, useToday } from '../study/ui';
 export { starText };
 
 type Tab = 'now' | 'mine' | 'find' | 'rec';
-type Mine = 'watched' | 'want' | 'awards';
+type Mine = 'watched' | 'want' | 'quotes' | 'awards';
 
 /** sub: 없으면 극장가, 'watched'·'want'·'awards' 내 영화, 'find' 찾기, 'rec' 추천, 'new' 넣기 창 */
 export function Movies({ sub }: { sub?: string }) {
   const d = useStudy();
   const today = useToday();
-  const mineSub: Mine | null = sub === 'watched' || sub === 'want' || sub === 'awards' ? sub : null;
+  const mineSub: Mine | null = sub === 'watched' || sub === 'want' || sub === 'quotes' || sub === 'awards' ? sub : null;
   const tab: Tab = mineSub || sub === 'ceremony' ? 'mine' : sub === 'find' ? 'find' : sub === 'rec' ? 'rec' : 'now';
   const [sort, setSort] = useState<'recent' | 'rating'>('recent');
   const [tag, setTag] = useState('');
@@ -60,6 +60,11 @@ export function Movies({ sub }: { sub?: string }) {
           <button className={mineSub === 'want' ? 'on' : ''} onClick={() => go('/movies/want')}>
             보고 싶어요{want.length ? ` ${want.length}` : ''}
           </button>
+          {watched.some((m) => m.comment) && (
+            <button className={mineSub === 'quotes' ? 'on' : ''} onClick={() => go('/movies/quotes')}>
+              한줄평
+            </button>
+          )}
           <button className={mineSub === 'awards' ? 'on' : ''} onClick={() => go('/movies/awards')}>
             시상식
           </button>
@@ -160,6 +165,33 @@ export function Movies({ sub }: { sub?: string }) {
             )}
           </>
         ))}
+
+      {mineSub === 'quotes' && (
+        <>
+          <div className="st-seg sm">
+            <button className={sort === 'recent' ? 'on' : ''} onClick={() => setSort('recent')}>
+              날짜순
+            </button>
+            <button className={sort === 'rating' ? 'on' : ''} onClick={() => setSort('rating')}>
+              별점순
+            </button>
+          </div>
+          <div className="mq-list">
+            {watched
+              .filter((m) => m.comment)
+              .map((m) => (
+                <button key={m.id} className="mq-item" onClick={() => setView(m.id)}>
+                  <p>“{m.comment}”</p>
+                  <small>
+                    <b>{m.title}</b>
+                    {[m.rating && starText(m.rating), m.watched && shortDate(m.watched)].filter(Boolean).map((x) => ` · ${x}`)}
+                  </small>
+                </button>
+              ))}
+          </div>
+          {!watched.some((m) => m.comment) && <p className="st-hint">한줄 감상평을 남긴 영화가 아직 없어요.</p>}
+        </>
+      )}
 
       {mineSub === 'want' && watched.some((m) => m.rewish) && (
         <section className="st-card">

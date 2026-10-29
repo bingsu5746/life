@@ -25,6 +25,7 @@ export function daySummary(d: StudyData, date: string): string[] {
   const study = alive(d.sessions).filter((s) => s.date === date);
   const min = study.reduce((a, s) => a + s.minutes, 0);
   if (min) out.push(`공부 ${min >= 60 ? `${Math.floor(min / 60)}시간${min % 60 ? ` ${min % 60}분` : ''}` : `${min}분`}`);
+  for (const s of study.filter((x) => x.memo).sort((a, b) => a.start - b.start)) out.push(`- ${s.subjectId && d.subjects[s.subjectId] ? `${d.subjects[s.subjectId].name}: ` : ''}${s.memo}`);
   const done = alive(d.todos).filter((t) => t.done && t.doneAt && new Date(t.doneAt + 9 * 3600_000).toISOString().slice(0, 10) === date);
   if (done.length) out.push(`할 일 ${done.length}개 끝냄`);
   for (const w of alive(d.workouts).filter((x) => x.date === date)) out.push(`운동: ${w.kind}${w.minutes ? ` ${w.minutes}분` : ''}`);

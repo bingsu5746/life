@@ -51,9 +51,11 @@ export function markHwPages(hw: Homework, item: HwItem, pages: number[], on: boo
   patchHwItem(hw.id, item.id, { doneRanges: compress(cur) as Range[] });
 }
 
-export function addSession(s: Omit<StudySession, 'id' | 'updatedAt'>) {
+export function addSession(s: Omit<StudySession, 'id' | 'updatedAt'>): Id | undefined {
   if (s.minutes <= 0) return;
-  put('sessions', { ...s, id: newId() });
+  const id = newId();
+  put('sessions', { ...s, id });
+  return id;
 }
 
 /** 단어 첫 답 저장 (상자) */

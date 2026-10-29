@@ -45,3 +45,31 @@ export function mistakePatterns(d: Pick<StudyData, 'notes' | 'books'>, onlyOpen 
 
 /** 실수가 많은 과목인지: 이유를 적은 오답 5개 이상 중 실수가 40% 이상 */
 export const isCareless = (p: SubjectPattern | undefined) => !!p && p.withReason >= 5 && p.careless >= 0.4;
+
+/** 오답을 넣을 때 과목 추천: 사진에서 읽은 글 → 켜 둔 타이머 → 방금 공부한 과목 → 방금 넣은 오답 순.
+ *  확실하지 않으면 null (사람이 고른다). */
+export function guessNoteSubject(d: Pick<StudyData, 'subjects' | 'sessions' | 'notes'>, now: number, timerSubject?: Id, text?: string): { id: Id; why: string } | null {
+  const subs = alive(d.subjects);
+  const ok = (id?: Id) => !!id && subs.some((s) => s.id === id);
+  if (text) {
+    const latin = (text.match(/[A-Za-z]/g) ?? []).length;
+    const hangul = (text.match(/[가-힣]/g) ?? []).length;
+    const find = (re: RegExp) => subs.find((s) => re.test(s.name));
+    // 글자가 충분하고 영어가 대부분이면 영어 과목
+    if (latin + hangul >= 30 && latin / (latin + hangul) > 0.7) {
+      const en = find(/영어|english/i);
+      if (en) return { id: en.id, why: '사진 글이 영어라서' };
+    }
+  }
+  if (ok(timerSubject)) return { id: timerSubject!, why: '타이머로 공부 중인 과목' };
+  const H2 = 2 * 3600_000;
+  const recent = alive(d.sessions)
+    .filter((s) => ok(s.subjectId) && now - s.end < H2 && s.end <= now + 60_000)
+    .sort((a, b) => b.end - a.end)[0];
+  if (recent) return { id: recent.subjectId!, why: '방금 공부한 과목' };
+  const note = alive(d.notes)
+    .filter((n) => ok(n.subjectId) && now - n.created < H2)
+    .sort((a, b) => b.created - a.created)[0];
+  if (note) return { id: note.subjectId, why: '방금 넣은 오답과 같은 과목' };
+  return null;
+}

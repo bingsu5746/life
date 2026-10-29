@@ -237,6 +237,7 @@ function SavingRow({ g, today, onEdit }: { g: SavingGoal; today: string; onEdit:
         <small className="st-muted">
           {won(have)} / {won(g.target)}
           {g.due ? ` · ${shortDate(g.due)}까지` : ''}
+          {g.autoPct ? ` · 용돈 ${g.autoPct}% 자동` : ''}
         </small>
       </div>
       <Bar value={Math.max(0, Math.min(have, g.target))} max={g.target} label={`${g.name} 모은 정도`} />
@@ -354,7 +355,10 @@ function GoalSheet({ item, onClose }: { item?: SavingGoal; onClose: () => void }
   const [name, setName] = useState(item?.name ?? '');
   const [target, setTarget] = useState(item ? item.target.toLocaleString('ko-KR') : '');
   const [due, setDue] = useState(item?.due ?? '');
+  const today = useToday();
+  const [pct, setPct] = useState(item?.autoPct ? String(item.autoPct) : '');
   const t = readWon(target);
+  const p = Math.min(100, Math.max(0, Number(pct) || 0));
   return (
     <Sheet title={item ? '모으기 목표 고치기' : '모으기 목표 만들기'} onClose={onClose}>
       <div className="st-form">
@@ -365,6 +369,12 @@ function GoalSheet({ item, onClose }: { item?: SavingGoal; onClose: () => void }
           <input className="st-input sm" inputMode="numeric" value={target} onChange={(e) => setTarget(e.target.value.replace(/\D/g, '') ? Number(e.target.value.replace(/\D/g, '').slice(0, 10)).toLocaleString('ko-KR') : '')} placeholder="목표 금액" aria-label="목표 금액 (원)" />원
           <input className="st-input sm" type="date" value={due} onChange={(e) => setDue(e.target.value)} aria-label="언제까지 (선택)" />
         </div>
+        <Field label="용돈 들어오면 저절로 모으기 (선택)">
+          <div className="st-inline">
+            <input className="st-input xs" inputMode="numeric" value={pct} onChange={(e) => setPct(e.target.value.replace(/\D/g, '').slice(0, 3))} placeholder="0" aria-label="모을 비율 (%)" />%
+          </div>
+          <small className="st-muted">{p ? `「용돈」으로 들어온 돈의 ${p}%를 그날 이 목표에 넣어요${item?.autoSince ? ` (${item.autoSince}부터)` : ' (오늘부터 들어온 용돈)'}.` : '비우면 직접 넣을 때만 모아요.'}</small>
+        </Field>
         <div className="st-row end">
           {item && (
             <button
@@ -382,7 +392,7 @@ function GoalSheet({ item, onClose }: { item?: SavingGoal; onClose: () => void }
             className="btn btn-primary"
             disabled={!name.trim() || !t}
             onClick={() => {
-              put('savings', { ...(item ?? { deposits: [], created: Date.now() }), id: item?.id ?? newId(), name: name.trim().slice(0, 40), target: t!, due: due || undefined } as SavingGoal);
+              put('savings', { ...(item ?? { deposits: [], created: Date.now() }), id: item?.id ?? newId(), name: name.trim().slice(0, 40), target: t!, due: due || undefined, autoPct: p || undefined, autoSince: p ? (item?.autoPct ? item.autoSince : today) : undefined } as SavingGoal);
               onClose();
             }}
           >
