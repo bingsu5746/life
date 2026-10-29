@@ -41,9 +41,27 @@ const Translate = lazy(() => import('./Translate').then((m) => ({ default: m.Tra
 const Tutors = lazy(() => import('./Tutors').then((m) => ({ default: m.Tutors })));
 const Words = lazy(() => import('./Words').then((m) => ({ default: m.Words })));
 
-const PRELOAD = [() => import('../life/Home'), () => import('../life/Fitness'), () => import('../life/Money'), () => import('../life/Hobby'), () => import('../life/Movies'), () => import('../life/Games'), () => import('../life/Music'), () => import('../life/Diary'), () => import('./Books'), () => import('./Life'), () => import('./Review'), () => import('./Settings'), () => import('./Time'), () => import('./Translate'), () => import('./Preview'), () => import('./Tutors'), () => import('./Words')];
+const PRELOAD = [
+  () => import('../life/Home'),
+  () => import('../life/Fitness'),
+  () => import('../life/Money'),
+  () => import('../life/Hobby'),
+  () => import('../life/Movies'),
+  () => import('../life/Games'),
+  () => import('../life/Music'),
+  () => import('../life/Diary'),
+  () => import('./Books'),
+  () => import('./Life'),
+  () => import('./Review'),
+  () => import('./Settings'),
+  () => import('./Time'),
+  () => import('./Translate'),
+  () => import('./Preview'),
+  () => import('./Tutors'),
+  () => import('./Words'),
+];
 
-import { activeItem, AREA_ITEMS, AREAS, HOBBY_PARTS, MOVIE_ITEMS, movieItem, TABS, type AreaKey } from './tabs';
+import { activeItem, AREA_ITEMS, AREAS, HOBBY_PARTS, MOVIE_ITEMS, movieItem, SETTING_CATS, TABS, type AreaKey } from './tabs';
 export { TABS };
 /** 메뉴에는 없지만 열 수 있는 화면 (설정은 맨 위 막대의 톱니) */
 const HIDDEN = ['settings'];
@@ -133,7 +151,7 @@ export function Study({ path, loggedIn, syncReady = true, onLogin }: { path: str
   else if (tab === 'review') content = <Review sub={id} />;
   else if (tab === 'time') content = <Time sub={id} />;
   else if (tab === 'life') content = <Life sub={id} />;
-  else if (tab === 'settings') content = <Settings />;
+  else if (tab === 'settings') content = <Settings cat={path[1]} />;
   else if (tab === 'preview') content = <Preview sub={id} />;
   else if (tab === 'translate') content = <Translate loggedIn={loggedIn} onLogin={onLogin} />;
   else if (tab === 'exams') content = <Exams id={id} sub={sub} />;
@@ -172,7 +190,26 @@ export function Study({ path, loggedIn, syncReady = true, onLogin }: { path: str
           })}
         </nav>
       )}
-      {!running && area === 'study' && (
+      {!running && tab === 'settings' && (
+        <nav className="st-nav" aria-label="설정 메뉴">
+          <button className="st-tab st-tab-home" onClick={() => go('/')}>
+            <Icon name="area-home" />
+            <span className="st-tab-label">메인으로</span>
+            <span className="st-tab-short">메인</span>
+          </button>
+          {SETTING_CATS.map((c) => {
+            const on = (path[1] ?? 'general') === c.key || (!SETTING_CATS.some((x) => x.key === path[1]) && c.key === 'general');
+            return (
+              <button key={c.key} className={`st-tab ${on ? 'on' : ''}`} aria-current={on ? 'page' : undefined} onClick={() => go(`/settings/${c.key}`)}>
+                <Icon name={c.icon} />
+                <span className="st-tab-label">{c.label}</span>
+                <span className="st-tab-short">{c.label.split('·')[0]}</span>
+              </button>
+            );
+          })}
+        </nav>
+      )}
+      {!running && area === 'study' && tab !== 'settings' && (
         <nav className="st-nav" aria-label="공부 메뉴">
           <button className="st-tab st-tab-home" onClick={() => go('/')}>
             <Icon name="area-home" />
@@ -236,7 +273,7 @@ export function Study({ path, loggedIn, syncReady = true, onLogin }: { path: str
           <Suspense fallback={<p className="st-muted">여는 중…</p>}>{content}</Suspense>
         </div>
       </div>
-      {!running && area === 'study' && <AddButton today={today} tab={tab} />}
+      {!running && area === 'study' && tab !== 'settings' && <AddButton today={today} tab={tab} />}
       <Toaster />
       <TimerAlarm />
     </main>

@@ -84,3 +84,13 @@ export function activeItem(area: keyof typeof AREA_ITEMS, sub?: string, p0?: str
   if (area === 'hobby') return sub === 'wish' || sub === 'reading' ? sub : '';
   return '';
 }
+
+/** 설정 화면의 칸 */
+export const SETTING_CATS = [
+  { key: 'general', label: '일반', icon: 'settings' },
+  { key: 'study', label: '공부', icon: 'area-study' },
+  { key: 'school', label: '학교', icon: 'exams' },
+  { key: 'life', label: '운동·돈·취미', icon: 'area-hobby' },
+  { key: 'notify', label: '알림', icon: 'bell' },
+  { key: 'data', label: '백업', icon: 'save' },
+] as const;

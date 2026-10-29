@@ -4,15 +4,19 @@ import { shortDate } from './dates';
 import { alive, newId, SUBJECT_COLORS, type StudyData, type Subject } from './model';
 import { exportBackup, importBackup } from './backup';
 import { getTheme, setTheme, type Theme } from '../../lib/theme';
-import { AREAS, TABS } from './tabs';
+import { AREAS, SETTING_CATS, TABS } from './tabs';
 import { TimetableEditor } from './TimetableEditor';
 import { SchoolSettings } from './SchoolPanel';
+import { NotifyTime } from '../life/NotifyTime';
+import { DEFAULT_PLACE } from '../life/weather';
+import { formOf } from '../life/diaryForm';
 import { disableNotify, enableNotify, localTimes, notifySupported } from './notify';
 import { isLoggedIn, notifyTest } from '../auth/api';
 import { getStudy, put, remove, resetLocal, setSettings, useStudy } from './store';
 import { confirmDelete, Field, go, NumInput, subjectsOf, TextInput, toast, useToday, WeekdayPicker } from './ui';
 
-export function Settings() {
+export function Settings({ cat: cat0 }: { cat?: string }) {
+  const cat = SETTING_CATS.some((c) => c.key === cat0) ? cat0 : 'general';
   const d = useStudy();
   const s = d.settings;
   const today = useToday();
@@ -23,247 +27,256 @@ export function Settings() {
   return (
     <div className="st-page narrow">
       <div className="st-page-head">
-        <h2>설정</h2>
+        <h2>{SETTING_CATS.find((c) => c.key === cat)?.label ?? '설정'}</h2>
       </div>
 
-      <section className="st-card st-form">
-        <h3 className="st-h">과목</h3>
-        {subjects.map((x, i) => (
-          <SubjectRow key={x.id} s={x} first={i === 0} last={i === subjects.length - 1} prev={subjects[i - 1]} next={subjects[i + 1]} />
-        ))}
-        <form
-          className="st-inline"
-          onSubmit={(e) => {
-            e.preventDefault();
-            if (!subj.trim()) return;
-            put('subjects', { id: newId(), name: subj.trim(), color: SUBJECT_COLORS[subjects.length % SUBJECT_COLORS.length], order: subjects.length });
-            setSubj('');
-          }}
-        >
-          <input className="st-input sm" placeholder="새 과목" value={subj} onChange={(e) => setSubj(e.target.value)} />
-          <button className="btn btn-sm">추가</button>
-        </form>
-      </section>
-
-      <p className="st-hint">
-        시험 날짜·범위는{' '}
-        <button className="st-link" onClick={() => go('/exams')}>
-          시험
-        </button>{' '}
-        화면에서 넣고 고쳐요.
-      </p>
-
-      <section className="st-card st-form">
-        <h3 className="st-h">하루 분량 나누기</h3>
-        <Field group label="쉬는 요일" hint="모든 계획에 적용 (계획마다 따로 정할 수도 있어요)">
-          <WeekdayPicker value={s.restDays} onChange={(v) => setSettings({ restDays: v })} label="쉬는 요일" />
-        </Field>
-        <Field group label="빼는 날짜 (여행·행사)">
-          <div className="st-chips">
-            {s.offDates
-              .filter((x) => x >= today)
-              .map((x) => (
-                <button key={x} className="st-chip on" onClick={() => setSettings({ offDates: s.offDates.filter((y) => y !== x) })} aria-label={`${shortDate(x)} 빼기 취소`}>
-                  {shortDate(x)} ✕
+      {cat === 'general' && (
+        <>
+          <section className="st-card st-form">
+            <h3 className="st-h">화면</h3>
+            <div className="st-seg" role="radiogroup" aria-label="화면 밝기">
+              {(
+                [
+                  ['system', '기기 설정'],
+                  ['light', '밝게'],
+                  ['dark', '어둡게'],
+                ] as const
+              ).map(([k, label]) => (
+                <button key={k} role="radio" aria-checked={theme === k} className={theme === k ? 'on' : ''} onClick={() => (setTheme(k), setThemeState(k))}>
+                  {label}
                 </button>
               ))}
-          </div>
-          <span className="st-inline">
-            <input className="st-input sm" type="date" min={today} value={off} onChange={(e) => setOff(e.target.value)} />
-            <button className="btn btn-sm" onClick={() => !s.offDates.includes(off) && setSettings({ offDates: [...s.offDates.filter((x) => x >= today), off].sort() })}>
-              빼기
-            </button>
-          </span>
-        </Field>
-        <Field label={`과외 있는 날 분량: 평소의 ${Math.round(s.tutorRatio * 100)}%`}>
-          <input type="range" min={0} max={100} step={10} value={s.tutorRatio * 100} onChange={(e) => setSettings({ tutorRatio: Number(e.target.value) / 100 })} />
-        </Field>
-        <label className="st-toggle">
-          <input type="checkbox" checked={s.wordsUseTutorRatio} onChange={(e) => setSettings({ wordsUseTutorRatio: e.target.checked })} /> 단어장 계획에도 과외 날 비율 쓰기
-        </label>
-        <Field label="하루가 시작되는 시각" hint="이 시각 전에 공부해도 전날 분량으로 쳐요">
-          <select className="st-input sm st-fit" value={s.dayStart} onChange={(e) => setSettings({ dayStart: Number(e.target.value) })}>
-            {[0, 1, 2, 3, 4, 5, 6].map((h) => (
-              <option key={h} value={h}>
-                새벽 {h}시
-              </option>
+            </div>
+          </section>
+
+          <section className="st-card st-form">
+            <h3 className="st-h">메인에 보일 영역</h3>
+            <div className="st-chips">
+              {AREAS.filter((a) => a.key !== 'home').map((a) => {
+                const on = !s.hiddenAreas?.includes(a.key);
+                return (
+                  <button key={a.key} type="button" className={`st-chip ${on ? 'on' : ''}`} aria-pressed={on} onClick={() => setSettings({ hiddenAreas: on ? [...(s.hiddenAreas ?? []), a.key] : (s.hiddenAreas ?? []).filter((k) => k !== a.key) })}>
+                    {a.label}
+                  </button>
+                );
+              })}
+            </div>
+          </section>
+
+          <WeatherSettings />
+        </>
+      )}
+      {cat === 'study' && (
+        <>
+          <section className="st-card st-form">
+            <h3 className="st-h">과목</h3>
+            {subjects.map((x, i) => (
+              <SubjectRow key={x.id} s={x} first={i === 0} last={i === subjects.length - 1} prev={subjects[i - 1]} next={subjects[i + 1]} />
             ))}
-          </select>
-        </Field>
-        <Field label="하루 최대 쪽 (넘으면 알림)">
-          <NumInput className="st-input xs" value={s.dailyMax} min={0} max={9999} allowEmpty placeholder="없음" onCommit={(v) => setSettings({ dailyMax: v && v > 0 ? Math.round(v) : null })} />
-        </Field>
-      </section>
-
-      <section className="st-card st-form">
-        <h3 className="st-h">복습 · 단어</h3>
-        <Field label="단계별 다시 보기 간격 (일)" hint="맞히면 다음 단계, 틀리면 1단계로 돌아가요. 마지막 단계에서 맞히면 「외움」이에요.">
-          <div className="st-inline wrap st-intervals">
-            {s.intervals.map((v, i) => (
-              <NumInput
-                key={i}
-                className="st-input xs"
-                value={v}
-                min={1}
-                max={365}
-                aria-label={`${i + 1}단계`}
-                onCommit={(n) => {
-                  const next = [...getStudy().settings.intervals];
-                  next[i] = Math.round(n ?? v);
-                  setSettings({ intervals: next });
-                }}
-              />
-            ))}
-          </div>
-        </Field>
-        <Field label="객관식으로 올라갈 수 있는 단계">
-          <select className="st-input sm st-fit" value={s.quizMaxBox} onChange={(e) => setSettings({ quizMaxBox: Number(e.target.value) })}>
-            {[1, 2, 3, 4, 5].map((b) => (
-              <option key={b} value={b}>
-                {b}단계까지
-              </option>
-            ))}
-          </select>
-        </Field>
-        <Field label="모르는 단어 모음: 하루 새 단어">
-          <NumInput className="st-input xs" value={s.inboxPerDay} min={1} max={200} onCommit={(v) => setSettings({ inboxPerDay: Math.round(v ?? s.inboxPerDay) })} />
-        </Field>
-      </section>
-
-      <section className="st-card st-form">
-        <h3 className="st-h">뽀모도로 (분)</h3>
-        <div className="st-inline wrap">
-          {(
-            [
-              ['work', '공부'],
-              ['short', '휴식'],
-              ['long', '긴 휴식'],
-              ['every', '긴 휴식 간격(번)'],
-            ] as const
-          ).map(([k, label]) => (
-            <label key={k} className="st-mini-field">
-              <small>{label}</small>
-              <NumInput className="st-input xs" value={s.pomo[k]} min={1} max={180} onCommit={(v) => setSettings({ pomo: { ...getStudy().settings.pomo, [k]: Math.round(v ?? s.pomo[k]) } })} />
-            </label>
-          ))}
-        </div>
-      </section>
-      <section className="st-card st-form">
-        <h3 className="st-h">화면</h3>
-        <div className="st-seg" role="radiogroup" aria-label="화면 밝기">
-          {(
-            [
-              ['system', '기기 설정'],
-              ['light', '밝게'],
-              ['dark', '어둡게'],
-            ] as const
-          ).map(([k, label]) => (
-            <button key={k} role="radio" aria-checked={theme === k} className={theme === k ? 'on' : ''} onClick={() => (setTheme(k), setThemeState(k))}>
-              {label}
-            </button>
-          ))}
-        </div>
-      </section>
-
-      <SchoolSettings />
-
-      <section className="st-card st-form">
-        <h3 className="st-h">학교 시간표</h3>
-        {s.school && <p className="st-hint">「내 학교」에서 나이스 시간표를 가져올 수 있어요.</p>}
-        <TimetableEditor />
-      </section>
-
-      <NotifySettings />
-
-      <section className="st-card st-form">
-        <h3 className="st-h">메인에 보일 영역</h3>
-        <div className="st-chips">
-          {AREAS.filter((a) => a.key !== 'home').map((a) => {
-            const on = !s.hiddenAreas?.includes(a.key);
-            return (
-              <button
-                key={a.key}
-                type="button"
-                className={`st-chip ${on ? 'on' : ''}`}
-                aria-pressed={on}
-                onClick={() => setSettings({ hiddenAreas: on ? [...(s.hiddenAreas ?? []), a.key] : (s.hiddenAreas ?? []).filter((k) => k !== a.key) })}
-              >
-                {a.label}
-              </button>
-            );
-          })}
-        </div>
-      </section>
-
-      <section className="st-card st-form">
-        <h3 className="st-h">공부 메뉴에 보일 칸</h3>
-        <p className="st-hint">안 쓰는 칸은 꺼 두면 메뉴에서 숨겨요. 넣어 둔 자료는 지워지지 않고, 다시 켜면 그대로 보여요.</p>
-        <div className="st-chips">
-          {TABS.filter((t) => t.key !== 'today').map((t) => {
-            const on = !s.hiddenTabs?.includes(t.key);
-            return (
-              <button
-                key={t.key}
-                type="button"
-                className={`st-chip ${on ? 'on' : ''}`}
-                aria-pressed={on}
-                onClick={() => setSettings({ hiddenTabs: on ? [...(s.hiddenTabs ?? []), t.key] : (s.hiddenTabs ?? []).filter((k) => k !== t.key) })}
-              >
-                {t.label}
-              </button>
-            );
-          })}
-          {(() => {
-            const on = !s.hiddenTabs?.includes('condition');
-            return (
-              <button
-                type="button"
-                className={`st-chip ${on ? 'on' : ''}`}
-                aria-pressed={on}
-                onClick={() => setSettings({ hiddenTabs: on ? [...(s.hiddenTabs ?? []), 'condition'] : (s.hiddenTabs ?? []).filter((k) => k !== 'condition') })}
-              >
-                잠·컨디션 (오늘 화면)
-              </button>
-            );
-          })()}
-        </div>
-      </section>
-
-      <section className="st-card st-form">
-        <h3 className="st-h">백업</h3>
-        <p className="st-hint">공부 자료와 단어를 파일 하나로 내려받아요 (오답 사진은 빠져요). 다시 넣으면 지금 자료와 합쳐져요.</p>
-        <div className="st-row">
-          <button className="btn btn-sm" onClick={exportBackup}>
-            백업 파일 내려받기
-          </button>
-          <label className="btn btn-sm">
-            백업에서 가져오기
-            <input
-              type="file"
-              accept="application/json,.json"
-              hidden
-              onChange={(e) => {
-                const f = e.target.files?.[0];
-                e.target.value = '';
-                if (f)
-                  void importBackup(f).then(
-                    (r) => toast(`백업을 합쳤어요 (단어 ${r.words}개)`),
-                    (err: Error) => toast(err.message),
-                  );
+            <form
+              className="st-inline"
+              onSubmit={(e) => {
+                e.preventDefault();
+                if (!subj.trim()) return;
+                put('subjects', { id: newId(), name: subj.trim(), color: SUBJECT_COLORS[subjects.length % SUBJECT_COLORS.length], order: subjects.length });
+                setSubj('');
               }}
-            />
-          </label>
-        </div>
-        <button
-          className="st-link st-danger"
-          onClick={() => {
-            if (!window.confirm('이 기기에 저장된 공부 자료를 모두 지울까요? (로그인했다면 계정 자료는 남아요)')) return;
-            void resetLocal().then(() => toast('이 기기의 자료를 지웠어요'));
-          }}
-        >
-          이 기기의 자료 모두 지우기
-        </button>
-      </section>
+            >
+              <input className="st-input sm" placeholder="새 과목" value={subj} onChange={(e) => setSubj(e.target.value)} />
+              <button className="btn btn-sm">추가</button>
+            </form>
+          </section>
+
+          <p className="st-hint">
+            시험 날짜·범위는{' '}
+            <button className="st-link" onClick={() => go('/exams')}>
+              시험
+            </button>{' '}
+            화면에서 넣고 고쳐요.
+          </p>
+
+          <section className="st-card st-form">
+            <h3 className="st-h">하루 분량 나누기</h3>
+            <Field group label="쉬는 요일" hint="모든 계획에 적용 (계획마다 따로 정할 수도 있어요)">
+              <WeekdayPicker value={s.restDays} onChange={(v) => setSettings({ restDays: v })} label="쉬는 요일" />
+            </Field>
+            <Field group label="빼는 날짜 (여행·행사)">
+              <div className="st-chips">
+                {s.offDates
+                  .filter((x) => x >= today)
+                  .map((x) => (
+                    <button key={x} className="st-chip on" onClick={() => setSettings({ offDates: s.offDates.filter((y) => y !== x) })} aria-label={`${shortDate(x)} 빼기 취소`}>
+                      {shortDate(x)} ✕
+                    </button>
+                  ))}
+              </div>
+              <span className="st-inline">
+                <input className="st-input sm" type="date" min={today} value={off} onChange={(e) => setOff(e.target.value)} />
+                <button className="btn btn-sm" onClick={() => !s.offDates.includes(off) && setSettings({ offDates: [...s.offDates.filter((x) => x >= today), off].sort() })}>
+                  빼기
+                </button>
+              </span>
+            </Field>
+            <Field label={`과외 있는 날 분량: 평소의 ${Math.round(s.tutorRatio * 100)}%`}>
+              <input type="range" min={0} max={100} step={10} value={s.tutorRatio * 100} onChange={(e) => setSettings({ tutorRatio: Number(e.target.value) / 100 })} />
+            </Field>
+            <label className="st-toggle">
+              <input type="checkbox" checked={s.wordsUseTutorRatio} onChange={(e) => setSettings({ wordsUseTutorRatio: e.target.checked })} /> 단어장 계획에도 과외 날 비율 쓰기
+            </label>
+            <Field label="하루가 시작되는 시각" hint="이 시각 전에 공부해도 전날 분량으로 쳐요">
+              <select className="st-input sm st-fit" value={s.dayStart} onChange={(e) => setSettings({ dayStart: Number(e.target.value) })}>
+                {[0, 1, 2, 3, 4, 5, 6].map((h) => (
+                  <option key={h} value={h}>
+                    새벽 {h}시
+                  </option>
+                ))}
+              </select>
+            </Field>
+            <Field label="하루 최대 쪽 (넘으면 알림)">
+              <NumInput className="st-input xs" value={s.dailyMax} min={0} max={9999} allowEmpty placeholder="없음" onCommit={(v) => setSettings({ dailyMax: v && v > 0 ? Math.round(v) : null })} />
+            </Field>
+          </section>
+
+          <section className="st-card st-form">
+            <h3 className="st-h">복습 · 단어</h3>
+            <Field label="단계별 다시 보기 간격 (일)" hint="맞히면 다음 단계, 틀리면 1단계로 돌아가요. 마지막 단계에서 맞히면 「외움」이에요.">
+              <div className="st-inline wrap st-intervals">
+                {s.intervals.map((v, i) => (
+                  <NumInput
+                    key={i}
+                    className="st-input xs"
+                    value={v}
+                    min={1}
+                    max={365}
+                    aria-label={`${i + 1}단계`}
+                    onCommit={(n) => {
+                      const next = [...getStudy().settings.intervals];
+                      next[i] = Math.round(n ?? v);
+                      setSettings({ intervals: next });
+                    }}
+                  />
+                ))}
+              </div>
+            </Field>
+            <Field label="객관식으로 올라갈 수 있는 단계">
+              <select className="st-input sm st-fit" value={s.quizMaxBox} onChange={(e) => setSettings({ quizMaxBox: Number(e.target.value) })}>
+                {[1, 2, 3, 4, 5].map((b) => (
+                  <option key={b} value={b}>
+                    {b}단계까지
+                  </option>
+                ))}
+              </select>
+            </Field>
+            <Field label="모르는 단어 모음: 하루 새 단어">
+              <NumInput className="st-input xs" value={s.inboxPerDay} min={1} max={200} onCommit={(v) => setSettings({ inboxPerDay: Math.round(v ?? s.inboxPerDay) })} />
+            </Field>
+          </section>
+
+          <section className="st-card st-form">
+            <h3 className="st-h">뽀모도로 (분)</h3>
+            <div className="st-inline wrap">
+              {(
+                [
+                  ['work', '공부'],
+                  ['short', '휴식'],
+                  ['long', '긴 휴식'],
+                  ['every', '긴 휴식 간격(번)'],
+                ] as const
+              ).map(([k, label]) => (
+                <label key={k} className="st-mini-field">
+                  <small>{label}</small>
+                  <NumInput className="st-input xs" value={s.pomo[k]} min={1} max={180} onCommit={(v) => setSettings({ pomo: { ...getStudy().settings.pomo, [k]: Math.round(v ?? s.pomo[k]) } })} />
+                </label>
+              ))}
+            </div>
+          </section>
+          <section className="st-card st-form">
+            <h3 className="st-h">공부 메뉴에 보일 칸</h3>
+            <p className="st-hint">안 쓰는 칸은 꺼 두면 메뉴에서 숨겨요. 넣어 둔 자료는 지워지지 않고, 다시 켜면 그대로 보여요.</p>
+            <div className="st-chips">
+              {TABS.filter((t) => t.key !== 'today').map((t) => {
+                const on = !s.hiddenTabs?.includes(t.key);
+                return (
+                  <button key={t.key} type="button" className={`st-chip ${on ? 'on' : ''}`} aria-pressed={on} onClick={() => setSettings({ hiddenTabs: on ? [...(s.hiddenTabs ?? []), t.key] : (s.hiddenTabs ?? []).filter((k) => k !== t.key) })}>
+                    {t.label}
+                  </button>
+                );
+              })}
+              {(() => {
+                const on = !s.hiddenTabs?.includes('condition');
+                return (
+                  <button type="button" className={`st-chip ${on ? 'on' : ''}`} aria-pressed={on} onClick={() => setSettings({ hiddenTabs: on ? [...(s.hiddenTabs ?? []), 'condition'] : (s.hiddenTabs ?? []).filter((k) => k !== 'condition') })}>
+                    잠·컨디션 (오늘 화면)
+                  </button>
+                );
+              })()}
+            </div>
+          </section>
+        </>
+      )}
+      {cat === 'school' && (
+        <>
+          <SchoolSettings />
+
+          <section className="st-card st-form">
+            <h3 className="st-h">학교 시간표</h3>
+            {s.school && <p className="st-hint">「내 학교」에서 나이스 시간표를 가져올 수 있어요.</p>}
+            <TimetableEditor />
+          </section>
+        </>
+      )}
+      {cat === 'notify' && (
+        <>
+          <NotifySettings />
+
+          <NotifyTime k="checkinTime" label="하루 마감 알림" fallback="22:00" />
+          <NotifyTime k="diaryTime" label="일기 알림" fallback="22:30" />
+        </>
+      )}
+      {cat === 'life' && (
+        <>
+          <LifeSettings />
+        </>
+      )}
+      {cat === 'data' && (
+        <>
+          <section className="st-card st-form">
+            <h3 className="st-h">백업</h3>
+            <p className="st-hint">공부 자료와 단어를 파일 하나로 내려받아요 (오답 사진은 빠져요). 다시 넣으면 지금 자료와 합쳐져요.</p>
+            <div className="st-row">
+              <button className="btn btn-sm" onClick={exportBackup}>
+                백업 파일 내려받기
+              </button>
+              <label className="btn btn-sm">
+                백업에서 가져오기
+                <input
+                  type="file"
+                  accept="application/json,.json"
+                  hidden
+                  onChange={(e) => {
+                    const f = e.target.files?.[0];
+                    e.target.value = '';
+                    if (f)
+                      void importBackup(f).then(
+                        (r) => toast(`백업을 합쳤어요 (단어 ${r.words}개)`),
+                        (err: Error) => toast(err.message),
+                      );
+                  }}
+                />
+              </label>
+            </div>
+            <button
+              className="st-link st-danger"
+              onClick={() => {
+                if (!window.confirm('이 기기에 저장된 공부 자료를 모두 지울까요? (로그인했다면 계정 자료는 남아요)')) return;
+                void resetLocal().then(() => toast('이 기기의 자료를 지웠어요'));
+              }}
+            >
+              이 기기의 자료 모두 지우기
+            </button>
+          </section>
+        </>
+      )}
       <p className="st-hint center">로그인하면 공부 자료가 폰·PC에서 같이 보여요. 로그인하지 않으면 이 기기에만 저장돼요.</p>
     </div>
   );
@@ -362,7 +375,15 @@ function NotifySettings() {
             </button>
             {times && (
               <>
-                <button className="btn btn-sm" disabled={busy} onClick={() => void notifyTest().then((r) => toast(`알림을 ${r.sent}곳에 보냈어요`)).catch((e: Error) => toast(e.message))}>
+                <button
+                  className="btn btn-sm"
+                  disabled={busy}
+                  onClick={() =>
+                    void notifyTest()
+                      .then((r) => toast(`알림을 ${r.sent}곳에 보냈어요`))
+                      .catch((e: Error) => toast(e.message))
+                  }
+                >
                   알림 시험해 보기
                 </button>
                 <button className="btn btn-sm" disabled={busy} onClick={() => void disableNotify().then(() => (setTimes(null), toast('이 기기의 알림을 껐어요')))}>
@@ -375,5 +396,97 @@ function NotifySettings() {
         </>
       )}
     </section>
+  );
+}
+
+/** 날씨 위치: 기본 노원구, 「지금 위치로」 */
+function WeatherSettings() {
+  const d = useStudy();
+  const p = d.settings.weatherPlace ?? DEFAULT_PLACE;
+  return (
+    <section className="st-card st-form">
+      <h3 className="st-h">날씨 위치</h3>
+      <div className="st-inline wrap">
+        <span>{p.name}</span>
+        <button
+          className="btn btn-sm"
+          onClick={() =>
+            navigator.geolocation?.getCurrentPosition(
+              (pos) => (setSettings({ weatherPlace: { lat: Math.round(pos.coords.latitude * 100) / 100, lon: Math.round(pos.coords.longitude * 100) / 100, name: '지금 위치' } }), toast('날씨 위치를 바꿨어요')),
+              () => toast('위치를 받을 수 없어요. 브라우저에서 위치 권한을 허용해 주세요'),
+            )
+          }
+        >
+          지금 위치로
+        </button>
+        {d.settings.weatherPlace && (
+          <button className="st-link" onClick={() => setSettings({ weatherPlace: undefined })}>
+            노원구로 되돌리기
+          </button>
+        )}
+      </div>
+    </section>
+  );
+}
+
+/** 운동 · 돈 · 취미 · 일기 설정 (각 화면에 흩어진 목표를 한곳에서) */
+function LifeSettings() {
+  const d = useStudy();
+  const s = d.settings;
+  const num = (v: string) => (v.trim() ? Math.max(0, Math.round(Number(v.replace(/[^\d]/g, '')))) || undefined : undefined);
+  return (
+    <>
+      <section className="st-card st-form">
+        <h3 className="st-h">운동</h3>
+        <div className="st-inline wrap">
+          일주일에
+          <input className="st-input xs" inputMode="numeric" defaultValue={s.fitnessGoal?.perWeek ?? ''} onBlur={(e) => setSettings({ fitnessGoal: { ...s.fitnessGoal, perWeek: num(e.target.value) } })} aria-label="일주일 운동 날" />
+          일 ·
+          <input
+            className="st-input xs"
+            inputMode="numeric"
+            defaultValue={s.fitnessGoal?.minutes ? Math.round(s.fitnessGoal.minutes / 60) : ''}
+            onBlur={(e) => setSettings({ fitnessGoal: { ...s.fitnessGoal, minutes: num(e.target.value) ? num(e.target.value)! * 60 : undefined } })}
+            aria-label="일주일 운동 시간"
+          />
+          시간
+        </div>
+        <div className="st-inline wrap">
+          잠 목표
+          <select className="st-input xs" value={s.sleepGoal ?? ''} onChange={(e) => setSettings({ sleepGoal: e.target.value ? Number(e.target.value) : undefined })} aria-label="잠 목표">
+            <option value="">없음</option>
+            {[6, 6.5, 7, 7.5, 8, 8.5, 9].map((h) => (
+              <option key={h} value={h}>
+                {h}시간
+              </option>
+            ))}
+          </select>
+        </div>
+      </section>
+      <section className="st-card st-form">
+        <h3 className="st-h">돈</h3>
+        <div className="st-inline wrap">
+          한 달 예산
+          <input className="st-input sm" inputMode="numeric" defaultValue={s.monthlyBudget?.toLocaleString('ko-KR') ?? ''} onBlur={(e) => setSettings({ monthlyBudget: num(e.target.value) })} aria-label="한 달 예산" />원
+        </div>
+        <div className="st-inline wrap">
+          일주일 한도
+          <input className="st-input sm" inputMode="numeric" defaultValue={s.weeklyLimit?.toLocaleString('ko-KR') ?? ''} onBlur={(e) => setSettings({ weeklyLimit: num(e.target.value) })} aria-label="일주일 한도" />원
+        </div>
+      </section>
+      <section className="st-card st-form">
+        <h3 className="st-h">취미 · 일기</h3>
+        <div className="st-inline wrap">
+          올해 책
+          <input className="st-input xs" inputMode="numeric" defaultValue={s.readingGoal ?? ''} onBlur={(e) => setSettings({ readingGoal: num(e.target.value) })} aria-label="올해 읽을 책" />권
+        </div>
+        <label className="st-toggle">
+          <input type="checkbox" checked={formOf(d).autoFill} onChange={(e) => setSettings({ diaryForm: { parts: formOf(d).parts, autoFill: e.target.checked } })} /> 새 일기에 오늘 한 것 미리 채우기
+        </label>
+        <button className="st-link" onClick={() => go('/diary/form')}>
+          일기 양식 고치기
+        </button>
+      </section>
+    </>
   );
 }
