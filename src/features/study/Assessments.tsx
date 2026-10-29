@@ -4,6 +4,7 @@ import { addDays, dday, diffDays, shortDate } from './dates';
 import { scopeLines, scopeText } from './exams';
 import { ExamTabs } from './Exams';
 import { alive, newId, type Assessment } from './model';
+import { stepDates } from './assessPlan';
 import { put, remove, useStudy } from './store';
 import { Bar, Check, confirmDelete, Empty, Field, go, Icon, Sheet, SubjectDot, SubjectPicker, subjectsOf, tap, toast, useToday } from './ui';
 
@@ -94,7 +95,11 @@ export function Assessments({ sub }: { sub?: string }) {
 export function TaskCard({ a, today, onEdit, compact }: { a: Assessment; today: string; onEdit?: () => void; compact?: boolean }) {
   const d = useStudy();
   const n = a.steps.filter((s) => s.done).length;
-  const steps = compact ? a.steps.filter((s) => !s.done).slice(0, 2) : a.steps;
+  // 남은 준비를 내는 날까지 나눈 날짜 (오늘 화면에는 오늘 몫만)
+  const plan = stepDates(a, today);
+  const todays = a.steps.filter((s) => plan.get(s.id) === today);
+  const steps = compact ? (todays.length ? todays : a.steps.filter((s) => !s.done).slice(0, 1)) : a.steps;
+  const when = (x: string) => (x === today ? '오늘' : x === addDays(today, 1) ? '내일' : shortDate(x));
   return (
     <section className={compact ? 'st-task compact' : 'st-card st-task'}>
       <div className="st-task-head" {...(onEdit ? tap(onEdit) : {})}>
@@ -113,6 +118,7 @@ export function TaskCard({ a, today, onEdit, compact }: { a: Assessment; today: 
           <div className="st-item-main">
             <div className={`st-item-title ${s.done ? 'done' : ''}`}>{s.text}</div>
           </div>
+          {!s.done && plan.has(s.id) && !compact && <small className={plan.get(s.id) === today ? 'st-pill' : 'st-muted'}>{when(plan.get(s.id)!)}</small>}
         </div>
       ))}
       {compact && a.steps.length > 0 && (
@@ -156,7 +162,7 @@ function TaskSheet({ item, today, onClose }: { item?: Assessment; today: string;
         <Field label="내는 날 · 발표하는 날">
           <input className="st-input sm" type="date" value={due} onChange={(e) => setDue(e.target.value)} />
         </Field>
-        <Field label="준비할 것 (한 줄에 하나, 선택)" hint="체크하며 준비해요. 예: 주제 정하기 / 자료 찾기 / 초안 쓰기 / 발표 연습">
+        <Field label="준비할 것 (한 줄에 하나, 선택)" hint="적은 순서대로 내는 날 전날까지 날마다 나눠 드려요. 밀리면 남은 날에 다시 나눠요.">
           <textarea className="st-input" rows={4} value={text} onChange={(e) => setText(e.target.value)} placeholder={'주제 정하기\n자료 찾기\n초안 쓰기\n발표 연습'} />
         </Field>
         <Field label="메모 (선택)">

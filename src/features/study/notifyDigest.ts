@@ -1,7 +1,7 @@
 // 알림 글 만들기: 앞으로 7일 동안 날짜·시각마다 「오늘 할 것」「내일 준비」를 미리 계산해 서버에 맡긴다.
 // (서버는 공부 자료를 열어 보지 않고, 정한 시각에 이 글을 그대로 보낸다)
 import { addDays, diffDays, weekday, weekStart } from './dates';
-import { upcomingExams, timetable } from './exams';
+import { scopeDate, upcomingExams, timetable } from './exams';
 import { buildExamPlan } from './examPlan';
 import { alive, type DateStr, type StudyData, type WordsData } from './model';
 import { planViews, homeworkViews } from './select';
@@ -56,6 +56,17 @@ export function awardsYear(d: StudyData, date: DateStr): number | null {
   return alive(d.movies).some((m) => m.status === 'watched' && m.watched?.startsWith(String(y))) ? y : null;
 }
 
+/** 그날로부터 1~3일 뒤에 시험 보는 과목 (가장 가까운 것): 약점 한 장을 훑어볼 때 */
+export function weakDue(d: StudyData, today: DateStr, date: DateStr): { subjectId: string; days: number } | null {
+  let best: { subjectId: string; days: number } | null = null;
+  for (const e of upcomingExams(d, today))
+    for (const s of e.scopes ?? []) {
+      const n = diffDays(date, scopeDate(e, s));
+      if (n >= 1 && n <= 3 && d.subjects[s.subjectId] && (!best || n < best.days)) best = { subjectId: s.subjectId, days: n };
+    }
+  return best;
+}
+
 /** 그날 아침: 오늘 할 것 */
 export function morning(d: StudyData, words: WordsData, today: DateStr, date: DateStr): string {
   const parts: string[] = [];
@@ -65,6 +76,8 @@ export function morning(d: StudyData, words: WordsData, today: DateStr, date: Da
     else if (e.date > date && diffDays(date, e.date) <= 14) parts.push(`${e.name} D-${diffDays(date, e.date)}`);
     if (parts.length) break;
   }
+  const wk = weakDue(d, today, date);
+  if (wk) parts.push(`${d.subjects[wk.subjectId].name} 시험 D-${wk.days}: 약점 한 장을 훑어보세요`);
   const tasks = alive(d.assessments).filter((a) => !a.done && a.due >= date && diffDays(date, a.due) <= 2);
   for (const a of tasks) parts.push(`수행평가 ${a.due === date ? '오늘' : `D-${diffDays(date, a.due)}`}: ${d.subjects[a.subjectId]?.name ?? ''} ${a.title}`.replace(/\s+/g, ' '));
   const hw = homeworkViews(d, today).filter((h) => !h.finished && h.due === date);
@@ -135,6 +148,7 @@ export function buildDigest(d: StudyData, words: WordsData, today: DateStr, time
       const am = Number(t.slice(0, 2)) < 15;
       const y = am ? awardsYear(d, date) : null;
       const weak = am && weakQuiz(words, date).length > 0;
+      const wk = am ? weakDue(d, today, date) : null;
       // 일기 알림: 그날 일기가 없을 때만 (썼으면 그 시각의 원래 알림)
       if (d.settings.diaryTime === t && !(d.diary[date] && !d.diary[date].deleted)) {
         out.push({ date, slot, title: '일기 쓸 시간이에요', body: '오늘 하루를 짧게라도 남겨 볼까요? 꿈 꾼 게 있으면 그것도요', url: `/diary/${date}` });
@@ -146,7 +160,7 @@ export function buildDigest(d: StudyData, words: WordsData, today: DateStr, time
         return;
       }
       const sunday = !am && weekday(date) === 0;
-      out.push({ date, slot, title: y ? '🏆 영화 시상식' : sunday ? '내일 준비 · 이번 주 돌아보기' : am ? '오늘 할 것' : '내일 준비', body: sunday ? `${evening(d, today, date)} · ${weekBody(d, date, today)}` : am ? morning(d, words, today, date) : evening(d, today, date), url: y ? '/movies/ceremony' : sunday ? '/week' : weak ? '/words' : undefined });
+      out.push({ date, slot, title: y ? '🏆 영화 시상식' : sunday ? '내일 준비 · 이번 주 돌아보기' : am ? '오늘 할 것' : '내일 준비', body: sunday ? `${evening(d, today, date)} · ${weekBody(d, date, today)}` : am ? morning(d, words, today, date) : evening(d, today, date), url: y ? '/movies/ceremony' : sunday ? '/week' : wk ? `/exams/weak-${wk.subjectId}` : weak ? '/words' : undefined });
     });
   }
   return out.slice(0, 24);

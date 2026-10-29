@@ -12,6 +12,7 @@ import { Bar, Check, confirmDelete, Empty, Field, go, Icon, Menu, Sheet, Subject
 const Grades = lazy(() => import('./Grades').then((m) => ({ default: m.Grades })));
 const SemesterGoals = lazy(() => import('./SemesterGoals').then((m) => ({ default: m.SemesterGoals })));
 const Assessments = lazy(() => import('./Assessments').then((m) => ({ default: m.Assessments })));
+const WeakPage = lazy(() => import('./WeakPage').then((m) => ({ default: m.WeakPage })));
 
 export const KIND_NAME: Record<ExamKind, string> = { school: '내신', mock: '모의고사·수능', other: '기타' };
 
@@ -33,6 +34,12 @@ export function Exams({ id, sub }: { id?: string; sub?: string }) {
     return (
       <Suspense fallback={<p className="st-muted">여는 중…</p>}>
         <SemesterGoals />
+      </Suspense>
+    );
+  if (id?.startsWith('weak-'))
+    return (
+      <Suspense fallback={<p className="st-muted">여는 중…</p>}>
+        <WeakPage subjectId={id.slice(5)} />
       </Suspense>
     );
   if (id && sub === 'plan') return <ExamPlanPage id={id} />;
@@ -497,6 +504,11 @@ function ExamDetail({ id }: { id: string }) {
                 {n}/{s.lines.length}
               </small>
             </div>
+            {diffDays(today, sd) >= 0 && diffDays(today, sd) <= 7 && (
+              <button className="st-link wk-link" onClick={() => go(`/exams/weak-${s.subjectId}`)}>
+                {d.subjects[s.subjectId]?.name ?? '이 과목'} 약점 한 장 보기
+              </button>
+            )}
             {s.lines.map((l) => (
               <div key={l.id} className="st-item">
                 <Check on={l.done} label={`${l.text} 다 했어요`} onClick={() => toggle(s, l.id)} />

@@ -1,10 +1,10 @@
 // 메인: 공부 · 운동 · 돈 · 취미 · 일기를 한눈에. 누르면 그 영역으로
 import { exportBackup } from '../study/backup';
-import { dday, longDate, weekStart } from '../study/dates';
+import { addDays, dday, longDate, weekStart, weekday } from '../study/dates';
 import { upcomingExams } from '../study/exams';
 import { alive } from '../study/model';
 import { todaySummary } from '../study/select';
-import { useStudy, useWords } from '../study/store';
+import { put, useStudy, useWords } from '../study/store';
 import { minutesText } from '../study/timer';
 import { AREAS } from '../study/tabs';
 import { go, Icon, useToday } from '../study/ui';
@@ -116,6 +116,7 @@ export function Home(_: { loggedIn: boolean; onLogin: () => void }) {
           </button>
         </p>
       </header>
+      <ChangeBanner today={today} />
       <div className="hm-grid">
         {AREAS.filter((a) => a.key !== 'home' && show(a.key)).map((a) => {
           const c = cards[a.key];
@@ -166,5 +167,34 @@ export function Home(_: { loggedIn: boolean; onLogin: () => void }) {
       })()}
       <p className="st-hint">메인에 보일 영역은 설정에서 고를 수 있어요.</p>
     </div>
+  );
+}
+
+/** 지난주에 정한 「이번 주에 바꿀 한 가지」. 주말이면 지켰는지 묻는다 */
+function ChangeBanner({ today }: { today: string }) {
+  const d = useStudy();
+  const note = d.weekNotes[addDays(weekStart(today), -7)];
+  if (!note || note.deleted || !note.change) return null;
+  const weekend = weekday(today) === 6 || weekday(today) === 0;
+  return (
+    <section className="hm-change">
+      <small>이번 주에 바꿀 한 가지</small>
+      <b>{note.change}</b>
+      {note.kept !== undefined ? (
+        <small className="st-muted">{note.kept ? '지켰어요 ✓' : '다음 주에 다시 해 봐요'}</small>
+      ) : (
+        weekend && (
+          <div className="st-inline">
+            <span className="st-muted">지켰나요?</span>
+            <button className="btn btn-sm btn-primary" onClick={() => put('weekNotes', { ...note, kept: true })}>
+              지켰어요
+            </button>
+            <button className="btn btn-sm" onClick={() => put('weekNotes', { ...note, kept: false })}>
+              못 지켰어요
+            </button>
+          </div>
+        )
+      )}
+    </section>
   );
 }

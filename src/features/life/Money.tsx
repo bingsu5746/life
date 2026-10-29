@@ -5,7 +5,7 @@ import { shortDate } from '../study/dates';
 import { alive, newId, type MoneyRule, type MoneyTx, type SavingGoal } from '../study/model';
 import { put, remove, setSettings, useStudy } from '../study/store';
 import { Bar, confirmDelete, Empty, Field, go, Icon, Sheet, tap, toast, useToday } from '../study/ui';
-import { budgetView, compareMonths, savingPace, weekSpent, monthlyAmount, monthLabel, monthlyOut, monthOf, monthSummary, readWon, saved, shiftMonth, upcomingRules, won } from './calc';
+import { budgetView, compareMonths, savingPace, weekAllowance, weekSpent, monthlyAmount, monthLabel, monthlyOut, monthOf, monthSummary, readWon, saved, shiftMonth, upcomingRules, won } from './calc';
 import { WEEKDAYS } from '../study/dates';
 
 const OUT = ['식비', '간식·카페', '교통', '쇼핑', '문화·여가', '교육·책', '통신', '선물', '기타'];
@@ -99,6 +99,16 @@ export function Money({ sub }: { sub?: string }) {
               </button>
             )}
             {month === monthOf(today) && <WeekLimit today={today} />}
+            {month === monthOf(today) &&
+              (() => {
+                const wa = weekAllowance(d, today);
+                return wa ? (
+                  <p className="mn-allow">
+                    이번 주에 써도 되는 돈 <b>{won(wa.amount)}</b>
+                    <small className="st-muted">{wa.fixed ? ` · 이번 달 남은 고정 지출 ${won(wa.fixed)}을 빼고 셌어요` : ''}</small>
+                  </p>
+                ) : null;
+              })()}
           </section>
 
           {!alive(d.moneyTx).length ? (

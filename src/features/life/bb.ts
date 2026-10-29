@@ -1,4 +1,5 @@
 // 넣은 슛 합 (경기·연습 기록에서)
+import { addDays, weekStart } from '../study/dates';
 import { alive, type DateStr, type StudyData, type Workout } from '../study/model';
 
 export interface ShotLine {
@@ -50,4 +51,29 @@ export function courtNames(d: Pick<StudyData, 'workouts'>): string[] {
     .filter((w) => w.bb?.court)
     .sort((a, b) => b.date.localeCompare(a.date));
   return [...new Set(list.map((w) => w.bb!.court!))].slice(0, 20);
+}
+
+/** 연습 항목(이름)별 주마다 넣은 수/던진 수 (최근 weeks 주, 오래된 주부터) */
+export function itemTrend(d: Pick<StudyData, 'workouts'>, name: string, today: DateStr, weeks = 8): { start: DateStr; m: number; a: number }[] {
+  const key = name.trim().toLowerCase();
+  const ws = weekStart(today);
+  const out = Array.from({ length: weeks }, (_, i) => ({ start: addDays(ws, -7 * (weeks - 1 - i)), m: 0, a: 0 }));
+  for (const w of alive(d.workouts)) {
+    if (w.kind !== '농구' || !w.bb?.items || w.date > today) continue;
+    const row = out.find((x) => w.date >= x.start && w.date <= addDays(x.start, 6));
+    if (!row) continue;
+    for (const it of w.bb.items)
+      if (it.name.trim().toLowerCase() === key && it.att) {
+        row.m += it.made ?? 0;
+        row.a += it.att;
+      }
+  }
+  return out;
+}
+
+/** 던진 수를 적은 연습 항목 이름 (많이 한 순) */
+export function trackedItems(d: Pick<StudyData, 'workouts'>): string[] {
+  const n = new Map<string, number>();
+  for (const w of alive(d.workouts)) for (const it of w.bb?.items ?? []) if (it.att) n.set(it.name.trim(), (n.get(it.name.trim()) ?? 0) + 1);
+  return [...n].sort((a, b) => b[1] - a[1]).map(([k]) => k);
 }

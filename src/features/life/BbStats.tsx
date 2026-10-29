@@ -3,7 +3,9 @@ import { addDays, weekStart } from '../study/dates';
 import { useState } from 'react';
 import { setSettings, useStudy } from '../study/store';
 import { Bar, useToday } from '../study/ui';
-import { shotsBetween, shotsByCourt, type ShotLine } from './bb';
+import { itemTrend, shotsBetween, shotsByCourt, trackedItems, type ShotLine } from './bb';
+import { LineChart } from '../study/charts';
+import { shortDate } from '../study/dates';
 
 type Kind = 'fg' | 'tp' | 'ft';
 const NAME: Record<Kind, string> = { fg: '2점', tp: '3점', ft: '자유투' };
@@ -128,6 +130,33 @@ export function BbGoals() {
             );
           })
       )}
+    </section>
+  );
+}
+
+/** 연습 항목별 성공률이 주마다 어떻게 바뀌었는지 (최근 8주): 연습한 게 실제로 늘었는지 */
+export function ItemTrend() {
+  const d = useStudy();
+  const today = useToday();
+  const names = trackedItems(d).slice(0, 8);
+  const [pick, setPick] = useState('');
+  const name = names.includes(pick) ? pick : names[0];
+  if (!name) return null;
+  const t = itemTrend(d, name, today);
+  if (t.filter((x) => x.a).length < 2) return null;
+  return (
+    <section className="st-card">
+      <h3 className="st-h">연습 항목별 성공률 · 최근 8주</h3>
+      {names.length > 1 && (
+        <div className="st-chips">
+          {names.map((n) => (
+            <button key={n} className={`st-chip ${n === name ? 'on' : ''}`} aria-pressed={n === name} onClick={() => setPick(n)}>
+              {n}
+            </button>
+          ))}
+        </div>
+      )}
+      <LineChart label={`${name} 주별 성공률`} height={150} domain={[0, 100]} points={t.map((x) => ({ label: shortDate(x.start).replace(/\(.\)/, ''), title: `${shortDate(x.start)} 주 · ${x.m}/${x.a}`, y: x.a ? Math.round((x.m / x.a) * 100) : null }))} format={(v) => `${Math.round(v)}%`} />
     </section>
   );
 }

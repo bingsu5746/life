@@ -1,5 +1,6 @@
 // 지난 성적 (계산): 과목별 흐름, 평균 등급, 바뀐 정도, 시험 전 공부 시간
 import { addDays } from './dates';
+import { sleepMinutes } from './condition';
 import { alive, type DateStr, type GradeRecord, type GradeScore, type StudyData } from './model';
 
 export type Metric = 'grade' | 'raw' | 'percentile' | 'standard';
@@ -124,4 +125,17 @@ export function neededScore(g: { target: number; parts: { weight: number; score?
   if (left <= 0) return { need: null, got: Math.round(got * 10) / 10, left: 0, possible: got >= g.target };
   const need = Math.ceil(((g.target - got) / left) * 10) / 10;
   return { need: Math.max(0, need), got: Math.round(got * 10) / 10, left: Math.round(left * 100), possible: need <= 100 };
+}
+
+/** 시험 전 days 일 (시험 날 빼고)의 생활: 하루 평균 공부(분) · 기록한 날의 평균 잠(분) */
+export function prepBefore(d: Pick<StudyData, 'sessions' | 'conditions'>, date: DateStr, days = 14): { studyPerDay: number; sleepAvg: number | null; sleepDays: number } {
+  const from = addDays(date, -days);
+  const study = alive(d.sessions)
+    .filter((s) => s.date >= from && s.date < date)
+    .reduce((a, s) => a + s.minutes, 0);
+  const sleeps = alive(d.conditions)
+    .filter((c) => c.id >= from && c.id < date)
+    .map((c) => sleepMinutes(c))
+    .filter((m): m is number => m !== null);
+  return { studyPerDay: Math.round(study / days), sleepAvg: sleeps.length ? Math.round(sleeps.reduce((a, b) => a + b, 0) / sleeps.length) : null, sleepDays: sleeps.length };
 }

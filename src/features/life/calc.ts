@@ -249,3 +249,24 @@ export function autoSaves(d: StudyData, cat = '용돈'): SavingGoal[] {
   }
   return out;
 }
+
+/** 이번 주에 (오늘부터 일요일까지) 써도 되는 돈.
+ *  남은 예산 − 이번 달 남은 고정 지출을 남은 날로 나눠 이번 주 남은 날만큼. 일주일 한도가 있으면 그 남은 돈과 작은 쪽. */
+export function weekAllowance(d: StudyData, today: DateStr): { amount: number; fixed: number; perDay: number } | null {
+  const budget = d.settings.monthlyBudget;
+  if (!budget) return null;
+  const month = monthOf(today);
+  const daysLeft = daysInMonth(month) - Number(today.slice(8, 10)) + 1;
+  const monthEnd = `${month}-${String(daysInMonth(month)).padStart(2, '0')}`;
+  const fixed = upcomingRules(d, today, daysLeft)
+    .filter((x) => x.rule.type === 'out' && x.date <= monthEnd)
+    .reduce((a, x) => a + x.rule.amount, 0);
+  const free = Math.max(0, budget - monthSummary(d, month).out - fixed);
+  const perDay = Math.floor(free / daysLeft);
+  const sunday = addDays(weekStart(today), 6);
+  const weekDays = daysBetween(today, sunday < monthEnd ? sunday : monthEnd).length;
+  let amount = perDay * weekDays;
+  const lim = d.settings.weeklyLimit;
+  if (lim) amount = Math.min(amount, Math.max(0, lim - weekSpent(d, today)));
+  return { amount, fixed, perDay };
+}

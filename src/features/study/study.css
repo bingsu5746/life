@@ -5649,3 +5649,94 @@ body {
   width: 100%;
   max-width: 520px;
 }
+
+.ps-pick {
+  position: sticky;
+  bottom: 84px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px 10px 16px;
+  border-radius: 14px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.12);
+  animation: st-fade 0.24s var(--ease);
+  z-index: 5;
+}
+
+.mn-allow {
+  margin: 10px 0 0;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--soft);
+  font-size: 0.92rem;
+}
+
+.hm-change {
+  display: grid;
+  gap: 6px;
+  padding: 16px 18px;
+  border-radius: var(--radius);
+  background: var(--accent);
+  color: var(--on-accent);
+  animation: st-fade 0.3s var(--ease);
+}
+
+.hm-change small {
+  opacity: 0.7;
+  font-size: 0.78rem;
+}
+
+.hm-change b {
+  font-size: 1.08rem;
+  letter-spacing: -0.01em;
+}
+
+.hm-change .st-muted {
+  color: inherit;
+}
+
+.hm-change .btn {
+  border-color: transparent;
+}
+
+.hm-change .btn:not(.btn-primary) {
+  background: transparent;
+  color: inherit;
+  border-color: color-mix(in srgb, var(--on-accent) 35%, transparent);
+}
+
+.hm-change .btn-primary {
+  background: var(--on-accent);
+  color: var(--accent);
+}
+
+/* 약점 한 장 */
+.wk-big {
+  margin: 4px 0 0;
+  font-size: 1.2rem;
+}
+.wk-list {
+  margin: 6px 0 0;
+  padding-left: 18px;
+  display: grid;
+  gap: 6px;
+  line-height: 1.5;
+}
+.wk-sub {
+  display: block;
+  margin-top: 8px;
+  font-size: 0.9rem;
+}
+.wk-words {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+}
+.wk-link {
+  justify-self: start;
+  margin: 4px 0 8px;
+  font-size: 0.86rem;
+}

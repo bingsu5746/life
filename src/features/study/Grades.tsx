@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { shortDate } from './dates';
 import { examEnd, examSubjectIds } from './exams';
 import { ExamTabs } from './Exams';
-import { parseWrongNums, wrongFrequency, change, changeText, findScore, METRIC_NAME, metricsFor, MOCK_SUBJECTS, readNum, recordAverage, recordsOf, scoreValue, series, studyBefore, subjectNames, type Metric } from './grades';
+import { parseWrongNums, wrongFrequency, change, changeText, findScore, METRIC_NAME, metricsFor, MOCK_SUBJECTS, readNum, prepBefore, recordAverage, recordsOf, scoreValue, series, studyBefore, subjectNames, type Metric } from './grades';
 import { BarChart, LineChart, TableView } from './charts';
 import { addDays } from './dates';
 import { alive, newId, type GradeRecord, type GradeScore } from './model';
@@ -181,6 +181,7 @@ export function Grades({ sub }: { sub?: string }) {
           <WrongNumbers records={records} names={names} />
 
           <StudyVsScore records={records} metric={metric} />
+          <PrepVsScore records={records} metric={metric} />
 
           <section className="st-card">
             <h3 className="st-h">넣은 성적</h3>
@@ -203,6 +204,40 @@ export function Grades({ sub }: { sub?: string }) {
       {goalOpen && <GoalSheet kind={kind} names={names} onClose={() => setGoalOpen(false)} />}
       {editing && <GradeSheet record={editing === 'new' ? undefined : editing} kind={kind} fromExamId={fromExam?.id} onSaved={setKind} onClose={() => go('/exams/grades')} />}
     </div>
+  );
+}
+
+/** 시험마다 시험 전 2주의 하루 공부 · 평균 잠과 평균 성적을 나란히 (어떤 준비가 잘 맞았는지) */
+function PrepVsScore({ records, metric }: { records: GradeRecord[]; metric: Metric }) {
+  const d = useStudy();
+  const rows = records.slice(-6).map((r) => ({ r, p: prepBefore(d, r.date), avg: recordAverage(r, metric) }));
+  if (rows.length < 2 || rows.every((x) => !x.p.studyPerDay && x.p.sleepAvg === null)) return null;
+  const fmt = (v: number | null) => (v === null ? '—' : metric === 'grade' ? `${v}등급` : `${v}`);
+  return (
+    <section className="st-card">
+      <h3 className="st-h">시험 전 2주 생활과 성적</h3>
+      <table className="st-table">
+        <thead>
+          <tr>
+            <th>시험</th>
+            <th>하루 공부</th>
+            <th>평균 잠</th>
+            <th>평균 {METRIC_NAME[metric]}</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((x) => (
+            <tr key={x.r.id}>
+              <td>{x.r.name}</td>
+              <td>{minutesText(x.p.studyPerDay)}</td>
+              <td>{x.p.sleepAvg === null ? '—' : minutesText(x.p.sleepAvg)}</td>
+              <td>{fmt(x.avg)}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      <p className="st-hint">「기록」의 공부 시간과 오늘 화면의 잠 기록으로 셌어요. 같이 보이는 것이지, 잠이나 공부 시간 때문에 성적이 달라졌다고 단정할 수는 없어요.</p>
+    </section>
   );
 }
 

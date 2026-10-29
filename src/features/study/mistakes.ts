@@ -1,4 +1,5 @@
 // 오답 패턴: 과목마다 어떤 이유로 많이 틀리는지, 어느 단원에서 많이 틀리는지
+import { answer } from './review';
 import { alive, REASONS, type Id, type StudyData, type WrongNote, type WrongReason } from './model';
 
 export interface SubjectPattern {
@@ -72,4 +73,14 @@ export function guessNoteSubject(d: Pick<StudyData, 'subjects' | 'sessions' | 'n
     .sort((a, b) => b.created - a.created)[0];
   if (note) return { id: note.subjectId, why: '방금 넣은 오답과 같은 과목' };
   return null;
+}
+
+/** 다시 풀기에서 이만큼 연달아 맞히면 졸업 (해결됨) */
+export const GRADUATE = 2;
+
+/** 오답 다시 풀기 결과: 단계 간격은 그대로 쓰되, 두 번 연달아 맞히면 바로 해결됨. 틀리면 연속이 0으로 */
+export function redoAnswer(n: WrongNote, ok: boolean, today: string, intervals: number[]): WrongNote {
+  const next = answer(n, ok, 'redo', today, intervals);
+  const okRun = ok ? (n.okRun ?? 0) + 1 : 0;
+  return { ...next, okRun: okRun || undefined, learned: next.learned || okRun >= GRADUATE };
 }

@@ -1,10 +1,11 @@
 // 국어·영어 지문: 넣기(붙여넣기·사진 글자 읽기) · 헷갈린 점 · 영어는 해석 · 다시 보기
-import { useState } from 'react';
-import { isLoggedIn, translate } from '../auth/api';
+import { useEffect, useState } from 'react';
+import { isLoggedIn, translate, wordMeanings } from '../auth/api';
+import { addToInbox } from './actions';
 import { shortDate } from './dates';
 import { alive, newId, type Passage } from './model';
 import { chunkText, dueAgain } from './passages';
-import { put, remove, useStudy } from './store';
+import { getWords, put, remove, useStudy } from './store';
 import { confirmDelete, Empty, Field, go, Icon, Sheet, tap, toast, useToday } from './ui';
 
 type Lang = 'all' | 'ko' | 'en';
@@ -101,6 +102,7 @@ function PassageView({ p, today, onEdit, edit, onCloseEdit }: { p: Passage; toda
       <div className="ps-text" lang={p.lang}>
         {p.text}
       </div>
+      {p.lang === 'en' && <WordPick from={p.title} today={today} />}
       {p.lang === 'en' && p.translation && (
         <>
           <button className="st-link" onClick={() => setShowTr(!showTr)}>
@@ -224,5 +226,49 @@ function PassageSheet({ item, onClose }: { item: Partial<Passage>; onClose: () =
         </div>
       </div>
     </Sheet>
+  );
+}
+
+/** 영어 지문에서 단어를 길게 눌러 고르면 「모르는 단어 모음」에 넣는 줄이 아래에 뜬다 */
+function WordPick({ from, today }: { from: string; today: string }) {
+  const [term, setTerm] = useState('');
+  const [busy, setBusy] = useState(false);
+  useEffect(() => {
+    const on = () => {
+      const sel = window.getSelection();
+      const t = sel?.toString().trim() ?? '';
+      const inText = !!sel?.anchorNode && !!(sel.anchorNode.parentElement?.closest('.ps-text'));
+      // 영어 낱말 1~4개만 (문장 전체를 고른 것은 무시)
+      setTerm(inText && /^[A-Za-z][A-Za-z'’-]*(?:\s+[A-Za-z][A-Za-z'’-]*){0,3}$/.test(t) ? t.replace(/[’]/g, "'") : '');
+    };
+    document.addEventListener('selectionchange', on);
+    return () => document.removeEventListener('selectionchange', on);
+  }, []);
+  if (!term) return <small className="st-muted">모르는 단어는 길게 눌러 고르면 단어장에 넣을 수 있어요.</small>;
+  return (
+    <div className="ps-pick" role="status">
+      <b lang="en">{term}</b>
+      <button
+        className="btn btn-sm btn-primary"
+        disabled={busy}
+        onClick={async () => {
+          setBusy(true);
+          let meaning = '';
+          if (isLoggedIn())
+            try {
+              meaning = (await wordMeanings([term])).meanings[0]?.trim() ?? '';
+            } catch {
+              /* 뜻은 나중에 채워도 된다 */
+            }
+          addToInbox(term, meaning, getWords(), today, from);
+          toast(`「${term}」를 모르는 단어 모음에 넣었어요${meaning ? ` (${meaning})` : ''}`);
+          window.getSelection()?.removeAllRanges();
+          setTerm('');
+          setBusy(false);
+        }}
+      >
+        {busy ? '넣는 중…' : '단어장에 넣기'}
+      </button>
+    </div>
   );
 }

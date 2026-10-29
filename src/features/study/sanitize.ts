@@ -164,6 +164,7 @@ const FIX: Record<Collection, Fix> = {
     answer: str(x.answer),
     reason: typeof x.reason === 'string' ? x.reason : null,
     memo: str(x.memo),
+    okRun: score(x.okRun, 1, 99),
     comments: x.comments === undefined ? undefined : arr(x.comments).filter((c): c is Obj => isObj(c) && typeof c.id === 'string' && isDate(c.date) && typeof c.text === 'string').map((c) => ({ id: c.id as string, date: c.date as DateStr, text: (c.text as string).slice(0, 300), at: optNum(c.at) })).slice(-30),
     paperId: optStr(x.paperId),
     created: num(x.created),
@@ -329,7 +330,7 @@ const FIX: Record<Collection, Fix> = {
     wake: hhmm(x.wake),
     mood: Number.isInteger(x.mood) && (x.mood as number) >= 1 && (x.mood as number) <= 5 ? (x.mood as number) : undefined,
   }),
-  weekNotes: (x) => ({ ...x, text: str(x.text).slice(0, 1000) }),
+  weekNotes: (x) => ({ ...x, text: str(x.text).slice(0, 1000), change: optStr(x.change)?.slice(0, 100), kept: typeof x.kept === 'boolean' ? x.kept : undefined }),
   previews: (x) =>
     isDate(x.date)
       ? {
@@ -470,6 +471,7 @@ const fixWord: Fix = (x) =>
         ...x,
         ...review(x),
         example: isObj(x.example) && typeof x.example.s === 'string' && typeof x.example.ko === 'string' ? { s: x.example.s.slice(0, 300), ko: x.example.ko.slice(0, 300) } : undefined,
+        from: typeof x.from === 'string' && x.from.trim() ? x.from.trim().slice(0, 60) : undefined,
         listId: str(x.listId),
         meaning: str(x.meaning),
         day: optNum(x.day) === undefined ? undefined : Math.max(0, Math.min(999, Math.round(x.day as number))),

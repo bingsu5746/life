@@ -423,6 +423,7 @@ function WordSheet({ w, onClose }: { w: Word; onClose: () => void }) {
         </Field>
         <p className="st-hint">
           {w.box === 0 ? '새 단어' : w.learned ? '외움' : `${boxLabel(w.box, intervals)} · 다음 ${shortDate(w.due)}`} · 틀린 횟수 {w.wrong}
+          {w.from && ` · 「${w.from}」에서`}
         </p>
         <div className="st-row end">
           <button

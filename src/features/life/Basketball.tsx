@@ -6,7 +6,7 @@ import { alive, newId, type BasketballStat, type PracticeItem, type Workout } fr
 import { DRILLS, guessKind, practiceTotals } from './drills';
 import { put, remove, useStudy } from '../study/store';
 import { minutesText } from '../study/timer';
-import { BbGoals, ShotSummary } from './BbStats';
+import { BbGoals, ItemTrend, ShotSummary } from './BbStats';
 import { courtNames } from './bb';
 import { confirmDelete, Empty, go, Icon, Sheet, tap, toast, useToday } from '../study/ui';
 
@@ -58,6 +58,7 @@ export function Basketball({ sub }: { sub?: string }) {
         <>
           <BbGoals />
           <ShotSummary />
+          <ItemTrend />
           {games.length > 0 && (
             <section className="st-card">
               <h3 className="st-h">

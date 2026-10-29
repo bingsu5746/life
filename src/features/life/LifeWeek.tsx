@@ -1,7 +1,8 @@
 // 이번 주 돌아보기 화면 (/week, /week/<그 주의 아무 날>)
 import { addDays, isDate, shortDate, weekStart } from '../study/dates';
-import { useStudy } from '../study/store';
-import { go, useToday } from '../study/ui';
+import { put, useStudy } from '../study/store';
+import { go, toast, useToday } from '../study/ui';
+import { useState } from 'react';
 import { won } from './calc';
 import { lifeMonth, lifeWeek, monthTrend } from './lifeWeek';
 import { monthLabel, monthOf, shiftMonth } from './calc';
@@ -113,6 +114,7 @@ export function LifeWeekPage({ day, monthly }: { day?: string; monthly?: boolean
         </section>
       )}
       {monthly && <Trend month={month} />}
+      {!monthly && w.from <= today && <NextChange from={w.from} />}
       {!monthly && (
         <button className="st-link" onClick={() => go(`/time/week-${w.from}`)}>
           공부 자세히 돌아보기 (과목별 · 다음 주 할 것)
@@ -139,6 +141,35 @@ function Trend({ month }: { month: string }) {
       <BarChart label="달별 운동한 날" height={110} bars={bars((x) => x.workoutDays)} format={(v) => `${v}일`} />
       <h4 className="ta-h">쓴 돈</h4>
       <BarChart label="달별 쓴 돈" height={110} bars={bars((x) => x.spent)} format={short} />
+    </section>
+  );
+}
+
+/** 다음 주에 바꿀 한 가지: 정해 두면 다음 주 내내 메인 맨 위에 보이고, 주말에 지켰는지 묻는다 */
+function NextChange({ from }: { from: string }) {
+  const d = useStudy();
+  const note = d.weekNotes[from];
+  const [v, setV] = useState(note?.change ?? '');
+  const save = () => {
+    put('weekNotes', { ...(note ?? { id: from, text: '' }), change: v.trim() || undefined, kept: undefined } as never);
+    toast(v.trim() ? '다음 주 메인 화면 맨 위에 보여 드릴게요' : '지웠어요');
+  };
+  return (
+    <section className="st-card st-form">
+      <h3 className="st-h">다음 주에 바꿀 한 가지</h3>
+      <form
+        className="st-inline"
+        onSubmit={(e) => {
+          e.preventDefault();
+          save();
+        }}
+      >
+        <input className="st-input" value={v} onChange={(e) => setV(e.target.value)} maxLength={100} placeholder="예: 11시 전에 휴대폰 끄기" aria-label="다음 주에 바꿀 한 가지" />
+        <button className="btn btn-sm btn-primary" disabled={v.trim() === (note?.change ?? '')}>
+          저장
+        </button>
+      </form>
+      {note?.kept !== undefined && <small className="st-muted">{note.kept ? '지켰어요 ✓' : '못 지켰어요'}</small>}
     </section>
   );
 }

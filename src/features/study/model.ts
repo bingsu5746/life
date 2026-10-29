@@ -242,6 +242,10 @@ export interface DayCondition extends Stamp {
 export interface WeekNote extends Stamp {
   id: DateStr;
   text: string;
+  /** 다음 주에 바꿀 한 가지 (이 주를 돌아보며 정함) */
+  change?: string;
+  /** 다음 주가 끝날 때: 지켰는지 */
+  kept?: boolean;
 }
 
 /** 지난 성적 (시험 한 번) */
@@ -370,6 +374,8 @@ export interface WrongNote extends Stamp, Review {
   comments?: NoteComment[];
   /** 기출·모의고사 풀이에서 넣은 오답이면 그 풀이 */
   paperId?: Id;
+  /** 다시 풀기에서 연달아 맞힌 횟수 (2번이면 졸업 = 해결됨) */
+  okRun?: number;
   created: number;
 }
 
@@ -700,6 +706,8 @@ export interface Word extends Stamp, Review {
   firstSeen?: DateStr;
   /** 예문: 문장 안의 그 단어(활용형)를 [ ] 로 감싼다. 예: They [abandoned] the car. */
   example?: { s: string; ko: string };
+  /** 어디서 만난 단어인지 (예: 지문 제목) */
+  from?: string;
 }
 
 export interface StudySession extends Stamp {

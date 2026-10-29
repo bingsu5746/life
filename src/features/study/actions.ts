@@ -64,20 +64,20 @@ export function answerWord(w: Word, correct: boolean, via: Via, mode: Mode, toda
 }
 
 /** 새 단어 넣기 (순서는 그 목록의 끝에 이어서) */
-export function addWords(listId: Id, rows: { term: string; meaning: string; day?: number }[], existing: Word[], today: DateStr) {
+export function addWords(listId: Id, rows: { term: string; meaning: string; day?: number; from?: string }[], existing: Word[], today: DateStr) {
   let order = existing.reduce((m, w) => Math.max(m, w.order), 0);
-  putWords(rows.map((r) => ({ id: newId(), updatedAt: 0, listId, term: r.term.trim(), meaning: r.meaning.trim(), day: r.day, order: ++order, box: 0, due: today, wrong: 0 })));
+  putWords(rows.map((r) => ({ id: newId(), updatedAt: 0, listId, term: r.term.trim(), meaning: r.meaning.trim(), day: r.day, order: ++order, box: 0, due: today, wrong: 0, from: r.from })));
 }
 
 /** 모르는 단어 모음에 한 단어 넣기 (모음이 없으면 만든다) */
-export function addToInbox(term: string, meaning: string, words: WordsData, today: DateStr) {
+export function addToInbox(term: string, meaning: string, words: WordsData, today: DateStr, from?: string) {
   const d = getStudy();
   let inbox = alive(d.wordLists).find((l) => l.kind === 'inbox');
   if (!inbox) {
     inbox = { id: newId(), updatedAt: 0, name: '모르는 단어 모음', kind: 'inbox', subjectId: alive(d.subjects).find((s) => /영어/.test(s.name))?.id ?? '', done: [], undone: [] };
     put('wordLists', inbox);
   }
-  addWords(inbox.id, [{ term, meaning }], listWords(words, inbox.id), today);
+  addWords(inbox.id, [{ term, meaning, from }], listWords(words, inbox.id), today);
 }
 
 /** 오답 빨리 넣기: 「틀린 번호: 3, 7, 12」 · 「p.37 5번 p.38 2번」 (한 번에 저장) */
