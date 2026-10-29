@@ -52,6 +52,8 @@ export interface StudySettings {
   sleepGoal?: number;
   /** 일주일에 쓸 돈 한도 (넘으면 저녁 알림) */
   weeklyLimit?: number;
+  /** 내 학교 (나이스에서 급식·학사일정·시간표를 받을 때) */
+  school?: { name: string; grade?: number; cls?: string };
   /** 마지막으로 백업 파일을 내려받은 날 */
   lastBackup?: DateStr;
   /** 농구 목표 성공률 (%) */

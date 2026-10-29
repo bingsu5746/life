@@ -273,3 +273,24 @@ export async function recommendMovies(input: RecommendInput) {
 export async function movieProviders(items: { title: string; year?: number }[]) {
   return call<{ providers: (string[] | null)[] }>('movies/ott', 'POST', { items });
 }
+
+// ===== 학교 (나이스: 급식 · 학사일정 · 시간표) =====
+export interface SchoolMeal {
+  date: string;
+  kind: string;
+  dishes: string[];
+  cal?: string;
+}
+export interface SchoolEvent {
+  date: string;
+  name: string;
+  off: boolean;
+}
+export interface SchoolPeriod {
+  date: string;
+  period: number;
+  subject: string;
+}
+export async function schoolInfo(body: { name: string; grade?: number; cls?: string; from: string; to: string; want: ('meals' | 'events' | 'timetable')[] }) {
+  return call<{ school: string; meals?: SchoolMeal[]; events?: SchoolEvent[]; timetable?: SchoolPeriod[] }>('school', 'POST', body);
+}

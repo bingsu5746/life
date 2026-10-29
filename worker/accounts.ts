@@ -14,6 +14,7 @@
 import { DurableObject } from 'cloudflare:workers';
 import { COOKIE_NAME, cutText, Limiter, passwordProblem, readCookie } from './security';
 import { fetchBoxOffice, fetchCatalogPage, fetchUpcoming } from './kobis';
+import { fetchEvents, fetchMeals, fetchTimetable, findSchool } from './neis';
 import { fetchProviders } from './ott';
 import { buildRecommendInput, normTitle, readRecommendations, readRecommendRequest } from './recommend';
 import { allowedEndpoint, localDate, makeVapid, nextFire, sendPush, type PushSub, type Vapid } from './push';
@@ -196,6 +197,7 @@ export class Accounts extends DurableObject<Env> {
     if (path === 'movies/catalog' && req.method === 'GET') return this.catalogSearch(new URL(req.url).searchParams);
     if (path === 'movies/recommend' && req.method === 'POST') return this.recommend(user, body);
     if (path === 'movies/ott' && req.method === 'POST') return this.ott(body);
+    if (path === 'school' && req.method === 'POST') return this.school(body);
     if (path === 'movies/catalog/sync' && req.method === 'POST') return this.catalogSync(req.headers.get('x-life-kobis-key') ?? undefined);
     if (path === 'notify' || path.startsWith('notify/')) return this.notifyRoute(req, path, user, body);
     if (path === 'me/nickname' && req.method === 'PUT') {
@@ -576,6 +578,41 @@ export class Accounts extends DurableObject<Env> {
       }
     }
     return json({ providers });
+  }
+
+  /** 학교: 급식 · 학사일정 · 시간표 (나이스). 학교 코드는 30일, 나머지는 6시간 저장 */
+  private async school(b: Record<string, unknown>): Promise<Response> {
+    const key = (this.env as unknown as { NEIS_KEY?: string }).NEIS_KEY;
+    if (!key) return fail('학교 정보를 쓰려면 나이스 키(NEIS_KEY)가 필요해요.', 503);
+    const name = typeof b.name === 'string' ? b.name.normalize('NFC').trim().slice(0, 40) : '';
+    const day = (v: unknown) => (typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v) ? v : '');
+    const from = day(b.from);
+    const to = day(b.to);
+    if (!name || !from || !to || to < from || Date.parse(to) - Date.parse(from) > 92 * 86_400_000) return fail('학교 이름과 날짜를 확인해 주세요.');
+    const grade = typeof b.grade === 'number' && Number.isInteger(b.grade) && b.grade >= 1 && b.grade <= 3 ? b.grade : 0;
+    const cls = typeof b.cls === 'string' && /^\d{1,2}$/.test(b.cls) ? String(Number(b.cls)) : '';
+    const want = new Set(Array.isArray(b.want) ? b.want.filter((x) => typeof x === 'string') : []);
+    const cached = async <T>(ck: string, ms: number, get: () => Promise<T>): Promise<T> => {
+      const c = this.sql.exec<{ data: string; at: number }>('SELECT data, at FROM cache WHERE key = ?', ck).toArray()[0];
+      if (c && Date.now() - c.at < ms) return JSON.parse(c.data) as T;
+      const v = await get();
+      this.sql.exec('INSERT OR REPLACE INTO cache (key, data, at) VALUES (?, ?, ?)', ck, JSON.stringify(v), Date.now());
+      return v;
+    };
+    try {
+      const codes = await cached(`neis:school:${name}`, 30 * 86_400_000, () => findSchool(key, name));
+      if (!codes) return fail(`「${name}」을 나이스에서 찾지 못했어요. 학교 이름을 정확히 써 주세요.`, 404);
+      const H6 = 6 * 3_600_000;
+      const id = `${codes.office}${codes.school}`;
+      const meals = want.has('meals') ? await cached(`neis:meal:${id}:${from}:${to}`, H6, () => fetchMeals(key, codes, from, to)) : undefined;
+      const events = want.has('events') ? await cached(`neis:event:${id}:${from}:${to}`, H6, () => fetchEvents(key, codes, from, to)) : undefined;
+      const timetable = want.has('timetable') && grade && cls ? await cached(`neis:tt:${id}:${grade}:${cls}:${from}:${to}`, H6, () => fetchTimetable(key, codes, grade, cls, from, to)) : undefined;
+      return json({ school: codes.name, meals, events, timetable });
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      console.error('neis failed', msg);
+      return fail(msg.startsWith('나이스') ? msg : '나이스에서 정보를 받지 못했어요. 잠시 뒤 다시 해 주세요.', 502);
+    }
   }
 
   // ===== 알림 (웹 푸시) =====

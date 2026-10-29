@@ -5740,3 +5740,18 @@ body {
   margin: 4px 0 8px;
   font-size: 0.86rem;
 }
+
+/* 학교 (나이스) */
+.sc-today {
+  display: grid;
+  gap: 8px;
+}
+.sc-event {
+  margin: 0;
+  font-weight: 600;
+}
+.sc-meal {
+  margin: 4px 0 0;
+  line-height: 1.6;
+  word-break: keep-all;
+}

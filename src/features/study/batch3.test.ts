@@ -727,3 +727,25 @@ describe('약점 한 장 알림 (weakDue)', () => {
     expect(e.body).toContain('영어 시험 D-3: 약점 한 장을 훑어보세요');
   });
 });
+
+describe('나이스 학교 정보 → 앱 자료 (school.ts)', () => {
+  it('과목 맞추기 · 요일별 시간표 · 시험 묶기 · 쉬는 날', async () => {
+    const { matchSubject, weekPattern, examEvents, offDays } = await import('./school');
+    const subs = [
+      { id: 'ma', name: '수학' },
+      { id: 'ko', name: '국어' },
+      { id: 'en', name: '영어' },
+    ];
+    expect(matchSubject('수학Ⅰ', subs)).toBe('ma');
+    expect(matchSubject('영 어', subs)).toBe('en');
+    expect(matchSubject('문학', subs)).toBeNull();
+    const P = (date: string, period: number, subject: string) => ({ date, period, subject });
+    expect(weekPattern([P('2026-10-26', 2, '영어'), P('2026-10-26', 1, '문학'), P('2026-10-27', 1, '수학Ⅰ'), P('2026-10-19', 1, '옛날')])).toEqual({ '1': ['문학', '영어'], '2': ['수학Ⅰ'] });
+    const E = (date: string, name: string, off = false) => ({ date, name, off });
+    expect(examEvents([E('2026-11-03', '2차 지필평가'), E('2026-11-02', '2차 지필평가'), E('2026-11-05', '2차 지필평가'), E('2026-11-19', '전국연합학력평가'), E('2026-11-10', '체육대회')])).toEqual([
+      { name: '2차 지필평가', date: '2026-11-02', end: '2026-11-05' },
+      { name: '전국연합학력평가', date: '2026-11-19' },
+    ]);
+    expect(offDays([E('2026-12-25', '성탄절', true), E('2026-11-20', '재량휴업일', true), E('2026-11-10', '체육대회')])).toEqual(['2026-11-20', '2026-12-25']);
+  });
+});

@@ -1,5 +1,6 @@
 // 「오늘」 화면 (설계 §7): 과외 숙제 → 문제집 오늘 분량 → 영단어 → 복습 → 할 일·습관 → 공부 시간
 import { ExamToday } from './ExamPlan';
+import { SchoolToday } from './SchoolPanel';
 import { todayExamItems } from './examPlan';
 import { useMemo, useState } from 'react';
 import { addDays, dday, longDate, shortDate, weekStart } from './dates';
@@ -93,6 +94,8 @@ export function Today() {
           오늘 수업: {classes.map((id) => d.subjects[id].name).join(' · ')}
         </p>
       )}
+
+      {d.settings.school && <SchoolToday today={today} />}
 
       {(weekday0 === 0 || weekday0 === 1) && (
         <button className="st-dday-empty" onClick={() => go(`/time/week-${weekday0 === 0 ? weekStart(today) : addDays(weekStart(today), -7)}`)}>

@@ -6,6 +6,7 @@ import { exportBackup, importBackup } from './backup';
 import { getTheme, setTheme, type Theme } from '../../lib/theme';
 import { AREAS, TABS } from './tabs';
 import { TimetableEditor } from './TimetableEditor';
+import { SchoolSettings } from './SchoolPanel';
 import { disableNotify, enableNotify, localTimes, notifySupported } from './notify';
 import { isLoggedIn, notifyTest } from '../auth/api';
 import { getStudy, put, remove, resetLocal, setSettings, useStudy } from './store';
@@ -164,8 +165,11 @@ export function Settings() {
         </div>
       </section>
 
+      <SchoolSettings />
+
       <section className="st-card st-form">
         <h3 className="st-h">학교 시간표</h3>
+        {s.school && <p className="st-hint">「내 학교」에서 나이스 시간표를 가져올 수 있어요.</p>}
         <TimetableEditor />
       </section>
 

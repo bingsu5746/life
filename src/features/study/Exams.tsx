@@ -6,6 +6,7 @@ import { alive, newId, SUBJECT_COLORS, type Exam, type ExamDay, type ExamKind, t
 import { put, useStudy } from './store';
 import { removeExam } from './actions';
 import { ExamPlanPage } from './ExamPlan';
+import { SchoolExams } from './SchoolPanel';
 import { Bar, Check, confirmDelete, Empty, Field, go, Icon, Menu, Sheet, SubjectDot, SubjectPicker, subjectsOf, toast, useToday, tap } from './ui';
 
 // 성적 화면은 그래프가 있어 열 때 받는다
@@ -131,6 +132,8 @@ function ExamList({ adding, progress }: { adding: boolean; progress: boolean }) 
           })}
         </div>
       )}
+
+      {d.settings.school && <SchoolExams today={today} />}
 
       <section className="st-card">
         <div className="st-inline between">
