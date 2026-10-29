@@ -334,3 +334,63 @@ export function toggleItem(exam: Exam, id: string, today: DateStr, now = Date.no
   else done[id] = today;
   return { ...exam, plan: { ...(exam.plan as ExamPlanSettings), done } };
 }
+
+export interface SubjectReview {
+  subjectId: Id;
+  lines: number;
+  /** 시험 날까지 끝낸 줄 */
+  done: number;
+  /** 계획에서 잡은 시간 · 실제로 적은 공부 시간 (분) */
+  planned: number;
+  actual: number;
+  /** 실제 점수 (백분율, 성적을 넣었을 때) */
+  score: number | null;
+}
+
+export interface PlanReview {
+  subjects: SubjectReview[];
+  /** 끝낸 줄 비율 0~1 */
+  doneRate: number;
+  /** 실제로 한 줄에 쓴 시간 (분, 자료가 모자라면 null) */
+  perLine: number | null;
+  /** 계획 기간에 실제로 공부한 하루 평균 (평일 · 주말, 분) */
+  weekday: number | null;
+  weekend: number | null;
+  from: DateStr;
+  to: DateStr;
+}
+
+/** 끝난 시험의 계획 돌아보기: 계획대로 한 비율 · 실제 공부 시간 · 점수 · 다음 계획에 쓸 값 */
+export function reviewExamPlan(d: StudyData, exam: Exam): PlanReview | null {
+  const plan = exam.plan;
+  const scopes = (exam.scopes ?? []).filter((s) => s.lines.length);
+  if (!plan || !scopes.length) return null;
+  const from = plan.started ?? addDays(exam.date, -14);
+  const to = addDays(exam.date, -1);
+  const grade = alive(d.grades).find((g) => g.examId === exam.id);
+  const subjects: SubjectReview[] = scopes.map((sc) => {
+    const examDate = scopeDate(exam, sc);
+    const done = sc.lines.filter((l) => l.done && (!l.at || kstDate(l.at) <= examDate)).length;
+    const { mult } = subjectMult(d, sc.subjectId, plan.weights?.[sc.subjectId] ?? 1);
+    const actual = alive(d.sessions)
+      .filter((s) => s.subjectId === sc.subjectId && s.date >= from && s.date < examDate)
+      .reduce((a, s) => a + s.minutes, 0);
+    const sName = d.subjects[sc.subjectId]?.name;
+    const sc2 = grade?.scores.find((x) => x.subject === sName);
+    const score = sc2 ? (sc2.raw !== undefined ? Math.round((sc2.raw / (sc2.full || 100)) * 100) : null) : null;
+    return { subjectId: sc.subjectId, lines: sc.lines.length, done, planned: round5(plan.perLine * mult) * sc.lines.length, actual, score };
+  });
+  const lines = subjects.reduce((a, s) => a + s.lines, 0);
+  const done = subjects.reduce((a, s) => a + s.done, 0);
+  const actual = subjects.reduce((a, s) => a + s.actual, 0);
+  const perLine = done >= 3 && actual > 0 ? Math.min(180, Math.max(10, round5(actual / done))) : null;
+  // 계획 기간의 날마다 공부 시간 (모든 과목)
+  const by = new Map<DateStr, number>();
+  for (const s of alive(d.sessions)) if (s.date >= from && s.date <= to) by.set(s.date, (by.get(s.date) ?? 0) + s.minutes);
+  const avg = (weekend: boolean) => {
+    const days = from <= to ? daysBetween(from, to).filter((x) => [0, 6].includes(weekday(x)) === weekend) : [];
+    if (days.length < 2) return null;
+    return Math.round(days.reduce((a, x) => a + (by.get(x) ?? 0), 0) / days.length / 10) * 10;
+  };
+  return { subjects, doneRate: lines ? done / lines : 0, perLine, weekday: avg(false), weekend: avg(true), from, to };
+}

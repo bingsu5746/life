@@ -127,7 +127,9 @@ describe('주간 돌아보기·알림 글', () => {
     const e = buildDigest(d, {}, '2026-10-25', ['07:30', '21:00'], 2);
     expect(e).toHaveLength(4);
     expect(e[0]).toMatchObject({ date: '2026-10-25', slot: 0, title: '오늘 할 것' });
-    expect(e[1]).toMatchObject({ date: '2026-10-25', slot: 1, title: '내일 준비', body: '내일 수업 예습 1개' });
+    // 10/25 는 일요일: 저녁 알림에 이번 주 요약이 붙는다
+    expect(e[1]).toMatchObject({ date: '2026-10-25', slot: 1, title: '내일 준비 · 이번 주 돌아보기', url: '/week' });
+    expect(e[1].body).toMatch(/^내일 수업 예습 1개 · 이번 주 공부 0분/);
     expect(e[2].body).toContain('오늘 수업 예습 1개');
     expect(e[3].body).toBe('내일 수업: 수학');
   });
@@ -368,5 +370,36 @@ describe('넣은 슛 합 (shotsBetween)', () => {
     const w = (id: string, date: string, bb: object, kind = '농구') => ({ id, kind, date, bb, updatedAt: 1 });
     const d = { workouts: Object.fromEntries([w('a', '2026-10-27', { mode: 'practice', fgm: 5, fga: 10, tpm: 2, tpa: 8 }), w('b', '2026-10-28', { mode: 'game', ftm: 3, fta: 4, fgm: 1, fga: 3 }), w('c', '2026-10-20', { mode: 'practice', fgm: 9, fga: 9 }), w('d', '2026-10-28', { fgm: 9, fga: 9 }, '헬스')].map((x) => [x.id, x])) } as never;
     expect(shotsBetween(d, '2026-10-26', '2026-10-28')).toEqual({ fg: { m: 6, a: 13 }, tp: { m: 2, a: 8 }, ft: { m: 3, a: 4 } });
+  });
+});
+
+describe('반복 할 일 (dueTodoRules)', () => {
+  it('정한 요일에만, 이미 있거나 지운 것은 다시 만들지 않는다', async () => {
+    const { dueTodoRules, ruleTodoId } = await import('./todoRules');
+    // 2026-10-28 은 수요일(3)
+    const d = { todoRules: { a: { id: 'a', title: '단어 복습', weekdays: [3], start: '2026-10-01', updatedAt: 1 }, b: { id: 'b', title: '운동', weekdays: [], start: '2026-10-01', updatedAt: 1 }, c: { id: 'c', title: '월요일만', weekdays: [1], start: '2026-10-01', updatedAt: 1 } }, todos: { [ruleTodoId('b', '2026-10-28')]: { id: 'x', deleted: true, updatedAt: 1 } } } as never;
+    expect(dueTodoRules(d, '2026-10-28').map((t) => t.title)).toEqual(['단어 복습']);
+  });
+});
+
+describe('독서 목표 (goalPace)', () => {
+  it('남은 권수와 한 달 몫', async () => {
+    const { goalPace } = await import('../life/Reading');
+    expect(goalPace(24, 12, '2026-07-01')).toEqual({ left: 12, perMonth: 2, onTrack: true });
+    expect(goalPace(24, 2, '2026-07-01').onTrack).toBe(false);
+    expect(goalPace(5, 6, '2026-12-31').left).toBe(0);
+  });
+});
+
+describe('시험 계획 돌아보기 (reviewExamPlan)', () => {
+  it('끝낸 줄 비율 · 실제 공부 시간 · 점수 · 한 줄 시간', async () => {
+    const { reviewExamPlan } = await import('./examPlan');
+    const at = Date.parse('2026-10-05T03:00:00Z');
+    const exam = { id: 'e', name: '중간', date: '2026-10-10', updatedAt: 1, scopes: [{ id: 's', subjectId: 'm', lines: [{ id: 'a', text: '1', done: true, at }, { id: 'b', text: '2', done: true, at }, { id: 'c', text: '3', done: true, at }, { id: 'd', text: '4', done: false }] }], plan: { on: true, weekday: 120, weekend: 200, perLine: 40, review: 0.35, started: '2026-10-01' } };
+    const d = { subjects: { m: { id: 'm', name: '수학' } }, sessions: { x: { id: 'x', subjectId: 'm', date: '2026-10-03', minutes: 150, updatedAt: 1 }, y: { id: 'y', subjectId: 'm', date: '2026-10-11', minutes: 999, updatedAt: 1 } }, grades: { g: { id: 'g', examId: 'e', kind: 'school', date: '2026-10-20', updatedAt: 1, scores: [{ id: 'q', subject: '수학', raw: 84 }] } } } as never;
+    const r = reviewExamPlan(d, exam as never)!;
+    expect(r.doneRate).toBe(0.75);
+    expect(r.subjects[0]).toMatchObject({ lines: 4, done: 3, actual: 150, score: 84 });
+    expect(r.perLine).toBe(50);
   });
 });

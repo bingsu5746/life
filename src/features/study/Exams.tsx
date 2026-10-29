@@ -458,6 +458,12 @@ function ExamDetail({ id }: { id: string }) {
         </button>
       )}
 
+      {examEnd(exam) < today && exam.plan && (
+        <button className="st-addline" onClick={() => go(`/exams/${exam.id}/plan`)}>
+          <Icon name="target" /> 공부 계획 돌아보기
+        </button>
+      )}
+
       {examEnd(exam) < today && !alive(d.grades).some((g) => g.examId === exam.id) && (
         <button className="st-addline" onClick={() => go(`/exams/grades/from-${exam.id}`)}>
           <Icon name="plus" /> 이 시험 성적 넣기

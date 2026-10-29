@@ -92,6 +92,7 @@ const FIX: Record<Collection, Fix> = {
                 review: cl(x.plan.review, 0, 2, 0.35),
                 weights: isObj(x.plan.weights) ? Object.fromEntries(Object.entries(x.plan.weights).filter(([, v]) => typeof v === 'number').map(([k, v]) => [k, cl(v, 0.5, 2, 1)])) : undefined,
                 done: isObj(x.plan.done) ? Object.fromEntries(Object.entries(x.plan.done).filter(([k, v]) => /^[A-Z]:[\w:-]{1,60}$/.test(k) && isDate(v))) : undefined,
+                started: optDate(x.plan.started),
                 lock: isObj(x.plan.lock) && isDate(x.plan.lock.date) ? { date: x.plan.lock.date, ids: arr(x.plan.lock.ids).filter((i): i is string => typeof i === 'string').slice(0, 200) } : undefined,
               }
             : undefined,
@@ -184,6 +185,7 @@ const FIX: Record<Collection, Fix> = {
     const height = score(x.height, 50, 250);
     return weight !== undefined || height !== undefined ? { ...x, weight, height } : null;
   },
+  todoRules: (x) => (isDate(x.start) ? { ...x, title: str(x.title, '할 일').slice(0, 100), weekdays: ints(x.weekdays, 0, 6), paused: x.paused === true ? true : undefined, created: num(x.created) } : null),
   drillLogs: (x) =>
     isDate(x.date) && typeof x.drillId === 'string'
       ? { ...x, drillId: str(x.drillId).slice(0, 30), made: score(x.made, 0, 1000), shots: score(x.shots, 0, 1000), minutes: score(x.minutes, 0, 600), created: num(x.created) }
@@ -265,7 +267,7 @@ const FIX: Record<Collection, Fix> = {
     doneDate: optDate(x.doneDate),
     created: num(x.created),
   }),
-  diary: (x) => (isDate(x.id) ? { ...x, mood: score(x.mood, 1, 5), title: optStr(x.title)?.slice(0, 60), text: str(x.text).slice(0, 20000), parts: isObj(x.parts) ? Object.fromEntries(Object.entries(x.parts).filter(([k, v]) => /^[a-z]{2,12}$/.test(k) && typeof v === 'string' && v.trim()).slice(0, 12).map(([k, v]) => [k, (v as string).slice(0, 5000)])) : undefined } : null),
+  diary: (x) => (isDate(x.id) ? { ...x, mood: score(x.mood, 1, 5), title: optStr(x.title)?.slice(0, 60), text: str(x.text).slice(0, 20000), parts: isObj(x.parts) ? Object.fromEntries(Object.entries(x.parts).filter(([k, v]) => /^[a-z]{2,12}$/.test(k) && typeof v === 'string' && v.trim()).slice(0, 12).map(([k, v]) => [k, (v as string).slice(0, 5000)])) : undefined, photos: Array.isArray(x.photos) ? x.photos.filter((p): p is string => typeof p === 'string').slice(0, 4) : undefined } : null),
   decks: (x) => ({ ...x, name: str(x.name, '카드 묶음'), subjectId: str(x.subjectId) }),
   cards: (x) => ({ ...x, ...review(x), deckId: str(x.deckId), front: str(x.front), back: str(x.back), created: optNum(x.created), firstSeen: optDate(x.firstSeen) }),
   wordLists: (x) => ({
@@ -403,6 +405,9 @@ export function sanitizeSettings(s: unknown): StudySettings & { updatedAt: numbe
       : undefined,
     fitnessGoal: isObj(x.fitnessGoal) ? { perWeek: score((x.fitnessGoal as Obj).perWeek, 1, 14), minutes: score((x.fitnessGoal as Obj).minutes, 1, 10080) } : undefined,
     monthlyBudget: score(x.monthlyBudget, 1, 1e10),
+    bbGoals: isObj(x.bbGoals) ? { ft: score((x.bbGoals as Obj).ft, 1, 100), fg: score((x.bbGoals as Obj).fg, 1, 100), tp: score((x.bbGoals as Obj).tp, 1, 100) } : undefined,
+    readingGoal: score(x.readingGoal, 1, 1000),
+    examPlanDefaults: isObj(x.examPlanDefaults) ? { weekday: cl((x.examPlanDefaults as Obj).weekday, 0, 900, 150), weekend: cl((x.examPlanDefaults as Obj).weekend, 0, 900, 240), perLine: cl((x.examPlanDefaults as Obj).perLine, 5, 300, 40) } : undefined,
     diaryForm: isObj(x.diaryForm) ? { parts: arr((x.diaryForm as Obj).parts).filter((t): t is string => typeof t === 'string' && /^[a-z]{2,12}$/.test(t)).slice(0, 12), autoFill: (x.diaryForm as Obj).autoFill !== false } : undefined,
     hiddenAreas: x.hiddenAreas === undefined ? undefined : arr(x.hiddenAreas).filter((t): t is string => typeof t === 'string').slice(0, 10),
     gradeGoals: isObj(x.gradeGoals) ? { school: goals((x.gradeGoals as Obj).school), mock: goals((x.gradeGoals as Obj).mock) } : undefined,

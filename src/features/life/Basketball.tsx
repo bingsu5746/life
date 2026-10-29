@@ -5,7 +5,7 @@ import { shortDate } from '../study/dates';
 import { alive, newId, type BasketballStat, type Workout } from '../study/model';
 import { put, remove, useStudy } from '../study/store';
 import { minutesText } from '../study/timer';
-import { ShotSummary } from './ShotCounter';
+import { BbGoals, ShotSummary } from './ShotCounter';
 import { confirmDelete, Empty, go, Icon, Sheet, tap, toast, useToday } from '../study/ui';
 
 const md = (x: string) => shortDate(x).replace(/\(.\)/, '');
@@ -57,6 +57,7 @@ export function Basketball({ sub }: { sub?: string }) {
         </Empty>
       ) : (
         <>
+          <BbGoals />
           <ShotSummary />
           <section className="st-card">
             <h3 className="st-h">

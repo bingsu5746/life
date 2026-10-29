@@ -42,6 +42,12 @@ export interface StudySettings {
   fitnessGoal?: { perWeek?: number; minutes?: number };
   /** 한 달 지출 예산 (원) */
   monthlyBudget?: number;
+  /** 농구 목표 성공률 (%) */
+  bbGoals?: { ft?: number; fg?: number; tp?: number };
+  /** 올해 읽을 책 수 */
+  readingGoal?: number;
+  /** 새 시험 계획의 기본값 (지난 시험 돌아보기에서 정함) */
+  examPlanDefaults?: { weekday: number; weekend: number; perLine: number };
   /** 일기 양식: 쓸 칸들 · 새 일기에 오늘 한 것을 미리 채울지 */
   diaryForm?: { parts: string[]; autoFill: boolean };
   /** 메인 화면에서 숨긴 영역 (예: 'money') */
@@ -117,6 +123,8 @@ export interface ExamPlanSettings {
   done?: Record<string, DateStr>;
   /** 오늘 할 것을 고정한 목록 */
   lock?: { date: DateStr; ids: string[] };
+  /** 계획을 처음 켠 날 */
+  started?: DateStr;
 }
 
 export interface Exam extends Stamp {
@@ -544,6 +552,19 @@ export interface DiaryEntry extends Stamp {
   text: string;
   /** 양식 칸마다 쓴 것 (오늘 한 것 · 좋았던 것 · 꿈 …) */
   parts?: Record<string, string>;
+  /** 사진 (오답 사진처럼 기기에 저장, 최대 4장) */
+  photos?: Id[];
+}
+
+/** 반복 할 일: 정한 요일마다 그날 할 일이 생긴다 */
+export interface TodoRule extends Stamp {
+  id: Id;
+  title: string;
+  /** 0 일 ~ 6 토 (비면 매일) */
+  weekdays: number[];
+  start: DateStr;
+  paused?: boolean;
+  created: number;
 }
 
 /** 농구 혼자 연습 드릴 한 번 (드릴 목록은 life/drills.ts) */
@@ -698,12 +719,13 @@ export interface StudyData {
   movies: Record<Id, Movie>;
   reads: Record<Id, Reading>;
   drillLogs: Record<Id, DrillLog>;
+  todoRules: Record<Id, TodoRule>;
 }
 
 /** 단어는 많아질 수 있어 따로 묶는다 */
 export type WordsData = Record<Id, Word>;
 
-export const COLLECTIONS = ['subjects', 'exams', 'books', 'plans', 'tutors', 'homework', 'notes', 'decks', 'cards', 'wordLists', 'sessions', 'todos', 'habits', 'grades', 'previews', 'assessments', 'blanks', 'conditions', 'weekNotes', 'papers', 'workouts', 'bodyLogs', 'moneyTx', 'savings', 'hobbies', 'hobbyLogs', 'wishes', 'diary', 'moneyRules', 'movies', 'reads', 'drillLogs'] as const;
+export const COLLECTIONS = ['subjects', 'exams', 'books', 'plans', 'tutors', 'homework', 'notes', 'decks', 'cards', 'wordLists', 'sessions', 'todos', 'habits', 'grades', 'previews', 'assessments', 'blanks', 'conditions', 'weekNotes', 'papers', 'workouts', 'bodyLogs', 'moneyTx', 'savings', 'hobbies', 'hobbyLogs', 'wishes', 'diary', 'moneyRules', 'movies', 'reads', 'drillLogs', 'todoRules'] as const;
 export type Collection = (typeof COLLECTIONS)[number];
 
 export const DEFAULT_SETTINGS: StudySettings = {
@@ -755,6 +777,7 @@ export function emptyStudy(): StudyData {
     movies: {},
     reads: {},
     drillLogs: {},
+    todoRules: {},
   };
 }
 

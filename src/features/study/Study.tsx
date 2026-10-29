@@ -1,4 +1,5 @@
 // 공부 도우미: 탭과 하위 화면 (설계 docs/superpowers/specs/2026-10-23-study-planner-design.md)
+import { dueTodoRules } from './todoRules';
 import { pendingExamLocks } from './examPlan';
 import { lazy, Suspense, useEffect, useState } from 'react';
 import './study.css';
@@ -26,6 +27,7 @@ const Money = lazy(() => import('../life/Money').then((m) => ({ default: m.Money
 const Hobby = lazy(() => import('../life/Hobby').then((m) => ({ default: m.Hobby })));
 const Movies = lazy(() => import('../life/Movies').then((m) => ({ default: m.Movies })));
 const Search = lazy(() => import('../life/Search').then((m) => ({ default: m.Search })));
+const LifeWeekPage = lazy(() => import('../life/LifeWeek').then((m) => ({ default: m.LifeWeekPage })));
 const Diary = lazy(() => import('../life/Diary').then((m) => ({ default: m.Diary })));
 const Preview = lazy(() => import('./Preview').then((m) => ({ default: m.Preview })));
 const Translate = lazy(() => import('./Translate').then((m) => ({ default: m.Translate })));
@@ -46,7 +48,8 @@ export function Study({ path, loggedIn, syncReady = true, onLogin }: { path: str
   // 영역: 주소 맨 앞이 없으면 메인, fitness·money·hobby·movies 면 그 영역, 그 밖(study·공부 칸들·설정)은 공부
   const p0 = path[0];
   const isSearch = p0 === 'search';
-  const area: AreaKey = !p0 || isSearch ? 'home' : (AREAS.some((a) => a.key === p0) && p0 !== 'study' ? p0 : 'study') as AreaKey;
+  const isWeek = p0 === 'week';
+  const area: AreaKey = !p0 || isSearch || isWeek ? 'home' : (AREAS.some((a) => a.key === p0) && p0 !== 'study' ? p0 : 'study') as AreaKey;
   const spath = p0 === 'study' ? path.slice(1) : path;
   const tab = area !== 'study' ? '' : TABS.some((t) => t.key === spath[0]) || HIDDEN.includes(spath[0]) ? spath[0] : 'today';
   const [, id, sub] = area === 'study' ? spath : path;
@@ -63,6 +66,12 @@ export function Study({ path, loggedIn, syncReady = true, onLogin }: { path: str
     if (!syncReady) return;
     const locks = pendingExamLocks(d, today);
     if (locks.length) putMany(locks.map((e) => ({ c: 'exams' as const, item: e as never })));
+  }, [d, today, syncReady]);
+  // 반복 할 일: 오늘 것을 만든다
+  useEffect(() => {
+    if (!syncReady) return;
+    const due = dueTodoRules(d, today);
+    if (due.length) putMany(due.map((t) => ({ c: 'todos' as const, item: t as never })));
   }, [d, today, syncReady]);
   // 고정 지출·수입: 날이 된 것을 자동으로 넣는다 (같은 날·같은 규칙은 같은 id 라 두 기기에서 넣어도 하나)
   useEffect(() => {
@@ -89,7 +98,8 @@ export function Study({ path, loggedIn, syncReady = true, onLogin }: { path: str
   const running = id && (sub === 'learn' || sub === 'prep' || sub === 'weak' || (tab === 'review' && (id === 'redo' || id?.startsWith('cards-run') || id?.startsWith('blank-run'))));
 
   let content;
-  if (isSearch) content = <Search q0={path[1] ? decodeURIComponent(path[1]) : ''} />;
+  if (isWeek) content = <LifeWeekPage day={path[1]} />;
+  else if (isSearch) content = <Search q0={path[1] ? decodeURIComponent(path[1]) : ''} />;
   else if (area === 'home') content = <Home loggedIn={loggedIn} onLogin={onLogin} />;
   else if (area === 'fitness') content = <Fitness sub={path[1]} sub2={path[2]} />;
   else if (area === 'money') content = <Money sub={path[1]} />;

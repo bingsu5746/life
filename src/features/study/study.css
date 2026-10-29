@@ -4765,15 +4765,15 @@ body {
   align-items: flex-start;
 }
 
-.st-weekdays {
+.hb-weekdays {
   margin-top: 8px;
 }
-.st-weekdays summary {
+.hb-weekdays summary {
   cursor: pointer;
   color: var(--muted);
   font-size: 0.88rem;
 }
-.st-weekdays > * {
+.hb-weekdays > * {
   margin-top: 8px;
 }
 
@@ -5058,4 +5058,93 @@ body {
 .dr-from {
   color: var(--muted);
   font-weight: 400;
+}
+
+/* 일기 사진 */
+.dy-photos {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.dy-photo {
+  position: relative;
+}
+.dy-img {
+  display: block;
+  width: 96px;
+  height: 96px;
+  object-fit: cover;
+  border-radius: 12px;
+  background: var(--soft);
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+.dy-photo-x {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 24px;
+  height: 24px;
+  border: 0;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.55);
+  color: #fff;
+  font-size: 0.75rem;
+  cursor: pointer;
+}
+.dy-photo-add {
+  display: grid;
+  place-items: center;
+  width: 96px;
+  height: 96px;
+  border: 1px dashed var(--line-strong);
+  border-radius: 12px;
+  color: var(--muted);
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+.dy-thumb .dy-img {
+  width: 100%;
+  height: 160px;
+  margin-top: 8px;
+}
+
+/* 한 주 돌아보기 */
+.lw-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 10px;
+}
+.lw-card {
+  display: grid;
+  gap: 4px;
+  text-align: left;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  cursor: pointer;
+}
+.lw-card small:first-child {
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+.lw-card b {
+  font-size: 1.2rem;
+  letter-spacing: -0.02em;
+}
+.lw-card small {
+  font-size: 0.78rem;
+}
+.lw-up {
+  color: #30a46c;
+}
+.lw-down {
+  color: var(--bad);
+}
+.lw-shots {
+  margin: 6px 0 0;
+  font-size: 0.92rem;
 }

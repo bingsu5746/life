@@ -4,7 +4,7 @@ import { addDays, shortDate } from '../study/dates';
 import { alive, newId, type BasketballStat, type Workout } from '../study/model';
 import { putMany, useStudy } from '../study/store';
 import { Check, Empty, go, toast, useToday } from '../study/ui';
-import { ShotSummary } from './ShotCounter';
+import { BbGoals, ShotSummary } from './ShotCounter';
 import { AREA_NAME, buildSession, DRILLS, recentStats, totalMinutes, weaknesses, type Drill, type Need } from './drills';
 
 const MIN = [20, 30, 45, 60];
@@ -42,7 +42,7 @@ export function DrillsPage() {
   const [open, setOpen] = useState<string | null>(null);
   const [made, setMade] = useState<Record<string, string>>({});
   const stats = recentStats(d, today);
-  const weak = weaknesses(stats);
+  const weak = weaknesses(stats, d.settings.bbGoals);
   const day = Math.floor(Date.parse(`${today}T00:00:00Z`) / 86_400_000);
   const logs = alive(d.drillLogs).sort((a, b) => b.date.localeCompare(a.date) || b.created - a.created);
   const recent = [...new Set(logs.filter((l) => l.date >= addDays(today, -3)).map((l) => l.drillId))];
@@ -74,6 +74,7 @@ export function DrillsPage() {
       <div className="st-page-head">
         <h2>농구 연습</h2>
       </div>
+      <BbGoals />
       <ShotSummary />
       <section className="st-card dr-opts">
         <div className="st-chips" aria-label="시간">

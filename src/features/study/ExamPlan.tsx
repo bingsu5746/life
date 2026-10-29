@@ -1,10 +1,11 @@
 // 시험 공부 자동 계획 화면 + 오늘 화면에 붙는 오늘 할 것
 import { useState } from 'react';
 import { dday, shortDate } from './dates';
-import { buildExamPlan, DEFAULT_PLAN, suggestedMinutes, todayExamItems, toggleItem, type PlanDay } from './examPlan';
+import { buildExamPlan, DEFAULT_PLAN, reviewExamPlan, suggestedMinutes, todayExamItems, toggleItem, type PlanDay } from './examPlan';
 import type { Exam, ExamPlanSettings } from './model';
-import { put, useStudy } from './store';
-import { Bar, Check, Empty, Field, go, SubjectDot, useToday } from './ui';
+import { put, setSettings, useStudy } from './store';
+import { examEnd } from './exams';
+import { Bar, Check, Empty, Field, go, SubjectDot, toast, useToday } from './ui';
 
 const hm = (m: number) => (m >= 60 ? `${Math.floor(m / 60)}시간${m % 60 ? ` ${m % 60}분` : ''}` : `${m}분`);
 const KIND_LABEL = { learn: '공부', notes: '오답', review: '복습', skim: '훑어보기' } as const;
@@ -26,7 +27,9 @@ export function ExamPlanPage({ id }: { id: string }) {
   const scopes = (exam.scopes ?? []).filter((s) => s.lines.length);
   const plan = exam.plan;
   const result = buildExamPlan(d, exam, today);
-  const save = (p: Partial<ExamPlanSettings>) => put('exams', { ...exam, plan: { ...(exam.plan ?? { on: false, ...DEFAULT_PLAN }), ...p } });
+  const base: ExamPlanSettings = { on: false, ...DEFAULT_PLAN, ...(d.settings.examPlanDefaults ?? {}) };
+  const save = (p: Partial<ExamPlanSettings>) => put('exams', { ...exam, plan: { ...(exam.plan ?? base), ...(p.on && !exam.plan?.started ? { started: today } : {}), ...p } });
+  const ended = examEnd(exam) < today;
   const sug = suggestedMinutes(d, today);
   return (
     <div className="st-page narrow">
@@ -37,7 +40,9 @@ export function ExamPlanPage({ id }: { id: string }) {
         <h2>공부 계획 · {exam.name}</h2>
       </div>
 
-      {!scopes.length ? (
+      {ended && plan ? (
+        <PlanReviewCard exam={exam} />
+      ) : !scopes.length ? (
         <Empty title="먼저 시험 범위를 넣어 주세요">
           <p>과목마다 시험 범위(단원·쪽수 한 줄씩)를 넣으면, 시험 날까지 날마다 나눠 줘요.</p>
           <button className="btn btn-primary" onClick={() => go(`/exams/${id}`)}>
@@ -48,7 +53,7 @@ export function ExamPlanPage({ id }: { id: string }) {
         <section className="st-card st-form">
           <h3 className="st-h">하루에 쓸 수 있는 시간</h3>
           <p className="st-sub">시험 범위의 줄마다 처음 공부할 날을 정하고, 마감 전에는 복습과 시험 전날 훑어보기를 넣어 드려요. 못 한 건 남은 날에 다시 나눠요.</p>
-          <TimeInputs value={plan ?? { on: false, ...DEFAULT_PLAN }} onChange={save} />
+          <TimeInputs value={plan ?? base} onChange={save} />
           {(sug.weekday !== (plan?.weekday ?? DEFAULT_PLAN.weekday) || sug.weekend !== (plan?.weekend ?? DEFAULT_PLAN.weekend)) && (
             <button className="st-link" onClick={() => save(sug)}>
               평소 공부한 시간으로 (평일 {hm(sug.weekday)} · 주말 {hm(sug.weekend)})
@@ -237,5 +242,59 @@ export function ExamToday({ today }: { today: string }) {
         );
       })}
     </section>
+  );
+}
+
+/** 끝난 시험: 계획대로 한 정도 · 실제 공부 시간 · 점수, 다음 계획에 쓸 값 */
+function PlanReviewCard({ exam }: { exam: Exam }) {
+  const d = useStudy();
+  const r = reviewExamPlan(d, exam);
+  if (!r) return <p className="st-hint">돌아볼 계획이 없어요.</p>;
+  const next = { weekday: r.weekday ?? exam.plan!.weekday, weekend: r.weekend ?? exam.plan!.weekend, perLine: r.perLine ?? exam.plan!.perLine };
+  const hasScore = r.subjects.some((s) => s.score !== null);
+  return (
+    <>
+      <section className="st-card">
+        <h3 className="st-h">시험 돌아보기</h3>
+        <Bar value={Math.round(r.doneRate * 100)} max={100} label="범위 끝낸 비율" />
+        <p className="st-hint">
+          시험 범위 {Math.round(r.doneRate * 100)}%를 시험 전에 끝냈어요 ({shortDate(r.from)} ~ {shortDate(r.to)})
+        </p>
+        {r.subjects.map((s) => (
+          <div key={s.subjectId} className="xp-subj">
+            <div className="st-inline between">
+              <span>
+                <SubjectDot id={s.subjectId} d={d} /> <b>{d.subjects[s.subjectId]?.name ?? '과목'}</b>
+              </span>
+              <small className="st-muted">{s.score !== null ? `${s.score}점` : '점수 없음'}</small>
+            </div>
+            <small className="st-muted">
+              범위 {s.done}/{s.lines} · 공부 시간 {hm(s.actual)} / 계획 {hm(s.planned)}
+              {s.actual === 0 ? ' (이 과목으로 적은 공부 시간이 없어요)' : ''}
+            </small>
+          </div>
+        ))}
+        {!hasScore && (
+          <button className="st-link" onClick={() => go(`/exams/grades/from-${exam.id}`)}>
+            이 시험 성적 넣기 (점수와 나란히 볼 수 있어요)
+          </button>
+        )}
+      </section>
+      <section className="st-card">
+        <h3 className="st-h">다음 시험 계획에</h3>
+        <p className="st-sub">
+          이번에 실제로는 평일 {r.weekday !== null ? hm(r.weekday) : '—'} · 주말 {r.weekend !== null ? hm(r.weekend) : '—'}씩 공부했고, 범위 한 줄에 {r.perLine !== null ? `${r.perLine}분` : '— (자료가 모자라요)'}쯤 걸렸어요. (공부 시간은 기록 칸에 과목을 골라 적은 것만 세요)
+        </p>
+        <button
+          className="btn btn-sm"
+          onClick={() => {
+            setSettings({ examPlanDefaults: next });
+            toast('다음에 만드는 시험 계획부터 이 값으로 시작해요');
+          }}
+        >
+          다음 계획 기본값으로: 평일 {hm(next.weekday)} · 주말 {hm(next.weekend)} · 한 줄 {next.perLine}분
+        </button>
+      </section>
+    </>
   );
 }

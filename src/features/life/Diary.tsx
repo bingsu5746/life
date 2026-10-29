@@ -1,5 +1,6 @@
 // 일기: 하루에 하나, 기분과 글. 달별로 모아 보고 찾기
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { addPhoto, photoUrl, removePhoto } from '../study/photos';
 import { addDays, longDate, shortDate } from '../study/dates';
 import { alive, type DiaryEntry } from '../study/model';
 import { put, remove, setSettings, useStudy } from '../study/store';
@@ -71,6 +72,11 @@ function List({ month, today }: { month: string; today: string }) {
               {e.title && <small className="st-muted">{shortDate(e.id)}</small>}
             </div>
             <p className="dy-preview">{e.text || Object.values(e.parts ?? {})[0]}</p>
+            {e.photos?.[0] && (
+              <div className="dy-thumb">
+                <Photo id={e.photos[0]} />
+              </div>
+            )}
           </section>
         ))
       )}
@@ -91,11 +97,40 @@ function Write({ date, today }: { date: string; today: string }) {
   const [parts, setParts] = useState<Record<string, string>>(() => ({ ...(cur?.parts ?? {}), ...(!cur && form.autoFill && form.parts.includes('done') && lines.length ? { done: lines.join('\n') } : {}) }));
   const shownParts = DIARY_PARTS.filter((p) => form.parts.includes(p.key) || parts[p.key]?.trim());
   const clean = (x: Record<string, string>) => Object.fromEntries(Object.entries(x).filter(([, v]) => v.trim()));
-  const changed = mood !== (cur?.mood ?? 0) || title !== (cur?.title ?? '') || text !== (cur?.text ?? '') || JSON.stringify(clean(parts)) !== JSON.stringify(clean(cur?.parts ?? {}));
+  const [photos, setPhotos] = useState<string[]>(cur?.photos ?? []);
+  const [busy, setBusy] = useState(false);
+  // 이 화면에서 넣은 사진: 저장하지 않고 나가면 지운다
+  const added = useRef<string[]>([]);
+  const savedRef = useRef(false);
+  useEffect(
+    () => () => {
+      if (!savedRef.current) for (const p of added.current) void removePhoto(p);
+    },
+    [],
+  );
+  async function addPhotos(files: FileList) {
+    setBusy(true);
+    const ids: string[] = [];
+    for (const f of [...files].slice(0, 4 - photos.length)) {
+      try {
+        const r = await addPhoto(f);
+        ids.push(r.id);
+        added.current.push(r.id);
+        if (r.error) toast(`이 기기에는 저장했어요. 서버에는 나중에 올려요 (${r.error})`);
+      } catch {
+        toast('사진을 넣지 못했어요');
+      }
+    }
+    setPhotos((x) => [...x, ...ids].slice(0, 4));
+    setBusy(false);
+  }
+  const changed = JSON.stringify(photos) !== JSON.stringify(cur?.photos ?? []) || mood !== (cur?.mood ?? 0) || title !== (cur?.title ?? '') || text !== (cur?.text ?? '') || JSON.stringify(clean(parts)) !== JSON.stringify(clean(cur?.parts ?? {}));
   function save() {
     const p = clean(parts);
-    if (!text.trim() && !mood && !Object.keys(p).length) return toast('한 줄이라도 써 주세요');
-    put('diary', { id: date, mood: mood || undefined, title: title.trim() || undefined, text, parts: Object.keys(p).length ? p : undefined } as DiaryEntry);
+    if (!text.trim() && !mood && !Object.keys(p).length && !photos.length) return toast('한 줄이라도 써 주세요');
+    savedRef.current = true;
+    for (const old of cur?.photos ?? []) if (!photos.includes(old)) void removePhoto(old);
+    put('diary', { id: date, mood: mood || undefined, title: title.trim() || undefined, text, parts: Object.keys(p).length ? p : undefined, photos: photos.length ? photos : undefined } as DiaryEntry);
     toast('일기를 저장했어요');
     go(`/diary/${monthOf(date)}`);
   }
@@ -138,12 +173,29 @@ function Write({ date, today }: { date: string; today: string }) {
           </label>
         ))}
         <textarea className="st-input dy-text" rows={shownParts.length ? 8 : 12} value={text} onChange={(e) => setText(e.target.value)} placeholder="하고 싶은 말을 자유롭게…" aria-label="일기" />
+        <div className="dy-photos">
+          {photos.map((id) => (
+            <div key={id} className="dy-photo">
+              <Photo id={id} />
+              <button type="button" className="dy-photo-x" aria-label="사진 빼기" onClick={() => setPhotos(photos.filter((x) => x !== id))}>
+                ✕
+              </button>
+            </div>
+          ))}
+          {photos.length < 4 && (
+            <label className="dy-photo-add">
+              {busy ? '넣는 중…' : '＋ 사진'}
+              <input type="file" accept="image/*" multiple hidden disabled={busy} onChange={(e) => e.target.files?.length && void addPhotos(e.target.files)} />
+            </label>
+          )}
+        </div>
         <div className="st-row end">
           {cur && (
             <button
               className="btn btn-sm st-danger"
               onClick={() => {
                 if (!confirmDelete(`${shortDate(date)} 일기`)) return;
+                for (const ph of cur.photos ?? []) void removePhoto(ph);
                 remove('diary', date);
                 go(`/diary/${monthOf(date)}`);
               }}
@@ -216,4 +268,18 @@ function Form() {
       </section>
     </div>
   );
+}
+
+function Photo({ id }: { id: string }) {
+  const [url, setUrl] = useState<string | null | undefined>(undefined);
+  useEffect(() => {
+    let on = true;
+    void photoUrl(id).then((u) => on && setUrl(u));
+    return () => {
+      on = false;
+    };
+  }, [id]);
+  if (url === undefined) return <div className="dy-img loading" />;
+  if (!url) return <div className="dy-img missing">사진 없음</div>;
+  return <img className="dy-img" src={url} alt="일기 사진" />;
 }

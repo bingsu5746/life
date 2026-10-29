@@ -32,6 +32,7 @@ function Todos({ today }: { today: string }) {
   const [due, setDue] = useState('');
   const [showDone, setShowDone] = useState(false);
   const [edit, setEdit] = useState<Todo | null>(null);
+  const [rules, setRules] = useState(false);
   const all = alive(d.todos);
   const open = all.filter((t) => !t.done).sort((a, b) => Number(!!b.star) - Number(!!a.star) || (a.due ?? '9999').localeCompare(b.due ?? '9999') || a.created - b.created);
   const done = all.filter((t) => t.done).sort((a, b) => (b.doneAt ?? 0) - (a.doneAt ?? 0));
@@ -48,7 +49,12 @@ function Todos({ today }: { today: string }) {
   }
   return (
     <section className="st-card">
-      <h3 className="st-h">할 일</h3>
+      <div className="st-inline between">
+        <h3 className="st-h">할 일</h3>
+        <button className="st-link" onClick={() => setRules(true)}>
+          반복{alive(d.todoRules).length ? ` ${alive(d.todoRules).length}` : ''}
+        </button>
+      </div>
       <form
         className="st-inline"
         onSubmit={(e) => {
@@ -106,7 +112,57 @@ function Todos({ today }: { today: string }) {
           </div>
         ))}
       {edit && <TodoSheet t={edit} onClose={() => setEdit(null)} />}
+      {rules && <RulesSheet today={today} onClose={() => setRules(false)} />}
     </section>
+  );
+}
+
+/** 반복 할 일 목록 · 넣기 */
+function RulesSheet({ today, onClose }: { today: string; onClose: () => void }) {
+  const d = useStudy();
+  const [title, setTitle] = useState('');
+  const [weekdays, setWeekdays] = useState<number[]>([]);
+  const list = alive(d.todoRules).sort((a, b) => a.created - b.created);
+  const when = (w: number[]) => (w.length ? [...w].sort((a, b) => ((a + 6) % 7) - ((b + 6) % 7)).map((x) => WEEKDAYS[x]).join('·') : '매일');
+  return (
+    <Sheet title="반복 할 일" onClose={onClose}>
+      <div className="st-form">
+        {list.map((r) => (
+          <div key={r.id} className={`st-item ${r.paused ? 'mn-paused' : ''}`}>
+            <div className="st-item-main">
+              <div className="st-item-title">{r.title}</div>
+              <div className="st-item-sub">
+                {when(r.weekdays)}
+                {r.paused ? ' · 멈춤' : ''}
+              </div>
+            </div>
+            <button className="st-link" onClick={() => put('todoRules', { ...r, paused: r.paused ? undefined : true })}>
+              {r.paused ? '다시' : '멈춤'}
+            </button>
+            <button className="st-x" aria-label={`${r.title} 지우기`} onClick={() => confirmDelete(`「${r.title}」 반복`) && remove('todoRules', r.id)}>
+              ✕
+            </button>
+          </div>
+        ))}
+        {!list.length && <p className="st-hint">매일 또는 정한 요일마다 그날 할 일이 저절로 생겨요. 예: 월·수·금 「영단어 Day 복습」</p>}
+        <input className="st-input" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="반복할 일" aria-label="반복할 일" />
+        <WeekdayPicker value={weekdays} onChange={setWeekdays} label="요일 (안 고르면 매일)" />
+        <div className="st-row end">
+          <button
+            className="btn btn-primary"
+            disabled={!title.trim()}
+            onClick={() => {
+              put('todoRules', { id: newId(), title: title.trim().slice(0, 100), weekdays, start: today, created: Date.now() });
+              setTitle('');
+              setWeekdays([]);
+              toast('반복 할 일을 만들었어요');
+            }}
+          >
+            만들기
+          </button>
+        </div>
+      </div>
+    </Sheet>
   );
 }
 
@@ -266,7 +322,7 @@ function HabitWeekdays({ habits, today }: { habits: Habit[]; today: string }) {
   const known = rates.filter((r) => r.pct !== null && r.due >= 3);
   const worst = known.length > 1 ? [...known].sort((a, b) => a.pct! - b.pct!)[0] : null;
   return (
-    <details className="st-weekdays">
+    <details className="hb-weekdays">
       <summary>요일별 달성률{worst && ` · ${WEEKDAYS[worst.weekday]}요일에 제일 잘 빠져요`}</summary>
       {habits.length > 1 && (
         <select className="st-input sm" value={pick} onChange={(e) => setPick(e.target.value)} aria-label="습관 고르기">

@@ -92,7 +92,12 @@ export function Home(_: { loggedIn: boolean; onLogin: () => void }) {
     <div className="hm">
       <header className="hm-head">
         <h2>{longDate(today)}</h2>
-        <p className="st-sub">오늘도 하나씩 해 봐요</p>
+        <p className="st-sub">
+          오늘도 하나씩 해 봐요 ·{' '}
+          <button className="st-link" onClick={() => go('/week')}>
+            이번 주 돌아보기
+          </button>
+        </p>
       </header>
       <div className="hm-grid">
         {AREAS.filter((a) => a.key !== 'home' && show(a.key)).map((a) => {

@@ -440,14 +440,16 @@ export interface Weakness {
 }
 
 /** 기록으로 본 약한 부분 (가장 약한 순, 기록이 적으면 빈 목록) */
-export function weaknesses(s: Stats): Weakness[] {
+/** goals: 내가 정한 목표 성공률(%)이 있으면 그 값을 기준으로 */
+export function weaknesses(s: Stats, goals: { ft?: number; fg?: number; tp?: number } = {}): Weakness[] {
+  const g = { ft: (goals.ft ?? 70) / 100, tp: (goals.tp ?? 33) / 100, fg: (goals.fg ?? 45) / 100 };
   const out: (Weakness & { gap: number })[] = [];
   const ft = pct(s.ft);
-  if (ft !== null && ft < 0.7) out.push({ area: 'ft', gap: 0.7 - ft, why: `자유투 ${Math.round(ft * 100)}% (${s.ft.m}/${s.ft.a})` });
+  if (ft !== null && ft < g.ft) out.push({ area: 'ft', gap: g.ft - ft, why: `자유투 ${Math.round(ft * 100)}% (${s.ft.m}/${s.ft.a})` });
   const tp = pct(s.tp);
-  if (tp !== null && tp < 0.33) out.push({ area: 'three', gap: 0.33 - tp, why: `3점 ${Math.round(tp * 100)}% (${s.tp.m}/${s.tp.a})` });
+  if (tp !== null && tp < g.tp) out.push({ area: 'three', gap: g.tp - tp, why: `3점 ${Math.round(tp * 100)}% (${s.tp.m}/${s.tp.a})` });
   const fg = pct(s.fg);
-  if (fg !== null && fg < 0.45) out.push({ area: 'shoot', gap: 0.45 - fg, why: `2점 ${Math.round(fg * 100)}% (${s.fg.m}/${s.fg.a})` });
+  if (fg !== null && fg < g.fg) out.push({ area: 'shoot', gap: g.fg - fg, why: `2점 ${Math.round(fg * 100)}% (${s.fg.m}/${s.fg.a})` });
   if (s.games >= 2 && s.ast / s.games < 1.5) out.push({ area: 'pass', gap: 0.05, why: `경기당 어시스트 ${Math.round((s.ast / s.games) * 10) / 10}` });
   if (s.games >= 2 && s.reb / s.games < 3) out.push({ area: 'reb', gap: 0.04, why: `경기당 리바운드 ${Math.round((s.reb / s.games) * 10) / 10}` });
   return out.sort((a, b) => b.gap - a.gap).map(({ gap: _g, ...w }) => w);

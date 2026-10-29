@@ -2,7 +2,7 @@
 import { useState } from 'react';
 import { addDays, shortDate } from '../study/dates';
 import { alive, newId, type Reading } from '../study/model';
-import { put, remove, useStudy } from '../study/store';
+import { put, remove, setSettings, useStudy } from '../study/store';
 import { Bar, confirmDelete, Empty, Field, Icon, Sheet, tap, toast, useToday } from '../study/ui';
 import { StarInput, starText } from './MovieParts';
 
@@ -47,6 +47,7 @@ export function ReadingPage() {
           <Icon name="plus" />
         </button>
       </div>
+      <ReadGoal done={doneYear} today={today} />
       {all.length > 0 && (
         <div className="mv-summary">
           <span>
@@ -173,5 +174,60 @@ function ReadSheet({ item, today, onClose }: { item: Partial<Reading>; today: st
         </div>
       </div>
     </Sheet>
+  );
+}
+
+/** 올해 목표: 몇 권 · 남은 달에 한 달 몇 권 */
+export function goalPace(goal: number, done: number, today: string): { left: number; perMonth: number; onTrack: boolean } {
+  const month = Number(today.slice(5, 7));
+  const left = Math.max(0, goal - done);
+  const monthsLeft = 12 - month + 1;
+  // 지금까지 지나간 몫 (이번 달은 날짜 비율만큼)
+  const day = Number(today.slice(8, 10));
+  const expected = (goal * (month - 1 + day / 31)) / 12;
+  return { left, perMonth: Math.round((left / monthsLeft) * 10) / 10, onTrack: done >= Math.floor(expected) };
+}
+
+function ReadGoal({ done, today }: { done: number; today: string }) {
+  const d = useStudy();
+  const goal = d.settings.readingGoal;
+  const [edit, setEdit] = useState(false);
+  const [v, setV] = useState(goal?.toString() ?? '');
+  if (edit)
+    return (
+      <div className="st-inline">
+        올해
+        <input className="st-input xs" inputMode="numeric" autoFocus value={v} onChange={(e) => setV(e.target.value.replace(/\D/g, '').slice(0, 3))} aria-label="올해 읽을 책 수" />권 읽기
+        <button
+          className="btn btn-sm btn-primary"
+          onClick={() => {
+            setSettings({ readingGoal: Number(v) > 0 ? Number(v) : undefined });
+            setEdit(false);
+          }}
+        >
+          저장
+        </button>
+      </div>
+    );
+  if (!goal)
+    return (
+      <button className="st-link" onClick={() => setEdit(true)}>
+        올해 독서 목표 정하기
+      </button>
+    );
+  const p = goalPace(goal, done, today);
+  return (
+    <section className="st-card">
+      <div className="st-inline between">
+        <h3 className="st-h">
+          올해 {done}/{goal}권
+        </h3>
+        <button className="st-link" onClick={() => setEdit(true)}>
+          고치기
+        </button>
+      </div>
+      <Bar value={Math.min(done, goal)} max={goal} label="올해 독서 목표" />
+      <p className="st-hint">{p.left ? `남은 ${p.left}권 · 한 달에 ${p.perMonth}권씩 읽으면 돼요${p.onTrack ? '' : ' (조금 늦어요)'}` : '올해 목표를 이뤘어요!'}</p>
+    </section>
   );
 }

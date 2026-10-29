@@ -1,12 +1,13 @@
 // 알림 글 만들기: 앞으로 7일 동안 날짜·시각마다 「오늘 할 것」「내일 준비」를 미리 계산해 서버에 맡긴다.
 // (서버는 공부 자료를 열어 보지 않고, 정한 시각에 이 글을 그대로 보낸다)
-import { addDays, diffDays } from './dates';
+import { addDays, diffDays, weekday } from './dates';
 import { upcomingExams, timetable } from './exams';
 import { buildExamPlan } from './examPlan';
 import { alive, type DateStr, type StudyData, type WordsData } from './model';
 import { planViews, homeworkViews } from './select';
 import { classesOn } from './timetable';
 import { ruleDates } from '../life/calc';
+import { lifeWeek } from '../life/lifeWeek';
 
 export interface DigestEntry {
   date: DateStr;
@@ -35,6 +36,16 @@ export function weakQuiz(words: WordsData, date: DateStr, n = 3): string[] {
   const day = Math.floor(Date.parse(`${date}T00:00:00Z`) / 86_400_000);
   const start = (day * n) % weak.length;
   return Array.from({ length: Math.min(n, weak.length) }, (_, i) => weak[(start + i) % weak.length].term);
+}
+
+/** 일요일 저녁: 이번 주 한 줄 요약 */
+export function weekBody(d: StudyData, date: DateStr, today: DateStr): string {
+  const w = lifeWeek(d, date, today);
+  const hm = (m: number) => (m >= 60 ? `${Math.round((m / 60) * 10) / 10}시간` : `${m}분`);
+  const parts = [`공부 ${hm(w.study.now)}`, `운동 ${w.workout.days}일`, `쓴 돈 ${w.spent.now.toLocaleString('ko-KR')}원`];
+  if (w.movies.length) parts.push(`영화 ${w.movies.length}편`);
+  if (w.pages) parts.push(`책 ${w.pages}쪽`);
+  return `이번 주 ${parts.join(' · ')} (눌러서 돌아보기)`;
 }
 
 /** 1월 1일이면 지난해 (본 영화가 있을 때만) */
@@ -119,7 +130,8 @@ export function buildDigest(d: StudyData, words: WordsData, today: DateStr, time
       const am = Number(t.slice(0, 2)) < 15;
       const y = am ? awardsYear(d, date) : null;
       const weak = am && weakQuiz(words, date).length > 0;
-      out.push({ date, slot, title: y ? '🏆 영화 시상식' : am ? '오늘 할 것' : '내일 준비', body: am ? morning(d, words, today, date) : evening(d, today, date), url: y ? '/movies/ceremony' : weak ? '/words' : undefined });
+      const sunday = !am && weekday(date) === 0;
+      out.push({ date, slot, title: y ? '🏆 영화 시상식' : sunday ? '내일 준비 · 이번 주 돌아보기' : am ? '오늘 할 것' : '내일 준비', body: sunday ? `${evening(d, today, date)} · ${weekBody(d, date, today)}` : am ? morning(d, words, today, date) : evening(d, today, date), url: y ? '/movies/ceremony' : sunday ? '/week' : weak ? '/words' : undefined });
     });
   }
   return out.slice(0, 24);
