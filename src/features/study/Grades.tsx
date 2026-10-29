@@ -295,7 +295,7 @@ function GradeSheet({ record, kind: kind0, fromExamId, onSaved, onClose }: { rec
       ]
     : [
         { k: 'raw', label: '원점수', lo: 0, hi: 1000 },
-        { k: 'standard', label: '표준', lo: 0, hi: 300 },
+        { k: 'standard', label: '표준점수', lo: 0, hi: 300 },
         { k: 'percentile', label: '백분위', lo: 0, hi: 100 },
         { k: 'grade', label: '등급', lo: 1, hi: 9 },
       ];

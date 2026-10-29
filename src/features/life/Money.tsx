@@ -94,7 +94,7 @@ export function Money({ sub }: { sub?: string }) {
                 </p>
               </>
             ) : (
-              <button className="st-link" onClick={() => setBudgetOpen(true)}>
+              <button className="st-link mn-set" onClick={() => setBudgetOpen(true)}>
                 한 달 예산 정하기
               </button>
             )}
@@ -138,10 +138,12 @@ export function Money({ sub }: { sub?: string }) {
                       <div key={t.id} className="st-item st-tap" {...tap(() => setEdit(t))}>
                         <div className="st-item-main">
                           <div className="st-item-title">{t.memo || t.category}</div>
-                          <div className="st-item-sub">
-                            {t.category}
-                            {t.ruleId ? ' · 고정' : ''}
-                          </div>
+                          {(t.memo || t.ruleId) && (
+                            <div className="st-item-sub">
+                              {t.memo ? t.category : ''}
+                              {t.ruleId ? `${t.memo ? ' · ' : ''}고정` : ''}
+                            </div>
+                          )}
                         </div>
                         <b className={t.type === 'in' ? 'mn-in' : ''}>
                           {t.type === 'in' ? '+' : '−'}
@@ -571,8 +573,8 @@ function WeekLimit({ today }: { today: string }) {
     );
   if (!lim)
     return (
-      <button className="st-link" onClick={() => setEdit(true)}>
-        일주일 한도 정하기 (넘으면 알림)
+      <button className="st-link mn-set" onClick={() => setEdit(true)}>
+        일주일 한도 정하기
       </button>
     );
   return (

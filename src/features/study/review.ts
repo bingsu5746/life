@@ -43,12 +43,12 @@ export function newToday<T extends Review & { firstSeen?: DateStr; created?: num
 }
 
 /** 상자 이름: 0 → 새 단어, 그 밖엔 「2번 상자 · 3일」 (간격은 설정에서 바꿀 수 있다) */
-export const boxLabel = (box: number, intervals: number[]) => (box === 0 ? '새 단어' : `${box}번 상자 · ${intervals[box - 1] ?? '?'}일`);
+export const boxLabel = (box: number, intervals: number[]) => (box === 0 ? '새 단어' : `${box}단계 · ${intervals[box - 1] ?? '?'}일 간격`);
 
 /** 3일 뒤 · 내일 · 오늘 */
 export function dueText(r: Review, today: DateStr): string {
-  if (r.learned) return '익힘';
-  if (r.box === 0) return '아직 안 봄';
+  if (r.learned) return '외움';
+  if (r.box === 0) return '새 단어';
   const n = diffDays(today, r.due);
   return n <= 0 ? '오늘' : n === 1 ? '내일' : `${n}일 뒤`;
 }

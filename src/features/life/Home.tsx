@@ -54,7 +54,7 @@ export function Home(_: { loggedIn: boolean; onLogin: () => void }) {
     }
   > = {
     study: {
-      lines: [sum.total ? (sum.left ? `오늘 할 것 ${sum.left}개 남음` : '오늘 할 것 끝') : '오늘 정해 둔 공부가 없어요', `오늘 공부 ${minutesText(studied)}`],
+      lines: [sum.total ? (sum.left ? `오늘 할 것 ${sum.left}개 남음` : '오늘 할 것 다 했어요') : '오늘 정해 둔 공부가 없어요', `오늘 공부 ${minutesText(studied)}`],
       badge: exam ? { big: dday(today, exam.date), small: exam.name } : undefined,
       streak: dayStreak(
         alive(d.sessions)
@@ -64,7 +64,7 @@ export function Home(_: { loggedIn: boolean; onLogin: () => void }) {
       ),
     },
     fitness: {
-      lines: [`이번 주 ${wkDays}${goal ? `/${goal}` : ''}일 운동`, didToday ? '오늘 운동했어요' : workoutStreak(alive(d.workouts), today) ? `${workoutStreak(alive(d.workouts), today)}일 연속` : '오늘은 아직'],
+      lines: [`이번 주 ${wkDays}${goal ? `/${goal}` : ''}일 운동`, didToday ? '오늘 운동했어요' : workoutStreak(alive(d.workouts), today) ? `${workoutStreak(alive(d.workouts), today)}일 연속` : '오늘은 아직 안 했어요'],
       action: didToday ? undefined : { label: '운동 넣기', to: '/fitness/new' },
       streak: workoutStreak(alive(d.workouts), today),
     },

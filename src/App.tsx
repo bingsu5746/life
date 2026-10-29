@@ -22,7 +22,7 @@ const parse = () =>
     .filter(Boolean)
     .map(safeDecode);
 
-const SYNC_TEXT: Record<SyncStatus, string> = { local: '이 기기에만 저장', syncing: '동기화 중…', saved: '서버에 저장됨', error: '동기화 실패 (나중에 다시 해요)' };
+const SYNC_TEXT: Record<SyncStatus, string> = { local: '이 기기에만 저장', syncing: '동기화 중…', saved: '서버에 저장됨', error: '동기화 실패 (잠시 뒤 다시 시도해요)' };
 
 export default function App() {
   const [path, setPath] = useState(parse);

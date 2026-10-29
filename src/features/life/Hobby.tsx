@@ -15,7 +15,7 @@ const WISH_KIND: Record<WishItem['kind'], string> = {
   show: '드라마',
   game: '게임',
   place: '가 볼 곳',
-  other: '그 밖',
+  other: '기타',
 };
 // 영화는 「영화」 칸에서 따로 (예전에 넣은 영화만 여기 남는다)
 const STATUS: Record<WishItem['status'], string> = {
@@ -66,11 +66,11 @@ function HobbyMain({ sub, view }: { sub?: string; view: 'main' | 'wish' }) {
           </button>
         ) : (
           <button className="btn btn-sm btn-primary" onClick={() => (hobbies.length ? setLog('new') : setHobbyEdit('new'))}>
-            <Icon name="plus" /> {hobbies.length ? '한 것 넣기' : '취미 만들기'}
+            <Icon name="plus" /> {hobbies.length ? '기록 넣기' : '취미 만들기'}
           </button>
         )}
       </div>
-      {view === 'main' && (
+      {view === 'main' && hobbies.length > 0 && (
         <>
 
       <section className="st-card">
@@ -80,7 +80,6 @@ function HobbyMain({ sub, view }: { sub?: string; view: 'main' | 'wish' }) {
             ＋ 취미
           </button>
         </div>
-        {!hobbies.length && <p className="st-hint">기타·그림·독서·게임처럼 꾸준히 하고 싶은 취미를 만들고, 한 시간을 적어 보세요.</p>}
         {hobbies.map((x) => (
           <div key={x.id} className="st-subj-row">
             <span className="st-tap" {...tap(() => setHobbyEdit(x))}>
@@ -160,7 +159,7 @@ function HobbyMain({ sub, view }: { sub?: string; view: 'main' | 'wish' }) {
               </div>
               {w.status !== 'done' && (
                 <button className="btn btn-sm" onClick={() => (w.status === 'want' ? put('wishes', { ...w, status: 'doing' }) : setWish({ ...w, status: 'done', doneDate: today }))}>
-                  {w.status === 'want' ? '시작' : '끝냈어요'}
+                  {w.status === 'want' ? '시작하기' : '끝냈어요'}
                 </button>
               )}
             </div>
@@ -169,9 +168,12 @@ function HobbyMain({ sub, view }: { sub?: string; view: 'main' | 'wish' }) {
       </section>
       )}
 
-      {view === 'main' && !hobbies.length && !alive(d.wishes).length && (
-        <Empty icon="🎸" title="좋아하는 것을 넣어 보세요">
-          <p>공부만 하면 지쳐요. 취미에 쓴 시간도 적어 두면 한 주를 돌아볼 때 도움이 돼요.</p>
+      {view === 'main' && !hobbies.length && (
+        <Empty icon="🎸" title="좋아하는 취미를 만들어 보세요">
+          <p>기타·그림·게임처럼 꾸준히 하고 싶은 것을 만들고 한 시간을 적어 두면, 한 주를 돌아볼 때 보여 드려요.</p>
+          <button className="btn btn-primary" onClick={() => setHobbyEdit('new')}>
+            취미 만들기
+          </button>
         </Empty>
       )}
 
@@ -190,7 +192,7 @@ function LogSheet({ item, today, onClose }: { item?: HobbyLog; today: string; on
   const [minutes, setMinutes] = useState(item?.minutes?.toString() ?? '30');
   const [memo, setMemo] = useState(item?.memo ?? '');
   return (
-    <Sheet title={item ? '고치기' : '취미 한 것 넣기'} onClose={onClose}>
+    <Sheet title={item ? '취미 기록 고치기' : '취미 기록 넣기'} onClose={onClose}>
       <div className="st-form">
         <div className="st-chips">
           {hobbies.map((x) => (
@@ -203,7 +205,7 @@ function LogSheet({ item, today, onClose }: { item?: HobbyLog; today: string; on
           <input className="st-input sm" type="date" value={date} max={today} onChange={(e) => setDate(e.target.value)} aria-label="날짜" />
           <input className="st-input xs" inputMode="numeric" value={minutes} onChange={(e) => setMinutes(e.target.value.replace(/\D/g, '').slice(0, 4))} aria-label="시간 (분)" />분
         </div>
-        <input className="st-input" value={memo} onChange={(e) => setMemo(e.target.value)} placeholder="무엇을 했나 (예: 새 곡 연습)" aria-label="메모" />
+        <input className="st-input" value={memo} onChange={(e) => setMemo(e.target.value)} placeholder="무엇을 했나요? (예: 새 곡 연습)" aria-label="메모" />
         <div className="st-row end">
           {item && (
             <button className="btn btn-sm st-danger" onClick={() => confirmDelete('이 기록') && (remove('hobbyLogs', item.id), onClose())}>

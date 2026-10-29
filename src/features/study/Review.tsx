@@ -79,6 +79,19 @@ function Notes({ today, adding }: { today: string; adding?: boolean }) {
   const open = all.filter((n) => !n.learned && (!subject || n.subjectId === subject));
   const reasons = (Object.keys(REASONS) as WrongReason[]).map((r) => ({ r, n: open.filter((x) => x.reason === r).length })).filter((x) => x.n);
   const totalR = reasons.reduce((a, x) => a + x.n, 0);
+  // 아직 오답이 하나도 없으면 안내만
+  if (!all.length)
+    return (
+      <>
+        <Empty icon="📝" title="오답이 없어요">
+          <p>문제집을 체크할 때 「틀린 번호」를 쓰거나, 사진과 함께 넣을 수 있어요.</p>
+          <button className="btn btn-primary" onClick={() => setEdit('new')}>
+            오답 넣기
+          </button>
+        </Empty>
+        {edit && <NoteSheet note={edit === 'new' ? undefined : edit} today={today} onClose={() => (setEdit(null), adding && go('/review'))} />}
+      </>
+    );
   return (
     <>
       <section className="st-card st-learn-cta">
@@ -419,7 +432,7 @@ function NoteSheet({ note, today, onClose }: { note?: WrongNote; today: string; 
         </Field>
         {note && (
           <p className="st-hint">
-            {note.learned ? '해결됨' : `${note.box}번 상자 · 다음 ${shortDate(note.due)}`} · 틀린 횟수 {note.wrong}
+            {note.learned ? '해결됨' : `${note.box}단계 · 다음 ${shortDate(note.due)}`} · 틀린 횟수 {note.wrong}
           </p>
         )}
         <div className="st-row end">
@@ -511,7 +524,7 @@ function NoteRun() {
       const s = getStudy().settings;
       const next = answer(n!, ok, 'redo', today, s.intervals, s.quizMaxBox);
       put('notes', next);
-      if (next.learned) toast('5번 상자까지 맞혀서 「해결됨」으로 옮겼어요');
+      if (next.learned) toast('마지막 단계까지 맞혀서 「해결됨」으로 옮겼어요');
       setFirst(new Map(first).set(n!.id, ok));
     }
     // 오답은 세션 안에서 다시 내지 않는다 (같은 문제를 바로 또 풀면 답을 외운 것)
@@ -603,7 +616,7 @@ function Cards({ today, adding: add }: { today: string; adding?: boolean }) {
       <section className="st-card st-learn-cta">
         <div>
           <p className="st-sub">
-            오늘 볼 카드 <b>{due.length}</b> · 전체 {cards.length}장 · 익힘 {cards.filter((c) => c.learned).length}
+            오늘 볼 카드 <b>{due.length}</b> · 전체 {cards.length}장 · 외움 {cards.filter((c) => c.learned).length}
           </p>
           <p className="st-hint">영어 단어는 「영단어」 탭이 더 좋아요 (단어장 계획·객관식).</p>
         </div>
@@ -864,7 +877,7 @@ function CardRun() {
         </button>
         <Bar value={first.size} max={total} label="본 카드" />
         <label className="st-toggle sm">
-          <input type="checkbox" checked={flip} onChange={(e) => setFlip(e.target.checked)} /> 뒤→앞
+          <input type="checkbox" checked={flip} onChange={(e) => setFlip(e.target.checked)} /> 뒷면 먼저
         </label>
       </div>
       <SwipeCard key={`${c.id}:${queue.length}`} front={flip ? c.back : c.front} back={(flip ? c.front : c.back) || '(내용 없음)'} sub={d.decks[c.deckId]?.name} onAnswer={reply} />

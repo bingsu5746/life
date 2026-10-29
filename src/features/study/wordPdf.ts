@@ -1,4 +1,4 @@
-// 영단어장 PDF 읽기 (설계 §9.5 ⓪). PDF 는 이 기기 안에서만 읽고, 단어·뜻만 남긴다.
+// 영단어장 PDF 읽기 (설계 §9.5 ⓪). PDF는 이 기기 안에서만 읽고, 단어·뜻만 남긴다.
 // 글자가 든 PDF: 글자 조각의 위치로 줄·칸·단을 나눈다 (아래 순수 함수, 시험으로 확인).
 // 스캔한 PDF(글자 없음): 페이지를 그림으로 그려 글자 인식(tesseract)으로 읽는다.
 
@@ -183,7 +183,7 @@ export async function readPdf(file: File, opts: { from: number; to: number; pass
       const blob = await new Promise<Blob | null>((r) => canvas.toBlob(r, 'image/png'));
       if (!blob) continue;
       const { readImageText } = await import('../../lib/ocr');
-      texts.push(await readImageText(blob, (stage, ratio) => opts.onProgress?.(`${n}쪽 글자 인식 (${stage})`, (n - from + ratio) / (to - from + 1))));
+      texts.push(await readImageText(blob, (stage, ratio) => opts.onProgress?.(`${n}쪽 글자 인식 중${stage === 'recognizing text' ? '' : ' (준비)'}`, (n - from + ratio) / (to - from + 1))));
     }
   } finally {
     await task.destroy();

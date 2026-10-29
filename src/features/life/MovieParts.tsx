@@ -7,7 +7,7 @@ import { put, remove, useStudy } from '../study/store';
 import { confirmDelete, Field, Sheet, toast } from '../study/ui';
 
 /** 본 곳: 영화관 종류와 집·OTT */
-export const PLACES = ['일반 영화관', '아이맥스', '스크린X', '4DX', '돌비', '집', '넷플릭스', 'Apple TV', '티빙', '디즈니+', '쿠팡플레이', '웨이브', '왓챠', '그 밖'];
+export const PLACES = ['일반 영화관', '아이맥스', '스크린X', '4DX', '돌비', '집', '넷플릭스', 'Apple TV', '티빙', '디즈니+', '쿠팡플레이', '웨이브', '왓챠', '기타'];
 
 /** ★★★½☆ 처럼 */
 export function starText(r?: number) {

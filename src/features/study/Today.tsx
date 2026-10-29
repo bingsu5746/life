@@ -72,7 +72,7 @@ export function Today() {
           <h2>{longDate(today)}</h2>
           {total > 0 && (
             <p className="st-sub">
-              {done === total ? '오늘 할 것 끝' : `오늘 할 것 ${total - done}개 남음`} · 공부 {minutesText(studied)}
+              {done === total ? '오늘 할 것 다 했어요' : `오늘 할 것 ${total - done}개 남음`} · 공부 {minutesText(studied)}
             </p>
           )}
         </div>

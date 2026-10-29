@@ -110,7 +110,7 @@ function Todos({ today }: { today: string }) {
       )}
       {done.length > 0 && (
         <button className="st-fold" onClick={() => setShowDone(!showDone)}>
-          한 일 {done.length} <span className={`st-fold-icon ${showDone ? 'open' : ''}`}><Icon name="chevron" /></span>
+          끝낸 일 {done.length} <span className={`st-fold-icon ${showDone ? 'open' : ''}`}><Icon name="chevron" /></span>
         </button>
       )}
       {showDone &&
@@ -151,7 +151,7 @@ function RulesSheet({ today, onClose }: { today: string; onClose: () => void }) 
               </div>
             </div>
             <button className="st-link" onClick={() => put('todoRules', { ...r, paused: r.paused ? undefined : true })}>
-              {r.paused ? '다시' : '멈춤'}
+              {r.paused ? '다시 켜기' : '멈추기'}
             </button>
             <button className="st-x" aria-label={`${r.title} 지우기`} onClick={() => confirmDelete(`「${r.title}」 반복`) && remove('todoRules', r.id)}>
               ✕

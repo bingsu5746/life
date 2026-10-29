@@ -122,7 +122,7 @@ export function Papers({ sub }: { sub?: string }) {
                     {p.title} <span className="st-muted">· {d.subjects[p.subjectId]?.name ?? '과목'}</span>
                   </div>
                   <div className="st-item-sub">
-                    {shortDate(p.date)} 풂
+                    {shortDate(p.date)} 풀이
                     {p.score !== undefined && ` · ${p.score}/${p.full ?? 100}점`}
                     {p.grade !== undefined && ` · ${p.grade}등급`}
                     {p.minutes !== undefined && ` · ${minutesText(p.minutes)}`}

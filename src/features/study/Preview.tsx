@@ -127,7 +127,7 @@ export function Preview({ sub }: { sub?: string }) {
 
           {past.length > 0 && (
             <details className="st-card st-more">
-              <summary>한 예습 {past.length}</summary>
+              <summary>끝낸 예습 {past.length}</summary>
               {past.map((p) => (
                 <PreviewRow key={p.id} p={p} today={today} onEdit={() => setEdit(p)} />
               ))}

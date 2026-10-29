@@ -11,7 +11,6 @@ import { courtNames } from './bb';
 import { confirmDelete, Empty, go, Icon, Sheet, tap, toast, useToday } from '../study/ui';
 
 const md = (x: string) => shortDate(x).replace(/\(.\)/, '');
-const pct = (m: number, a: number) => (a ? `${Math.round((m / a) * 1000) / 10}%` : '—');
 const RESULT = { win: '승', lose: '패', draw: '무' } as const;
 
 /** 여러 기록의 합 */
@@ -31,8 +30,6 @@ export function Basketball({ sub }: { sub?: string }) {
     .filter((w) => w.kind === '농구')
     .sort((a, b) => b.date.localeCompare(a.date) || b.created - a.created);
   const games = all.filter((w) => w.bb?.mode === 'game');
-  const stats = all.map((w) => w.bb).filter((x): x is BasketballStat => !!x);
-  const t = bbTotals(stats);
   const g = bbTotals(games.map((w) => w.bb!));
   const wins = games.filter((w) => w.bb?.result === 'win').length;
   const losses = games.filter((w) => w.bb?.result === 'lose').length;
@@ -61,52 +58,28 @@ export function Basketball({ sub }: { sub?: string }) {
         <>
           <BbGoals />
           <ShotSummary />
-          <section className="st-card">
-            <h3 className="st-h">
-              경기 {games.length}번{games.length ? ` · ${wins}승 ${losses}패` : ''}
-            </h3>
-            <div className="st-stat-row bb-stats">
-              <div>
-                <small>평균 득점</small>
-                <b>{games.length ? Math.round((g.pts / n) * 10) / 10 : '—'}</b>
+          {games.length > 0 && (
+            <section className="st-card">
+              <h3 className="st-h">
+                경기 {games.length}번{games.length ? ` · ${wins}승 ${losses}패` : ''}
+              </h3>
+              <div className="st-stat-row bb-stats">
+                <div>
+                  <small>평균 득점</small>
+                  <b>{games.length ? Math.round((g.pts / n) * 10) / 10 : '—'}</b>
+                </div>
+                <div>
+                  <small>평균 리바운드</small>
+                  <b>{games.length ? Math.round((g.reb / n) * 10) / 10 : '—'}</b>
+                </div>
+                <div>
+                  <small>평균 어시스트</small>
+                  <b>{games.length ? Math.round((g.ast / n) * 10) / 10 : '—'}</b>
+                </div>
               </div>
-              <div>
-                <small>평균 리바운드</small>
-                <b>{games.length ? Math.round((g.reb / n) * 10) / 10 : '—'}</b>
-              </div>
-              <div>
-                <small>평균 어시스트</small>
-                <b>{games.length ? Math.round((g.ast / n) * 10) / 10 : '—'}</b>
-              </div>
-            </div>
-            {chrono.length > 1 && <LineChart label="경기별 득점" height={150} points={chrono.map((w) => ({ label: md(w.date), title: shortDate(w.date), y: w.bb?.pts ?? null }))} format={(x) => `${Math.round(x)}`} />}
-          </section>
-          <section className="st-card">
-            <h3 className="st-h">슛 성공률 (경기 + 연습)</h3>
-            <div className="st-stat-row">
-              <div>
-                <small>2점슛</small>
-                <b>{pct(t.fgm, t.fga)}</b>
-                <small>
-                  {t.fgm}/{t.fga}
-                </small>
-              </div>
-              <div>
-                <small>3점슛</small>
-                <b>{pct(t.tpm, t.tpa)}</b>
-                <small>
-                  {t.tpm}/{t.tpa}
-                </small>
-              </div>
-              <div>
-                <small>자유투</small>
-                <b>{pct(t.ftm, t.fta)}</b>
-                <small>
-                  {t.ftm}/{t.fta}
-                </small>
-              </div>
-            </div>
-          </section>
+              {chrono.length > 1 && <LineChart label="경기별 득점" height={150} points={chrono.map((w) => ({ label: md(w.date), title: shortDate(w.date), y: w.bb?.pts ?? null }))} format={(x) => `${Math.round(x)}`} />}
+            </section>
+          )}
           <section className="st-card">
             <h3 className="st-h">기록</h3>
             {all.slice(0, 40).map((w) => (
@@ -275,7 +248,7 @@ function BbSheet({ item, today, onClose }: { item?: Workout; today: string; onCl
                   value={r.name}
                   onChange={(e) => setRow(i, { name: e.target.value, kind: r.kind ?? guessKind(e.target.value) })}
                   onBlur={() => !r.kind && setRow(i, { kind: guessKind(r.name) })}
-                  placeholder="무엇을 연습했나 (예: 자유투)"
+                  placeholder="연습한 것 (예: 자유투)"
                   aria-label="연습한 것"
                 />
                 <div className="bb-item-nums">
@@ -283,7 +256,7 @@ function BbSheet({ item, today, onClose }: { item?: Workout; today: string; onCl
                   /
                   <input className="st-input xs" inputMode="numeric" value={r.att} onChange={(e) => setRow(i, { att: e.target.value.replace(/\D/g, '').slice(0, 4) })} placeholder="시도" aria-label={`${r.name || '연습'} 시도 수`} />
                   <select className="st-input xs" value={r.kind ?? ''} onChange={(e) => setRow(i, { kind: (e.target.value || undefined) as Row['kind'] })} aria-label="어느 슛으로 셀지">
-                    <option value="">슛 아님</option>
+                    <option value="">성공률만</option>
                     <option value="fg">2점</option>
                     <option value="tp">3점</option>
                     <option value="ft">자유투</option>

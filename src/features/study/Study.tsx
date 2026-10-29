@@ -13,7 +13,10 @@ import { localTimes, uploadDigest } from './notify';
 import { autoSaves, dueRuleTx } from '../life/calc';
 // 시험 화면은 오늘 화면(D-day)과 같이 쓰여 함께 받는다
 import { Exams } from './Exams';
-import { go, Icon, Toaster, useToday } from './ui';
+import { go, Icon, Sheet, Toaster, useToday } from './ui';
+
+/** 폰 아래 메뉴에 늘 보이는 공부 메뉴 (나머지는 「더 보기」) */
+const PHONE_TABS: string[] = ['today', 'exams', 'words', 'review', 'time'];
 
 // 오늘 화면 말고는 열 때 받는다 (처음 여는 속도)
 const Books = lazy(() => import('./Books').then((m) => ({ default: m.Books })));
@@ -46,6 +49,7 @@ export function Study({ path, loggedIn, syncReady = true, onLogin }: { path: str
   const d = useStudy();
   const words = useWords();
   const today = useToday();
+  const [more, setMore] = useState(false);
   // 영역: 주소 맨 앞이 없으면 메인, fitness·money·hobby·movies 면 그 영역, 그 밖(study·공부 칸들·설정)은 공부
   const p0 = path[0];
   const isSearch = p0 === 'search';
@@ -129,6 +133,7 @@ export function Study({ path, loggedIn, syncReady = true, onLogin }: { path: str
   else if (tab === 'exams') content = <Exams id={id} sub={sub} />;
   else content = <Today />;
 
+  const studyTabs = TABS.filter((t) => t.key === 'today' || t.key === tab || !d.settings.hiddenTabs?.includes(t.key));
   return (
     <main className={`study ${running ? 'running' : ''}`}>
       {!running && area === 'home' && (
@@ -168,8 +173,8 @@ export function Study({ path, loggedIn, syncReady = true, onLogin }: { path: str
             <span className="st-tab-label">메인으로</span>
             <span className="st-tab-short">메인</span>
           </button>
-          {TABS.filter((t) => t.key === 'today' || t.key === tab || !d.settings.hiddenTabs?.includes(t.key)).map((t) => (
-            <button key={t.key} className={`st-tab ${tab === t.key ? 'on' : ''}`} aria-current={tab === t.key ? 'page' : undefined} onClick={() => go(t.key === 'today' ? '/study' : `/${t.key}`)}>
+          {studyTabs.map((t) => (
+            <button key={t.key} className={`st-tab ${tab === t.key ? 'on' : ''} ${PHONE_TABS.includes(t.key) || t.key === tab ? '' : 'st-tab-extra'}`} aria-current={tab === t.key ? 'page' : undefined} onClick={() => go(t.key === 'today' ? '/study' : `/${t.key}`)}>
               <Icon name={t.key} />
               <span className="st-tab-label">{t.label}</span>
               <span className="st-tab-short">{'short' in t ? t.short : t.label}</span>
@@ -177,7 +182,41 @@ export function Study({ path, loggedIn, syncReady = true, onLogin }: { path: str
               {t.key === 'time' && tab !== 'time' && <TimerChip />}
             </button>
           ))}
+          {/* 폰: 자주 쓰는 것만 아래에 두고 나머지는 「더 보기」에서 */}
+          <button className="st-tab st-tab-more" aria-label="공부 메뉴 더 보기" onClick={() => setMore(true)}>
+            <Icon name="more" />
+            <span className="st-tab-short">더 보기</span>
+          </button>
         </nav>
+      )}
+      {more && (
+        <Sheet title="공부 메뉴" onClose={() => setMore(false)}>
+          <div className="st-more-grid">
+            {studyTabs
+              .filter((t) => !PHONE_TABS.includes(t.key) && t.key !== tab)
+              .map((t) => (
+                <button
+                  key={t.key}
+                  onClick={() => {
+                    setMore(false);
+                    go(`/${t.key}`);
+                  }}
+                >
+                  <Icon name={t.key} />
+                  {t.label}
+                </button>
+              ))}
+            <button
+              onClick={() => {
+                setMore(false);
+                go('/');
+              }}
+            >
+              <Icon name="area-home" />
+              메인으로
+            </button>
+          </div>
+        </Sheet>
       )}
       <div className="st-main">
         {saveFailed && (
@@ -226,7 +265,7 @@ function LoginHint({ onLogin }: { onLogin: () => void }) {
         <button className="st-link" onClick={onLogin}>
           로그인
         </button>
-        하면 폰·PC 에서 같이 볼 수 있어요.
+        하면 폰·PC에서 같이 볼 수 있어요.
       </span>
       <button
         className="st-x"

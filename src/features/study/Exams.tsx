@@ -92,7 +92,7 @@ function ExamList({ adding, progress }: { adding: boolean; progress: boolean }) 
 
       {!upcoming.length ? (
         <Empty title="다가오는 시험이 없어요">
-          <p>시험 날과 과목별 시험 범위를 넣으면 D-day 와 범위 체크리스트를 보여 드려요.</p>
+          <p>시험 날과 과목별 시험 범위를 넣으면 D-day와 범위 체크리스트를 보여 드려요.</p>
           <button className="btn btn-primary" onClick={() => setEdit('new')}>
             시험 넣기
           </button>
@@ -136,6 +136,8 @@ function ExamList({ adding, progress }: { adding: boolean; progress: boolean }) 
         </div>
         {!subjects.length ? (
           <p className="st-hint">과목을 먼저 만들면 과목마다 학교에서 어디까지 나갔는지 적어 둘 수 있어요.</p>
+        ) : !subjects.some((s) => s.progress?.length) ? (
+          <p className="st-hint">학교에서 어디까지 나갔는지 적어 두면 예습할 곳을 정할 때 보여 드려요. ＋를 눌러 적어요.</p>
         ) : (
           subjects.map((s) => {
             const last = s.progress?.[s.progress.length - 1];
@@ -144,7 +146,7 @@ function ExamList({ adding, progress }: { adding: boolean; progress: boolean }) 
                 <SubjectDot id={s.id} d={d} />
                 <div className="st-item-main">
                   <div className="st-item-title">{s.name}</div>
-                  <div className="st-item-sub">{last ? `${last.text} · ${daysAgo(today, last.date) === 0 ? '오늘' : `${daysAgo(today, last.date)}일 전`}` : '아직 기록 없음'}</div>
+                  <div className="st-item-sub">{last ? `${last.text} · ${daysAgo(today, last.date) === 0 ? '오늘' : daysAgo(today, last.date) === 1 ? '어제' : `${daysAgo(today, last.date)}일 전`}` : '아직 기록 없음'}</div>
                 </div>
                 <Icon name="chevron" />
               </div>
@@ -215,7 +217,7 @@ function ProgressSheet({ subject, today, onClose }: { subject: Subject; today: s
         }}
       >
         <input className="st-input" autoFocus placeholder="오늘 어디까지 나갔나요? (예: 2단원 3절, 교과서 54쪽)" value={text} onChange={(e) => setText(e.target.value)} aria-label="학교 진도" />
-        <p className="st-hint">Enter 로 저장해요. 같은 날 다시 적으면 그날 기록을 고쳐요.</p>
+        <p className="st-hint">Enter로 저장해요. 같은 날 다시 적으면 그날 기록을 고쳐요.</p>
       </form>
       {list.length > 0 && (
         <div className="st-progress-log">
@@ -338,7 +340,7 @@ function ExamSheet({ exam, today, onClose }: { exam?: Exam; today: string; onClo
         </div>
         {multi && !endOk && <p className="bad">마지막 날은 첫날 뒤, {MAX_EXAM_DAYS}일 안으로 골라 주세요.</p>}
         {multi && endOk && (
-          <Field group label="날짜별 시험 과목" hint="그날 보는 과목을 눌러 고르세요. 과목별 시험 날이 정해져 계획·D-day 에 쓰여요.">
+          <Field group label="날짜별 시험 과목" hint="그날 보는 과목을 눌러 고르세요. 과목별 시험 날이 정해져 계획·D-day에 쓰여요.">
             {!subjects.length && <p className="st-hint">아래에서 과목을 먼저 추가해 주세요.</p>}
             <div className="st-timetable-edit">
               {rows.map((r) => (
@@ -609,7 +611,7 @@ export function DdayHero({ today }: { today: string }) {
   if (!exams.length)
     return (
       <button className="st-dday-empty" onClick={() => go('/exams/new')}>
-        시험 날을 넣으면 여기에 D-day 가 크게 보여요 <Icon name="chevron" />
+        시험 날을 넣으면 여기에 D-day가 크게 보여요 <Icon name="chevron" />
       </button>
     );
   const [e, ...rest] = exams;

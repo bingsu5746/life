@@ -96,7 +96,7 @@ export function Settings() {
 
       <section className="st-card st-form">
         <h3 className="st-h">복습 · 영단어</h3>
-        <Field label="다시 보기 간격 (일, 상자 1~5)" hint="맞히면 다음 상자, 틀리면 1번 상자. 5번 상자에서 맞히면 익힘">
+        <Field label="단계별 다시 보기 간격 (일)" hint="맞히면 다음 단계, 틀리면 1단계로 돌아가요. 마지막 단계에서 맞히면 「외움」이에요.">
           <div className="st-inline wrap st-intervals">
             {s.intervals.map((v, i) => (
               <NumInput
@@ -105,7 +105,7 @@ export function Settings() {
                 value={v}
                 min={1}
                 max={365}
-                aria-label={`${i + 1}번 상자`}
+                aria-label={`${i + 1}단계`}
                 onCommit={(n) => {
                   const next = [...getStudy().settings.intervals];
                   next[i] = Math.round(n ?? v);
@@ -115,11 +115,11 @@ export function Settings() {
             ))}
           </div>
         </Field>
-        <Field label="객관식으로 오를 수 있는 상자">
+        <Field label="객관식으로 올라갈 수 있는 단계">
           <select className="st-input sm st-fit" value={s.quizMaxBox} onChange={(e) => setSettings({ quizMaxBox: Number(e.target.value) })}>
             {[1, 2, 3, 4, 5].map((b) => (
               <option key={b} value={b}>
-                {b}번까지
+                {b}단계까지
               </option>
             ))}
           </select>
@@ -260,7 +260,7 @@ export function Settings() {
           이 기기의 자료 모두 지우기
         </button>
       </section>
-      <p className="st-hint center">로그인하면 공부 자료가 폰·PC 에서 같이 보여요. 로그인하지 않으면 이 기기에만 저장돼요.</p>
+      <p className="st-hint center">로그인하면 공부 자료가 폰·PC에서 같이 보여요. 로그인하지 않으면 이 기기에만 저장돼요.</p>
     </div>
   );
 }
@@ -333,7 +333,7 @@ function NotifySettings() {
     <section className="st-card st-form">
       <h3 className="st-h">알림</h3>
       {!notifySupported() ? (
-        <p className="st-hint">이 브라우저는 알림을 받을 수 없어요. 아이폰은 Safari 에서 「공유 → 홈 화면에 추가」로 사이트를 추가한 뒤, 홈 화면에서 열어 켜 주세요.</p>
+        <p className="st-hint">이 브라우저는 알림을 받을 수 없어요. 아이폰은 Safari에서 「공유 → 홈 화면에 추가」로 사이트를 추가한 뒤, 홈 화면에서 열어 켜 주세요.</p>
       ) : !isLoggedIn() ? (
         <p className="st-hint">알림은 로그인한 뒤에 켤 수 있어요 (정한 시각에 서버가 보내요).</p>
       ) : (
@@ -359,7 +359,7 @@ function NotifySettings() {
             {times && (
               <>
                 <button className="btn btn-sm" disabled={busy} onClick={() => void notifyTest().then((r) => toast(`알림을 ${r.sent}곳에 보냈어요`)).catch((e: Error) => toast(e.message))}>
-                  시험 알림 보내기
+                  알림 시험해 보기
                 </button>
                 <button className="btn btn-sm" disabled={busy} onClick={() => void disableNotify().then(() => (setTimes(null), toast('이 기기의 알림을 껐어요')))}>
                   끄기

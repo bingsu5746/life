@@ -14,6 +14,10 @@
   --bad: #c2410c;
   --warn: #a16207;
   --radius: 16px;
+  /* 움직임: 빠르게 시작해 부드럽게 멈춘다 */
+  --ease: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-in: cubic-bezier(0.55, 0, 1, 0.45);
+  --dur: 0.22s;
   /* 화면 코드에서 쓰는 옛 이름 (막대 색 등) */
   --ok: var(--accent);
   --blue-2: var(--accent);
@@ -110,9 +114,14 @@ button:disabled {
   font-size: 0.94rem;
   white-space: nowrap;
   transition:
-    background 0.15s,
-    border-color 0.15s,
-    opacity 0.15s;
+    background 0.18s var(--ease),
+    border-color 0.18s var(--ease),
+    opacity 0.18s var(--ease),
+    transform 0.16s var(--ease);
+}
+
+.btn:active:not(:disabled) {
+  transform: scale(0.97);
 }
 
 .btn:hover:not(:disabled) {

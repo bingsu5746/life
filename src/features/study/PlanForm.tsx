@@ -111,7 +111,7 @@ export function PlanForm({ target, targetId, units, done, reserved, existing, to
           </div>
         </Field>
       )}
-      <Field label={target === 'book' ? '또는 페이지 직접' : '또는 Day 직접'} hint={`예: ${target === 'book' ? '12-80, 95-110' : '1-10'} (쓰면 위 선택 대신 이것으로)`}>
+      <Field label={target === 'book' ? '또는 쪽 직접 쓰기' : '또는 Day 직접 쓰기'} hint={`예: ${target === 'book' ? '12-80, 95-110' : '1-10'} (쓰면 위 선택 대신 이것으로)`}>
         <input className="st-input" value={custom} onChange={(e) => setCustom(e.target.value)} placeholder={rangeText(range) || '12-80'} />
       </Field>
 
@@ -121,7 +121,7 @@ export function PlanForm({ target, targetId, units, done, reserved, existing, to
             시험에 맞추기
           </button>
           <button type="button" className={mode === 'date' ? 'on' : ''} onClick={() => setMode('date')}>
-            날짜 직접
+            날짜 고르기
           </button>
         </div>
       </Field>

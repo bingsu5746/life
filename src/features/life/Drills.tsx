@@ -94,7 +94,7 @@ export function DrillsPage() {
         <div className="st-chips" aria-label="난이도">
           {([1, 2, 3] as const).map((l) => (
             <button key={l} className={`st-chip ${level === l ? 'on' : ''}`} aria-pressed={level === l} onClick={() => (setLevel(l), keep('level', l))}>
-              {LEVEL[l]}까지
+              {l === 1 ? '쉬운 것만' : l === 2 ? '보통까지' : '어려운 것까지'}
             </button>
           ))}
         </div>
@@ -210,7 +210,7 @@ function Steps({ x }: { x: Drill }) {
       </ol>
       {x.from && x.src && (
         <a className="dr-src" href={x.src} target="_blank" rel="noreferrer noopener" onClick={(e) => e.stopPropagation()}>
-          {x.from}의 연습에서 따옴 · 자료 보기
+          {x.from} 연습법 · 출처 보기
         </a>
       )}
     </>

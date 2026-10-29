@@ -9,7 +9,7 @@ import { NotifyTime } from './NotifyTime';
 
 const MOOD = ['', '나쁨', '별로', '보통', '좋음', '최고'];
 const FEEL = ['아쉬워요', '보통', '뿌듯해요'];
-const KINDS = ['안 했어요', '걷기', '달리기', '헬스', '홈트', '농구', '그 밖'];
+const KINDS = ['안 했어요', '걷기', '달리기', '헬스', '홈트', '농구', '기타'];
 
 export function CheckinPage() {
   const d = useStudy();
@@ -95,7 +95,7 @@ export function CheckinPage() {
       <button className="btn btn-primary btn-lg" disabled={!mood && !feel && !kind && !line.trim()} onClick={save}>
         하루 마감
       </button>
-      <NotifyTime k="checkinTime" label="체크인 알림" fallback="22:00" />
+      <NotifyTime k="checkinTime" label="하루 마감 알림" fallback="22:00" />
     </div>
   );
 }

@@ -115,7 +115,7 @@ export function LifeWeekPage({ day, monthly }: { day?: string; monthly?: boolean
       {monthly && <Trend month={month} />}
       {!monthly && (
         <button className="st-link" onClick={() => go(`/time/week-${w.from}`)}>
-          공부 주간 돌아보기 (과목별·다음 주 할 것) 열기
+          공부 자세히 돌아보기 (과목별 · 다음 주 할 것)
         </button>
       )}
     </div>

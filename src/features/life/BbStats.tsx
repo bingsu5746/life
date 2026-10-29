@@ -19,6 +19,7 @@ export function ShotSummary() {
     ['오늘', shotsBetween(d, today, today)],
     ['이번 주', shotsBetween(d, weekStart(today), today)],
     ['30일', shotsBetween(d, addDays(today, -29), today)],
+    ['전체', shotsBetween(d, '0000-01-01', today)],
   ];
   const courts = shotsByCourt(d, addDays(today, -89), today).filter((c) => c.s.fg.a || c.s.tp.a || c.s.ft.a);
   if (rows.every(([, s]) => !s.fg.a && !s.tp.a && !s.ft.a)) return null;

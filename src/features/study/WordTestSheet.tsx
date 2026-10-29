@@ -46,7 +46,7 @@ export function WordTestSheet({ listId }: { listId: string }) {
     setBusy('예문 만드는 중…');
     try {
       const n = await fillExamples(picked, (a, b) => setBusy(`예문 만드는 중… ${a}/${b}`));
-      toast(`${n}단어에 예문을 넣었어요. AI 가 만든 문장이라 한 번 확인해 주세요`);
+      toast(`${n}단어에 예문을 넣었어요. AI가 만든 문장이라 한 번 확인해 주세요`);
       setSeed(seed + 1);
     } catch (e) {
       toast(e instanceof Error ? e.message : '예문을 만들지 못했어요');

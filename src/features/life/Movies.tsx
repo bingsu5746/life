@@ -122,7 +122,7 @@ export function Movies({ sub }: { sub?: string }) {
               </span>
               {watched.length > 3 && (
                 <button className="st-link" onClick={() => setSort(sort === 'recent' ? 'rating' : 'recent')}>
-                  {sort === 'recent' ? '최근 순' : '별점 순'}
+                  {sort === 'recent' ? '최근순' : '별점순'}
                 </button>
               )}
             </div>

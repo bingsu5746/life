@@ -161,11 +161,11 @@ function RunningTimer({ timer, update, onStop }: { timer: TimerState; update: (t
               {!v!.finished &&
                 (timer.runningSince === null ? (
                   <button className="btn btn-lg" onClick={() => (primeAudio(), update(resume(timer, Date.now())))}>
-                    계속
+                    이어서 하기
                   </button>
                 ) : (
                   <button className="btn btn-lg" onClick={() => update(pause(timer, Date.now()))}>
-                    멈춤
+                    잠깐 멈추기
                   </button>
                 ))}
               <button className="btn btn-lg" onClick={onStop}>
@@ -206,7 +206,8 @@ function Stats({ sessions, today, todayMin }: { sessions: StudySession[]; today:
   const grid = daysBetween(from, addDays(ws, 6));
   const dayMin = new Map<string, number>();
   for (const s of sessions) if (s.date >= from) dayMin.set(s.date, (dayMin.get(s.date) ?? 0) + s.minutes);
-  const recent = [...sessions].sort((a, b) => b.start - a.start).slice(0, 12);
+  const [allRecent, setAllRecent] = useState(false);
+  const recent = [...sessions].sort((a, b) => b.start - a.start).slice(0, allRecent ? 30 : 5);
   return (
     <>
       <section className="st-card">
@@ -277,7 +278,12 @@ function Stats({ sessions, today, todayMin }: { sessions: StudySession[]; today:
               </div>
             </div>
           ))}
-          <p className="st-hint">기록을 누르면 시간을 고치거나 지울 수 있어요.</p>
+          {!allRecent && sessions.length > 5 && (
+            <button className="st-fold" onClick={() => setAllRecent(true)}>
+              더 보기
+            </button>
+          )}
+          <p className="st-hint">누르면 고치거나 지울 수 있어요.</p>
         </section>
       )}
       <WeeklyGoals />

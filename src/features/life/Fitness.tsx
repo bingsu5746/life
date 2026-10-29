@@ -202,7 +202,7 @@ function BodyCard({ today }: { today: string }) {
       </div>
       {hs.length > 1 && <LineChart label="키 흐름" height={130} points={hs.map((l) => ({ label: md(l.id), title: shortDate(l.id), y: l.height ?? null }))} format={(x) => `${Math.round(x * 10) / 10}`} />}
       {ws.length > 1 && <LineChart label="몸무게 흐름" height={130} points={ws.map((l) => ({ label: md(l.id), title: shortDate(l.id), y: l.weight ?? null }))} format={(x) => `${Math.round(x * 10) / 10}`} />}
-      <p className="st-hint">BMI 는 몸무게(kg) ÷ 키(m)² 로 계산한 값이에요. 청소년은 나이·성별에 따른 기준표로 봐야 해서 여기서는 숫자만 보여 드려요.</p>
+      <p className="st-hint">BMI는 몸무게(kg) ÷ 키(m)² 로 계산한 값이에요. 청소년은 나이·성별에 따른 기준표로 봐야 해서 여기서는 숫자만 보여 드려요.</p>
     </section>
   );
 }
@@ -281,7 +281,7 @@ function WorkoutSheet({ item, today, onClose }: { item?: Workout; today: string;
               </button>
             ))}
           </div>
-          <input className="st-input sm" value={custom} onChange={(e) => setCustom(e.target.value)} placeholder="그 밖 (예: 줄넘기)" aria-label="다른 운동" />
+          <input className="st-input sm" value={custom} onChange={(e) => setCustom(e.target.value)} placeholder="직접 쓰기 (예: 줄넘기)" aria-label="다른 운동" />
         </Field>
         <div className="st-inline wrap">
           <label className="st-cond-time">

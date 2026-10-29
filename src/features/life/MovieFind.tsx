@@ -31,7 +31,7 @@ export function serviceNames(p: string[] | null | undefined): string[] {
 type Key = { title: string; year?: number };
 const keyOf = (k: Key) => `${norm(k.title)}:${k.year ?? ''}`;
 
-/** 목록에 있는 영화들이 어느 OTT 에 있는지 (한 번 받은 건 다시 안 받음) */
+/** 목록에 있는 영화들이 어느 OTT에 있는지 (한 번 받은 건 다시 안 받음) */
 export function useOtt(items: Key[]) {
   const [got, setGot] = useState<Map<string, string[] | null>>(new Map());
   const [off, setOff] = useState('');
@@ -331,7 +331,7 @@ export function RecTab({ onWatched, onOpen }: Common) {
             aria-label="보고 싶은 것"
           />
           <div className="st-row end">
-            <small className="st-muted">Enter 로 보내기 · 줄바꿈은 Shift+Enter</small>
+            <small className="st-muted">Enter로 보내기 · 줄바꿈은 Shift+Enter</small>
             <button className="btn btn-primary btn-sm" type="submit" disabled={busy || !wish.trim()}>
               {busy ? '고르는 중…' : '추천받기'}
             </button>
@@ -346,7 +346,7 @@ export function RecTab({ onWatched, onOpen }: Common) {
           ))}
         </div>
       )}
-      <p className="st-hint">AI 가 고른 제목 중 KOBIS 영화 목록에서 확인된 영화만 보여 줘요. 취향은 추측이라 틀릴 수 있어요.</p>
+      <p className="st-hint">AI가 고른 제목 중 KOBIS 영화 목록에서 확인된 영화만 보여 줘요. 취향은 추측이라 틀릴 수 있어요.</p>
       {ott.off && <p className="st-hint">{ott.off}</p>}
     </section>
   );

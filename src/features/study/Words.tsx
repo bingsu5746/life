@@ -7,7 +7,7 @@ import { MAX_DAYS, rangeText } from './pages';
 import { boxLabel, dueText } from './review';
 import { dayUnits, listDoneDays, listWords, planViews, wordListViews } from './select';
 import { getStudy, getWords, put, putWords, remove, removeWords, useStudy, useWords } from './store';
-import { addWords, answerWord, fillExamples, markDays } from './actions';
+import { addWords, answerWord, markDays } from './actions';
 import { parseWords, wordsText, type ParsedWord } from './wordParse';
 import { choicesFor, requeue, type Mode } from './wordSession';
 import { PlanForm } from './PlanForm';
@@ -67,7 +67,7 @@ function ListIndex() {
               </strong>
               <Bar value={seen} max={v.words.length} label="본 단어" />
               <small>
-                {v.words.length}단어 · 익히는 중 {seen - learned} · 익힘 {learned}
+                {v.words.length}단어 · 익히는 중 {seen - learned} · 외움 {learned}
               </small>
               <small className={v.fresh.length + v.due.length ? 'ok' : 'st-muted'}>{v.fresh.length + v.due.length ? `오늘 새 단어 ${v.fresh.length} · 복습 ${v.due.length}` : '오늘 분량 끝'}</small>
             </button>
@@ -151,7 +151,6 @@ function ListDetail({ id }: { id: string }) {
   const [edit, setEdit] = useState<Word | null>(null);
   const [filter, setFilter] = useState<'all' | 'new' | 'learning' | 'learned'>('all');
   const [q, setQ] = useState('');
-  const [exBusy, setExBusy] = useState<string | null>(null);
   const list = d.wordLists[id];
   const plans = planViews(d, allWords, today);
   if (!list || list.deleted)
@@ -216,25 +215,28 @@ function ListDetail({ id }: { id: string }) {
               시험 {shortDate(list.testDate)} {dday(today, list.testDate)}
             </span>
           )}
-          <p className="st-sub">
-            {ws.length}단어 · 아직 안 봄 {ws.filter((w) => w.box === 0).length} · 익히는 중 {ws.filter((w) => w.box > 0 && !w.learned).length} · 익힘 {ws.filter((w) => w.learned).length}
-          </p>
-          <div className="st-boxes" aria-label="상자별 단어 수">
+          <div className="st-boxes" aria-label="외운 단계별 단어 수">
             {Array.from({ length: d.settings.intervals.length + 1 }, (_, b) => (
               <span key={b} title={boxLabel(b, d.settings.intervals)}>
                 <b>{ws.filter((w) => w.box === b && !w.learned).length}</b>
-                <small>{b === 0 ? '새 단어' : `${b}번 상자`}</small>
+                <small>{b === 0 ? '새 단어' : `${b}단계`}</small>
               </span>
             ))}
-            <span>
+            <span className="done">
               <b>{ws.filter((w) => w.learned).length}</b>
-              <small>익힘</small>
+              <small>외움</small>
             </span>
           </div>
+          <details className="st-explain">
+            <summary>단계가 뭐예요?</summary>
+            <p>
+              단어를 맞힐 때마다 한 단계씩 올라가고, 단계가 높을수록 더 오래 있다가 다시 나와요 ({d.settings.intervals.map((n, i) => `${i + 1}단계 ${n}일`).join(' · ')}). 틀리면 1단계로 돌아가요. {d.settings.intervals.length}단계에서 또 맞히면 「외움」이에요. 잊어버릴 때쯤 다시 보게 해서 오래 기억하게 하는 방법이에요. 간격은 설정에서 바꿀 수 있어요.
+            </p>
+          </details>
         </div>
         {list.kind !== 'inbox' && ws.length >= 5 && (
           <p className="st-hint">
-            지금 시험을 보면 <b>약 {expectedScore(ws, today)}점</b> (상자 기록으로 어림한 값){list.kind === 'test' && list.testDate && list.testDate >= today ? ` · 시험 ${dday(today, list.testDate)}` : ''}. 시험 대비는 모를 것 같은 단어부터 나와요.
+            지금 시험을 보면 <b>약 {expectedScore(ws, today)}점</b> (외운 단계로 어림한 값){list.kind === 'test' && list.testDate && list.testDate >= today ? ` · 시험 ${dday(today, list.testDate)}` : ''}. 시험 대비는 모를 것 같은 단어부터 나와요.
           </p>
         )}
         {v.prep && ws.length > 0 ? (
@@ -253,27 +255,11 @@ function ListDetail({ id }: { id: string }) {
       {ws.length > 0 && (
         <div className="st-inline wrap">
           <button className="btn btn-sm" onClick={() => go(`/words/practice/${id}`)}>
-            연습 (카드·4지선다·예문·듣고 쓰기)
+            연습
           </button>
           <button className="btn btn-sm" onClick={() => go(`/words/${id}/test`)}>
             시험지 만들기
           </button>
-          {ws.some((w) => !w.example) && (
-            <button
-              className="btn btn-sm"
-              disabled={!!exBusy}
-              onClick={() => {
-                if (!isLoggedIn()) return toast('예문 만들기는 로그인한 뒤에 쓸 수 있어요');
-                setExBusy('예문 만드는 중…');
-                void fillExamples(ws, (a, b) => setExBusy(`예문 만드는 중… ${a}/${b}`))
-                  .then((n) => toast(`${n}단어에 예문을 넣었어요. AI 가 만든 문장이라 한 번 확인해 주세요`))
-                  .catch((e: Error) => toast(e.message))
-                  .finally(() => setExBusy(null));
-              }}
-            >
-              {exBusy ?? `예문 만들기 (AI, ${ws.filter((w) => !w.example).length}개)`}
-            </button>
-          )}
         </div>
       )}
 
@@ -281,7 +267,7 @@ function ListDetail({ id }: { id: string }) {
         <section className="st-card">
           <h3 className="st-h">Day 계획</h3>
           {days === 0 ? (
-            <p className="st-hint">Day 수를 넣거나 단어를 Day 별로 넣으면 계획을 세울 수 있어요.</p>
+            <p className="st-hint">Day 수를 넣거나 단어를 Day별로 넣으면 계획을 세울 수 있어요.</p>
           ) : (
             <>
               {v.plan && !planning && (
@@ -299,7 +285,15 @@ function ListDetail({ id }: { id: string }) {
                   </button>
                 </p>
               )}
-              {(!v.plan || planning) && (
+              {!v.plan && !planning && (
+                <p className="st-sub">
+                  날짜별로 나눠 외우려면{' '}
+                  <button className="st-link" onClick={() => setPlanning(true)}>
+                    Day 계획 세우기
+                  </button>
+                </p>
+              )}
+              {planning && (
                 <PlanForm target="words" targetId={id} units={dayUnits(days)} done={doneDays} reserved={new Set()} existing={v.plan?.plan} today={today} onDone={() => setPlanning(false)} />
               )}
               <div className="st-days">
@@ -313,7 +307,7 @@ function ListDetail({ id }: { id: string }) {
                   );
                 })}
               </div>
-              <p className="st-hint">Day 를 누르면 다 외운 것으로 체크·해제해요. 단어를 넣은 Day 는 모두 한 번 익히면 저절로 체크돼요.</p>
+              <p className="st-hint">Day를 누르면 다 외운 것으로 체크·해제해요. 단어를 넣은 Day는 모두 한 번 익히면 저절로 체크돼요.</p>
             </>
           )}
         </section>
@@ -337,7 +331,7 @@ function ListDetail({ id }: { id: string }) {
           <div className="st-seg sm">
             {(['all', 'new', 'learning', 'learned'] as const).map((f) => (
               <button key={f} className={filter === f ? 'on' : ''} onClick={() => setFilter(f)}>
-                {f === 'all' ? '전체' : f === 'new' ? '안 봄' : f === 'learning' ? '익히는 중' : '익힘'}
+                {f === 'all' ? '전체' : f === 'new' ? '새 단어' : f === 'learning' ? '익히는 중' : '외움'}
               </button>
             ))}
           </div>
@@ -428,7 +422,7 @@ function WordSheet({ w, onClose }: { w: Word; onClose: () => void }) {
           <input className="st-input xs" inputMode="numeric" value={day} onChange={(e) => setDay(e.target.value.replace(/\D/g, ''))} />
         </Field>
         <p className="st-hint">
-          {w.box === 0 ? '아직 안 봄' : w.learned ? '익힘' : `${boxLabel(w.box, intervals)} · 다음 ${shortDate(w.due)}`} · 틀린 횟수 {w.wrong}
+          {w.box === 0 ? '새 단어' : w.learned ? '외움' : `${boxLabel(w.box, intervals)} · 다음 ${shortDate(w.due)}`} · 틀린 횟수 {w.wrong}
         </p>
         <div className="st-row end">
           <button
@@ -495,7 +489,7 @@ function ImportSheet({ list, existing, onClose }: { list: WordList; existing: Wo
         } else throw e;
       }
     } catch {
-      toast('PDF 를 열지 못했어요. 붙여넣기나 사진으로 넣어 주세요');
+      toast('PDF를 열지 못했어요. 붙여넣기나 사진으로 넣어 주세요');
     } finally {
       setBusy(null);
     }
@@ -512,7 +506,7 @@ function ImportSheet({ list, existing, onClose }: { list: WordList; existing: Wo
       setSkip(new Set());
       toast(r.scanned.length ? `글자가 없는 ${r.scanned.length}쪽은 글자 인식으로 읽었어요. 틀린 곳을 고쳐 주세요` : '읽은 단어를 표로 보여 드려요. 확인하고 저장하세요');
     } catch {
-      toast('PDF 를 읽지 못했어요');
+      toast('PDF를 읽지 못했어요');
     } finally {
       setBusy(null);
     }
@@ -552,7 +546,7 @@ function ImportSheet({ list, existing, onClose }: { list: WordList; existing: Wo
     }
   }
 
-  // 뜻이 빈 단어들: AI 로 뜻 채우기 (로그인했을 때)
+  // 뜻이 빈 단어들: AI로 뜻 채우기 (로그인했을 때)
   const empty = rows.filter((r, i) => !skip.has(i) && r.problem === '뜻이 비어 있어요');
   async function fillMeanings() {
     if (!empty.length) return;
@@ -577,7 +571,7 @@ function ImportSheet({ list, existing, onClose }: { list: WordList; existing: Wo
     }
     if (replace.size) {
       setText((t) => t.split(/\r?\n/).map((l) => replace.get(l) ?? l).join('\n'));
-      toast(`${replace.size}단어의 뜻을 채웠어요. AI 가 찾은 뜻이라 한 번 확인해 주세요`);
+      toast(`${replace.size}단어의 뜻을 채웠어요. AI가 찾은 뜻이라 한 번 확인해 주세요`);
     }
   }
 
@@ -608,7 +602,7 @@ function ImportSheet({ list, existing, onClose }: { list: WordList; existing: Wo
       </div>
       {tab === 'pdf' && (
         <div className="st-form">
-          <p className="st-hint">단어장 PDF 는 이 기기 안에서만 읽고 어디에도 올리지 않아요. 단어와 뜻만 저장해요.</p>
+          <p className="st-hint">단어장 PDF는 이 기기 안에서만 읽고 어디에도 올리지 않아요. 단어와 뜻만 저장해요.</p>
           <input type="file" accept="application/pdf,.pdf" onChange={(e) => e.target.files?.[0] && void openPdf(e.target.files[0])} />
           {needPw && (
             <div className="st-inline">
@@ -634,7 +628,7 @@ function ImportSheet({ list, existing, onClose }: { list: WordList; existing: Wo
                 </button>
                 {busy && (
                   <button className="btn btn-sm" onClick={() => abort.current?.abort()}>
-                    그만
+                    멈추기
                   </button>
                 )}
               </div>
@@ -800,8 +794,8 @@ function WordRun({ listId, mode }: { listId: string; mode: 'learn' | 'prep' | 'w
             </div>
           </Field>
           <p className="st-hint">
-            {method === 'card' ? '카드를 눌러 뒤집어 뜻을 보고, 왼쪽으로 밀면 「모른다」 오른쪽으로 밀면 「안다」예요. 상자 1~5번을 모두 오를 수 있어요.' : '보기 4개 중 고르기. 고르기는 떠올리기보다 쉬워서 3번 상자까지만 올라요.'}
-            {mode === 'prep' && ' 시험 대비는 상자를 올리지 않고, 틀린 단어만 1번 상자로 보내요.'} 틀린 단어는 몇 장 뒤에 다시 나와요.
+            {method === 'card' ? '카드를 눌러 뜻을 보고, 모르면 왼쪽 · 알면 오른쪽으로 밀어요.' : `보기 4개 중 고르기예요. 고르기는 떠올리기보다 쉬워서 ${d.settings.quizMaxBox}단계까지만 올라가요.`}
+            {mode === 'prep' && ' 시험 대비는 단계를 올리지 않고, 틀린 단어만 1단계로 내려요.'} 틀린 단어는 몇 장 뒤에 다시 나와요.
           </p>
           <button className="btn btn-primary btn-lg" onClick={begin}>
             시작
@@ -823,7 +817,7 @@ function WordRun({ listId, mode }: { listId: string; mode: 'learn' | 'prep' | 'w
           <p>
             {total}단어 중 처음에 맞힌 것 {right}개 ({total ? Math.round((right / total) * 100) : 0}%)
           </p>
-          <p className="st-hint">{mode === 'prep' ? '틀린 단어는 1번 상자로 가서' : '틀린 단어는'} {d.settings.intervals[0] === 1 ? '내일' : `${d.settings.intervals[0]}일 뒤에`} 다시 나와요.</p>
+          <p className="st-hint">{mode === 'prep' ? '틀린 단어는 1단계로 내려가' : '틀린 단어는'} {d.settings.intervals[0] === 1 ? '내일' : `${d.settings.intervals[0]}일 뒤에`} 다시 나와요.</p>
           <div className="st-row">
             {right < total && (
               <button
@@ -836,7 +830,7 @@ function WordRun({ listId, mode }: { listId: string; mode: 'learn' | 'prep' | 'w
                   setStep((x) => x + 1);
                 }}
               >
-                모른 {total - right}개만 다시
+                모른 단어 {total - right}개만 다시
               </button>
             )}
             <button className={`btn ${right < total ? '' : 'btn-primary'}`} onClick={() => go('/study')}>

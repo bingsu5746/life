@@ -630,6 +630,6 @@ describe('타이머 한 줄 메모 → 일기 오늘 한 것', () => {
     const d = emptyStudy();
     d.subjects = { ma: { id: 'ma', name: '수학', color: '#000', order: 1, updatedAt: 1 } } as never;
     d.sessions = { x: { id: 'x', updatedAt: 1, subjectId: 'ma', start: 1, end: 2, minutes: 40, date: '2026-10-29', kind: 'watch', memo: '미적분 3단원' } } as never;
-    expect(daySummary(d, '2026-10-29')).toEqual(['공부 40분', '- 수학: 미적분 3단원']);
+    expect(daySummary(d, '2026-10-29')).toEqual(['공부 40분', '수학: 미적분 3단원']);
   });
 });

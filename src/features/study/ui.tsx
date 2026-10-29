@@ -109,10 +109,24 @@ const FOCUSABLE = 'a[href], button:not([disabled]), input:not([disabled]):not([t
 export function Sheet({ title, onClose, children, wide }: { title: string; onClose: () => void; children: ReactNode; wide?: boolean }) {
   const ref = useRef<HTMLDivElement>(null);
   // 부르는 쪽이 그릴 때마다 새 onClose 를 넘겨도 창을 처음 열 때만 칸에 커서를 둔다 (1초마다 커서가 튀지 않게)
-  const closeRef = useRef(onClose);
+  const onCloseRef = useRef(onClose);
   useEffect(() => {
-    closeRef.current = onClose;
+    onCloseRef.current = onClose;
   });
+  // 닫을 때: 내려가며 사라지는 모습을 보여 준 뒤 닫는다
+  const [closing, setClosing] = useState(false);
+  const closingRef = useRef(false);
+  const closeRef = useRef(() => {
+    if (closingRef.current) return;
+    closingRef.current = true;
+    if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return onCloseRef.current();
+    setClosing(true);
+    setTimeout(() => onCloseRef.current(), 190);
+  });
+  const close = () => closeRef.current();
+  // 폰: 머리 부분을 아래로 끌어 내려 닫기
+  const drag = useRef<{ y: number; id: number } | null>(null);
+  const [dy, setDy] = useState(0);
   useEffect(() => {
     const before = document.activeElement as HTMLElement | null;
     const key = (e: KeyboardEvent) => {
@@ -140,11 +154,25 @@ export function Sheet({ title, onClose, children, wide }: { title: string; onClo
     };
   }, []);
   return (
-    <div className="st-sheet-bg" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
-      <div className={`st-sheet ${wide ? 'wide' : ''}`} role="dialog" aria-modal="true" aria-label={title} ref={ref} tabIndex={-1}>
-        <header>
+    <div className={`st-sheet-bg ${closing ? 'closing' : ''}`} onMouseDown={(e) => e.target === e.currentTarget && close()}>
+      <div className={`st-sheet ${wide ? 'wide' : ''} ${dy ? 'dragging' : ''}`} style={dy ? { transform: `translateY(${dy}px)` } : undefined} role="dialog" aria-modal="true" aria-label={title} ref={ref} tabIndex={-1}>
+        <header
+          onPointerDown={(e) => {
+            if (e.pointerType !== 'touch' || (e.target as HTMLElement).closest('button')) return;
+            drag.current = { y: e.clientY, id: e.pointerId };
+            e.currentTarget.setPointerCapture(e.pointerId);
+          }}
+          onPointerMove={(e) => drag.current?.id === e.pointerId && setDy(Math.max(0, e.clientY - drag.current.y))}
+          onPointerUp={(e) => {
+            if (drag.current?.id !== e.pointerId) return;
+            drag.current = null;
+            if (dy > 90) close();
+            setDy(0);
+          }}
+          onPointerCancel={() => ((drag.current = null), setDy(0))}
+        >
           <h3>{title}</h3>
-          <button className="st-x" onClick={onClose} aria-label="닫기">
+          <button className="st-x" onClick={close} aria-label="닫기">
             ✕
           </button>
         </header>
@@ -281,7 +309,7 @@ type InputRest = Omit<InputHTMLAttributes<HTMLInputElement>, 'value' | 'onChange
 
 /**
  * 숫자 칸. 저장된 값이 바뀌면(다른 기기에서 와도) 따라 바뀌고,
- * 칸을 떠나거나 Enter 를 누를 때 값이 정말 달라졌을 때만 저장한다 (같은 값을 다시 저장해 다른 기기의 고침을 덮지 않게).
+ * 칸을 떠나거나 Enter를 누를 때 값이 정말 달라졌을 때만 저장한다 (같은 값을 다시 저장해 다른 기기의 고침을 덮지 않게).
  */
 export function NumInput({ value, onCommit, min, max, allowEmpty, ...rest }: { value: number | null | undefined; onCommit: (v: number | null) => void; min: number; max: number; allowEmpty?: boolean } & InputRest) {
   const shown = value == null ? '' : String(value);
@@ -341,14 +369,19 @@ let toastFn: ((msg: string) => void) | null = null;
 export const toast = (msg: string) => toastFn?.(msg);
 export function Toaster() {
   const [msg, setMsg] = useState<string | null>(null);
+  const [out, setOut] = useState(false);
   useEffect(() => {
     let t = 0;
+    let t2 = 0;
     let shownAt = 0;
     toastFn = (m) => {
       setMsg(m);
+      setOut(false);
       shownAt = Date.now();
       clearTimeout(t);
-      t = window.setTimeout(() => setMsg(null), 2800);
+      clearTimeout(t2);
+      t = window.setTimeout(() => setOut(true), 2600);
+      t2 = window.setTimeout(() => setMsg(null), 2800);
     };
     // 다른 화면으로 가면 지난 알림은 지운다 (누르자마자 화면이 바뀌는 알림은 남긴다)
     const onNav = () => Date.now() - shownAt > 800 && setMsg(null);
@@ -356,11 +389,12 @@ export function Toaster() {
     return () => {
       toastFn = null;
       clearTimeout(t);
+      clearTimeout(t2);
       window.removeEventListener('hashchange', onNav);
     };
   }, []);
   return msg ? (
-    <div className="st-toast" role="status">
+    <div key={msg} className={`st-toast ${out ? 'out' : ''}`} role="status">
       {msg}
     </div>
   ) : null;

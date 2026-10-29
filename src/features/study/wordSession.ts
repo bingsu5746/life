@@ -101,7 +101,7 @@ export function choicesFor(w: Word, pool: Word[], rand: () => number = Math.rand
   return all;
 }
 
-/** 단어장의 Day 가 끝났는지 (그 Day 의 단어를 모두 한 번 이상 익힘) */
+/** 단어장의 Day가 끝났는지 (그 Day 의 단어를 모두 한 번 이상 익힘) */
 export function finishedDays(words: Word[]): number[] {
   const byDay = new Map<number, Word[]>();
   for (const w of words) if (w.day !== undefined) byDay.set(w.day, [...(byDay.get(w.day) ?? []), w]);
