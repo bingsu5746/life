@@ -12,13 +12,16 @@ export { goalPace, pagesBetween, withProgress };
 
 type Tab = 'reading' | 'want' | 'done';
 const TAB_NAME: Record<Tab, string> = { reading: '읽는 중', want: '읽고 싶어요', done: '다 읽었어요' };
+type View = Tab | 'quotes';
 
 export function ReadingPage() {
   const d = useStudy();
   const today = useToday();
-  const [tab, setTab] = useState<Tab>('reading');
+  const [view, setTab] = useState<View>('reading');
+  const tab: Tab = view === 'quotes' ? 'done' : view;
   const [edit, setEdit] = useState<Partial<Reading> | null>(null);
   const all = alive(d.reads);
+  const quotes = all.flatMap((b) => (b.quotes ?? []).map((q, i) => ({ ...q, book: b, key: `${b.id}-${i}` })));
   const by = (s: Tab) => all.filter((b) => b.status === s).sort((a, b) => (s === 'done' ? (b.finished ?? '').localeCompare(a.finished ?? '') : b.created - a.created));
   const list = by(tab);
   const year = today.slice(0, 4);
@@ -45,15 +48,31 @@ export function ReadingPage() {
       )}
       <nav className="mv-sub" aria-label="독서">
         {(Object.keys(TAB_NAME) as Tab[]).map((k) => (
-          <button key={k} className={tab === k ? 'on' : ''} onClick={() => setTab(k)}>
+          <button key={k} className={view === k ? 'on' : ''} onClick={() => setTab(k)}>
             {TAB_NAME[k]}
             {by(k).length ? ` ${by(k).length}` : ''}
           </button>
         ))}
+        {quotes.length > 0 && (
+          <button className={view === 'quotes' ? 'on' : ''} onClick={() => setTab('quotes')}>
+            밑줄 {quotes.length}
+          </button>
+        )}
       </nav>
-      {!list.length ? (
+      {view === 'quotes' ? (
+        <div className="mq-list">
+          {quotes.map((q) => (
+            <button key={q.key} className="mq-item" onClick={() => setEdit(q.book)}>
+              <p>“{q.text}”</p>
+              <small>
+                <b>{q.book.title}</b>
+                {q.page ? ` · ${q.page}쪽` : ''}
+              </small>
+            </button>
+          ))}
+        </div>
+      ) : !list.length ? (
         <Empty title={all.length ? '이 칸에는 책이 없어요' : '읽는 책을 넣어 보세요'}>
-          <p>읽은 쪽 수를 적어 두면 진도가 보이고, 다 읽으면 별점과 감상을 남길 수 있어요.</p>
           <button className="btn btn-primary" onClick={() => setEdit({ status: tab })}>
             책 넣기
           </button>
@@ -90,6 +109,7 @@ function ReadSheet({ item, today, onClose }: { item: Partial<Reading>; today: st
   const [rating, setRating] = useState(item.rating ?? 0);
   const [comment, setComment] = useState(item.comment ?? '');
   const [review, setReview] = useState(item.review ?? '');
+  const [quotes, setQuotes] = useState(item.quotes ?? []);
   const num = (s: string) => (s ? Number(s) : undefined);
   return (
     <Sheet title={item.id ? '책 고치기' : '책 넣기'} onClose={onClose}>
@@ -122,6 +142,7 @@ function ReadSheet({ item, today, onClose }: { item: Partial<Reading>; today: st
             <span>쪽</span>
           </div>
         )}
+        {status !== 'want' && <QuoteInput quotes={quotes} onChange={setQuotes} />}
         {status === 'done' && (
           <>
             <StarInput value={rating} onChange={setRating} />
@@ -157,6 +178,7 @@ function ReadSheet({ item, today, onClose }: { item: Partial<Reading>; today: st
                 rating: status === 'done' && rating ? rating : undefined,
                 comment: status === 'done' ? comment.trim() || undefined : undefined,
                 review: status === 'done' ? review.trim() || undefined : undefined,
+                quotes: quotes.length ? quotes : undefined,
               };
               base.started = status !== 'want' ? (item.started ?? today) : undefined;
               base.finished = status === 'done' ? (item.finished ?? today) : undefined;
@@ -170,6 +192,40 @@ function ReadSheet({ item, today, onClose }: { item: Partial<Reading>; today: st
         </div>
       </div>
     </Sheet>
+  );
+}
+
+/** 밑줄 친 문장: 문장 · 쪽 넣고, 누르면 지우기 */
+function QuoteInput({ quotes, onChange }: { quotes: { text: string; page?: number }[]; onChange: (q: { text: string; page?: number }[]) => void }) {
+  const [text, setText] = useState('');
+  const [page, setPage] = useState('');
+  const add = () => {
+    if (!text.trim()) return;
+    onChange([...quotes, { text: text.trim().slice(0, 1000), page: Number(page) || undefined }]);
+    setText('');
+    setPage('');
+  };
+  return (
+    <Field group label="밑줄">
+      {quotes.map((q, i) => (
+        <div key={i} className="st-item">
+          <div className="st-item-main">
+            <div className="st-item-title">“{q.text}”</div>
+            {q.page && <div className="st-item-sub">{q.page}쪽</div>}
+          </div>
+          <button type="button" className="st-link" aria-label="이 문장 지우기" onClick={() => onChange(quotes.filter((_, j) => j !== i))}>
+            ×
+          </button>
+        </div>
+      ))}
+      <textarea className="st-input" rows={2} value={text} onChange={(e) => setText(e.target.value)} placeholder="마음에 든 문장" aria-label="밑줄 문장" />
+      <div className="st-inline">
+        <input className="st-input xs" inputMode="numeric" value={page} onChange={(e) => setPage(e.target.value.replace(/\D/g, '').slice(0, 5))} placeholder="쪽" aria-label="쪽" />
+        <button type="button" className="btn btn-sm" disabled={!text.trim()} onClick={add}>
+          문장 넣기
+        </button>
+      </div>
+    </Field>
   );
 }
 

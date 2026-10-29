@@ -1321,7 +1321,9 @@ input[type='range'] {
 }
 
 .st-day.today {
-  box-shadow: 0 0 0 2px var(--surface), 0 0 0 3px var(--accent);
+  box-shadow:
+    0 0 0 2px var(--surface),
+    0 0 0 3px var(--accent);
 }
 
 .st-weak {
@@ -1544,7 +1546,9 @@ input[type='range'] {
 }
 
 .st-tap {
-  transition: background 0.18s var(--ease), transform 0.16s var(--ease);
+  transition:
+    background 0.18s var(--ease),
+    transform 0.16s var(--ease);
 }
 
 .st-tap:active {
@@ -4500,7 +4504,10 @@ body {
   font: inherit;
   font-weight: 600;
   cursor: pointer;
-  transition: background 0.15s, border-color 0.15s, color 0.15s;
+  transition:
+    background 0.15s,
+    border-color 0.15s,
+    color 0.15s;
 }
 .sw-btn.no:hover {
   border-color: rgb(var(--sw-no));
@@ -5632,7 +5639,9 @@ body {
   font: inherit;
   font-size: 0.86rem;
   font-weight: 500;
-  transition: background 0.18s var(--ease), transform 0.16s var(--ease);
+  transition:
+    background 0.18s var(--ease),
+    transform 0.16s var(--ease);
 }
 
 .st-more-grid button:active {
@@ -5943,7 +5952,9 @@ body.focus-on {
   opacity: 0;
   transform: translateY(10px);
   pointer-events: none;
-  transition: opacity 0.35s var(--ease), transform 0.35s var(--ease);
+  transition:
+    opacity 0.35s var(--ease),
+    transform 0.35s var(--ease);
 }
 .focus.show .focus-ctl {
   opacity: 1;
@@ -5974,7 +5985,9 @@ body.focus-on {
   border-radius: 999px;
   font: inherit;
   font-size: 0.9rem;
-  transition: background 0.2s var(--ease), transform 0.16s var(--ease);
+  transition:
+    background 0.2s var(--ease),
+    transform 0.16s var(--ease);
 }
 .focus button:active {
   transform: scale(0.96);
@@ -6039,7 +6052,9 @@ body.focus-on {
   color: inherit;
   font: inherit;
   text-align: left;
-  transition: transform 0.16s var(--ease), background 0.18s var(--ease);
+  transition:
+    transform 0.16s var(--ease),
+    background 0.18s var(--ease);
 }
 .mk-item:active {
   transform: scale(0.99);
@@ -6099,4 +6114,200 @@ body.focus-on {
   text-overflow: ellipsis;
   white-space: nowrap;
   font-size: 0.9rem;
+}
+
+/* 쉬는 시간 단어 */
+.bw {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  width: 100%;
+  max-width: 420px;
+  margin: 12px auto 0;
+}
+.bw-card {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface);
+  text-align: left;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+.bw-card b {
+  font-size: 16px;
+}
+.bw-card span {
+  font-size: 13px;
+  color: var(--muted);
+}
+.bw-card.on span {
+  color: inherit;
+}
+.bw-more {
+  grid-column: 1 / -1;
+  background: none;
+  border: 0;
+  color: var(--muted);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+.bw.dark .bw-card {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.12);
+}
+.bw.dark .bw-card span,
+.bw.dark .bw-more {
+  color: rgba(255, 255, 255, 0.6);
+}
+.bw.dark .bw-card.on span {
+  color: #fff;
+}
+
+/* 메인: 학교 (급식 · 일정 · 방학) */
+.hm-school {
+  display: grid;
+  gap: 6px;
+  padding: 14px 18px;
+  border-radius: var(--radius);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  font-size: 0.92rem;
+}
+.hm-school p {
+  margin: 0;
+  display: flex;
+  gap: 10px;
+  align-items: baseline;
+}
+.hm-school small {
+  flex: none;
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
+/* 앞으로 7일 할 양 */
+.wl-bars {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 6px;
+  height: 120px;
+  margin-top: 10px;
+}
+.wl-day {
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  justify-items: center;
+  align-items: end;
+  gap: 4px;
+  padding: 0;
+  background: none;
+  border: 0;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+.wl-day span {
+  width: 100%;
+  max-width: 28px;
+  min-height: 2px;
+  border-radius: 6px 6px 2px 2px;
+  background: var(--line-strong);
+  align-self: end;
+}
+.wl-day small {
+  font-size: 0.72rem;
+  color: var(--muted);
+}
+.wl-day b {
+  font-size: 0.78rem;
+  font-weight: 500;
+  color: var(--muted);
+}
+.wl-day.heavy span {
+  background: var(--bad);
+}
+.wl-day.on span {
+  background: var(--accent);
+}
+.wl-day.on b {
+  color: var(--text);
+}
+.wl-warn {
+  color: var(--bad);
+  font-size: 0.8rem;
+}
+.wl-detail {
+  margin: 10px 0 0;
+  font-size: 0.85rem;
+}
+
+/* 올해 결산 */
+.yr-card {
+  padding: 24px 22px;
+  border-radius: var(--radius);
+  background: #111;
+  color: #fff;
+}
+.yr-card > small {
+  font-size: 1.3rem;
+  font-weight: 700;
+}
+.yr-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px 14px;
+  margin-top: 18px;
+}
+.yr-grid div {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+.yr-grid small,
+.yr-grid span {
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 0.78rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.yr-grid b {
+  font-size: 1.35rem;
+}
+
+/* 여행 지도 */
+.pm-map {
+  height: 60vh;
+  min-height: 320px;
+  border-radius: var(--radius);
+  overflow: hidden;
+  background: var(--soft);
+  z-index: 0;
+}
+.pm-map.pick {
+  height: 260px;
+  min-height: 0;
+}
+.pm-name {
+  border: 0;
+  background: none;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 0;
+}
+
+.dy-mic {
+  justify-self: start;
+}
+.dy-mic.on {
+  background: var(--bad);
+  border-color: var(--bad);
+  color: #fff;
 }

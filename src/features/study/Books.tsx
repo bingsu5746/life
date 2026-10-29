@@ -1,6 +1,7 @@
 // 문제집: 목록 · 넣기(목차 붙여넣기·사진) · 문제집 하나(계획·달력·진도) (설계 §4~5)
 import { useMemo, useRef, useState } from 'react';
-import { addDays, daysBetween, longDate, shortDate, weekStart } from './dates';
+import { addDays, daysBetween, longDate, shortDate, weekStart, WEEKDAYS, weekday } from './dates';
+import { weekLoad } from './weekLoad';
 import { alive, newId, type Book, type Unit } from './model';
 import { compress, expand, parseRanges, rangeText } from './pages';
 import { paceOf } from './plan';
@@ -21,6 +22,41 @@ export function Books({ id, sub }: { id?: string; sub?: string }) {
   return <BookList />;
 }
 
+/** 이번 주 할 양: 앞으로 7일 문제집 쪽수, 몰린 날 표시 */
+function WeekLoad({ views, today }: { views: ReturnType<typeof planViews>; today: string }) {
+  const [pick, setPick] = useState<string | null>(null);
+  const days = weekLoad(
+    views.map((v) => ({ name: v.name, today: v.sched.today, days: v.sched.days })),
+    today,
+  );
+  const max = Math.max(1, ...days.map((x) => x.total));
+  if (!days.some((x) => x.total)) return null;
+  const sel = days.find((x) => x.date === pick);
+  const heavy = days.filter((x) => x.heavy);
+  return (
+    <section className="st-card wl">
+      <div className="st-inline between">
+        <h3 className="st-h">앞으로 7일</h3>
+        {heavy.length > 0 && <small className="wl-warn">{heavy.map((x) => (x.date === today ? '오늘' : `${WEEKDAYS[weekday(x.date)]}`)).join('·')}에 몰려 있어요</small>}
+      </div>
+      <div className="wl-bars">
+        {days.map((x) => (
+          <button key={x.date} className={`wl-day ${x.heavy ? 'heavy' : ''} ${pick === x.date ? 'on' : ''}`} onClick={() => setPick(pick === x.date ? null : x.date)} aria-label={`${shortDate(x.date)} ${x.total}쪽`}>
+            <small>{x.total || ''}</small>
+            <span style={{ height: `${(x.total / max) * 100}%` }} />
+            <b>{x.date === today ? '오늘' : WEEKDAYS[weekday(x.date)]}</b>
+          </button>
+        ))}
+      </div>
+      {sel && (
+        <p className="st-muted wl-detail">
+          {shortDate(sel.date)}: {sel.parts.length ? sel.parts.map((p) => `${p.name} ${p.n}쪽`).join(' · ') : '쉬는 날'}
+        </p>
+      )}
+    </section>
+  );
+}
+
 function BookList() {
   const d = useStudy();
   const words = useWords();
@@ -36,6 +72,7 @@ function BookList() {
         </button>
       </div>
       <BookTabs on="books" />
+      <WeekLoad views={views.filter((v) => v.plan.target === 'book')} today={today} />
       {!books.length && (
         <Empty icon="📖" title="아직 넣은 문제집이 없어요">
           <p>목차를 붙여 넣거나 목차 사진을 찍으면, 시험까지 하루에 풀 페이지를 정해 드려요.</p>
@@ -341,7 +378,12 @@ function BookDetail({ id, plan }: { id: string; plan?: boolean }) {
                 '오늘은 배정 없음'
               )}
               {v.sched.end && ` · ${longDate(v.sched.end)}까지 남은 ${v.sched.remaining.length}쪽`}
-              {pace !== 0 && <span className={pace > 0 ? 'ok' : 'bad'}> · 계획보다 {Math.abs(pace)}쪽 {pace > 0 ? '앞섬' : '밀림'}</span>}
+              {pace !== 0 && (
+                <span className={pace > 0 ? 'ok' : 'bad'}>
+                  {' '}
+                  · 계획보다 {Math.abs(pace)}쪽 {pace > 0 ? '앞섬' : '밀림'}
+                </span>
+              )}
             </p>
             {v.sched.warning && <PlanWarning p={v} />}
             {(() => {
@@ -444,9 +486,7 @@ function Calendar({ v, today }: { v: NonNullable<ReturnType<typeof planViews>[nu
           );
         })}
       </div>
-      <p className="st-hint">
-        {open ? (sel && sel.n ? `${shortDate(open)}: p.${rangeText(sel.items)}` : `${shortDate(open)}: 배정 없음`) : '날짜를 누르면 그날 쪽이 보여요 · 흐린 칸: 쉬는 날 · 점선: 과외 날 · 굵은 테두리: 마지막 날'}
-      </p>
+      <p className="st-hint">{open ? (sel && sel.n ? `${shortDate(open)}: p.${rangeText(sel.items)}` : `${shortDate(open)}: 배정 없음`) : '날짜를 누르면 그날 쪽이 보여요 · 흐린 칸: 쉬는 날 · 점선: 과외 날 · 굵은 테두리: 마지막 날'}</p>
     </section>
   );
 }

@@ -92,9 +92,7 @@ export function studyInsights(d: StudyData, today: DateStr): Section[] {
     },
     {
       title: '과목별 (전체)',
-      ranks: [...subj]
-        .sort((a, b) => b[1].min - a[1].min)
-        .map(([id, e]) => ({ label: d.subjects[id]?.name ?? '과목 없음', value: e.min, text: `${hm(e.min)} · ${pct(e.min, total)}% · ${e.n}번 · 한 번 ${hm(Math.round(e.min / e.n))}` })),
+      ranks: [...subj].sort((a, b) => b[1].min - a[1].min).map(([id, e]) => ({ label: d.subjects[id]?.name ?? '과목 없음', value: e.min, text: `${hm(e.min)} · ${pct(e.min, total)}% · ${e.n}번 · 한 번 ${hm(Math.round(e.min / e.n))}` })),
     },
     { title: '달마다 (최근 12달)', bars: lastMonths(today, 12).map((m) => ({ label: `${Number(m.slice(5))}월`, title: m, value: sum(ss.filter((s) => monthOf(s.date) === m).map((s) => s.minutes)) })), barFormat: 'min' },
     { title: '요일마다 (한 주 평균)', bars: [1, 2, 3, 4, 5, 6, 0].map((w) => ({ label: WEEKDAYS[w], value: Math.round(wd[w] / weeksSpan) })), barFormat: 'min' },
@@ -130,7 +128,12 @@ export function gradeInsights(d: StudyData): Section[] {
       title: kind === 'school' ? '내신' : '모의고사',
       stats: [
         { label: '넣은 시험', value: `${rs.length}번` },
-        ...(avgs.length ? [{ label: '평균 등급 (최근)', value: `${avgs[avgs.length - 1]}`, sub: avgs.length > 1 ? `처음 ${avgs[0]}` : undefined }, { label: '가장 좋았던 평균', value: `${Math.min(...avgs)}` }] : []),
+        ...(avgs.length
+          ? [
+              { label: '평균 등급 (최근)', value: `${avgs[avgs.length - 1]}`, sub: avgs.length > 1 ? `처음 ${avgs[0]}` : undefined },
+              { label: '가장 좋았던 평균', value: `${Math.min(...avgs)}` },
+            ]
+          : []),
       ],
       ranks: ranks.sort((a, b) => b.value - a.value),
     });
@@ -138,10 +141,25 @@ export function gradeInsights(d: StudyData): Section[] {
   const papers = alive(d.papers);
   if (papers.length) {
     const wrong = sum(papers.map((p) => p.wrong.length));
-    out.push({ title: '혼자 푼 기출', stats: [{ label: '푼 시험', value: `${papers.length}회` }, { label: '틀린 문항', value: `${wrong}개`, sub: `한 번 평균 ${Math.round((wrong / papers.length) * 10) / 10}개` }, { label: '걸린 시간', value: hm(sum(papers.map((p) => p.minutes ?? 0))) }] });
+    out.push({
+      title: '혼자 푼 기출',
+      stats: [
+        { label: '푼 시험', value: `${papers.length}회` },
+        { label: '틀린 문항', value: `${wrong}개`, sub: `한 번 평균 ${Math.round((wrong / papers.length) * 10) / 10}개` },
+        { label: '걸린 시간', value: hm(sum(papers.map((p) => p.minutes ?? 0))) },
+      ],
+    });
   }
   const notes = alive(d.notes);
-  if (notes.length) out.push({ title: '오답', stats: [{ label: '넣은 오답', value: `${notes.length}개` }, { label: '해결', value: `${notes.filter((n) => n.learned).length}개`, sub: `${pct(notes.filter((n) => n.learned).length, notes.length)}%` }, { label: '가장 많이 틀린 문제', value: `${Math.max(...notes.map((n) => n.wrong))}번` }] });
+  if (notes.length)
+    out.push({
+      title: '오답',
+      stats: [
+        { label: '넣은 오답', value: `${notes.length}개` },
+        { label: '해결', value: `${notes.filter((n) => n.learned).length}개`, sub: `${pct(notes.filter((n) => n.learned).length, notes.length)}%` },
+        { label: '가장 많이 틀린 문제', value: `${Math.max(...notes.map((n) => n.wrong))}번` },
+      ],
+    });
   return out;
 }
 
@@ -195,7 +213,12 @@ export function hobbyInsights(d: StudyData, today: DateStr): Section[] {
     const rated = mv.filter((m) => m.rating);
     const count = (key: 'genre' | 'director' | 'nation' | 'where') => {
       const m = new Map<string, number>();
-      for (const x of mv) for (const v of (x[key] ?? '').split(/[,·]/).map((t) => t.trim()).filter(Boolean)) m.set(v, (m.get(v) ?? 0) + 1);
+      for (const x of mv)
+        for (const v of (x[key] ?? '')
+          .split(/[,·]/)
+          .map((t) => t.trim())
+          .filter(Boolean))
+          m.set(v, (m.get(v) ?? 0) + 1);
       return [...m].sort((a, b) => b[1] - a[1]).slice(0, 5);
     };
     const year = today.slice(0, 4);
@@ -251,9 +274,25 @@ export function hobbyInsights(d: StudyData, today: DateStr): Section[] {
     });
   }
   const games = alive(d.games);
-  if (games.length) out.push({ title: '게임', stats: [{ label: '끝낸 게임', value: `${games.filter((g) => g.status === 'done').length}개` }, { label: '한 시간', value: `${Math.round(sum(games.map((g) => g.hours ?? 0)))}시간` }, { label: '하는 중', value: `${games.filter((g) => g.status === 'playing').length}개` }] });
+  if (games.length)
+    out.push({
+      title: '게임',
+      stats: [
+        { label: '끝낸 게임', value: `${games.filter((g) => g.status === 'done').length}개` },
+        { label: '한 시간', value: `${Math.round(sum(games.map((g) => g.hours ?? 0)))}시간` },
+        { label: '하는 중', value: `${games.filter((g) => g.status === 'playing').length}개` },
+      ],
+    });
   const places = alive(d.places);
-  if (places.length) out.push({ title: '여행', stats: [{ label: '다녀온 곳', value: `${places.filter((p) => p.status === 'visited').length}곳` }, { label: '가 볼 곳', value: `${places.filter((p) => p.status === 'want').length}곳` }, { label: '지역', value: `${new Set(places.map((p) => p.region).filter(Boolean)).size}곳` }] });
+  if (places.length)
+    out.push({
+      title: '여행',
+      stats: [
+        { label: '다녀온 곳', value: `${places.filter((p) => p.status === 'visited').length}곳` },
+        { label: '가 볼 곳', value: `${places.filter((p) => p.status === 'want').length}곳` },
+        { label: '지역', value: `${new Set(places.map((p) => p.region).filter(Boolean)).size}곳` },
+      ],
+    });
   return out;
 }
 
@@ -286,4 +325,55 @@ export function moneyInsights(d: StudyData, today: DateStr): Section[] {
       barFormat: 'won',
     },
   ];
+}
+
+/** 올해 결산: 그해 기록만 세어서 (없는 칸은 빼고) */
+export function yearReview(d: StudyData, year: string): Stat[] {
+  const inY = (s?: string) => !!s && s.startsWith(year);
+  const top = <T>(xs: T[], key: (x: T) => string, w: (x: T) => number = () => 1) => {
+    const m = new Map<string, number>();
+    for (const x of xs) m.set(key(x), (m.get(key(x)) ?? 0) + w(x));
+    return [...m].sort((a, b) => b[1] - a[1])[0]?.[0];
+  };
+  const best = <T extends { rating?: number }>(xs: T[], name: (x: T) => string) => {
+    const r = xs.filter((x) => x.rating).sort((a, b) => b.rating! - a.rating!)[0];
+    return r ? `최고: ${name(r)} ★${r.rating}` : undefined;
+  };
+  const out: Stat[] = [];
+  const ss = alive(d.sessions).filter((s) => inY(s.date) && s.minutes > 0);
+  if (ss.length) {
+    const sub = top(
+      ss.filter((s) => s.subjectId && d.subjects[s.subjectId]),
+      (s) => d.subjects[s.subjectId!].name,
+      (s) => s.minutes,
+    );
+    out.push({ label: '공부한 시간', value: hm(sum(ss.map((s) => s.minutes))), sub: sub ? `가장 많이: ${sub}` : undefined });
+    out.push({ label: '공부한 날', value: `${new Set(ss.map((s) => s.date)).size}일`, sub: `가장 길게 이어서 ${longestStreak(ss.map((s) => s.date)).days}일` });
+  }
+  const ws = alive(d.workouts).filter((w) => inY(w.date));
+  if (ws.length) out.push({ label: '운동한 날', value: `${new Set(ws.map((w) => w.date)).size}일`, sub: `가장 많이: ${top(ws, (w) => w.kind)}` });
+  const mv = alive(d.movies).filter((m) => m.status === 'watched' && inY(m.watched));
+  if (mv.length) out.push({ label: '본 영화', value: `${mv.length}편`, sub: best(mv, (m) => m.title) });
+  const bk = alive(d.reads).filter((b) => b.status === 'done' && inY(b.finished));
+  if (bk.length) out.push({ label: '읽은 책', value: `${bk.length}권`, sub: best(bk, (b) => b.title) });
+  const gm = alive(d.games).filter((g) => g.status === 'done' && inY(g.finished));
+  if (gm.length) out.push({ label: '끝낸 게임', value: `${gm.length}개`, sub: best(gm, (g) => g.title) });
+  const rc = alive(d.records).filter((r) => r.status === 'have' && inY(r.bought));
+  if (rc.length) out.push({ label: '들인 음반', value: `${rc.length}장`, sub: `가장 많이: ${top(rc, (r) => r.artist)}` });
+  const pl = alive(d.places).filter((p) => p.status === 'visited' && inY(p.visited));
+  if (pl.length) out.push({ label: '다녀온 곳', value: `${pl.length}곳`, sub: best(pl, (p) => p.name) });
+  const dy = alive(d.diary).filter((e) => inY(e.id));
+  if (dy.length) out.push({ label: '쓴 일기', value: `${dy.length}편` });
+  const tx = alive(d.moneyTx).filter((t) => t.type === 'out' && inY(t.date));
+  if (tx.length)
+    out.push({
+      label: '쓴 돈',
+      value: won(sum(tx.map((t) => t.amount))),
+      sub: `가장 많이: ${top(
+        tx,
+        (t) => t.category,
+        (t) => t.amount,
+      )}`,
+    });
+  return out;
 }

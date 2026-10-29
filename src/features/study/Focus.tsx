@@ -5,7 +5,7 @@ import { examSoundUrl, saveSound } from '../../lib/soundStore';
 import { addSession } from './actions';
 import { alive } from './model';
 import { hhmm, MOCK_SUBJECTS, mockView, type MockState } from './mockExam';
-import { getStudy, useStudy } from './store';
+import { getStudy, useStudy, useWords } from './store';
 import { clock, minutesText, nextPhase, pause, resume, view, type TimerState } from './timer';
 import { primeAudio } from './timerStore';
 import { go, toast, useNow, useToday } from './ui';
@@ -90,6 +90,7 @@ export function FocusTimer({ timer, update, onStop, onExit }: { timer: TimerStat
           <small>{v.finished ? (timer.phase === 'work' ? '공부 끝! 쉬어요' : '휴식 끝') : paused ? '멈춤' : timer.kind === 'pomo' && timer.phase === 'work' ? '남은 시간' : timer.kind === 'pomo' ? '쉬는 중' : '공부한 시간'}</small>
         </div>
       </div>
+      {timer.kind === 'pomo' && timer.phase !== 'work' && <BreakWords dark />}
       <div className="focus-bottom">
         <span>오늘 {minutesText(todayMin)}</span>
       </div>
@@ -312,10 +313,58 @@ function MockScreen({ state, onRestart, onQuit }: { state: MockState; onRestart:
               공부 기록에 넣기
             </button>
           )}
+          {v.done && (
+            <button
+              onClick={() => {
+                onQuit();
+                go(`/exams/grades/self-${state.key}`);
+              }}
+            >
+              점수 넣기
+            </button>
+          )}
           <button onClick={() => window.confirm('처음부터 다시 볼까요?') && onRestart()}>처음부터</button>
           <button onClick={() => (v.done || window.confirm('시험을 그만둘까요? 기록은 남지 않아요')) && onQuit()}>{v.done ? '닫기' : '그만두기'}</button>
         </div>
       </div>
+    </div>
+  );
+}
+
+/** 쉬는 시간 단어 퀴즈: 내 단어장에서 몇 개 뽑아 뜻 맞혀 보기 (누르면 뜻) */
+export function BreakWords({ dark }: { dark?: boolean }) {
+  const d = useStudy();
+  const words = useWords();
+  const [seed, setSeed] = useState(() => Math.random());
+  const [open, setOpen] = useState<Set<string>>(new Set());
+  const pool = alive(words).filter((w) => d.wordLists[w.listId] && !d.wordLists[w.listId].deleted && w.term && w.meaning);
+  if (pool.length < 3) return null;
+  // 틀린 적 있는 단어를 먼저, 그다음은 섞어서
+  const pick = pool
+    .map((w, i) => {
+      const r = Math.sin((i + 1) * 12.9898 + seed * 78.233) * 43758.5453;
+      return { w, k: (w.wrong ? 0 : 1) + (r - Math.floor(r)) };
+    })
+    .sort((a, b) => a.k - b.k)
+    .slice(0, 4)
+    .map((x) => x.w);
+  return (
+    <div className={`bw ${dark ? 'dark' : ''}`} onPointerDown={(e) => e.stopPropagation()}>
+      {pick.map((w) => (
+        <button key={w.id} className={`bw-card ${open.has(w.id) ? 'on' : ''}`} onClick={() => setOpen(new Set(open).add(w.id))}>
+          <b>{w.term}</b>
+          <span>{open.has(w.id) ? w.meaning : '뜻 보기'}</span>
+        </button>
+      ))}
+      <button
+        className="bw-more"
+        onClick={() => {
+          setSeed(Math.random());
+          setOpen(new Set());
+        }}
+      >
+        다른 단어
+      </button>
     </div>
   );
 }

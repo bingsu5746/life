@@ -4,6 +4,7 @@ import { shortDate } from './dates';
 import { examEnd, examSubjectIds } from './exams';
 import { ExamTabs } from './Exams';
 import { parseWrongNums, wrongFrequency, change, changeText, findScore, METRIC_NAME, metricsFor, MOCK_SUBJECTS, readNum, prepBefore, recordAverage, recordsOf, scoreValue, series, studyBefore, subjectNames, type Metric } from './grades';
+import { GRADE_NAME } from './mockExam';
 import { BarChart, LineChart, TableView } from './charts';
 import { addDays } from './dates';
 import { alive, newId, type GradeRecord, type GradeScore } from './model';
@@ -41,6 +42,7 @@ export function Grades({ sub }: { sub?: string }) {
   const d = useStudy();
   const [kind, setKindState] = useState<GradeRecord['kind']>(() => {
     const from = sub?.startsWith('from-') ? d.exams[sub.slice(5)] : undefined;
+    if (sub?.startsWith('self-')) return 'mock';
     if (from) return from.kind === 'mock' ? 'mock' : 'school';
     const rec = sub ? d.grades[sub] : undefined;
     return rec ? rec.kind : readKind();
@@ -56,6 +58,7 @@ export function Grades({ sub }: { sub?: string }) {
     }
   };
   const [level, setLevelState] = useState<'고1' | '고2' | '고3'>(() => {
+    if (sub?.startsWith('self-')) return '고3';
     try {
       const v = localStorage.getItem('my-study.grades.level');
       return v === '고1' || v === '고3' ? v : '고2';
@@ -75,7 +78,8 @@ export function Grades({ sub }: { sub?: string }) {
   const levels = (['고1', '고2', '고3'] as const).filter((l) => l !== '고1' || allMock.some((r) => r.level === '고1'));
   const records = recordsOf(d, kind).filter((r) => kind !== 'mock' || (r.level ?? '고2') === level);
   const names = subjectNames(records);
-  const editing = sub === 'new' || sub?.startsWith('from-') ? 'new' : sub && d.grades[sub] && !d.grades[sub].deleted ? d.grades[sub] : null;
+  const self = sub?.startsWith('self-') ? sub.slice(5) : undefined;
+  const editing = sub === 'new' || sub?.startsWith('from-') || self ? 'new' : sub && d.grades[sub] && !d.grades[sub].deleted ? d.grades[sub] : null;
   const fromExam = sub?.startsWith('from-') ? d.exams[sub.slice(5)] : undefined;
 
   const avg = records.map((r) => recordAverage(r, metric));
@@ -220,7 +224,7 @@ export function Grades({ sub }: { sub?: string }) {
       )}
 
       {goalOpen && <GoalSheet kind={kind} names={names} onClose={() => setGoalOpen(false)} />}
-      {editing && <GradeSheet record={editing === 'new' ? undefined : editing} kind={kind} level={level} fromExamId={fromExam?.id} onSaved={setKind} onClose={() => go('/exams/grades')} />}
+      {editing && <GradeSheet record={editing === 'new' ? undefined : editing} kind={kind} level={level} fromExamId={fromExam?.id} selfKey={self} onSaved={setKind} onClose={() => go('/exams/grades')} />}
     </div>
   );
 }
@@ -317,16 +321,33 @@ const toRow = (s: GradeScore): Row => ({
 });
 const emptyRow = (subject: string): Row => ({ id: newId(), subject, raw: '', full: '', grade: '', average: '', standard: '', percentile: '', wrong: '' });
 
-function GradeSheet({ record, kind: kind0, level: level0, fromExamId, onSaved, onClose }: { record?: GradeRecord; kind: GradeRecord['kind']; level?: GradeRecord['level']; fromExamId?: string; onSaved: (k: GradeRecord['kind']) => void; onClose: () => void }) {
+function GradeSheet({
+  record,
+  kind: kind0,
+  level: level0,
+  fromExamId,
+  selfKey,
+  onSaved,
+  onClose,
+}: {
+  record?: GradeRecord;
+  kind: GradeRecord['kind'];
+  level?: GradeRecord['level'];
+  fromExamId?: string;
+  /** 앱에서 본 모의고사 과목 (점수 넣기) */ selfKey?: string;
+  onSaved: (k: GradeRecord['kind']) => void;
+  onClose: () => void;
+}) {
   const d = useStudy();
   const today = useToday();
   const exam = fromExamId ? d.exams[fromExamId] : undefined;
   const [kind, setKind] = useState<GradeRecord['kind']>(record?.kind ?? kind0);
-  const [name, setName] = useState(record?.name ?? exam?.name ?? '');
+  const [name, setName] = useState(record?.name ?? exam?.name ?? (selfKey ? `${Number(today.slice(5, 7))}월 ${today.slice(8, 10).replace(/^0/, '')}일 실전 연습` : ''));
   const [date, setDate] = useState(record?.date ?? (exam ? examEnd(exam) : today));
   const [memo, setMemo] = useState(record?.memo ?? '');
   const [lv, setLv] = useState<GradeRecord['level']>(record?.level ?? level0 ?? '고2');
   const startNames = (k: GradeRecord['kind']) => {
+    if (selfKey && GRADE_NAME[selfKey]) return selfKey === 'inquiry2' ? ['탐구1', '탐구2'] : [GRADE_NAME[selfKey]];
     if (exam) {
       const ids = examSubjectIds(exam);
       if (ids.length) return ids.map((id) => d.subjects[id]?.name ?? '과목');

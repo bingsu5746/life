@@ -1,4 +1,5 @@
 // 일기: 하루에 하나, 기분과 글. 달별로 모아 보고 찾기
+import { canListen, listen } from '../../lib/listen';
 import { useEffect, useRef, useState } from 'react';
 import { addPhoto, photoUrl, removePhoto } from '../study/photos';
 import { addDays, longDate, shortDate } from '../study/dates';
@@ -173,6 +174,7 @@ function Write({ date, today }: { date: string; today: string }) {
           </label>
         ))}
         <textarea className="st-input dy-text" rows={shownParts.length ? 8 : 12} value={text} onChange={(e) => setText(e.target.value)} placeholder="하고 싶은 말을 자유롭게…" aria-label="일기" />
+        <Dictate onText={(t) => setText((x) => (x.trim() ? `${x.replace(/\s+$/, '')} ${t}` : t))} />
         <div className="dy-photos">
           {photos.map((id) => (
             <div key={id} className="dy-photo">
@@ -283,4 +285,26 @@ function Photo({ id }: { id: string }) {
   if (url === undefined) return <div className="dy-img loading" />;
   if (!url) return <div className="dy-img missing">사진 없음</div>;
   return <img className="dy-img" src={url} alt="일기 사진" />;
+}
+
+/** 말로 쓰기 버튼 (음성 인식을 지원하는 브라우저에서만) */
+function Dictate({ onText }: { onText: (t: string) => void }) {
+  const [stop, setStop] = useState<(() => void) | null>(null);
+  if (!canListen()) return null;
+  return (
+    <button
+      type="button"
+      className={`btn btn-sm dy-mic ${stop ? 'on' : ''}`}
+      onClick={() => {
+        if (stop) return stop();
+        const s = listen(onText, (e) => {
+          setStop(null);
+          if (e && e !== 'no-speech' && e !== 'aborted') toast(e === 'not-allowed' ? '마이크를 쓸 수 있게 허용해 주세요' : '음성 인식이 멈췄어요');
+        });
+        setStop(() => s);
+      }}
+    >
+      {stop ? '■ 그만 듣기' : '🎙 말로 쓰기'}
+    </button>
+  );
 }

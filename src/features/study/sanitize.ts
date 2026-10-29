@@ -14,7 +14,10 @@ const optNum = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) ? v 
 const bool = (v: unknown) => v === true;
 const arr = (v: unknown): unknown[] => (Array.isArray(v) ? v : []);
 /** 체크 줄 목록 (시험 범위·수행평가 준비·백지 복습 핵심) */
-const lines = (v: unknown) => arr(v).filter((l): l is Obj => isObj(l) && typeof l.id === 'string' && typeof l.text === 'string').map((l) => ({ ...l, done: bool(l.done) }));
+const lines = (v: unknown) =>
+  arr(v)
+    .filter((l): l is Obj => isObj(l) && typeof l.id === 'string' && typeof l.text === 'string')
+    .map((l) => ({ ...l, done: bool(l.done) }));
 /** 시각 HH:MM */
 const hhmm = (v: unknown) => (typeof v === 'string' && /^([01]\d|2[0-3]):[0-5]\d$/.test(v) ? v : undefined);
 /** 농구 기록 칸 */
@@ -26,8 +29,17 @@ function bbStat(v: unknown) {
   return {
     mode: v.mode === 'game' ? ('game' as const) : ('practice' as const),
     result: v.result === 'win' || v.result === 'lose' || v.result === 'draw' ? v.result : undefined,
-    pts: n('pts'), reb: n('reb'), ast: n('ast'), stl: n('stl'), blk: n('blk'),
-    fgm: s('fgm'), fga: s('fga'), tpm: s('tpm'), tpa: s('tpa'), ftm: s('ftm'), fta: s('fta'),
+    pts: n('pts'),
+    reb: n('reb'),
+    ast: n('ast'),
+    stl: n('stl'),
+    blk: n('blk'),
+    fgm: s('fgm'),
+    fga: s('fga'),
+    tpm: s('tpm'),
+    tpa: s('tpa'),
+    ftm: s('ftm'),
+    fta: s('fta'),
     court: typeof v.court === 'string' && v.court.trim() ? v.court.trim().slice(0, 30) : undefined,
     items: Array.isArray(v.items)
       ? v.items
@@ -46,7 +58,10 @@ const ints = (v: unknown, lo: number, hi: number): number[] => arr(v).filter((x)
 function range(v: unknown): Range | null {
   return Array.isArray(v) && v.length >= 2 && typeof v[0] === 'number' && typeof v[1] === 'number' ? clampRange(v[0], v[1]) : null;
 }
-const ranges = (v: unknown): Range[] => arr(v).map(range).filter((r): r is Range => !!r);
+const ranges = (v: unknown): Range[] =>
+  arr(v)
+    .map(range)
+    .filter((r): r is Range => !!r);
 function marks(v: unknown): Mark[] {
   const out: Mark[] = [];
   for (const m of arr(v)) {
@@ -91,7 +106,15 @@ const FIX: Record<Collection, Fix> = {
               ? undefined
               : arr(x.scopes)
                   .filter((s): s is Obj => isObj(s) && typeof s.id === 'string')
-                  .map((s) => ({ ...s, subjectId: str(s.subjectId), date: optDate(s.date), note: optStr(s.note), lines: arr(s.lines).filter((l): l is Obj => isObj(l) && typeof l.id === 'string' && typeof l.text === 'string').map((l) => ({ ...l, done: bool(l.done) })) })),
+                  .map((s) => ({
+                    ...s,
+                    subjectId: str(s.subjectId),
+                    date: optDate(s.date),
+                    note: optStr(s.note),
+                    lines: arr(s.lines)
+                      .filter((l): l is Obj => isObj(l) && typeof l.id === 'string' && typeof l.text === 'string')
+                      .map((l) => ({ ...l, done: bool(l.done) })),
+                  })),
           plan: isObj(x.plan)
             ? {
                 on: x.plan.on === true,
@@ -99,10 +122,24 @@ const FIX: Record<Collection, Fix> = {
                 weekend: Math.round(cl(x.plan.weekend, 0, 900, 240)),
                 perLine: Math.round(cl(x.plan.perLine, 5, 300, 40)),
                 review: cl(x.plan.review, 0, 2, 0.35),
-                weights: isObj(x.plan.weights) ? Object.fromEntries(Object.entries(x.plan.weights).filter(([, v]) => typeof v === 'number').map(([k, v]) => [k, cl(v, 0.5, 2, 1)])) : undefined,
+                weights: isObj(x.plan.weights)
+                  ? Object.fromEntries(
+                      Object.entries(x.plan.weights)
+                        .filter(([, v]) => typeof v === 'number')
+                        .map(([k, v]) => [k, cl(v, 0.5, 2, 1)]),
+                    )
+                  : undefined,
                 done: isObj(x.plan.done) ? Object.fromEntries(Object.entries(x.plan.done).filter(([k, v]) => /^[A-Z]:[\w:-]{1,60}$/.test(k) && isDate(v))) : undefined,
                 started: optDate(x.plan.started),
-                lock: isObj(x.plan.lock) && isDate(x.plan.lock.date) ? { date: x.plan.lock.date, ids: arr(x.plan.lock.ids).filter((i): i is string => typeof i === 'string').slice(0, 200) } : undefined,
+                lock:
+                  isObj(x.plan.lock) && isDate(x.plan.lock.date)
+                    ? {
+                        date: x.plan.lock.date,
+                        ids: arr(x.plan.lock.ids)
+                          .filter((i): i is string => typeof i === 'string')
+                          .slice(0, 200),
+                      }
+                    : undefined,
               }
             : undefined,
         }
@@ -148,7 +185,17 @@ const FIX: Record<Collection, Fix> = {
       note: str(x.note),
       items: arr(x.items)
         .filter((i): i is Obj => isObj(i) && typeof i.id === 'string' && (i.kind === 'pages' || i.kind === 'text' || i.kind === 'words'))
-        .map((i) => ({ ...i, range: range(i.range) ?? undefined, doneRanges: i.doneRanges === undefined ? undefined : ranges(i.doneRanges), text: optStr(i.text), bookId: optStr(i.bookId), bookName: optStr(i.bookName), wordListId: optStr(i.wordListId), question: optStr(i.question), done: i.done === true ? true : undefined })),
+        .map((i) => ({
+          ...i,
+          range: range(i.range) ?? undefined,
+          doneRanges: i.doneRanges === undefined ? undefined : ranges(i.doneRanges),
+          text: optStr(i.text),
+          bookId: optStr(i.bookId),
+          bookName: optStr(i.bookName),
+          wordListId: optStr(i.wordListId),
+          question: optStr(i.question),
+          done: i.done === true ? true : undefined,
+        })),
     };
   },
   notes: (x) => ({
@@ -165,7 +212,13 @@ const FIX: Record<Collection, Fix> = {
     reason: typeof x.reason === 'string' ? x.reason : null,
     memo: str(x.memo),
     okRun: score(x.okRun, 1, 99),
-    comments: x.comments === undefined ? undefined : arr(x.comments).filter((c): c is Obj => isObj(c) && typeof c.id === 'string' && isDate(c.date) && typeof c.text === 'string').map((c) => ({ id: c.id as string, date: c.date as DateStr, text: (c.text as string).slice(0, 300), at: optNum(c.at) })).slice(-30),
+    comments:
+      x.comments === undefined
+        ? undefined
+        : arr(x.comments)
+            .filter((c): c is Obj => isObj(c) && typeof c.id === 'string' && isDate(c.date) && typeof c.text === 'string')
+            .map((c) => ({ id: c.id as string, date: c.date as DateStr, text: (c.text as string).slice(0, 300), at: optNum(c.at) }))
+            .slice(-30),
     paperId: optStr(x.paperId),
     created: num(x.created),
   }),
@@ -217,6 +270,8 @@ const FIX: Record<Collection, Fix> = {
     visited: optDate(x.visited),
     rating: typeof x.rating === 'number' && x.rating >= 0.5 && x.rating <= 5 ? Math.round(x.rating * 2) / 2 : undefined,
     note: optStr(x.note)?.slice(0, 3000),
+    lat: typeof x.lat === 'number' && typeof x.lon === 'number' && Math.abs(x.lat) <= 90 && Math.abs(x.lon) <= 180 ? x.lat : undefined,
+    lon: typeof x.lat === 'number' && typeof x.lon === 'number' && Math.abs(x.lat) <= 90 && Math.abs(x.lon) <= 180 ? x.lon : undefined,
     created: num(x.created),
   }),
   records: (x) => ({
@@ -235,12 +290,21 @@ const FIX: Record<Collection, Fix> = {
     listens: x.listens === undefined ? undefined : dates(x.listens).slice(-1000),
     created: num(x.created),
   }),
-  passages: (x) => ({ ...x, lang: x.lang === 'en' ? 'en' : 'ko', title: str(x.title, '지문').slice(0, 100), source: optStr(x.source)?.slice(0, 100), text: str(x.text).slice(0, 30000), note: optStr(x.note)?.slice(0, 5000), translation: optStr(x.translation)?.slice(0, 30000), confusing: bool(x.confusing), seen: x.seen === undefined ? undefined : dates(x.seen).slice(-100), photos: Array.isArray(x.photos) ? x.photos.filter((p): p is string => typeof p === 'string').slice(0, 6) : undefined, created: num(x.created) }),
+  passages: (x) => ({
+    ...x,
+    lang: x.lang === 'en' ? 'en' : 'ko',
+    title: str(x.title, '지문').slice(0, 100),
+    source: optStr(x.source)?.slice(0, 100),
+    text: str(x.text).slice(0, 30000),
+    note: optStr(x.note)?.slice(0, 5000),
+    translation: optStr(x.translation)?.slice(0, 30000),
+    confusing: bool(x.confusing),
+    seen: x.seen === undefined ? undefined : dates(x.seen).slice(-100),
+    photos: Array.isArray(x.photos) ? x.photos.filter((p): p is string => typeof p === 'string').slice(0, 6) : undefined,
+    created: num(x.created),
+  }),
   todoRules: (x) => (isDate(x.start) ? { ...x, title: str(x.title, '할 일').slice(0, 100), weekdays: ints(x.weekdays, 0, 6), paused: x.paused === true ? true : undefined, created: num(x.created) } : null),
-  drillLogs: (x) =>
-    isDate(x.date) && typeof x.drillId === 'string'
-      ? { ...x, drillId: str(x.drillId).slice(0, 30), made: score(x.made, 0, 1000), shots: score(x.shots, 0, 1000), minutes: score(x.minutes, 0, 600), created: num(x.created) }
-      : null,
+  drillLogs: (x) => (isDate(x.date) && typeof x.drillId === 'string' ? { ...x, drillId: str(x.drillId).slice(0, 30), made: score(x.made, 0, 1000), shots: score(x.shots, 0, 1000), minutes: score(x.minutes, 0, 600), created: num(x.created) } : null),
   reads: (x) => ({
     ...x,
     title: str(x.title, '책').slice(0, 100),
@@ -248,10 +312,21 @@ const FIX: Record<Collection, Fix> = {
     status: x.status === 'reading' || x.status === 'done' ? x.status : 'want',
     pages: score(x.pages, 1, 20000),
     read: score(x.read, 0, 20000),
-    log: Array.isArray(x.log) ? x.log.filter((l): l is { date: string; read: number } => isObj(l) && isDate(l.date) && typeof l.read === 'number' && l.read >= 0 && l.read <= 20000).slice(-400).map((l) => ({ date: l.date, read: Math.round(l.read) })) : undefined,
+    log: Array.isArray(x.log)
+      ? x.log
+          .filter((l): l is { date: string; read: number } => isObj(l) && isDate(l.date) && typeof l.read === 'number' && l.read >= 0 && l.read <= 20000)
+          .slice(-400)
+          .map((l) => ({ date: l.date, read: Math.round(l.read) }))
+      : undefined,
     rating: typeof x.rating === 'number' && x.rating >= 0.5 && x.rating <= 5 ? Math.round(x.rating * 2) / 2 : undefined,
     comment: optStr(x.comment)?.slice(0, 2000),
     review: optStr(x.review)?.slice(0, 20000),
+    quotes: Array.isArray(x.quotes)
+      ? x.quotes
+          .filter((q): q is Obj => isObj(q) && typeof q.text === 'string' && !!q.text.trim())
+          .slice(0, 300)
+          .map((q) => ({ text: (q.text as string).trim().slice(0, 1000), page: score(q.page, 1, 20000) }))
+      : undefined,
     started: optDate(x.started),
     finished: optDate(x.finished),
     created: num(x.created),
@@ -271,17 +346,25 @@ const FIX: Record<Collection, Fix> = {
     genre: optStr(x.genre)?.slice(0, 40),
     nation: optStr(x.nation)?.slice(0, 40),
     director: optStr(x.director)?.slice(0, 40),
-    tags: Array.isArray(x.tags) ? x.tags.filter((t): t is string => typeof t === 'string' && !!t.trim()).map((t) => t.trim().slice(0, 12)).slice(0, 10) : undefined,
-    again: Array.isArray(x.again) ? x.again.filter((a): a is { date: string; where?: string } => isObj(a) && isDate(a.date)).map((a) => ({ date: a.date, where: optStr(a.where)?.slice(0, 20) })).slice(0, 50) : undefined,
+    tags: Array.isArray(x.tags)
+      ? x.tags
+          .filter((t): t is string => typeof t === 'string' && !!t.trim())
+          .map((t) => t.trim().slice(0, 12))
+          .slice(0, 10)
+      : undefined,
+    again: Array.isArray(x.again)
+      ? x.again
+          .filter((a): a is { date: string; where?: string } => isObj(a) && isDate(a.date))
+          .map((a) => ({ date: a.date, where: optStr(a.where)?.slice(0, 20) }))
+          .slice(0, 50)
+      : undefined,
     watched: optDate(x.watched),
     release: optDate(x.release),
     where: optStr(x.where)?.slice(0, 20),
     created: num(x.created),
   }),
   moneyTx: (x) =>
-    isDate(x.date) && score(x.amount, 0, 1e10) !== undefined
-      ? { ...x, type: x.type === 'in' ? 'in' : 'out', amount: Math.round(x.amount as number), category: str(x.category, '기타').slice(0, 20), memo: optStr(x.memo)?.slice(0, 200), ruleId: optStr(x.ruleId), created: num(x.created) }
-      : null,
+    isDate(x.date) && score(x.amount, 0, 1e10) !== undefined ? { ...x, type: x.type === 'in' ? 'in' : 'out', amount: Math.round(x.amount as number), category: str(x.category, '기타').slice(0, 20), memo: optStr(x.memo)?.slice(0, 200), ruleId: optStr(x.ruleId), created: num(x.created) } : null,
   moneyRules: (x) =>
     isDate(x.start) && score(x.amount, 1, 1e10) !== undefined && ['daily', 'weekly', 'monthly', 'yearly'].includes(x.freq as string)
       ? {
@@ -323,7 +406,24 @@ const FIX: Record<Collection, Fix> = {
     doneDate: optDate(x.doneDate),
     created: num(x.created),
   }),
-  diary: (x) => (isDate(x.id) ? { ...x, mood: score(x.mood, 1, 5), title: optStr(x.title)?.slice(0, 60), text: str(x.text).slice(0, 20000), parts: isObj(x.parts) ? Object.fromEntries(Object.entries(x.parts).filter(([k, v]) => /^[a-z]{2,12}$/.test(k) && typeof v === 'string' && v.trim()).slice(0, 12).map(([k, v]) => [k, (v as string).slice(0, 5000)])) : undefined, photos: Array.isArray(x.photos) ? x.photos.filter((p): p is string => typeof p === 'string').slice(0, 4) : undefined } : null),
+  diary: (x) =>
+    isDate(x.id)
+      ? {
+          ...x,
+          mood: score(x.mood, 1, 5),
+          title: optStr(x.title)?.slice(0, 60),
+          text: str(x.text).slice(0, 20000),
+          parts: isObj(x.parts)
+            ? Object.fromEntries(
+                Object.entries(x.parts)
+                  .filter(([k, v]) => /^[a-z]{2,12}$/.test(k) && typeof v === 'string' && v.trim())
+                  .slice(0, 12)
+                  .map(([k, v]) => [k, (v as string).slice(0, 5000)]),
+              )
+            : undefined,
+          photos: Array.isArray(x.photos) ? x.photos.filter((p): p is string => typeof p === 'string').slice(0, 4) : undefined,
+        }
+      : null,
   decks: (x) => ({ ...x, name: str(x.name, '카드 묶음'), subjectId: str(x.subjectId) }),
   cards: (x) => ({ ...x, ...review(x), deckId: str(x.deckId), front: str(x.front), back: str(x.back), created: optNum(x.created), firstSeen: optDate(x.firstSeen) }),
   wordLists: (x) => ({
@@ -338,8 +438,21 @@ const FIX: Record<Collection, Fix> = {
     testDate: optDate(x.testDate),
     todayLock: isObj(x.todayLock) && isDate(x.todayLock.date) ? { date: x.todayLock.date, ids: arr(x.todayLock.ids).filter((i) => typeof i === 'string') } : undefined,
   }),
-  sessions: (x) => (isDate(x.date) ? { ...x, subjectId: optStr(x.subjectId), bookId: optStr(x.bookId), start: num(x.start), end: num(x.end), minutes: Math.max(0, num(x.minutes)), kind: x.kind === 'pomo' || x.kind === 'watch' ? x.kind : 'manual', place: optStr(x.place)?.slice(0, 20), memo: optStr(x.memo)?.slice(0, 100) } : null),
-  todos: (x) => ({ ...x, title: str(x.title), due: optDate(x.due), done: bool(x.done), doneAt: optNum(x.doneAt), star: x.star === true ? true : undefined, group: optStr(x.group)?.slice(0, 40), split: isObj(x.split) && typeof x.split.base === 'string' && Number.isFinite(x.split.from) && Number.isFinite(x.split.to) ? { base: String(x.split.base).slice(0, 80), unit: str(x.split.unit, '쪽').slice(0, 6), from: Number(x.split.from), to: Number(x.split.to) } : undefined, created: num(x.created) }),
+  sessions: (x) =>
+    isDate(x.date)
+      ? { ...x, subjectId: optStr(x.subjectId), bookId: optStr(x.bookId), start: num(x.start), end: num(x.end), minutes: Math.max(0, num(x.minutes)), kind: x.kind === 'pomo' || x.kind === 'watch' ? x.kind : 'manual', place: optStr(x.place)?.slice(0, 20), memo: optStr(x.memo)?.slice(0, 100) }
+      : null,
+  todos: (x) => ({
+    ...x,
+    title: str(x.title),
+    due: optDate(x.due),
+    done: bool(x.done),
+    doneAt: optNum(x.doneAt),
+    star: x.star === true ? true : undefined,
+    group: optStr(x.group)?.slice(0, 40),
+    split: isObj(x.split) && typeof x.split.base === 'string' && Number.isFinite(x.split.from) && Number.isFinite(x.split.to) ? { base: String(x.split.base).slice(0, 80), unit: str(x.split.unit, '쪽').slice(0, 6), from: Number(x.split.from), to: Number(x.split.to) } : undefined,
+    created: num(x.created),
+  }),
   habits: (x) => ({
     ...x,
     name: str(x.name, '습관'),
@@ -350,10 +463,7 @@ const FIX: Record<Collection, Fix> = {
     created: optDate(x.created) ?? '2000-01-01',
     archived: x.archived === true ? true : undefined,
   }),
-  assessments: (x) =>
-    isDate(x.due)
-      ? { ...x, subjectId: str(x.subjectId), title: str(x.title, '수행평가'), steps: lines(x.steps), done: bool(x.done), memo: optStr(x.memo), created: num(x.created) }
-      : null,
+  assessments: (x) => (isDate(x.due) ? { ...x, subjectId: str(x.subjectId), title: str(x.title, '수행평가'), steps: lines(x.steps), done: bool(x.done), memo: optStr(x.memo), created: num(x.created) } : null),
   blanks: (x) => ({
     ...x,
     ...review(x),
@@ -443,7 +553,9 @@ function goals(v: unknown): Record<string, number> | undefined {
 export function sanitizeSettings(s: unknown): StudySettings & { updatedAt: number } {
   const x = isObj(s) ? s : {};
   const d = DEFAULT_SETTINGS;
-  const intervals = arr(x.intervals).filter((n): n is number => typeof n === 'number' && Number.isFinite(n) && n >= 1 && n <= 365).map(Math.round);
+  const intervals = arr(x.intervals)
+    .filter((n): n is number => typeof n === 'number' && Number.isFinite(n) && n >= 1 && n <= 365)
+    .map(Math.round);
   const pomo = isObj(x.pomo) ? x.pomo : {};
   const clamp = (v: unknown, lo: number, hi: number, fb: number) => Math.min(hi, Math.max(lo, num(v, fb)));
   return {
@@ -459,14 +571,21 @@ export function sanitizeSettings(s: unknown): StudySettings & { updatedAt: numbe
     inboxPerDay: Math.round(clamp(x.inboxPerDay, 1, 200, d.inboxPerDay)),
     wordsUseTutorRatio: bool(x.wordsUseTutorRatio),
     schoolTimetable: isObj(x.schoolTimetable)
-      ? Object.fromEntries(Object.entries(x.schoolTimetable).filter(([k, v]) => /^[0-6]$/.test(k) && Array.isArray(v)).map(([k, v]) => [k, (v as unknown[]).filter((i): i is string => typeof i === 'string').slice(0, 12)]))
+      ? Object.fromEntries(
+          Object.entries(x.schoolTimetable)
+            .filter(([k, v]) => /^[0-6]$/.test(k) && Array.isArray(v))
+            .map(([k, v]) => [k, (v as unknown[]).filter((i): i is string => typeof i === 'string').slice(0, 12)]),
+        )
       : undefined,
     fitnessGoal: isObj(x.fitnessGoal) ? { perWeek: score((x.fitnessGoal as Obj).perWeek, 1, 14), minutes: score((x.fitnessGoal as Obj).minutes, 1, 10080) } : undefined,
     monthlyBudget: score(x.monthlyBudget, 1, 1e10),
     bbGoals: isObj(x.bbGoals) ? { ft: score((x.bbGoals as Obj).ft, 1, 100), fg: score((x.bbGoals as Obj).fg, 1, 100), tp: score((x.bbGoals as Obj).tp, 1, 100) } : undefined,
     readingGoal: score(x.readingGoal, 1, 1000),
     weeklyLimit: score(x.weeklyLimit, 1, 1e9),
-    weatherPlace: isObj(x.weatherPlace) && typeof x.weatherPlace.lat === 'number' && Math.abs(x.weatherPlace.lat) <= 90 && typeof x.weatherPlace.lon === 'number' && Math.abs(x.weatherPlace.lon) <= 180 ? { lat: x.weatherPlace.lat, lon: x.weatherPlace.lon, name: typeof x.weatherPlace.name === 'string' ? x.weatherPlace.name.slice(0, 30) : '내 위치' } : undefined,
+    weatherPlace:
+      isObj(x.weatherPlace) && typeof x.weatherPlace.lat === 'number' && Math.abs(x.weatherPlace.lat) <= 90 && typeof x.weatherPlace.lon === 'number' && Math.abs(x.weatherPlace.lon) <= 180
+        ? { lat: x.weatherPlace.lat, lon: x.weatherPlace.lon, name: typeof x.weatherPlace.name === 'string' ? x.weatherPlace.name.slice(0, 30) : '내 위치' }
+        : undefined,
     school: isObj(x.school) && typeof x.school.name === 'string' && x.school.name.trim() ? { name: x.school.name.trim().slice(0, 40), grade: score(x.school.grade, 1, 3), cls: typeof x.school.cls === 'string' && /^\d{1,2}$/.test(x.school.cls) ? x.school.cls : undefined } : undefined,
     sleepGoal: score(x.sleepGoal, 3, 12),
     diaryTime: typeof x.diaryTime === 'string' && /^([01]\d|2[0-3]):[0-5]\d$/.test(x.diaryTime) ? x.diaryTime : undefined,
@@ -490,10 +609,27 @@ export function sanitizeSettings(s: unknown): StudySettings & { updatedAt: numbe
       : undefined,
     lastBackup: optDate(x.lastBackup),
     examPlanDefaults: isObj(x.examPlanDefaults) ? { weekday: cl((x.examPlanDefaults as Obj).weekday, 0, 900, 150), weekend: cl((x.examPlanDefaults as Obj).weekend, 0, 900, 240), perLine: cl((x.examPlanDefaults as Obj).perLine, 5, 300, 40) } : undefined,
-    diaryForm: isObj(x.diaryForm) ? { parts: arr((x.diaryForm as Obj).parts).filter((t): t is string => typeof t === 'string' && /^[a-z]{2,12}$/.test(t)).slice(0, 12), autoFill: (x.diaryForm as Obj).autoFill !== false } : undefined,
-    hiddenAreas: x.hiddenAreas === undefined ? undefined : arr(x.hiddenAreas).filter((t): t is string => typeof t === 'string').slice(0, 10),
+    diaryForm: isObj(x.diaryForm)
+      ? {
+          parts: arr((x.diaryForm as Obj).parts)
+            .filter((t): t is string => typeof t === 'string' && /^[a-z]{2,12}$/.test(t))
+            .slice(0, 12),
+          autoFill: (x.diaryForm as Obj).autoFill !== false,
+        }
+      : undefined,
+    hiddenAreas:
+      x.hiddenAreas === undefined
+        ? undefined
+        : arr(x.hiddenAreas)
+            .filter((t): t is string => typeof t === 'string')
+            .slice(0, 10),
     gradeGoals: isObj(x.gradeGoals) ? { school: goals((x.gradeGoals as Obj).school), mock: goals((x.gradeGoals as Obj).mock) } : undefined,
-    hiddenTabs: x.hiddenTabs === undefined ? undefined : arr(x.hiddenTabs).filter((t): t is string => typeof t === 'string' && t !== 'today').slice(0, 20),
+    hiddenTabs:
+      x.hiddenTabs === undefined
+        ? undefined
+        : arr(x.hiddenTabs)
+            .filter((t): t is string => typeof t === 'string' && t !== 'today')
+            .slice(0, 20),
     pomo: {
       work: clamp(pomo.work, 1, 180, d.pomo.work),
       short: clamp(pomo.short, 1, 180, d.pomo.short),

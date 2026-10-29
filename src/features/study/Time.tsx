@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { addDays, daysBetween, shortDate, weekStart, WEEKDAYS } from './dates';
 import { BarChart, TableView } from './charts';
 import { WeekReview } from './WeekReview';
-import { FocusTimer, MockExamPage } from './Focus';
+import { BreakWords, FocusTimer, MockExamPage } from './Focus';
 import { sleepMinutes, splitStudy } from './condition';
 import { bySubject, compare, daily, minutesByDate, studyStreak, weekdayAverage, weekly } from './timeStats';
 import { alive, type StudySession } from './model';
@@ -186,6 +186,7 @@ function RunningTimer({ timer, update, onStop, onFocus }: { timer: TimerState; u
           끝내고 기록
         </button>
       </div>
+      {timer.kind === 'pomo' && timer.phase !== 'work' && <BreakWords />}
       <button className="st-link center" onClick={onFocus}>
         집중 화면
       </button>

@@ -680,6 +680,9 @@ export interface TravelPlace extends Stamp {
   rating?: number;
   /** 메뉴 · 가격 · 팁 */
   note?: string;
+  /** 지도 위치 */
+  lat?: number;
+  lon?: number;
   created: number;
 }
 
@@ -721,6 +724,8 @@ export interface Reading extends Stamp {
   rating?: number;
   comment?: string;
   review?: string;
+  /** 밑줄 친 문장 (쪽) */
+  quotes?: { text: string; page?: number }[];
   started?: DateStr;
   finished?: DateStr;
   created: number;
@@ -864,7 +869,45 @@ export interface StudyData {
 /** 단어는 많아질 수 있어 따로 묶는다 */
 export type WordsData = Record<Id, Word>;
 
-export const COLLECTIONS = ['subjects', 'exams', 'books', 'plans', 'tutors', 'homework', 'notes', 'decks', 'cards', 'wordLists', 'sessions', 'todos', 'habits', 'grades', 'previews', 'assessments', 'blanks', 'conditions', 'weekNotes', 'papers', 'workouts', 'bodyLogs', 'moneyTx', 'savings', 'hobbies', 'hobbyLogs', 'wishes', 'diary', 'moneyRules', 'movies', 'reads', 'drillLogs', 'todoRules', 'passages', 'games', 'records', 'places'] as const;
+export const COLLECTIONS = [
+  'subjects',
+  'exams',
+  'books',
+  'plans',
+  'tutors',
+  'homework',
+  'notes',
+  'decks',
+  'cards',
+  'wordLists',
+  'sessions',
+  'todos',
+  'habits',
+  'grades',
+  'previews',
+  'assessments',
+  'blanks',
+  'conditions',
+  'weekNotes',
+  'papers',
+  'workouts',
+  'bodyLogs',
+  'moneyTx',
+  'savings',
+  'hobbies',
+  'hobbyLogs',
+  'wishes',
+  'diary',
+  'moneyRules',
+  'movies',
+  'reads',
+  'drillLogs',
+  'todoRules',
+  'passages',
+  'games',
+  'records',
+  'places',
+] as const;
 export type Collection = (typeof COLLECTIONS)[number];
 
 export const DEFAULT_SETTINGS: StudySettings = {

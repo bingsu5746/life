@@ -1,7 +1,7 @@
 // 내 학교 (나이스): 설정에서 학교·학년·반 → 시간표 가져오기 · 휴업일 넣기. 오늘 화면엔 급식 · 오늘 학교 일정, 시험 화면엔 다가오는 시험 일정
 import { useEffect, useState } from 'react';
 import { isLoggedIn, schoolInfo, type SchoolEvent, type SchoolMeal } from '../auth/api';
-import { addDays, shortDate, weekStart } from './dates';
+import { addDays, diffDays, shortDate, weekStart } from './dates';
 import { alive, newId, SUBJECT_COLORS, type Exam } from './model';
 import { examEvents, matchSubject, offDays, weekPattern } from './school';
 import { getStudy, put, putMany, setSettings, useStudy } from './store';
@@ -66,6 +66,49 @@ export function SchoolToday({ today }: { today: string }) {
           </small>
           <p className="sc-meal">{meal.dishes.join(' · ')}</p>
         </div>
+      )}
+    </section>
+  );
+}
+
+/** 메인: 급식 · 오늘 학교 일정 · 방학까지 남은 날. 학사일정의 시험은 시험 목록에 저절로 넣는다 */
+export function SchoolHome({ today }: { today: string }) {
+  const meals = useSchoolData(today, addDays(today, 3), ['meals'])?.meals ?? [];
+  const events = useSchoolData(today, addDays(today, 150), ['events'])?.events;
+  useEffect(() => {
+    if (!events) return;
+    const cur = getStudy().exams;
+    const have = alive(cur);
+    // 아이디를 날짜로 정해 두면 여러 기기에서 넣어도 하나로 합쳐지고, 지운 것은 다시 생기지 않는다
+    const add = examEvents(events)
+      .filter((e) => e.date >= today && !cur[`neis-${e.date}`] && !have.some((x) => x.date === e.date))
+      .map((e) => ({ c: 'exams' as const, item: { id: `neis-${e.date}`, name: e.name, date: e.date, end: e.end, kind: /지필|고사/.test(e.name) && !/모의/.test(e.name) ? 'school' : 'mock' } as never }));
+    if (add.length) putMany(add);
+  }, [events, today]);
+  const afterLunch = new Date().getHours() >= 14;
+  const meal = meals.find((m) => (afterLunch ? m.date > today : m.date >= today) && m.kind === '중식') ?? meals.find((m) => (afterLunch ? m.date > today : m.date >= today));
+  const todayEv = (events ?? []).filter((e) => e.date === today && !/방학/.test(e.name));
+  const vac = (events ?? []).find((e) => e.date >= today && /방학/.test(e.name));
+  if (!meal && !todayEv.length && !vac) return null;
+  return (
+    <section className="hm-school">
+      {meal && (
+        <p>
+          <small>{meal.date === today ? '오늘' : shortDate(meal.date)} 급식</small>
+          {meal.dishes.join(' · ')}
+        </p>
+      )}
+      {todayEv.length > 0 && (
+        <p>
+          <small>오늘 학교</small>
+          {todayEv.map((e) => e.name).join(' · ')}
+        </p>
+      )}
+      {vac && (
+        <p>
+          <small>{vac.name}</small>
+          {vac.date === today ? '오늘' : `D-${diffDays(today, vac.date)}`}
+        </p>
       )}
     </section>
   );

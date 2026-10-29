@@ -1,10 +1,13 @@
 // 여행: 가 볼 곳 · 다녀온 곳 (맛집 · 카페 · 관광지 · 숙소)
-import { useState } from 'react';
+import { lazy, Suspense, useState } from 'react';
 import { shortDate } from '../study/dates';
 import { alive, newId, type TravelPlace } from '../study/model';
 import { put, remove, useStudy } from '../study/store';
 import { confirmDelete, Empty, Field, Icon, Sheet, tap, toast, useToday } from '../study/ui';
 import { StarInput, starText } from './MovieParts';
+
+const PlaceMap = lazy(() => import('./PlaceMap'));
+const PickMap = lazy(() => import('./PlaceMap').then((m) => ({ default: m.PickMap })));
 
 const KIND: Record<TravelPlace['kind'], string> = { food: '맛집', cafe: '카페', sight: '관광지', stay: '숙소', etc: '기타' };
 
@@ -14,10 +17,9 @@ export function Travel() {
   const [tab, setTab] = useState<TravelPlace['status']>('want');
   const [kind, setKind] = useState<TravelPlace['kind'] | ''>('');
   const [edit, setEdit] = useState<Partial<TravelPlace> | null>(null);
+  const [map, setMap] = useState(false);
   const all = alive(d.places);
-  const list = all
-    .filter((p) => p.status === tab && (!kind || p.kind === kind))
-    .sort((a, b) => (tab === 'visited' ? (b.visited ?? '').localeCompare(a.visited ?? '') : (a.region ?? '').localeCompare(b.region ?? '', 'ko')) || b.created - a.created);
+  const list = all.filter((p) => p.status === tab && (!kind || p.kind === kind)).sort((a, b) => (tab === 'visited' ? (b.visited ?? '').localeCompare(a.visited ?? '') : (a.region ?? '').localeCompare(b.region ?? '', 'ko')) || b.created - a.created);
   const kinds = [...new Set(all.filter((p) => p.status === tab).map((p) => p.kind))];
   // 지역별로 묶어서
   const groups = new Map<string, TravelPlace[]>();
@@ -37,17 +39,29 @@ export function Travel() {
         <button className={tab === 'visited' ? 'on' : ''} onClick={() => setTab('visited')}>
           다녀온 곳{all.filter((p) => p.status === 'visited').length ? ` ${all.filter((p) => p.status === 'visited').length}` : ''}
         </button>
+        {all.some((p) => p.lat !== undefined) && (
+          <button className={map ? 'on' : ''} onClick={() => setMap(!map)}>
+            지도
+          </button>
+        )}
       </nav>
-      {kinds.length > 1 && (
-        <div className="st-chips">
-          {kinds.map((k) => (
-            <button key={k} className={`st-chip ${kind === k ? 'on' : ''}`} aria-pressed={kind === k} onClick={() => setKind(kind === k ? '' : k)}>
-              {KIND[k]}
-            </button>
-          ))}
-        </div>
+      {map && (
+        <Suspense fallback={<div className="pm-map" />}>
+          <PlaceMap pins={all.filter((p) => p.lat !== undefined && p.lon !== undefined && (!kind || p.kind === kind)).map((p) => ({ id: p.id, lat: p.lat!, lon: p.lon!, name: p.name, done: p.status === 'visited' }))} onOpen={(id) => setEdit(d.places[id])} />
+        </Suspense>
       )}
-      {!list.length ? (
+      {map
+        ? null
+        : kinds.length > 1 && (
+            <div className="st-chips">
+              {kinds.map((k) => (
+                <button key={k} className={`st-chip ${kind === k ? 'on' : ''}`} aria-pressed={kind === k} onClick={() => setKind(kind === k ? '' : k)}>
+                  {KIND[k]}
+                </button>
+              ))}
+            </div>
+          )}
+      {map ? null : !list.length ? (
         <Empty title={tab === 'want' ? '가 보고 싶은 곳을 모아 두세요' : '다녀온 곳을 남겨 보세요'}>
           <button className="btn btn-primary" onClick={() => setEdit({ status: tab, kind: 'food' })}>
             장소 넣기
@@ -94,7 +108,15 @@ function PlaceSheet({ item, today, onClose }: { item: Partial<TravelPlace>; toda
   const [visited, setVisited] = useState(item.visited ?? today);
   const [rating, setRating] = useState(item.rating ?? 0);
   const [note, setNote] = useState(item.note ?? '');
-  const regions = [...new Set(alive(d.places).map((p) => p.region).filter(Boolean))] as string[];
+  const [pos, setPos] = useState(item.lat !== undefined && item.lon !== undefined ? { lat: item.lat, lon: item.lon } : undefined);
+  const [picking, setPicking] = useState(false);
+  const regions = [
+    ...new Set(
+      alive(d.places)
+        .map((p) => p.region)
+        .filter(Boolean),
+    ),
+  ] as string[];
   return (
     <Sheet title={item.id ? '장소 고치기' : '장소 넣기'} onClose={onClose}>
       <div className="st-form">
@@ -129,6 +151,36 @@ function PlaceSheet({ item, today, onClose }: { item: Partial<TravelPlace>; toda
           </>
         )}
         <textarea className="st-input" rows={3} value={note} onChange={(e) => setNote(e.target.value)} placeholder="메뉴 · 가격 · 팁" aria-label="메모" />
+        {picking ? (
+          <Suspense fallback={<div className="pm-map pick" />}>
+            <PickMap value={pos} onChange={setPos} />
+          </Suspense>
+        ) : null}
+        <div className="st-inline wrap">
+          <button type="button" className="btn btn-sm" onClick={() => setPicking(!picking)}>
+            <Icon name="pin" /> {pos ? '위치 고치기' : '지도에 위치 찍기'}
+          </button>
+          <button
+            type="button"
+            className="btn btn-sm"
+            onClick={() =>
+              navigator.geolocation?.getCurrentPosition(
+                (g) => {
+                  setPos({ lat: Math.round(g.coords.latitude * 1e6) / 1e6, lon: Math.round(g.coords.longitude * 1e6) / 1e6 });
+                  toast('지금 위치를 넣었어요');
+                },
+                () => toast('위치를 받지 못했어요'),
+              )
+            }
+          >
+            지금 여기
+          </button>
+          {pos && (
+            <button type="button" className="st-link" onClick={() => setPos(undefined)}>
+              위치 빼기
+            </button>
+          )}
+        </div>
         <div className="st-row end">
           {item.id && (
             <button className="btn btn-sm st-danger" onClick={() => confirmDelete(`「${item.name}」`) && (remove('places', item.id!), onClose())}>
@@ -139,7 +191,20 @@ function PlaceSheet({ item, today, onClose }: { item: Partial<TravelPlace>; toda
             className="btn btn-primary"
             disabled={!name.trim()}
             onClick={() => {
-              put('places', { ...item, id: item.id ?? newId(), created: item.created ?? Date.now(), name: name.trim(), kind, region: region.trim() || undefined, status, visited: status === 'visited' ? visited || undefined : undefined, rating: status === 'visited' && rating ? rating : undefined, note: note.trim() || undefined } as TravelPlace);
+              put('places', {
+                ...item,
+                id: item.id ?? newId(),
+                created: item.created ?? Date.now(),
+                name: name.trim(),
+                kind,
+                region: region.trim() || undefined,
+                status,
+                visited: status === 'visited' ? visited || undefined : undefined,
+                rating: status === 'visited' && rating ? rating : undefined,
+                note: note.trim() || undefined,
+                lat: pos?.lat,
+                lon: pos?.lon,
+              } as TravelPlace);
               toast('저장했어요');
               onClose();
             }}

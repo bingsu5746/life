@@ -32,6 +32,9 @@ export const MOCK_SUBJECTS: MockSubject[] = [
   },
 ];
 
+/** 성적 칸의 과목 이름 */
+export const GRADE_NAME: Record<string, string> = { korean: '국어', math: '수학', english: '영어', history: '한국사', inquiry1: '탐구1', inquiry2: '탐구1' };
+
 export const hhmm = (min: number) => `${String(Math.floor(min / 60) % 24).padStart(2, '0')}:${String(Math.floor(min % 60)).padStart(2, '0')}`;
 
 export interface MockState {
