@@ -92,3 +92,20 @@ export function sameAnswer(given: string, answer: string): boolean {
   const n = (s: string) => s.trim().toLowerCase().replace(/[.!?,;]+$/, '').replace(/\s+/g, ' ');
   return !!n(given) && n(given) === n(answer);
 }
+
+/**
+ * 단어 하나를 지금 시험에서 맞힐 가능성 (추정, 0~1). 내 답 기록(상자)만으로 어림한다:
+ * 상자가 높을수록·익힌 단어일수록 높고, 자주 틀린 단어와 복습 날짜가 지난 단어는 낮춘다.
+ * (답 하나하나의 기록은 없어서 상자를 기준으로 한 어림값이에요)
+ */
+export function knowChance(w: { box: number; learned?: boolean; wrong: number; due: string }, today: string): number {
+  const base = w.learned ? 0.95 : [0.15, 0.45, 0.6, 0.72, 0.82, 0.9][Math.max(0, Math.min(5, w.box))];
+  const p = base - 0.05 * Math.min(w.wrong, 4) - (w.box > 0 && !w.learned && w.due < today ? 0.05 : 0);
+  return Math.min(0.97, Math.max(0.05, p));
+}
+
+/** 목록 전체의 예상 점수 (100점 만점, 추정) */
+export function expectedScore(ws: { box: number; learned?: boolean; wrong: number; due: string }[], today: string): number | null {
+  if (!ws.length) return null;
+  return Math.round((ws.reduce((a, w) => a + knowChance(w, today), 0) / ws.length) * 100);
+}

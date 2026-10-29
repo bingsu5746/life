@@ -8,6 +8,7 @@ export const DIARY_PARTS: { key: string; label: string; hint: string }[] = [
   { key: 'thanks', label: '고마운 것', hint: '고마운 사람이나 일' },
   { key: 'dream', label: '꿈', hint: '어젯밤 꾼 꿈이 있다면' },
   { key: 'tomorrow', label: '내일 할 것', hint: '내일 꼭 하고 싶은 것' },
+  { key: 'checkin', label: '하루 마감', hint: '체크인에서 남긴 것' },
 ];
 
 export const DEFAULT_FORM = { parts: ['done', 'good', 'dream'], autoFill: true };

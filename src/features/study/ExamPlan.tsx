@@ -8,7 +8,7 @@ import { examEnd } from './exams';
 import { Bar, Check, Empty, Field, go, SubjectDot, toast, useToday } from './ui';
 
 const hm = (m: number) => (m >= 60 ? `${Math.floor(m / 60)}시간${m % 60 ? ` ${m % 60}분` : ''}` : `${m}분`);
-const KIND_LABEL = { learn: '공부', notes: '오답', review: '복습', skim: '훑어보기' } as const;
+const KIND_LABEL = { learn: '공부', notes: '오답', check: '실수 점검', review: '복습', skim: '훑어보기' } as const;
 
 /** 시험 하나의 계획 화면. /exams/<시험 id>/plan */
 export function ExamPlanPage({ id }: { id: string }) {

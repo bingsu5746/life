@@ -42,6 +42,12 @@ export interface StudySettings {
   fitnessGoal?: { perWeek?: number; minutes?: number };
   /** 한 달 지출 예산 (원) */
   monthlyBudget?: number;
+  /** 내신 목표 역산: 과목마다 학기 목표 점수(100점 환산)와 반영 비율 · 이미 받은 점수 */
+  semesterGoals?: Record<Id, SemesterGoal>;
+  /** 하루 마감 체크인 알림 시각 HH:MM */
+  checkinTime?: string;
+  /** 잠 목표 (시간) */
+  sleepGoal?: number;
   /** 일주일에 쓸 돈 한도 (넘으면 저녁 알림) */
   weeklyLimit?: number;
   /** 마지막으로 백업 파일을 내려받은 날 */
@@ -110,6 +116,13 @@ export interface ExamDay {
 
 /** school: 내신(학교 시험), mock: 모의고사·수능, other: 그 밖 */
 export type ExamKind = 'school' | 'mock' | 'other';
+
+export interface SemesterGoal {
+  /** 학기 목표 (100점 환산) */
+  target: number;
+  /** 반영 항목: 중간 · 기말 · 수행평가 … (비율 %, 받은 점수는 100점 만점으로) */
+  parts: { name: string; weight: number; score?: number }[];
+}
 
 /** 시험 공부 자동 계획 설정 (시험마다) */
 export interface ExamPlanSettings {
@@ -429,6 +442,16 @@ export interface BasketballStat {
   /** 자유투 */
   ftm?: number;
   fta?: number;
+  /** 연습: 무엇을 연습했고 몇 개 중 몇 개 넣었는지 */
+  items?: PracticeItem[];
+}
+
+export interface PracticeItem {
+  name: string;
+  /** 어느 슛으로 셀지 (없으면 성공률만) */
+  kind?: 'fg' | 'tp' | 'ft';
+  made?: number;
+  att?: number;
 }
 
 /** 몸무게·키 (id 는 날짜) */

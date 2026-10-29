@@ -541,3 +541,24 @@ export function shotsBetween(d: Pick<StudyData, 'workouts'>, from: DateStr, to: 
   }
   return out;
 }
+
+/** 연습 이름으로 어느 슛인지 짐작 (드릴 목록 → 이름 속 낱말) */
+export function guessKind(name: string): 'fg' | 'tp' | 'ft' | undefined {
+  const x = DRILLS.find((d) => d.name === name.trim());
+  if (x?.shotKind) return x.shotKind;
+  if (/자유투/.test(name)) return 'ft';
+  if (/3점|쓰리/.test(name)) return 'tp';
+  if (/슛|슈팅|점퍼|레이업|미드|2점|플로터|뱅크/.test(name)) return 'fg';
+  return undefined;
+}
+
+/** 연습 항목들 → 2점·3점·자유투 합 (슛으로 정한 항목만) */
+export function practiceTotals(items: { kind?: 'fg' | 'tp' | 'ft'; made?: number; att?: number }[]): { fgm: number; fga: number; tpm: number; tpa: number; ftm: number; fta: number } {
+  const t = { fgm: 0, fga: 0, tpm: 0, tpa: 0, ftm: 0, fta: 0 };
+  for (const i of items) {
+    if (!i.kind || !i.att) continue;
+    t[`${i.kind}m` as 'fgm'] += Math.min(i.made ?? 0, i.att);
+    t[`${i.kind}a` as 'fga'] += i.att;
+  }
+  return t;
+}

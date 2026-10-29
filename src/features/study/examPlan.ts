@@ -13,12 +13,14 @@ import { addDays, daysBetween, weekday } from './dates';
 import { examDates, scopeDate } from './exams';
 import { alive, type DateStr, type Exam, type ExamPlanSettings, type Id, type StudyData } from './model';
 import { hasClass } from './tutor';
+import { isCareless, mistakePatterns } from './mistakes';
+import { neededScore } from './grades';
 
 export const DEFAULT_PLAN: Omit<ExamPlanSettings, 'on'> = { weekday: 150, weekend: 240, perLine: 40, review: 0.35 };
 
 export interface PlanItem {
   id: string;
-  kind: 'learn' | 'notes' | 'review' | 'skim';
+  kind: 'learn' | 'notes' | 'check' | 'review' | 'skim';
   subjectId: Id;
   text: string;
   minutes: number;
@@ -98,10 +100,15 @@ function recentScore(d: StudyData, subjectName: string): number | null {
 export function subjectMult(d: StudyData, subjectId: Id, user = 1): { mult: number; why: string } {
   const name = d.subjects[subjectId]?.name ?? '';
   const sc = recentScore(d, name);
-  const auto = sc === null ? 1 : 1 + 0.4 * clamp((75 - sc) / 40, -0.25, 1);
+  // 내신 목표가 있으면 「남은 시험에서 필요한 점수」를 기준으로, 없으면 75점을 기준으로
+  const goal = d.settings?.semesterGoals?.[subjectId];
+  const need = goal ? neededScore(goal).need : null;
+  const base = need !== null ? Math.min(100, need) : 75;
+  const auto = sc === null ? (need !== null && need >= 90 ? 1.15 : 1) : 1 + 0.4 * clamp((sc < base ? base - sc : -(sc - base) / 2) / 30, -0.25, 1);
   const mult = Math.round(auto * user * 100) / 100;
   const parts: string[] = [];
-  if (sc !== null) parts.push(`최근 점수 ${Math.round(sc)}점${auto > 1.02 ? ` → 시간 +${Math.round((auto - 1) * 100)}%` : auto < 0.98 ? ` → 시간 ${Math.round((auto - 1) * 100)}%` : ''}`);
+  if (need !== null) parts.push(`목표까지 이번 시험 ${need}점 필요`);
+  if (sc !== null || need !== null) parts.push(`${sc !== null ? `최근 점수 ${Math.round(sc)}점` : '최근 점수 없음'}${auto > 1.02 ? ` → 시간 +${Math.round((auto - 1) * 100)}%` : auto < 0.98 ? ` → 시간 ${Math.round((auto - 1) * 100)}%` : ''}`);
   if (user !== 1) parts.push(`내가 정한 ×${user}`);
   return { mult, why: parts.join(' · ') || '기록 없음 (보통)' };
 }
@@ -139,6 +146,7 @@ export function buildExamPlan(d: StudyData, exam: Exam, today: DateStr): ExamPla
   const allDays = horizon >= today ? daysBetween(today, horizon) : [];
   const cap = new Map(allDays.map((x) => [x, dayCapacity(d, plan, x, examDaySet, today, studiedToday)]));
   const lockIds = plan.lock?.date === today ? new Set(plan.lock.ids) : null;
+  const patterns = mistakePatterns(d, true);
 
   interface Sub {
     sp: SubjectPlan;
@@ -179,6 +187,11 @@ export function buildExamPlan(d: StudyData, exam: Exam, today: DateStr): ExamPla
     }
     const wrongN = alive(d.notes).filter((n) => n.subjectId === sc.subjectId && !n.learned).length;
     if (wrongN > 0) queue.push({ id: `N:${sc.id}`, kind: 'notes', subjectId: sc.subjectId, text: `${name} 오답 ${wrongN}개 다시 보기`, minutes: round5(Math.min(40, wrongN * 3)), done: !!done[`N:${sc.id}`], doneDate: done[`N:${sc.id}`], minDay: today, learn: false });
+    // 실수가 많은 과목: 실수로 틀린 오답을 다시 보며 점검 (계산·문제 읽기)
+    if (isCareless(patterns.find((p) => p.subjectId === sc.subjectId))) {
+      const id = `C:${sc.id}`;
+      queue.push({ id, kind: 'check', subjectId: sc.subjectId, text: `${name} 실수 점검 (계산·문제 읽기 실수 오답 다시 보기)`, minutes: 15, done: !!done[id], doneDate: done[id], minDay: today, learn: false });
+    }
     const revTotal = round5(learnTotal * plan.review);
     const chunks = Math.max(1, Math.round(revTotal / 30));
     for (let i = 1; i <= chunks; i++) {

@@ -432,3 +432,104 @@ describe('백업 알림 날 (backupDue) · 이번 주 쓴 돈 (weekSpent)', () =
     expect(weekSpent(d, '2026-10-28')).toBe(8000);
   });
 });
+
+describe('농구 연습 항목 (practiceTotals · guessKind)', () => {
+  it('항목별 슛을 2점·3점·자유투로 더하고, 이름으로 슛 종류를 짐작한다', async () => {
+    const { practiceTotals, guessKind } = await import('../life/drills');
+    expect(practiceTotals([{ kind: 'ft', made: 14, att: 20 }, { kind: 'tp', made: 9, att: 25 }, { kind: 'fg', made: 12, att: 20 }, { kind: 'ft', made: 8, att: 10 }, { made: 5, att: 5 }])).toEqual({ fgm: 12, fga: 20, tpm: 9, tpa: 25, ftm: 22, fta: 30 });
+    expect(guessKind('자유투 루틴')).toBe('ft');
+    expect(guessKind('3점 캐치 앤 슛')).toBe('tp');
+    expect(guessKind('엘보 점퍼')).toBe('fg');
+    expect(guessKind('제자리 볼 핸들링')).toBeUndefined();
+  });
+});
+
+describe('오답 패턴 (mistakePatterns)', () => {
+  it('과목별 가장 많은 이유 · 실수 비율 · 단원', async () => {
+    const { mistakePatterns, isCareless } = await import('./mistakes');
+    const n = (id: string, reason: string | null, page?: number) => ({ id, subjectId: 'm', reason, bookId: page ? 'b' : undefined, page, learned: false, updatedAt: 1, box: 1, due: '2026-10-01', wrong: 1 });
+    const d = {
+      notes: Object.fromEntries([n('1', 'calc', 12), n('2', 'calc', 14), n('3', 'calc', 30), n('4', 'concept', 31), n('5', 'misread'), n('6', null)].map((x) => [x.id, x])),
+      books: { b: { id: 'b', name: '쎈', units: [{ name: '1단원', from: 1, to: 20 }, { name: '2단원', from: 21, to: 40 }], updatedAt: 1 } },
+    } as never;
+    const [p] = mistakePatterns(d);
+    expect(p.total).toBe(6);
+    expect(p.top).toEqual({ reason: 'calc', n: 3, share: 0.6 });
+    expect(p.careless).toBe(0.8);
+    expect(p.units).toEqual([{ name: '쎈 1단원', n: 2 }, { name: '쎈 2단원', n: 2 }]);
+    expect(isCareless(p)).toBe(true);
+  });
+});
+
+describe('잔 시간대별 공부 (sleepBuckets)', () => {
+  it('구간마다 평균, 사흘 넘는 구간 중 공부가 가장 많은 곳', async () => {
+    const { sleepBuckets } = await import('./condition');
+    const day = (i: number, sleep: number, mood: number | null) => ({ date: `2026-10-${String(i).padStart(2, '0')}`, sleep, mood });
+    const days = [day(1, 330, 2), day(2, 340, 3), day(3, 350, null), day(4, 450, 4), day(5, 460, 5), day(6, 440, 4), day(7, 600, null)];
+    const study = new Map([['2026-10-01', 60], ['2026-10-02', 60], ['2026-10-03', 90], ['2026-10-04', 180], ['2026-10-05', 120], ['2026-10-06', 150]]);
+    const r = sleepBuckets(days, study);
+    expect(r.buckets[1]).toEqual({ label: '5~6시간', days: 3, study: 70, mood: 2.5 });
+    expect(r.buckets[3]).toEqual({ label: '7~8시간', days: 3, study: 150, mood: 4.3 });
+    expect(r.best?.label).toBe('7~8시간');
+  });
+});
+
+describe('모으기 속도 (savingPace)', () => {
+  it('최근 8주 평균으로 끝나는 날과 당겨지는 날', async () => {
+    const { savingPace } = await import('../life/calc');
+    const dep = (date: string, amount: number) => ({ date, amount });
+    const g = { target: 100000, deposits: [dep('2026-09-03', 10000), dep('2026-09-17', 10000), dep('2026-10-01', 10000), dep('2026-10-15', 10000)], due: '2026-12-24' };
+    const r = savingPace(g, '2026-10-28');
+    expect(r.left).toBe(60000);
+    expect(r.perWeek).toBe(5000);
+    expect(r.eta).toBe('2027-01-20');
+    expect(r.needPerWeek).toBe(7400);
+    expect(r.faster[0]).toEqual({ extra: 5000, days: 42 });
+  });
+});
+
+describe('단어 시험 예상 점수 (knowChance · expectedScore)', () => {
+  it('상자·틀린 횟수·지난 복습으로 어림한다', async () => {
+    const { knowChance, expectedScore } = await import('./wordTest');
+    expect(knowChance({ box: 0, wrong: 0, due: '2026-10-28' }, '2026-10-28')).toBe(0.15);
+    expect(knowChance({ box: 5, wrong: 0, due: '2026-11-10' }, '2026-10-28')).toBe(0.9);
+    expect(knowChance({ box: 2, wrong: 2, due: '2026-10-20' }, '2026-10-28')).toBeCloseTo(0.45);
+    expect(expectedScore([{ box: 5, wrong: 0, due: '2026-11-10' }, { box: 0, wrong: 0, due: '2026-10-28' }], '2026-10-28')).toBe(53);
+    expect(expectedScore([], '2026-10-28')).toBeNull();
+  });
+});
+
+describe('영화 취향 지도 (tasteMap · unexplored)', () => {
+  it('장르별 편수·평균, 안 본 장르', async () => {
+    const { tasteMap, unexplored } = await import('../life/taste');
+    const m = (id: string, rating: number, genre?: string, nation?: string) => ({ id, title: id, status: 'watched', rating, genre, nation, updatedAt: 1, created: 1 });
+    const d = { movies: Object.fromEntries([m('a', 5, '액션,범죄', '미국'), m('b', 4, '액션', '한국'), m('c', 2, '드라마', '한국'), m('d', 3)].map((x) => [x.id, x])) } as never;
+    const t = tasteMap(d);
+    expect(t.rated).toBe(4);
+    expect(t.withInfo).toBe(3);
+    expect(t.genres[0]).toEqual({ name: '액션', count: 2, avg: 4.5 });
+    expect(t.nations[0]).toEqual({ name: '한국', count: 2, avg: 3 });
+    expect(unexplored(['액션', '다큐멘터리', '성인물(에로)', '애니메이션'], t.genres)).toEqual(['다큐멘터리', '애니메이션']);
+  });
+});
+
+describe('내신 목표 역산 (neededScore)', () => {
+  it('받은 점수와 비율로 남은 시험에 필요한 점수', async () => {
+    const { neededScore } = await import('./grades');
+    const g = { target: 90, parts: [{ weight: 30, score: 84 }, { weight: 30 }, { weight: 40, score: 95 }] };
+    // 84×0.3 + 95×0.4 = 25.2 + 38 = 63.2 → (90 − 63.2) / 0.3 = 89.4
+    expect(neededScore(g)).toEqual({ need: 89.4, got: 63.2, left: 30, possible: true });
+    expect(neededScore({ target: 99, parts: [{ weight: 50, score: 80 }, { weight: 50 }] }).possible).toBe(false);
+    expect(neededScore({ target: 80, parts: [{ weight: 50, score: 90 }, { weight: 50, score: 80 }] })).toEqual({ need: null, got: 85, left: 0, possible: true });
+  });
+});
+
+describe('하루 마감 체크인 알림', () => {
+  it('체크인 시각 칸은 체크인 알림', () => {
+    const d = emptyStudy();
+    d.settings.checkinTime = '22:30';
+    const e = buildDigest(d, {}, '2026-10-28', ['07:30', '22:30'], 1);
+    expect(e[1]).toMatchObject({ slot: 1, title: '오늘 어땠어요?', url: '/checkin' });
+    expect(e[0].title).toBe('오늘 할 것');
+  });
+});

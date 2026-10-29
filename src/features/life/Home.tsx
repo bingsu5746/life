@@ -97,6 +97,10 @@ export function Home(_: { loggedIn: boolean; onLogin: () => void }) {
           오늘도 하나씩 해 봐요 ·{' '}
           <button className="st-link" onClick={() => go('/week')}>
             이번 주 돌아보기
+          </button>{' '}
+          ·{' '}
+          <button className="st-link" onClick={() => go('/checkin')}>
+            하루 마감
           </button>
         </p>
       </header>

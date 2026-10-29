@@ -10,6 +10,7 @@ import { Bar, Check, confirmDelete, Empty, Field, go, Icon, Menu, Sheet, Subject
 
 // 성적 화면은 그래프가 있어 열 때 받는다
 const Grades = lazy(() => import('./Grades').then((m) => ({ default: m.Grades })));
+const SemesterGoals = lazy(() => import('./SemesterGoals').then((m) => ({ default: m.SemesterGoals })));
 const Assessments = lazy(() => import('./Assessments').then((m) => ({ default: m.Assessments })));
 
 export const KIND_NAME: Record<ExamKind, string> = { school: '내신', mock: '모의고사·수능', other: '기타' };
@@ -28,13 +29,19 @@ export function Exams({ id, sub }: { id?: string; sub?: string }) {
         <Assessments sub={sub} />
       </Suspense>
     );
+  if (id === 'goal')
+    return (
+      <Suspense fallback={<p className="st-muted">여는 중…</p>}>
+        <SemesterGoals />
+      </Suspense>
+    );
   if (id && sub === 'plan') return <ExamPlanPage id={id} />;
   if (id && id !== 'new' && id !== 'progress') return <ExamDetail id={id} />;
   return <ExamList adding={id === 'new'} progress={id === 'progress'} />;
 }
 
 /** 시험 · 성적 바꾸기 */
-export function ExamTabs({ on }: { on: 'exams' | 'grades' | 'tasks' }) {
+export function ExamTabs({ on }: { on: 'exams' | 'grades' | 'tasks' | 'goal' }) {
   return (
     <div className="st-seg" role="tablist" aria-label="시험·수행평가·성적">
       <button role="tab" aria-selected={on === 'exams'} className={on === 'exams' ? 'on' : ''} onClick={() => go('/exams')}>
@@ -45,6 +52,9 @@ export function ExamTabs({ on }: { on: 'exams' | 'grades' | 'tasks' }) {
       </button>
       <button role="tab" aria-selected={on === 'grades'} className={on === 'grades' ? 'on' : ''} onClick={() => go('/exams/grades')}>
         성적
+      </button>
+      <button role="tab" aria-selected={on === 'goal'} className={on === 'goal' ? 'on' : ''} onClick={() => go('/exams/goal')}>
+        목표
       </button>
     </div>
   );

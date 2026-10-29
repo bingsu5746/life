@@ -5148,3 +5148,137 @@ body {
   margin: 6px 0 0;
   font-size: 0.92rem;
 }
+
+/* 농구 연습 항목 */
+.bb-items {
+  display: grid;
+  gap: 10px;
+}
+.bb-item {
+  display: grid;
+  gap: 6px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--line);
+}
+.bb-item-nums {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.bb-item-nums select.st-input.xs {
+  width: auto;
+}
+
+.mk-pat summary {
+  cursor: pointer;
+  font-weight: 650;
+}
+.mk-row {
+  display: grid;
+  gap: 2px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--line);
+}
+.mk-row:last-child {
+  border-bottom: 0;
+}
+.mk-row span {
+  font-size: 0.9rem;
+}
+.sl-b {
+  margin-top: 14px;
+}
+.sl-goal {
+  margin-top: 10px;
+  gap: 8px;
+}
+
+/* 영화 취향 지도 */
+.tm summary {
+  cursor: pointer;
+  font-weight: 650;
+  margin-bottom: 6px;
+}
+.tm-group {
+  display: grid;
+  gap: 6px;
+  margin-top: 10px;
+}
+.tm-row {
+  display: grid;
+  grid-template-columns: 6.5em 1fr auto;
+  gap: 10px;
+  align-items: center;
+  font-size: 0.9rem;
+}
+.tm-row i {
+  height: 6px;
+  border-radius: 3px;
+  background: var(--text);
+  opacity: 0.75;
+}
+.tm-row small {
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+/* 내신 목표 */
+.sg-need {
+  font-size: 0.88rem;
+  font-weight: 650;
+}
+.sg-form {
+  margin-top: 12px;
+}
+.sg-part {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.sg-part .st-input:not(.xs) {
+  flex: 1;
+  min-width: 0;
+}
+
+/* 하루 마감 체크인 */
+.ck {
+  gap: 12px;
+}
+.ck-q {
+  display: grid;
+  gap: 10px;
+}
+.ck-opts {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 1fr;
+  gap: 6px;
+}
+.ck-opts.wrap {
+  grid-auto-flow: row;
+  grid-template-columns: repeat(auto-fill, minmax(84px, 1fr));
+}
+.ck-opts button {
+  min-height: 48px;
+  padding: 6px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-size: 0.88rem;
+  cursor: pointer;
+}
+.ck-opts button.on {
+  background: var(--text);
+  color: var(--surface);
+  border-color: var(--text);
+}
+.ck-time summary {
+  cursor: pointer;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+.ck-time > * {
+  margin-top: 8px;
+}

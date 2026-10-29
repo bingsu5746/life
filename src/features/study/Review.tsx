@@ -10,6 +10,7 @@ import { BlankRun, Blanks } from './Blanks';
 import { requeue } from './wordSession';
 import { Bar, confirmDelete, Empty, Field, go, Menu, Sheet, SubjectDot, SubjectPicker, SubjectTag, subjectsOf, toast, useToday, tap } from './ui';
 import { SwipeCard } from './SwipeCard';
+import { isCareless, mistakePatterns } from './mistakes';
 
 export function Review({ sub }: { sub?: string }) {
   if (sub === 'redo' || sub?.startsWith('redo?')) return <NoteRun />;
@@ -88,6 +89,7 @@ function Notes({ today, adding }: { today: string; adding?: boolean }) {
           </button>
         )}
       </section>
+      <Patterns subject={subject} onPick={setSubject} />
       <div className="st-inline wrap">
         <div className="st-seg sm">
           <button className={show === 'open' ? 'on' : ''} onClick={() => setShow('open')}>
@@ -419,6 +421,30 @@ function NoteSheet({ note, today, onClose }: { note?: WrongNote; today: string; 
         </div>
       </div>
     </Sheet>
+  );
+}
+
+/** 과목별 오답 패턴 (오답이 4개 넘는 과목만) */
+function Patterns({ subject, onPick }: { subject: string; onPick: (id: string) => void }) {
+  const d = useStudy();
+  const pats = mistakePatterns(d).filter((p) => p.total >= 4 && (!subject || p.subjectId === subject));
+  if (!pats.length) return null;
+  return (
+    <details className="st-card mk-pat" open={!!subject}>
+      <summary>오답 패턴</summary>
+      {pats.map((p) => (
+        <div key={p.subjectId} className="mk-row st-tap" {...tap(() => onPick(subject === p.subjectId ? '' : p.subjectId))}>
+          <b>
+            <SubjectDot id={p.subjectId} d={d} /> {d.subjects[p.subjectId]?.name ?? '과목'} <small className="st-muted">{p.total}개</small>
+          </b>
+          <span>
+            {p.top ? `${REASONS[p.top.reason]} ${Math.round(p.top.share * 100)}%` : '틀린 이유를 적으면 패턴이 보여요'}
+            {isCareless(p) && ' · 실수가 많아요 — 시험 계획에 실수 점검을 넣어요'}
+          </span>
+          {p.units.length > 0 && <small className="st-muted">많이 틀린 곳: {p.units.map((u) => `${u.name} ${u.n}개`).join(', ')}</small>}
+        </div>
+      ))}
+    </details>
   );
 }
 

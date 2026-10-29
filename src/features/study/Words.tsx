@@ -1,4 +1,5 @@
 // 영단어 (설계 §9.4~9.9): 목록 · 넣기(PDF·붙여넣기·사진) · 목록 하나 · 외우기(카드·객관식)
+import { expectedScore, knowChance } from './wordTest';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { addDays, dday, shortDate } from './dates';
 import { alive, newId, type Word, type WordList } from './model';
@@ -230,6 +231,11 @@ function ListDetail({ id }: { id: string }) {
             </span>
           </div>
         </div>
+        {list.kind !== 'inbox' && ws.length >= 5 && (
+          <p className="st-hint">
+            지금 시험을 보면 <b>약 {expectedScore(ws, today)}점</b> (상자 기록으로 어림한 값){list.kind === 'test' && list.testDate && list.testDate >= today ? ` · 시험 ${dday(today, list.testDate)}` : ''}. 시험 대비는 모를 것 같은 단어부터 나와요.
+          </p>
+        )}
         {v.prep && ws.length > 0 ? (
           <button className="btn btn-primary btn-lg" onClick={() => go(`/words/${id}/prep`)}>
             시험 대비 (전체 한 번씩)
@@ -745,10 +751,11 @@ function WordRun({ listId, mode }: { listId: string; mode: 'learn' | 'prep' | 'w
     const ws = listWords(all, listId);
     const v = wordListViews(getStudy(), all, today, planViews(getStudy(), all, today)).find((x) => x.list.id === listId);
     let ids: string[];
-    if (mode === 'prep') ids = ws.map((w) => w.id);
+    // 시험 대비: 맞힐 가능성이 낮은 단어부터 (점수를 가장 많이 올릴 단어)
+    if (mode === 'prep') ids = [...ws].sort((a, b) => knowChance(a, today) - knowChance(b, today) || Math.random() - 0.5).map((w) => w.id);
     else if (mode === 'weak') ids = ws.filter((w) => w.wrong > 0).sort((a, b) => b.wrong - a.wrong).slice(0, 20).map((w) => w.id);
     else ids = [...(v?.due ?? []), ...(v?.fresh ?? [])].map((w) => w.id);
-    if (mode !== 'learn') ids = ids.sort(() => Math.random() - 0.5);
+    if (mode === 'weak') ids = ids.sort(() => Math.random() - 0.5);
     setQueue(ids);
     setTotal(ids.length);
     setAnswered(new Map());

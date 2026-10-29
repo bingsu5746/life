@@ -21,11 +21,19 @@ const hhmm = (v: unknown) => (typeof v === 'string' && /^([01]\d|2[0-3]):[0-5]\d
 function bbStat(v: unknown) {
   if (!isObj(v)) return undefined;
   const n = (k: string) => score(v[k], 0, 500);
+  // 슛 수는 연습에서 수백 개가 될 수 있다
+  const s = (k: string) => score(v[k], 0, 20000);
   return {
     mode: v.mode === 'game' ? ('game' as const) : ('practice' as const),
     result: v.result === 'win' || v.result === 'lose' || v.result === 'draw' ? v.result : undefined,
     pts: n('pts'), reb: n('reb'), ast: n('ast'), stl: n('stl'), blk: n('blk'),
-    fgm: n('fgm'), fga: n('fga'), tpm: n('tpm'), tpa: n('tpa'), ftm: n('ftm'), fta: n('fta'),
+    fgm: s('fgm'), fga: s('fga'), tpm: s('tpm'), tpa: s('tpa'), ftm: s('ftm'), fta: s('fta'),
+    items: Array.isArray(v.items)
+      ? v.items
+          .filter((i): i is Obj => isObj(i) && typeof i.name === 'string' && !!i.name.trim())
+          .slice(0, 30)
+          .map((i) => ({ name: (i.name as string).trim().slice(0, 40), kind: i.kind === 'fg' || i.kind === 'tp' || i.kind === 'ft' ? i.kind : undefined, made: score(i.made, 0, 2000), att: score(i.att, 0, 2000) }))
+      : undefined,
   };
 }
 /** 점수 칸: 범위 밖이면 버린다 */
@@ -410,6 +418,25 @@ export function sanitizeSettings(s: unknown): StudySettings & { updatedAt: numbe
     bbGoals: isObj(x.bbGoals) ? { ft: score((x.bbGoals as Obj).ft, 1, 100), fg: score((x.bbGoals as Obj).fg, 1, 100), tp: score((x.bbGoals as Obj).tp, 1, 100) } : undefined,
     readingGoal: score(x.readingGoal, 1, 1000),
     weeklyLimit: score(x.weeklyLimit, 1, 1e9),
+    sleepGoal: score(x.sleepGoal, 3, 12),
+    checkinTime: typeof x.checkinTime === 'string' && /^([01]\d|2[0-3]):[0-5]\d$/.test(x.checkinTime) ? x.checkinTime : undefined,
+    semesterGoals: isObj(x.semesterGoals)
+      ? Object.fromEntries(
+          Object.entries(x.semesterGoals)
+            .filter(([, g]) => isObj(g) && typeof (g as Obj).target === 'number')
+            .slice(0, 30)
+            .map(([k, g]) => [
+              k,
+              {
+                target: cl((g as Obj).target, 0, 100, 80),
+                parts: arr((g as Obj).parts)
+                  .filter((p): p is Obj => isObj(p) && typeof p.name === 'string')
+                  .slice(0, 8)
+                  .map((p) => ({ name: (p.name as string).slice(0, 20), weight: cl(p.weight, 0, 100, 0), score: score(p.score, 0, 100) })),
+              },
+            ]),
+        )
+      : undefined,
     lastBackup: optDate(x.lastBackup),
     examPlanDefaults: isObj(x.examPlanDefaults) ? { weekday: cl((x.examPlanDefaults as Obj).weekday, 0, 900, 150), weekend: cl((x.examPlanDefaults as Obj).weekend, 0, 900, 240), perLine: cl((x.examPlanDefaults as Obj).perLine, 5, 300, 40) } : undefined,
     diaryForm: isObj(x.diaryForm) ? { parts: arr((x.diaryForm as Obj).parts).filter((t): t is string => typeof t === 'string' && /^[a-z]{2,12}$/.test(t)).slice(0, 12), autoFill: (x.diaryForm as Obj).autoFill !== false } : undefined,

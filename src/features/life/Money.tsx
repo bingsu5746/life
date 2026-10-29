@@ -5,7 +5,7 @@ import { shortDate } from '../study/dates';
 import { alive, newId, type MoneyRule, type MoneyTx, type SavingGoal } from '../study/model';
 import { put, remove, setSettings, useStudy } from '../study/store';
 import { Bar, confirmDelete, Empty, Field, go, Icon, Sheet, tap, toast, useToday } from '../study/ui';
-import { budgetView, compareMonths, weekSpent, monthlyAmount, monthLabel, monthlyOut, monthOf, monthSummary, readWon, saved, shiftMonth, upcomingRules, won } from './calc';
+import { budgetView, compareMonths, savingPace, weekSpent, monthlyAmount, monthLabel, monthlyOut, monthOf, monthSummary, readWon, saved, shiftMonth, upcomingRules, won } from './calc';
 import { WEEKDAYS } from '../study/dates';
 
 const OUT = ['식비', '간식·카페', '교통', '쇼핑', '문화·여가', '교육·책', '통신', '선물', '기타'];
@@ -240,6 +240,7 @@ function SavingRow({ g, today, onEdit }: { g: SavingGoal; today: string; onEdit:
         </small>
       </div>
       <Bar value={Math.max(0, Math.min(have, g.target))} max={g.target} label={`${g.name} 모은 정도`} />
+      {!g.done && have < g.target && <PaceLine g={g} today={today} />}
       <div className="st-inline">
         <input className="st-input sm" inputMode="numeric" value={v} onChange={(e) => setV(e.target.value)} placeholder="금액" aria-label={`${g.name}에 넣을 금액`} />
         <button className="btn btn-sm" onClick={() => add(1)}>
@@ -574,5 +575,18 @@ function WeekLimit({ today }: { today: string }) {
         </button>
       </p>
     </div>
+  );
+}
+
+/** 지금 속도로 언제 다 모으는지 · 마감에 맞추려면 · 더 모으면 며칠 당겨지는지 */
+function PaceLine({ g, today }: { g: SavingGoal; today: string }) {
+  const p = savingPace(g, today);
+  if (!p.perWeek && !p.needPerWeek) return <small className="st-muted">모은 기록이 쌓이면 언제 다 모으는지 알려 드려요</small>;
+  return (
+    <small className="st-muted mn-pace">
+      {p.perWeek ? `한 주에 ${won(p.perWeek)}씩 모으고 있어요 → ${p.eta ? `${shortDate(p.eta)}쯤 다 모아요` : ''}` : '최근 8주 동안 모은 돈이 없어요'}
+      {p.needPerWeek !== null && ` · 마감(${shortDate(g.due!)})에 맞추려면 한 주에 ${won(p.needPerWeek)}`}
+      {p.faster.length > 0 && ` · 한 주에 ${won(p.faster[0].extra)} 더 모으면 ${p.faster[0].days}일 빨라져요`}
+    </small>
   );
 }

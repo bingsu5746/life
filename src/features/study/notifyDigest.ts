@@ -135,6 +135,11 @@ export function buildDigest(d: StudyData, words: WordsData, today: DateStr, time
       const am = Number(t.slice(0, 2)) < 15;
       const y = am ? awardsYear(d, date) : null;
       const weak = am && weakQuiz(words, date).length > 0;
+      const checkin = d.settings.checkinTime === t;
+      if (checkin) {
+        out.push({ date, slot, title: '오늘 어땠어요?', body: '기분 · 공부 · 운동을 눌러서 하루를 마감해요', url: '/checkin' });
+        return;
+      }
       const sunday = !am && weekday(date) === 0;
       out.push({ date, slot, title: y ? '🏆 영화 시상식' : sunday ? '내일 준비 · 이번 주 돌아보기' : am ? '오늘 할 것' : '내일 준비', body: sunday ? `${evening(d, today, date)} · ${weekBody(d, date, today)}` : am ? morning(d, words, today, date) : evening(d, today, date), url: y ? '/movies/ceremony' : sunday ? '/week' : weak ? '/words' : undefined });
     });

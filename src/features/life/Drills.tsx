@@ -62,7 +62,7 @@ export function DrillsPage() {
       }
       return { id: newId(), date: today, drillId: x.id, made: m, shots: x.shots && m !== undefined ? x.shots : undefined, minutes: x.minutes, created: now + i };
     });
-    const workout: Workout = { id: newId(), date: today, kind: '농구', minutes: totalMinutes(done), memo: `혼자 연습: ${done.map((x) => x.name).join(', ')}`, bb, created: now } as Workout;
+    const workout: Workout = { id: newId(), date: today, kind: '농구', minutes: totalMinutes(done), bb: { ...bb, items: done.map((x, i) => ({ name: x.name, kind: x.shots ? x.shotKind : undefined, made: entries[i].made, att: entries[i].shots })) }, created: now } as Workout;
     putMany([...entries.map((e) => ({ c: 'drillLogs' as const, item: e as never })), { c: 'workouts' as const, item: workout as never }]);
     toast(`${totalMinutes(done)}분 연습을 기록했어요`);
     setChecked(new Set());

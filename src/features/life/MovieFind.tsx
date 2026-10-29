@@ -3,6 +3,7 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { catalogSearch, movieProviders, recommendMovies, type CatalogFilm } from '../auth/api';
 import { alive, newId, type Movie } from '../study/model';
 import { put, useStudy } from '../study/store';
+import { tasteMap, unexplored, type TasteRow } from './taste';
 import { tap, toast } from '../study/ui';
 
 export const norm = (t: string) => t.replace(/\s+/g, '').toLowerCase();
@@ -290,6 +291,16 @@ export function RecTab({ onWatched, onOpen }: Common) {
           지금 보고 싶은 것
         </button>
       </div>
+      {mode === 'taste' && (
+        <TasteCard
+          onExplore={(g) => {
+            setMode('wish');
+            const w = `평소 잘 안 보던 ${g} 장르 중에서 평이 좋은 입문작`;
+            setWish(w);
+            void run(w);
+          }}
+        />
+      )}
       {mode === 'taste' ? (
         <div className="st-inline between wrap">
           <small className="st-muted">{rated.length ? `별점을 준 ${rated.length}편의 별점·감상평을 보고 골라요 (4점 이상은 좋아함, 2.5점 이하는 별로)` : '별점을 준 영화가 없어요. 본 영화에 별점을 남겨 보세요.'}</small>
@@ -338,5 +349,64 @@ export function RecTab({ onWatched, onOpen }: Common) {
       <p className="st-hint">AI 가 고른 제목 중 KOBIS 영화 목록에서 확인된 영화만 보여 줘요. 취향은 추측이라 틀릴 수 있어요.</p>
       {ott.off && <p className="st-hint">{ott.off}</p>}
     </section>
+  );
+}
+
+/** 내 취향: 별점 준 영화의 장르·나라·감독 · 아직 안 본 장르 */
+function TasteCard({ onExplore }: { onExplore: (genre: string) => void }) {
+  const d = useStudy();
+  const t = tasteMap(d);
+  const [all, setAll] = useState<string[]>([]);
+  useEffect(() => {
+    let on = true;
+    catalogSearch({ facets: true })
+      .then((r) => on && setAll(r.facets?.genres ?? []))
+      .catch(() => {});
+    return () => {
+      on = false;
+    };
+  }, []);
+  if (!t.rated) return null;
+  const rows = (title: string, list: TasteRow[]) =>
+    list.length > 0 && (
+      <div className="tm-group">
+        <small className="aw-label">{title}</small>
+        {list.slice(0, 5).map((r) => (
+          <div key={r.name} className="tm-row">
+            <span>{r.name}</span>
+            <i style={{ width: `${Math.min(100, (r.count / list[0].count) * 100)}%` }} />
+            <small>
+              {r.count}편 · ★ {r.avg}
+            </small>
+          </div>
+        ))}
+      </div>
+    );
+  const fresh = unexplored(all, t.genres).slice(0, 8);
+  return (
+    <details className="tm" open>
+      <summary>내 취향 지도</summary>
+      {t.withInfo === 0 ? (
+        <p className="st-hint">장르·감독 정보는 「찾기」나 「극장가」에서 골라 담은 영화에만 있어요.</p>
+      ) : (
+        <>
+          {rows('장르', t.genres)}
+          {rows('나라', t.nations)}
+          {rows('감독', t.directors.filter((x) => x.count > 1 || t.directors.length < 6))}
+        </>
+      )}
+      {fresh.length > 0 && (
+        <div className="tm-group">
+          <small className="aw-label">아직 안 본 장르 · 누르면 추천</small>
+          <div className="st-chips">
+            {fresh.map((g) => (
+              <button key={g} className="st-chip" onClick={() => onExplore(g)}>
+                {g}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+    </details>
   );
 }

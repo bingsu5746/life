@@ -42,7 +42,7 @@ export default function App() {
   const userId = auth.user?.id ?? null;
   // 맨 위 막대: 지금 있는 영역 이름 (누르면 그 영역 처음으로)
   const area = AREAS.find((a) => a.key === path[0]);
-  const crumb = !path[0] ? null : path[0] === 'settings' ? { label: '설정', to: '/settings' } : path[0] === 'week' ? { label: '이번 주', to: '/week' } : path[0] === 'month' ? { label: '이번 달', to: '/month' } : path[0] === 'search' ? { label: '검색', to: '/search' } : area ? { label: area.label, to: `/${area.key}` } : { label: '공부', to: '/study' };
+  const crumb = !path[0] ? null : path[0] === 'settings' ? { label: '설정', to: '/settings' } : path[0] === 'week' ? { label: '이번 주', to: '/week' } : path[0] === 'checkin' ? { label: '하루 마감', to: '/checkin' } : path[0] === 'month' ? { label: '이번 달', to: '/month' } : path[0] === 'search' ? { label: '검색', to: '/search' } : area ? { label: area.label, to: `/${area.key}` } : { label: '공부', to: '/study' };
   // 「/」 를 누르면 검색 (글 쓰는 칸에서는 빼고)
   useEffect(() => {
     const k = (e: KeyboardEvent) => {

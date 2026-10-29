@@ -8,7 +8,8 @@ import { bySubject, compare, daily, minutesByDate, studyStreak, weekdayAverage, 
 import { alive, type StudySession } from './model';
 import { addSession } from './actions';
 import { placeTimeStats, STUDY_PLACES } from './timeStats';
-import { getStudy, put, remove, useStudy } from './store';
+import { sleepBuckets } from './condition';
+import { getStudy, put, remove, useStudy, setSettings } from './store';
 import { askNotify, loadTimer, primeAudio, saveTimer } from './timerStore';
 import { clock, finish, minutesText, nextPhase, pause, resume, start, view, type TimerState } from './timer';
 import { Bar, confirmDelete, Field, go, Icon, NumInput, Sheet, SubjectDot, SubjectPicker, subjectsOf, tap, toast, useNow, useToday } from './ui';
@@ -534,6 +535,7 @@ function SleepStudy({ today }: { today: string }) {
           )}
         </div>
       </div>
+      <SleepBuckets today={today} />
       <p className="st-hint">기록한 날끼리 평균을 낸 것이라, 잠 때문에 공부 시간이 달라졌다고 단정할 수는 없어요.</p>
     </section>
   );
@@ -587,5 +589,61 @@ function PlaceTime({ sessions, today }: { sessions: StudySession[]; today: strin
       )}
       <small className="st-muted">한 번 평균은 스톱워치·직접 넣은 기록으로 세요 (뽀모도로는 길이가 정해져 있어서 빼요). 시간대는 타이머 기록만.</small>
     </section>
+  );
+}
+
+/** 잔 시간대별 공부·기분 (최근 90일) + 잠 목표 */
+function SleepBuckets({ today }: { today: string }) {
+  const d = useStudy();
+  const days = daysBetween(addDays(today, -89), today).map((date) => {
+    const c = d.conditions[date]?.deleted ? undefined : d.conditions[date];
+    const diaryMood = d.diary[date] && !d.diary[date].deleted ? d.diary[date].mood : undefined;
+    return { date, sleep: sleepMinutes(c), mood: c?.mood ?? diaryMood ?? null };
+  });
+  const study = new Map<string, number>();
+  for (const s of alive(d.sessions)) if (s.date >= days[0].date) study.set(s.date, (study.get(s.date) ?? 0) + s.minutes);
+  const r = sleepBuckets(days, study);
+  const goal = d.settings.sleepGoal;
+  const last7 = days.slice(-7).filter((x) => x.sleep !== null);
+  const kept = goal ? last7.filter((x) => x.sleep! >= goal * 60).length : 0;
+  const shown = r.buckets.filter((b) => b.days > 0);
+  if (shown.length < 2) return null;
+  const max = Math.max(1, ...shown.map((b) => b.study));
+  return (
+    <div className="sl-b">
+      <h4 className="ta-h">잔 시간별 그날 공부 · 기분 (최근 90일)</h4>
+      {r.best && (
+        <p className="st-sub">
+          <b>{r.best.label}</b> 잤을 때 공부를 가장 많이 했어요 (평균 {minutesText(r.best.study)}
+          {r.best.mood ? ` · 기분 ${r.best.mood}/5` : ''})
+        </p>
+      )}
+      {shown.map((b) => (
+        <div key={b.label} className="st-subj-row">
+          <span>{b.label}</span>
+          <Bar value={b.study} max={max} label={`${b.label} 잔 날 공부`} />
+          <small>
+            {minutesText(b.study)}
+            {b.mood ? ` · 기분 ${b.mood}` : ''} · {b.days}일
+          </small>
+        </div>
+      ))}
+      <div className="st-inline wrap sl-goal">
+        잠 목표
+        <select className="st-input xs" value={goal ?? ''} onChange={(e) => setSettings({ sleepGoal: e.target.value ? Number(e.target.value) : undefined })} aria-label="잠 목표 시간">
+          <option value="">없음</option>
+          {[6, 6.5, 7, 7.5, 8, 8.5, 9].map((h) => (
+            <option key={h} value={h}>
+              {h}시간
+            </option>
+          ))}
+        </select>
+        {goal && last7.length > 0 && (
+          <small className="st-muted">
+            지난 7일 중 기록한 {last7.length}일에서 {kept}일 지켰어요
+          </small>
+        )}
+      </div>
+    </div>
   );
 }

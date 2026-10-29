@@ -112,3 +112,16 @@ export function wrongFrequency(records: GradeRecord[], subject: string): { count
   }
   return { counts, records: n, max };
 }
+
+/**
+ * 내신 목표 역산: 학기 목표(100점 환산)를 넘으려면 아직 안 본 항목에서 몇 점씩 받아야 하는지.
+ * 남은 항목은 모두 같은 점수를 받는다고 보고 계산한다.
+ */
+export function neededScore(g: { target: number; parts: { weight: number; score?: number }[] }): { need: number | null; got: number; left: number; possible: boolean } {
+  const total = g.parts.reduce((a, p) => a + p.weight, 0) || 100;
+  const got = g.parts.filter((p) => p.score !== undefined).reduce((a, p) => a + (p.score! * p.weight) / total, 0);
+  const left = g.parts.filter((p) => p.score === undefined).reduce((a, p) => a + p.weight / total, 0);
+  if (left <= 0) return { need: null, got: Math.round(got * 10) / 10, left: 0, possible: got >= g.target };
+  const need = Math.ceil(((g.target - got) / left) * 10) / 10;
+  return { need: Math.max(0, need), got: Math.round(got * 10) / 10, left: Math.round(left * 100), possible: need <= 100 };
+}

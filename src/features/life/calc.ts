@@ -195,3 +195,33 @@ export function weekSpent(d: Pick<StudyData, 'moneyTx'>, date: DateStr): number 
     .filter((t) => t.type === 'out' && t.date >= from && t.date <= date)
     .reduce((a, t) => a + t.amount, 0);
 }
+
+export interface SavingPace {
+  left: number;
+  /** 최근 8주 동안 한 주에 평균 모은 돈 */
+  perWeek: number;
+  /** 지금 속도로 다 모으는 날 (속도가 0 이면 null) */
+  eta: DateStr | null;
+  /** 마감까지 맞추려면 한 주에 필요한 돈 (마감이 없거나 지났으면 null) */
+  needPerWeek: number | null;
+  /** 한 주에 extra 원 더 모으면 며칠 당겨지는지 */
+  faster: { extra: number; days: number }[];
+}
+
+/** 모으기 목표: 지금 속도 · 끝나는 날 · 더 모으면 얼마나 당겨지는지 */
+export function savingPace(g: { target: number; deposits: { date: DateStr; amount: number }[]; due?: DateStr }, today: DateStr): SavingPace {
+  const have = g.deposits.reduce((a, x) => a + x.amount, 0);
+  const left = Math.max(0, g.target - have);
+  const from = addDays(today, -55);
+  const recent = g.deposits.filter((x) => x.date >= from && x.date <= today).reduce((a, x) => a + x.amount, 0);
+  const first = g.deposits.map((x) => x.date).sort()[0];
+  // 시작한 지 8주가 안 됐으면 시작한 날부터의 주 수로
+  const weeks = first && first > from ? Math.max(1, (Date.parse(today) - Date.parse(first)) / (7 * 86_400_000)) : 8;
+  const perWeek = Math.max(0, Math.round(recent / weeks));
+  const etaIn = (pw: number) => (pw > 0 ? Math.ceil((left / pw) * 7) : null);
+  const days = etaIn(perWeek);
+  const eta = left === 0 ? today : days === null ? null : addDays(today, days);
+  const weeksToDue = g.due && g.due > today ? (Date.parse(g.due) - Date.parse(today)) / (7 * 86_400_000) : null;
+  const faster = days === null || left === 0 ? [] : [5000, 10000].map((extra) => ({ extra, days: days - (etaIn(perWeek + extra) ?? days) })).filter((x) => x.days > 0);
+  return { left, perWeek, eta, needPerWeek: weeksToDue ? Math.ceil(left / weeksToDue / 100) * 100 : null, faster };
+}

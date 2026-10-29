@@ -2,7 +2,8 @@
 import { useState } from 'react';
 import { LineChart } from '../study/charts';
 import { shortDate } from '../study/dates';
-import { alive, newId, type BasketballStat, type Workout } from '../study/model';
+import { alive, newId, type BasketballStat, type PracticeItem, type Workout } from '../study/model';
+import { DRILLS, guessKind, practiceTotals } from './drills';
 import { put, remove, useStudy } from '../study/store';
 import { minutesText } from '../study/timer';
 import { BbGoals, ShotSummary } from './ShotCounter';
@@ -118,7 +119,15 @@ export function Basketball({ sub }: { sub?: string }) {
                     {w.minutes ? ` · ${minutesText(w.minutes)}` : ''}
                   </div>
                   <div className="st-item-sub">
-                    {[w.bb?.reb !== undefined && `리바운드 ${w.bb.reb}`, w.bb?.ast !== undefined && `어시스트 ${w.bb.ast}`, w.bb?.fga ? `2점 ${w.bb.fgm ?? 0}/${w.bb.fga}` : '', w.bb?.tpa ? `3점 ${w.bb.tpm ?? 0}/${w.bb.tpa}` : '', w.bb?.fta ? `자유투 ${w.bb.ftm ?? 0}/${w.bb.fta}` : '', w.memo]
+                    {[
+                      w.bb?.items?.length ? w.bb.items.map((i) => (i.att ? `${i.name} ${i.made ?? 0}/${i.att}` : i.name)).join(', ') : '',
+                      w.bb?.reb !== undefined && `리바운드 ${w.bb.reb}`,
+                      w.bb?.ast !== undefined && `어시스트 ${w.bb.ast}`,
+                      !w.bb?.items?.length && w.bb?.fga ? `2점 ${w.bb.fgm ?? 0}/${w.bb.fga}` : '',
+                      !w.bb?.items?.length && w.bb?.tpa ? `3점 ${w.bb.tpm ?? 0}/${w.bb.tpa}` : '',
+                      !w.bb?.items?.length && w.bb?.fta ? `자유투 ${w.bb.ftm ?? 0}/${w.bb.fta}` : '',
+                      w.memo,
+                    ]
                       .filter(Boolean)
                       .join(' · ')}
                   </div>
@@ -141,8 +150,23 @@ function BbSheet({ item, today, onClose }: { item?: Workout; today: string; onCl
   const [result, setResult] = useState<BasketballStat['result']>(b?.result);
   const [v, setV] = useState<Record<string, string>>(() => Object.fromEntries((['pts', 'reb', 'ast', 'stl', 'blk', 'fgm', 'fga', 'tpm', 'tpa', 'ftm', 'fta'] as const).map((k) => [k, b?.[k]?.toString() ?? ''])));
   const [memo, setMemo] = useState(item?.memo ?? '');
+  // 연습: 무엇을 · 몇 개 중 몇 개 (예전 기록은 슛 칸을 항목으로 바꿔 보여 준다)
+  type Row = { name: string; kind?: 'fg' | 'tp' | 'ft'; made: string; att: string };
+  const [rows, setRows] = useState<Row[]>(() => {
+    if (b?.items?.length) return b.items.map((i) => ({ name: i.name, kind: i.kind, made: i.made?.toString() ?? '', att: i.att?.toString() ?? '' }));
+    const old: Row[] = [];
+    if (b?.mode === 'practice') {
+      if (b.fga) old.push({ name: '2점슛', kind: 'fg', made: String(b.fgm ?? 0), att: String(b.fga) });
+      if (b.tpa) old.push({ name: '3점슛', kind: 'tp', made: String(b.tpm ?? 0), att: String(b.tpa) });
+      if (b.fta) old.push({ name: '자유투', kind: 'ft', made: String(b.ftm ?? 0), att: String(b.fta) });
+    }
+    return old.length ? old : [{ name: '', made: '', att: '' }];
+  });
+  const items: PracticeItem[] = rows.filter((r) => r.name.trim()).map((r) => ({ name: r.name.trim(), kind: r.kind, made: r.made ? Number(r.made) : undefined, att: r.att ? Number(r.att) : undefined }));
+  const rowBad = rows.some((r) => r.made && r.att && Number(r.made) > Number(r.att));
+  const setRow = (i: number, patch: Partial<Row>) => setRows(rows.map((r, k) => (k === i ? { ...r, ...patch } : r)));
   const num = (k: string) => (v[k].trim() ? Math.min(500, Math.max(0, Math.round(Number(v[k])))) : undefined);
-  const bad = (['fg', 'tp', 'ft'] as const).some((p) => (num(`${p}m`) ?? 0) > (num(`${p}a`) ?? Infinity));
+  const bad = mode === 'practice' ? rowBad : (['fg', 'tp', 'ft'] as const).some((p) => (num(`${p}m`) ?? 0) > (num(`${p}a`) ?? Infinity));
   const shots: BasketballStat = { mode, fgm: num('fgm'), fga: num('fga'), tpm: num('tpm'), tpa: num('tpa'), ftm: num('ftm'), fta: num('fta') };
   const field = (k: string, label: string) => (
     <label className="st-cond-time">
@@ -162,8 +186,10 @@ function BbSheet({ item, today, onClose }: { item?: Workout; today: string; onCl
     if (bad || !date) return;
     const m = Number(minutes);
     const pts = num('pts') ?? (mode === 'game' && ptsFromShots(shots) > 0 ? ptsFromShots(shots) : undefined);
+    const tot = practiceTotals(items);
+    const pr = (n: number) => (n > 0 ? n : undefined);
     const bb: BasketballStat = {
-      ...shots,
+      ...(mode === 'practice' ? { mode, fgm: pr(tot.fga) && tot.fgm, fga: pr(tot.fga), tpm: pr(tot.tpa) && tot.tpm, tpa: pr(tot.tpa), ftm: pr(tot.fta) && tot.ftm, fta: pr(tot.fta), items: items.length ? items : undefined } : shots),
       result: mode === 'game' ? result : undefined,
       pts: mode === 'game' ? pts : undefined,
       reb: mode === 'game' ? num('reb') : undefined,
@@ -214,11 +240,53 @@ function BbSheet({ item, today, onClose }: { item?: Workout; today: string; onCl
             </div>
           </>
         )}
-        <div className="bb-shots">
-          {shot('fg', '2점슛')}
-          {shot('tp', '3점슛')}
-          {shot('ft', '자유투')}
-        </div>
+        {mode === 'game' ? (
+          <div className="bb-shots">
+            {shot('fg', '2점슛')}
+            {shot('tp', '3점슛')}
+            {shot('ft', '자유투')}
+          </div>
+        ) : (
+          <div className="bb-items">
+            <datalist id="bb-drills">
+              {['2점슛', '3점슛', '자유투', '레이업', ...DRILLS.map((x) => x.name)].map((n) => (
+                <option key={n} value={n} />
+              ))}
+            </datalist>
+            {rows.map((r, i) => (
+              <div key={i} className="bb-item">
+                <input
+                  className="st-input"
+                  list="bb-drills"
+                  value={r.name}
+                  onChange={(e) => setRow(i, { name: e.target.value, kind: r.kind ?? guessKind(e.target.value) })}
+                  onBlur={() => !r.kind && setRow(i, { kind: guessKind(r.name) })}
+                  placeholder="무엇을 연습했나 (예: 자유투)"
+                  aria-label="연습한 것"
+                />
+                <div className="bb-item-nums">
+                  <input className="st-input xs" inputMode="numeric" value={r.made} onChange={(e) => setRow(i, { made: e.target.value.replace(/\D/g, '').slice(0, 4) })} placeholder="성공" aria-label={`${r.name || '연습'} 성공 수`} />
+                  /
+                  <input className="st-input xs" inputMode="numeric" value={r.att} onChange={(e) => setRow(i, { att: e.target.value.replace(/\D/g, '').slice(0, 4) })} placeholder="시도" aria-label={`${r.name || '연습'} 시도 수`} />
+                  <select className="st-input xs" value={r.kind ?? ''} onChange={(e) => setRow(i, { kind: (e.target.value || undefined) as Row['kind'] })} aria-label="어느 슛으로 셀지">
+                    <option value="">슛 아님</option>
+                    <option value="fg">2점</option>
+                    <option value="tp">3점</option>
+                    <option value="ft">자유투</option>
+                  </select>
+                  {rows.length > 1 && (
+                    <button type="button" className="st-x" aria-label="이 연습 빼기" onClick={() => setRows(rows.filter((_, k) => k !== i))}>
+                      ✕
+                    </button>
+                  )}
+                </div>
+              </div>
+            ))}
+            <button type="button" className="st-link" onClick={() => setRows([...rows, { name: '', made: '', att: '' }])}>
+              ＋ 연습 더 넣기
+            </button>
+          </div>
+        )}
         {bad && <p className="bad">넣은 수가 던진 수보다 많아요.</p>}
         {mode === 'game' && !v.pts.trim() && ptsFromShots(shots) > 0 && <p className="st-hint">득점을 비우면 슛으로 계산한 {ptsFromShots(shots)}점으로 적어요.</p>}
         <input className="st-input" value={memo} onChange={(e) => setMemo(e.target.value)} placeholder="메모 (예: 3대3, 왼손 레이업 연습)" aria-label="메모" />

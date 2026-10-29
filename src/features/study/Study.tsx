@@ -28,6 +28,7 @@ const Hobby = lazy(() => import('../life/Hobby').then((m) => ({ default: m.Hobby
 const Movies = lazy(() => import('../life/Movies').then((m) => ({ default: m.Movies })));
 const Search = lazy(() => import('../life/Search').then((m) => ({ default: m.Search })));
 const LifeWeekPage = lazy(() => import('../life/LifeWeek').then((m) => ({ default: m.LifeWeekPage })));
+const CheckinPage = lazy(() => import('../life/Checkin').then((m) => ({ default: m.CheckinPage })));
 const Diary = lazy(() => import('../life/Diary').then((m) => ({ default: m.Diary })));
 const Preview = lazy(() => import('./Preview').then((m) => ({ default: m.Preview })));
 const Translate = lazy(() => import('./Translate').then((m) => ({ default: m.Translate })));
@@ -49,7 +50,8 @@ export function Study({ path, loggedIn, syncReady = true, onLogin }: { path: str
   const p0 = path[0];
   const isSearch = p0 === 'search';
   const isWeek = p0 === 'week' || p0 === 'month';
-  const area: AreaKey = !p0 || isSearch || isWeek ? 'home' : (AREAS.some((a) => a.key === p0) && p0 !== 'study' ? p0 : 'study') as AreaKey;
+  const isCheckin = p0 === 'checkin';
+  const area: AreaKey = !p0 || isSearch || isWeek || isCheckin ? 'home' : (AREAS.some((a) => a.key === p0) && p0 !== 'study' ? p0 : 'study') as AreaKey;
   const spath = p0 === 'study' ? path.slice(1) : path;
   const tab = area !== 'study' ? '' : TABS.some((t) => t.key === spath[0]) || HIDDEN.includes(spath[0]) ? spath[0] : 'today';
   const [, id, sub] = area === 'study' ? spath : path;
@@ -98,7 +100,8 @@ export function Study({ path, loggedIn, syncReady = true, onLogin }: { path: str
   const running = id && (sub === 'learn' || sub === 'prep' || sub === 'weak' || (tab === 'review' && (id === 'redo' || id?.startsWith('redo?') || id?.startsWith('cards-run') || id?.startsWith('blank-run'))));
 
   let content;
-  if (isWeek) content = <LifeWeekPage day={path[1]} monthly={p0 === 'month'} />;
+  if (isCheckin) content = <CheckinPage />;
+  else if (isWeek) content = <LifeWeekPage day={path[1]} monthly={p0 === 'month'} />;
   else if (isSearch) content = <Search q0={path[1] ? decodeURIComponent(path[1]) : ''} />;
   else if (area === 'home') content = <Home loggedIn={loggedIn} onLogin={onLogin} />;
   else if (area === 'fitness') content = <Fitness sub={path[1]} sub2={path[2]} />;
