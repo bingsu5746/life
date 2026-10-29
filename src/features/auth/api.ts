@@ -213,3 +213,26 @@ export interface KobisInfo {
 export async function kobisInfo() {
   return call<KobisInfo>('movies/kobis');
 }
+
+export interface CatalogState {
+  year: number;
+  page: number;
+  done: boolean;
+  count: number;
+}
+export interface CatalogFilm {
+  code: string;
+  title: string;
+  open: string;
+  genre: string | null;
+  nation: string | null;
+  director: string | null;
+}
+/** 서버에 쌓아 둔 영화 목록(1990년~)에서 제목으로 찾기 */
+export async function catalogSearch(q: string) {
+  return call<{ items: CatalogFilm[]; state: CatalogState }>(`movies/catalog?q=${encodeURIComponent(q)}`);
+}
+/** 영화 목록을 몇 쪽 더 받는다 (done 이 될 때까지 되풀이) */
+export async function catalogSync() {
+  return call<{ state: CatalogState; last?: number; error?: string; busy?: boolean }>('movies/catalog/sync', 'POST', {});
+}

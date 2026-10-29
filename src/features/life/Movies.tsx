@@ -1,6 +1,6 @@
 // 영화: 극장가(KOBIS 박스오피스·개봉 예정), 본 영화(별점 0.5 단위 · 한줄 감상평 · 리뷰), 보고 싶은 영화(개봉일 D-day)
-import { useEffect, useState } from 'react';
-import { kobisInfo, type KobisInfo } from '../auth/api';
+import { useEffect, useRef, useState } from 'react';
+import { catalogSearch, catalogSync, kobisInfo, type CatalogFilm, type CatalogState, type KobisInfo } from '../auth/api';
 import { BarChart } from '../study/charts';
 import { dday, shortDate } from '../study/dates';
 import { alive, newId, type Movie } from '../study/model';
@@ -96,6 +96,7 @@ export function Movies({ sub }: { sub?: string }) {
         </p>
       )}
 
+      {tab === 'now' && <CatalogBar />}
       {tab === 'now' && <NowShowing today={today} onWatched={(m) => setEdit(m)} onOpen={(m) => (m.status === 'watched' ? setView(m.id) : setEdit(m))} />}
 
       {tab === 'watched' &&
@@ -262,6 +263,22 @@ function MovieSheet({ item, today, onClose }: { item: Partial<Movie>; today: str
   const [release, setRelease] = useState(item?.release ?? '');
   const [where, setWhere] = useState(item?.where ?? '');
   const isNew = !item.id;
+  // 제목을 치면 서버에 쌓아 둔 영화 목록(1990년~)에서 찾아 준다
+  const [found, setFound] = useState<CatalogFilm[]>([]);
+  useEffect(() => {
+    const q = title.trim();
+    if (!isNew || q.length < 1) return setFound([]);
+    let on = true;
+    const t = setTimeout(() => {
+      catalogSearch(q)
+        .then((r) => on && setFound(r.items.filter((f) => f.title !== q || f.open.slice(0, 4) !== year)))
+        .catch(() => on && setFound([]));
+    }, 250);
+    return () => {
+      on = false;
+      clearTimeout(t);
+    };
+  }, [title, isNew, year]);
   return (
     <Sheet title={isNew ? (item.title ? `「${item.title}」` : '영화 넣기') : '영화 고치기'} onClose={onClose}>
       <div className="st-form">
@@ -269,6 +286,28 @@ function MovieSheet({ item, today, onClose }: { item: Partial<Movie>; today: str
           <input className="st-input" autoFocus={!item.title} value={title} onChange={(e) => setTitle(e.target.value)} placeholder="영화 제목" aria-label="영화 제목" />
           <input className="st-input xs" inputMode="numeric" value={year} onChange={(e) => setYear(e.target.value.replace(/\D/g, '').slice(0, 4))} placeholder="연도" aria-label="개봉 연도 (선택)" />
         </div>
+        {found.length > 0 && (
+          <div className="mv-found" role="listbox" aria-label="영화 찾기">
+            {found.slice(0, 8).map((f) => (
+              <button
+                key={f.code}
+                type="button"
+                role="option"
+                aria-selected={false}
+                className="mv-found-item"
+                onClick={() => {
+                  setTitle(f.title);
+                  setYear(f.open.slice(0, 4));
+                  setRelease(f.open);
+                  setFound([]);
+                }}
+              >
+                <b>{f.title}</b>
+                <small className="st-muted">{[f.open.slice(0, 4), f.genre, f.nation, f.director].filter(Boolean).join(' · ')}</small>
+              </button>
+            ))}
+          </div>
+        )}
         <div className="st-seg">
           <button type="button" className={status === 'watched' ? 'on' : ''} aria-pressed={status === 'watched'} onClick={() => setStatus('watched')}>
             봤어요
@@ -448,5 +487,68 @@ function NowShowing({ today, onWatched, onOpen }: { today: string; onWatched: (m
       )}
       <p className="st-hint">자료: 영화진흥위원회 영화관입장권통합전산망(KOBIS). 6시간마다 새로 받아요.</p>
     </div>
+  );
+}
+
+/** 1990년부터 개봉한 영화 목록을 서버에 받아 두기 (한 번만, 이어서 하기 가능) */
+function CatalogBar() {
+  const [state, setState] = useState<CatalogState | null>(null);
+  const [run, setRun] = useState(false);
+  const [err, setErr] = useState('');
+  const stop = useRef(false);
+  useEffect(() => {
+    catalogSearch('')
+      .then((r) => setState(r.state))
+      .catch(() => {});
+    return () => {
+      stop.current = true;
+    };
+  }, []);
+  async function start() {
+    stop.current = false;
+    setRun(true);
+    setErr('');
+    try {
+      for (;;) {
+        const r = await catalogSync();
+        setState(r.state);
+        if (r.error) {
+          setErr(r.error);
+          break;
+        }
+        if (r.state.done || stop.current) break;
+        if (r.busy) await new Promise((res) => setTimeout(res, 1500));
+      }
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : '받지 못했어요');
+    } finally {
+      setRun(false);
+    }
+  }
+  if (!state) return null;
+  const pct = state.done ? 100 : Math.min(99, Math.round(((state.year - 1990) / (new Date().getFullYear() + 2 - 1990)) * 100));
+  return (
+    <section className="st-card">
+      <div className="st-inline between wrap">
+        <div>
+          <h3 className="st-h">영화 목록 (1990년~)</h3>
+          <small className="st-muted">{state.count ? `${state.count.toLocaleString('ko-KR')}편 저장됨 · 「영화 넣기」에서 제목을 치면 찾아 줘요` : '아직 안 받았어요'}</small>
+        </div>
+        {state.done ? (
+          <button className="btn btn-sm" disabled={run} onClick={() => void start()}>
+            새 영화 더 받기
+          </button>
+        ) : run ? (
+          <button className="btn btn-sm" onClick={() => (stop.current = true)}>
+            멈추기 · {state.year}년 {pct}%
+          </button>
+        ) : (
+          <button className="btn btn-sm btn-primary" onClick={() => void start()}>
+            {state.count ? '이어서 받기' : '영화 목록 받기'}
+          </button>
+        )}
+      </div>
+      {err && <p className="st-hint bad">{err}</p>}
+    </section>
   );
 }

@@ -103,3 +103,14 @@ export async function fetchUpcoming(key: string, today: string, to: string, page
   }
   return [...seen.values()].sort((a, b) => a.open.localeCompare(b.open) || a.title.localeCompare(b.title));
 }
+
+/** 목록 전체 받기용: 한 해의 영화 목록 한 쪽 (100개). 장편만 남기고, 개봉일이 그 해인 것 */
+export async function fetchCatalogPage(key: string, year: number, page: number): Promise<{ items: UpcomingItem[]; total: number }> {
+  const j = await getJson(`${BASE}/movie/searchMovieList.json?key=${encodeURIComponent(key)}&openStartDt=${year}&openEndDt=${year}&itemPerPage=100&curPage=${page}`);
+  const fault = kobisFault(j);
+  if (fault) throw new Error(fault);
+  const items = parseUpcoming(j, `${year}-01-01`, `${year}-12-31`);
+  if (!items) throw new Error('KOBIS 영화 목록 응답 모양이 예상과 달라요');
+  const total = Number((j as { movieListResult?: { totCnt?: unknown } }).movieListResult?.totCnt);
+  return { items, total: Number.isFinite(total) ? total : 0 };
+}

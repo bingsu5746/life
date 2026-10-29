@@ -13,7 +13,7 @@
 //   (학교처럼 여럿이 한 주소를 같이 쓰는 곳을 생각해 넉넉하게 잡는다)
 import { DurableObject } from 'cloudflare:workers';
 import { COOKIE_NAME, cutText, Limiter, passwordProblem, readCookie } from './security';
-import { fetchBoxOffice, fetchUpcoming } from './kobis';
+import { fetchBoxOffice, fetchCatalogPage, fetchUpcoming } from './kobis';
 import { allowedEndpoint, localDate, makeVapid, nextFire, sendPush, type PushSub, type Vapid } from './push';
 import { buildExamplesInput, readExamples, readExamplesRequest, buildInput, buildMeaningsInput, FAST_MODEL, modelInput, parseTranslation, readMeanings, readOutput, readRequest, readWordsRequest, TRANSLATE_MODEL } from './translate';
 
@@ -104,6 +104,8 @@ export class Accounts extends DurableObject<Env> {
       CREATE TABLE IF NOT EXISTS notify (user_id TEXT PRIMARY KEY, times TEXT NOT NULL, tz INTEGER NOT NULL, next_at INTEGER, digest TEXT NOT NULL DEFAULT '[]', origin TEXT NOT NULL);
       CREATE TABLE IF NOT EXISTS vapid (id INTEGER PRIMARY KEY, pub TEXT NOT NULL, priv TEXT NOT NULL);
       CREATE TABLE IF NOT EXISTS cache (key TEXT PRIMARY KEY, data TEXT NOT NULL, at INTEGER NOT NULL);
+      CREATE TABLE IF NOT EXISTS films (code TEXT PRIMARY KEY, title TEXT NOT NULL, norm TEXT NOT NULL, title_en TEXT, open TEXT NOT NULL, genre TEXT, nation TEXT, director TEXT);
+      CREATE INDEX IF NOT EXISTS films_norm ON films (norm);
     `);
   }
 
@@ -182,6 +184,8 @@ export class Accounts extends DurableObject<Env> {
     }
     if (path === 'me' && req.method === 'GET') return json({ user: this.publicUser(user) });
     if (path === 'translate' && req.method === 'POST') return this.translate(user, body);
+    if (path === 'movies/catalog' && req.method === 'GET') return this.catalogSearch(new URL(req.url).searchParams.get('q') ?? '');
+    if (path === 'movies/catalog/sync' && req.method === 'POST') return this.catalogSync(req.headers.get('x-life-kobis-key') ?? undefined);
     if (path === 'notify' || path.startsWith('notify/')) return this.notifyRoute(req, path, user, body);
     if (path === 'me/nickname' && req.method === 'PUT') {
       const nickname = cutText(String(body.nickname ?? '').normalize('NFC').trim(), 16);
@@ -412,6 +416,58 @@ export class Accounts extends DurableObject<Env> {
     if (out.boxOffice || out.upcoming) this.sql.exec("INSERT OR REPLACE INTO cache (key, data, at) VALUES ('kobis', ?, ?)", JSON.stringify(out), Date.now());
     else console.error('kobis failed', out.errors.join(' / '));
     return json(out);
+  }
+
+  // ===== 영화 목록 (1990년부터 KOBIS 에 올라 있는 장편) =====
+
+  private catalogBusy = false;
+
+  private catalogState(): { year: number; page: number; done: boolean; count: number } {
+    const r = this.sql.exec<{ data: string }>("SELECT data FROM cache WHERE key = 'catalog'").toArray()[0];
+    const count = this.sql.exec<{ n: number }>('SELECT COUNT(*) AS n FROM films').one().n;
+    const s = r ? (JSON.parse(r.data) as { year: number; page: number; done: boolean }) : { year: 1990, page: 1, done: false };
+    return { ...s, count };
+  }
+
+  private catalogSearch(q: string): Response {
+    const norm = q.normalize('NFC').toLowerCase().replace(/\s+/g, '').slice(0, 40);
+    const state = this.catalogState();
+    if (!norm) return json({ items: [], state });
+    const like = `%${norm.replace(/[\\%_]/g, (c) => `\\${c}`)}%`;
+    const items = this.sql
+      .exec<{ code: string; title: string; open: string; genre: string | null; nation: string | null; director: string | null }>("SELECT code, title, open, genre, nation, director FROM films WHERE norm LIKE ? ESCAPE '\\' ORDER BY (norm = ?) DESC, (norm LIKE ? ESCAPE '\\') DESC, open DESC LIMIT 30", like, norm, `${norm.replace(/[\\%_]/g, (c) => `\\${c}`)}%`)
+      .toArray();
+    return json({ items, state });
+  }
+
+  /** 한 번에 몇 쪽씩 받아 저장하고, 어디까지 했는지 돌려준다. 화면이 다 될 때까지 되풀이해서 부른다 */
+  private async catalogSync(fromWorker?: string): Promise<Response> {
+    const key = fromWorker || (this.env as unknown as { KOBIS_KEY?: string }).KOBIS_KEY;
+    if (!key) return fail('영화 정보 키(KOBIS_KEY)가 아직 설정되지 않았어요.', 503);
+    if (this.catalogBusy) return json({ state: this.catalogState(), busy: true });
+    this.catalogBusy = true;
+    const last = new Date(Date.now() + 9 * 3600_000).getUTCFullYear() + 1;
+    let { year, page, done } = this.catalogState();
+    let error = '';
+    try {
+      for (let n = 0; n < 20 && !done; n++) {
+        const { items, total } = await fetchCatalogPage(key, year, page);
+        for (const m of items) {
+          this.sql.exec('INSERT OR REPLACE INTO films (code, title, norm, title_en, open, genre, nation, director) VALUES (?, ?, ?, ?, ?, ?, ?, ?)', m.code, m.title, m.title.normalize('NFC').toLowerCase().replace(/\s+/g, ''), m.titleEn ?? null, m.open, m.genre ?? null, m.nation ?? null, m.director ?? null);
+        }
+        if (page * 100 >= total) {
+          year++;
+          page = 1;
+          if (year > last) done = true;
+        } else page++;
+      }
+    } catch (e) {
+      error = e instanceof Error ? e.message : String(e);
+    } finally {
+      this.sql.exec("INSERT OR REPLACE INTO cache (key, data, at) VALUES ('catalog', ?, ?)", JSON.stringify({ year, page, done }), Date.now());
+      this.catalogBusy = false;
+    }
+    return json({ state: this.catalogState(), last, error: error || undefined });
   }
 
   // ===== 알림 (웹 푸시) =====
