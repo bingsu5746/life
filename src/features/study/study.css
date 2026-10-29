@@ -6052,3 +6052,51 @@ body.focus-on {
   justify-self: start;
   cursor: pointer;
 }
+
+/* 자세히 보기 */
+.in-tabs {
+  width: fit-content;
+  max-width: 100%;
+  overflow-x: auto;
+}
+.in-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 14px 12px;
+}
+.in-stats > div {
+  display: grid;
+  gap: 2px;
+  align-content: start;
+}
+.in-stats small:first-child {
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+.in-stats b {
+  font-size: 1.2rem;
+  letter-spacing: -0.02em;
+}
+.in-ranks {
+  display: grid;
+  gap: 8px;
+  margin-top: 14px;
+}
+.in-rank {
+  display: grid;
+  grid-template-columns: minmax(70px, 30%) minmax(0, 1fr);
+  gap: 4px 12px;
+  align-items: center;
+}
+.in-rank small {
+  grid-column: 2;
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+.in-rank span {
+  grid-row: span 2;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.9rem;
+}

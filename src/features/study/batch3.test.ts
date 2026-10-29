@@ -793,3 +793,17 @@ describe('하루 몫으로 계획 (paceEnd · studyDays)', () => {
     expect(studyDays('2026-10-29', '2026-11-02', plan, ctx)).toBe(3);
   });
 });
+
+describe('자세히 보기 (insights)', () => {
+  it('최장 연속 · 공부 한눈에', async () => {
+    const { longestStreak, studyInsights } = await import('../life/insights');
+    expect(longestStreak(['2026-10-01', '2026-10-02', '2026-10-03', '2026-10-05', '2026-10-06'])).toEqual({ days: 3, from: '2026-10-01', to: '2026-10-03' });
+    const d = emptyStudy();
+    d.subjects = { ma: { id: 'ma', name: '수학', color: '#000', order: 1, updatedAt: 1 } } as never;
+    d.sessions = { a: { id: 'a', updatedAt: 1, subjectId: 'ma', start: 0, end: 0, minutes: 90, date: '2026-10-28', kind: 'manual' }, b: { id: 'b', updatedAt: 1, subjectId: 'ma', start: 0, end: 0, minutes: 30, date: '2026-10-29', kind: 'manual' } } as never;
+    const s = studyInsights(d, '2026-10-29');
+    expect(s[0].stats!.find((x) => x.label === '지금까지')!.value).toBe('2시간');
+    expect(s[0].stats!.find((x) => x.label === '최장 연속')!.value).toBe('2일');
+    expect(s[1].ranks![0].text).toBe('2시간 · 100% · 2번 · 한 번 1시간');
+  });
+});

@@ -90,6 +90,9 @@ function TimeHome({ sub }: { sub?: string }) {
           <button className="st-link" onClick={() => go('/time/week')}>
             주간 돌아보기
           </button>
+          <button className="st-link" onClick={() => go('/insights/study')}>
+            자세히
+          </button>
           <button className="btn btn-sm" onClick={() => setManual(true)}>
             <Icon name="plus" /> 공부 시간 넣기
           </button>

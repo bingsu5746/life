@@ -120,6 +120,10 @@ export function Home(_: { loggedIn: boolean; onLogin: () => void }) {
           ·{' '}
           <button className="st-link" onClick={() => go('/checkin')}>
             하루 마감
+          </button>{' '}
+          ·{' '}
+          <button className="st-link" onClick={() => go('/insights')}>
+            자세히 보기
           </button>
         </p>
       </header>
