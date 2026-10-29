@@ -3,6 +3,8 @@ import { exportBackup } from '../study/backup';
 import { addDays, dday, longDate, shortDate, weekStart, weekday } from '../study/dates';
 import { upcomingExams } from '../study/exams';
 import { SchoolHome } from '../study/SchoolPanel';
+import { EveBanner } from '../study/Eve';
+import { MorningCard } from './Morning';
 import { classesOn, nextSchoolDay } from '../study/timetable';
 import { alive } from '../study/model';
 import { todaySummary } from '../study/select';
@@ -133,12 +135,27 @@ export function Home(_: { loggedIn: boolean; onLogin: () => void }) {
             하루 마감
           </button>{' '}
           ·{' '}
+          <button className="st-link" onClick={() => go('/calendar')}>
+            달력
+          </button>{' '}
+          ·{' '}
+          <button className="st-link" onClick={() => go('/plan')}>
+            한 주 계획
+          </button>{' '}
+          ·{' '}
           <button className="st-link" onClick={() => go('/insights')}>
             자세히 보기
           </button>
         </p>
       </header>
       <ChangeBanner today={today} />
+      <EveBanner today={today} />
+      {weekday(today) === 0 && !d.settings.weekTargets?.[addDays(weekStart(today), 7)] && (
+        <button className="hm-plan" onClick={() => go('/plan')}>
+          다음 주 계획 세우기 ›
+        </button>
+      )}
+      <MorningCard today={today} />
       <SchoolHome today={today} />
       <div className="hm-grid">
         {AREAS.filter((a) => a.key !== 'home' && show(a.key)).map((a) => {

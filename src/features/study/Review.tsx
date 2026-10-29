@@ -14,9 +14,11 @@ import { Passages } from './Passages';
 import { dueAgain } from './passages';
 import { GRADUATE, guessNoteSubject, isCareless, mistakePatterns, redoAnswer } from './mistakes';
 import { loadTimer } from './timerStore';
+import { RetestSheet } from './RetestSheet';
 
 export function Review({ sub }: { sub?: string }) {
   if (sub === 'redo' || sub?.startsWith('redo?')) return <NoteRun />;
+  if (sub === 'retest') return <RetestSheet />;
   if (sub?.startsWith('cards-run')) return <CardRun />;
   if (sub?.startsWith('blank-run-')) return <BlankRun id={sub.slice(10)} />;
   if (sub?.startsWith('deck-')) return <DeckView id={sub.slice(5)} />;
@@ -114,6 +116,11 @@ function Notes({ today, adding }: { today: string; adding?: boolean }) {
         {due.length > 0 && (
           <button className="btn btn-primary btn-lg" onClick={() => go('/review/redo')}>
             다시 풀기 ({due.length})
+          </button>
+        )}
+        {alive(d.notes).some((n) => !n.learned) && (
+          <button className="st-link" onClick={() => go('/review/retest')}>
+            재시험지 만들기
           </button>
         )}
       </section>

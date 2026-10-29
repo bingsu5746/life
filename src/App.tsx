@@ -15,12 +15,7 @@ const safeDecode = (s: string) => {
     return s;
   }
 };
-const parse = () =>
-  window.location.hash
-    .replace(/^#\/?/, '')
-    .split('/')
-    .filter(Boolean)
-    .map(safeDecode);
+const parse = () => window.location.hash.replace(/^#\/?/, '').split('/').filter(Boolean).map(safeDecode);
 
 const SYNC_TEXT: Record<SyncStatus, string> = { local: '이 기기에만 저장', syncing: '동기화 중…', saved: '서버에 저장됨', error: '동기화 실패 (잠시 뒤 다시 시도해요)' };
 
@@ -42,7 +37,29 @@ export default function App() {
   const userId = auth.user?.id ?? null;
   // 맨 위 막대: 지금 있는 영역 이름 (누르면 그 영역 처음으로)
   const area = AREAS.find((a) => a.key === ((HOBBY_PARTS as readonly string[]).includes(path[0]) ? 'hobby' : path[0]));
-  const crumb = !path[0] ? null : path[0] === 'settings' ? { label: '설정', to: '/settings' } : path[0] === 'week' ? { label: '이번 주', to: '/week' } : path[0] === 'checkin' ? { label: '하루 마감', to: '/checkin' } : path[0] === 'month' ? { label: '이번 달', to: '/month' } : path[0] === 'search' ? { label: '검색', to: '/search' } : path[0] === 'insights' ? { label: '자세히 보기', to: '/insights' } : area ? { label: area.label, to: `/${area.key}` } : { label: '공부', to: '/study' };
+  const crumb = !path[0]
+    ? null
+    : path[0] === 'settings'
+      ? { label: '설정', to: '/settings' }
+      : path[0] === 'week'
+        ? { label: '이번 주', to: '/week' }
+        : path[0] === 'checkin'
+          ? { label: '하루 마감', to: '/checkin' }
+          : path[0] === 'month'
+            ? { label: '이번 달', to: '/month' }
+            : path[0] === 'search'
+              ? { label: '검색', to: '/search' }
+              : path[0] === 'insights'
+                ? { label: '자세히 보기', to: '/insights' }
+                : path[0] === 'calendar'
+                  ? { label: '달력', to: '/calendar' }
+                  : path[0] === 'plan'
+                    ? { label: '한 주 계획', to: '/plan' }
+                    : path[0] === 'eve'
+                      ? { label: '시험 전날', to: '/eve' }
+                      : area
+                        ? { label: area.label, to: `/${area.key}` }
+                        : { label: '공부', to: '/study' };
   // 「/」 를 누르면 검색 (글 쓰는 칸에서는 빼고)
   useEffect(() => {
     const k = (e: KeyboardEvent) => {

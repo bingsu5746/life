@@ -44,22 +44,69 @@ export function onSyncStatus(f: (s: SyncStatus) => void) {
   return () => void listeners.delete(f);
 }
 
-async function syncStudy() {
-  const raw = await getStore<StudyData>('study');
-  const remote = raw ? normalize(raw) : null;
-  const merged = mergeStudy(getStudy(), remote);
-  replaceStudy(merged);
-  if (!remote || !sameJson(merged, remote)) await putStore('study', merged);
-}
-async function syncWords() {
-  const raw = await getStore<unknown>('words');
-  const remote = raw ? sanitizeWords(raw) : null;
-  const merged = mergeWords(getWords(), remote);
-  replaceWords(merged);
-  if (!remote || !sameJson(merged, remote)) await putStore('words', merged);
-}
+/**
+ * 이 창이 마지막으로 서버와 맞춘 판(서버 시각)과, 그 뒤 고친 게 있는지.
+ * 창마다 메모리에만 둔다: 다른 창·새로 연 앱은 처음 한 번은 꼭 받아서 합친다 (옛 자료로 덮어쓰지 않게)
+ */
+const synced: Partial<Record<string, number>> = {};
+const dirtySet = new Set<string>();
+const keyOf = (name: SyncName) => `${loggedInUserId() ?? ''}.${name}`;
+if (typeof window !== 'undefined')
+  window.addEventListener('my-study-reset', () => {
+    for (const k of Object.keys(synced)) delete synced[k];
+    dirtySet.clear();
+  });
 
-const SYNCERS: Record<SyncName, () => Promise<void>> = { study: syncStudy, words: syncWords };
+interface Side<T> {
+  local: () => T;
+  read: (raw: unknown) => T;
+  merge: (local: T, remote: T | null) => T;
+  replace: (v: T) => void;
+}
+const SIDES: { study: Side<StudyData>; words: Side<ReturnType<typeof getWords>> } = {
+  study: { local: getStudy, read: (r) => normalize(r as StudyData), merge: mergeStudy, replace: replaceStudy },
+  words: { local: getWords, read: sanitizeWords, merge: mergeWords, replace: replaceWords },
+};
+
+/**
+ * 한 묶음 맞추기. 서버에서 바뀐 게 없으면 내용을 받지 않고, 이 기기에서 고친 것만 올린다.
+ * 그 사이 다른 기기가 올렸으면(conflict) 그때만 받아서 합친 뒤 올린다.
+ */
+async function syncOne(name: SyncName, pushOnly: boolean) {
+  const side = SIDES[name] as Side<unknown>;
+  const k = keyOf(name);
+  const done = (at: number) => {
+    synced[k] = at;
+    dirtySet.delete(k);
+  };
+  let at = synced[k] ?? 0;
+  const dirty = dirtySet.has(k);
+  // 고친 것만 올리기 (서버 판이 그대로면)
+  if (at && (pushOnly || dirty)) {
+    const r = await putStore(name, side.local(), at);
+    if ('ok' in r) return done(r.updatedAt);
+    at = 0;
+  }
+  for (let i = 0; i < 3; i++) {
+    const g = await getStore<unknown>(name, at);
+    if (g.unchanged) {
+      synced[k] = g.updatedAt;
+      if (!dirty) return;
+      const r = await putStore(name, side.local(), g.updatedAt);
+      if ('ok' in r) return done(r.updatedAt);
+      at = 0;
+      continue;
+    }
+    const remote = g.value ? side.read(g.value) : null;
+    const merged = side.merge(side.local(), remote);
+    side.replace(merged);
+    if (remote && sameJson(merged, remote)) return done(g.updatedAt);
+    const r = await putStore(name, merged, g.updatedAt);
+    if ('ok' in r) return done(r.updatedAt);
+    at = 0; // 그 사이 또 바뀜: 다시 받아서 합친다
+  }
+  throw new Error('동기화가 계속 겹쳐요');
+}
 
 /** 이 기기에 다른 계정의 자료가 남아 있으면 지운다. 로그아웃한 뒤 고친 것이 있으면 먼저 백업 파일로 받을지 묻는다 */
 async function switchOwner() {
@@ -76,7 +123,7 @@ const RETRY = [5_000, 15_000, 60_000, 300_000];
 let fails = 0;
 let retryTimer = 0;
 
-async function doRun(names: SyncName[]) {
+async function doRun(names: SyncName[], pushOnly = false) {
   const userId = loggedInUserId();
   if (!userId) return set('local');
   set('syncing');
@@ -84,7 +131,7 @@ async function doRun(names: SyncName[]) {
   try {
     const owner = getOwner();
     if (owner && owner !== userId) await switchOwner();
-    for (const n of names) await SYNCERS[n]();
+    for (const n of names) await syncOne(n, pushOnly);
     // 로그인 전에 이 기기에서 쓰던 자료는 처음 로그인한 계정에 합쳐진다
     setOwner(userId);
     setKey(DIRTY_KEY, null);
@@ -102,8 +149,8 @@ async function doRun(names: SyncName[]) {
 
 // 한 번에 하나씩 (두 번이 겹쳐 같은 자료를 동시에 받아 합치지 않게)
 let chain: Promise<void> = Promise.resolve();
-function run(names: SyncName[]): Promise<void> {
-  const next = chain.then(() => doRun(names));
+function run(names: SyncName[], pushOnly = false): Promise<void> {
+  const next = chain.then(() => doRun(names, pushOnly));
   chain = next.catch(() => undefined);
   return next;
 }
@@ -117,8 +164,10 @@ if (typeof window !== 'undefined') {
       if (getOwner()) setKey(DIRTY_KEY, '1');
       return;
     }
+    dirtySet.add(keyOf(name));
     clearTimeout(timers[name]);
-    timers[name] = window.setTimeout(() => void run([name]), 1500);
+    // 잇달아 고치면 한 번에 모아 올린다
+    timers[name] = window.setTimeout(() => void run([name], true), 4000);
   });
   // 인터넷이 다시 되면 바로
   window.addEventListener('online', () => {

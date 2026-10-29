@@ -147,12 +147,21 @@ async function gunzipB64(b64: string): Promise<string> {
   return new Response(stream).text();
 }
 export type StoreName = 'study' | 'words';
-export async function getStore<T>(name: StoreName): Promise<T | null> {
-  const r = await call<{ data: string | null }>('store/' + name);
-  return r.data ? (JSON.parse(await gunzipB64(r.data)) as T) : null;
+/** since 뒤로 바뀐 게 없으면 unchanged */
+export async function getStore<T>(name: StoreName, since = 0): Promise<{ unchanged: true; updatedAt: number } | { unchanged?: false; value: T | null; updatedAt: number }> {
+  const r = await call<{ data?: string | null; unchanged?: boolean; updatedAt?: number }>(`store/${name}${since ? `?since=${since}` : ''}`);
+  if (r.unchanged) return { unchanged: true, updatedAt: r.updatedAt ?? since };
+  return { value: r.data ? (JSON.parse(await gunzipB64(r.data)) as T) : null, updatedAt: r.updatedAt ?? 0 };
 }
-export async function putStore(name: StoreName, value: unknown) {
-  await call('store/' + name, 'PUT', { data: await gzipB64(JSON.stringify(value)) });
+/** base(기기가 아는 서버 판)를 주면, 그 사이 다른 기기가 올렸을 때 conflict */
+export async function putStore(name: StoreName, value: unknown, base?: number): Promise<{ ok: true; updatedAt: number } | { conflict: true }> {
+  try {
+    const r = await call<{ updatedAt?: number }>('store/' + name, 'PUT', { data: await gzipB64(JSON.stringify(value)), ...(base === undefined ? {} : { base }) });
+    return { ok: true, updatedAt: r.updatedAt ?? 0 };
+  } catch (e) {
+    if (e instanceof ApiError && e.status === 409) return { conflict: true };
+    throw e;
+  }
 }
 
 // ===== 오답 노트 사진 =====

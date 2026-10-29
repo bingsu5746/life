@@ -29,6 +29,9 @@ const Fitness = lazy(() => import('../life/Fitness').then((m) => ({ default: m.F
 const Money = lazy(() => import('../life/Money').then((m) => ({ default: m.Money })));
 const Hobby = lazy(() => import('../life/Hobby').then((m) => ({ default: m.Hobby })));
 const Travel = lazy(() => import('../life/Travel').then((m) => ({ default: m.Travel })));
+const CalendarPage = lazy(() => import('../life/Calendar').then((m) => ({ default: m.CalendarPage })));
+const WeekPlanPage = lazy(() => import('../life/WeekPlan').then((m) => ({ default: m.WeekPlanPage })));
+const EvePage = lazy(() => import('./Eve').then((m) => ({ default: m.EvePage })));
 const InsightsPage = lazy(() => import('../life/Insights').then((m) => ({ default: m.InsightsPage })));
 const Games = lazy(() => import('../life/Games').then((m) => ({ default: m.Games })));
 const Music = lazy(() => import('../life/Music').then((m) => ({ default: m.Music })));
@@ -78,7 +81,8 @@ export function Study({ path, loggedIn, syncReady = true, onLogin }: { path: str
   const isWeek = p0 === 'week' || p0 === 'month';
   const isCheckin = p0 === 'checkin';
   const isInsights = p0 === 'insights';
-  const area: AreaKey = !p0 || isSearch || isWeek || isCheckin || isInsights ? 'home' : (HOBBY_PARTS as readonly string[]).includes(p0) ? 'hobby' : ((AREAS.some((a) => a.key === p0) && p0 !== 'study' ? p0 : 'study') as AreaKey);
+  const isPage = p0 === 'calendar' || p0 === 'plan' || p0 === 'eve';
+  const area: AreaKey = !p0 || isSearch || isWeek || isCheckin || isInsights || isPage ? 'home' : (HOBBY_PARTS as readonly string[]).includes(p0) ? 'hobby' : ((AREAS.some((a) => a.key === p0) && p0 !== 'study' ? p0 : 'study') as AreaKey);
   const spath = p0 === 'study' ? path.slice(1) : path;
   const tab = area !== 'study' ? '' : TABS.some((t) => t.key === spath[0]) || HIDDEN.includes(spath[0]) ? spath[0] : 'today';
   const [, id, sub] = area === 'study' ? spath : path;
@@ -137,6 +141,9 @@ export function Study({ path, loggedIn, syncReady = true, onLogin }: { path: str
   let content;
   if (isCheckin) content = <CheckinPage />;
   else if (isInsights) content = <InsightsPage tab={path[1]} />;
+  else if (p0 === 'calendar') content = <CalendarPage />;
+  else if (p0 === 'plan') content = <WeekPlanPage />;
+  else if (p0 === 'eve') content = <EvePage />;
   else if (isWeek) content = <LifeWeekPage day={path[1]} monthly={p0 === 'month'} />;
   else if (isSearch) content = <Search q0={path[1] ? decodeURIComponent(path[1]) : ''} />;
   else if (area === 'home') content = <Home loggedIn={loggedIn} onLogin={onLogin} />;

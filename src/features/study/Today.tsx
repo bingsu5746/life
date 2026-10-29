@@ -13,6 +13,7 @@ import { put, useStudy, useWords } from './store';
 import { doneUpTo, finishPlan, markBook, markDays, markHwPages, patchHwItem, parseWrong, quickWrongNotes } from './actions';
 import { minutesText } from './timer';
 import { DdayHero } from './Exams';
+import { EveBanner } from './Eve';
 import { forecastFor } from './forecast';
 import { TaskCard, upcomingTasks } from './Assessments';
 import { ConditionCard } from './ConditionCard';
@@ -67,6 +68,7 @@ export function Today() {
 
   return (
     <div className="st-today">
+      <EveBanner today={today} />
       <DdayHero today={today} />
       <header className="st-today-head">
         <div>
@@ -89,11 +91,7 @@ export function Today() {
         </Empty>
       )}
 
-      {classes.length > 0 && (
-        <p className="st-classes">
-          오늘 수업: {classes.map((id) => d.subjects[id].name).join(' · ')}
-        </p>
-      )}
+      {classes.length > 0 && <p className="st-classes">오늘 수업: {classes.map((id) => d.subjects[id].name).join(' · ')}</p>}
 
       {d.settings.school && <SchoolToday today={today} />}
 
@@ -149,11 +147,7 @@ export function Today() {
             const paper = paperDays(l);
             return (
               <div key={l.list.id} className="st-item">
-                {paper ? (
-                  <Check on={l.todayDays.every((x) => l.plan?.target.done.has(x))} label="오늘 Day 다 했어요" onClick={() => markDays(l.list.id, l.todayDays, !l.todayDays.every((x) => l.plan?.target.done.has(x)))} />
-                ) : (
-                  <span className={`st-badge ${n ? '' : 'ok'}`}>{n ? n : '✓'}</span>
-                )}
+                {paper ? <Check on={l.todayDays.every((x) => l.plan?.target.done.has(x))} label="오늘 Day 다 했어요" onClick={() => markDays(l.list.id, l.todayDays, !l.todayDays.every((x) => l.plan?.target.done.has(x)))} /> : <span className={`st-badge ${n ? '' : 'ok'}`}>{n ? n : '✓'}</span>}
                 <div className="st-item-main" {...tap(() => go(`/words/${l.list.id}/${n > 0 || !l.prep ? 'learn' : 'prep'}`))}>
                   <div className="st-item-title">
                     <SubjectDot id={l.list.subjectId} d={d} />
@@ -287,13 +281,25 @@ function BookRow({ p, today }: { p: PlanView; today: string }) {
             {book.name} {sched.today.length > 0 && <span className="st-pages">p.{rangeText(sched.today)}</span>}
           </div>
           <div className="st-item-sub">
-            {sched.today.length === 0 ? (!sched.remaining.length ? '다 끝났어요' : sched.warning?.kind === 'ended' ? '시험 끝' : plan.start > today ? `${shortDate(plan.start)}부터 시작` : '오늘은 쉬는 날') : `${sched.today.length}쪽${unitNames.length ? ' · ' + unitNames.join(', ') : ''}${unitEnd ? ' · 단원 끝' : ''}`}
+            {sched.today.length === 0
+              ? !sched.remaining.length
+                ? '다 끝났어요'
+                : sched.warning?.kind === 'ended'
+                  ? '시험 끝'
+                  : plan.start > today
+                    ? `${shortDate(plan.start)}부터 시작`
+                    : '오늘은 쉬는 날'
+              : `${sched.today.length}쪽${unitNames.length ? ' · ' + unitNames.join(', ') : ''}${unitEnd ? ' · 단원 끝' : ''}`}
             {sched.end && ` · ${shortDate(sched.end)}까지 ${sched.remaining.length}쪽`}
           </div>
           {(() => {
             // 요즘 속도로는 마감까지 못 끝낼 것 같으면 미리 알린다
             const f = forecastFor(d, p, today);
-            return f.state === 'short' ? <div className="st-note">요즘 하루 {f.perDay}쪽으로는 {f.shortDays}일 모자라요. 하루 {f.need}쪽씩 해야 해요</div> : null;
+            return f.state === 'short' ? (
+              <div className="st-note">
+                요즘 하루 {f.perDay}쪽으로는 {f.shortDays}일 모자라요. 하루 {f.need}쪽씩 해야 해요
+              </div>
+            ) : null;
           })()}
           {plan.carried?.date === today && <div className="st-note">지난번 {plan.carried.count}쪽이 남아서 남은 날에 나눠 넣었어요</div>}
           {sched.warning && <PlanWarning p={p} />}
@@ -416,7 +422,10 @@ function Week({ plans, today }: { plans: PlanView[]; today: string }) {
   return (
     <section className="st-card">
       <button className="st-fold" onClick={() => setOpen(!open)} aria-expanded={open}>
-        다음 7일 미리 보기 <span className={`st-fold-icon ${open ? 'open' : ''}`}><Icon name="chevron" /></span>
+        다음 7일 미리 보기{' '}
+        <span className={`st-fold-icon ${open ? 'open' : ''}`}>
+          <Icon name="chevron" />
+        </span>
       </button>
       {open && (
         <div className="st-week">
@@ -443,4 +452,3 @@ function Week({ plans, today }: { plans: PlanView[]; today: string }) {
     </section>
   );
 }
-

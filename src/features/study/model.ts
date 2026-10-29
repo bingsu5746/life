@@ -36,6 +36,10 @@ export interface StudySettings {
   pomo: { work: number; short: number; long: number; every: number };
   /** 메뉴에서 숨긴 칸 (예: 'preview') */
   hiddenTabs?: string[];
+  /** 주마다 요일별 공부 시간 목표(분): 그 주 월요일 → [월 … 일] */
+  weekTargets?: Record<DateStr, number[]>;
+  /** 메인 아침 루틴 숨기기 */
+  morningOff?: boolean;
   /** 학교 시간표: 요일(1=월 … 5=금, 6=토)마다 그날 수업 과목 (교시 순) */
   schoolTimetable?: Record<string, Id[]>;
   /** 운동 목표: 일주일에 몇 번 · 몇 분 */
@@ -822,6 +826,8 @@ export interface Habit extends Stamp {
   log?: Record<DateStr, number>;
   created: DateStr;
   archived?: boolean;
+  /** 아침 루틴에 넣은 습관 */
+  morning?: boolean;
 }
 
 export interface StudyData {

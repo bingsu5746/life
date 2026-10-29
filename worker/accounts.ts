@@ -222,14 +222,24 @@ export class Accounts extends DurableObject<Env> {
     // 기기끼리 맞추는 묶음 자료 (공부 자료·영단어)
     const st = path.match(/^store\/(study|words)$/);
     if (st && req.method === 'GET') {
-      const r = this.sql.exec<{ data: string; updated: number }>('SELECT data, updated FROM blobs WHERE user_id = ? AND name = ?', user.id, st[1]).toArray()[0];
-      return json({ data: r?.data ?? null, updatedAt: r?.updated ?? 0 });
+      // since: 기기가 마지막으로 받은 때. 그 뒤로 바뀐 게 없으면 내용은 보내지 않는다
+      const since = Number(new URL(req.url).searchParams.get('since')) || 0;
+      const at = this.sql.exec<{ updated: number }>('SELECT updated FROM blobs WHERE user_id = ? AND name = ?', user.id, st[1]).toArray()[0]?.updated ?? 0;
+      if (since && at && at <= since) return json({ unchanged: true, updatedAt: at });
+      const r = at ? this.sql.exec<{ data: string }>('SELECT data FROM blobs WHERE user_id = ? AND name = ?', user.id, st[1]).toArray()[0] : undefined;
+      return json({ data: r?.data ?? null, updatedAt: at });
     }
     if (st && req.method === 'PUT') {
       const data = typeof body.data === 'string' ? body.data : '';
       if (!data || data.length > MAX_STORE || !/^[A-Za-z0-9+/=]+$/.test(data)) return fail('보낸 내용이 너무 크거나 잘못됐어요.', 413);
-      this.sql.exec('INSERT OR REPLACE INTO blobs (user_id, name, data, updated) VALUES (?, ?, ?, ?)', user.id, st[1], data, Date.now());
-      return json({ ok: true });
+      // base: 기기가 알고 있는 서버 판. 그 사이 다른 기기가 올렸으면 받지 않는다 (기기가 받아서 합친 뒤 다시 올림)
+      if (typeof body.base === 'number') {
+        const at = this.sql.exec<{ updated: number }>('SELECT updated FROM blobs WHERE user_id = ? AND name = ?', user.id, st[1]).toArray()[0]?.updated ?? 0;
+        if (at !== body.base) return json({ conflict: true, updatedAt: at }, 409);
+      }
+      const now = Date.now();
+      this.sql.exec('INSERT OR REPLACE INTO blobs (user_id, name, data, updated) VALUES (?, ?, ?, ?)', user.id, st[1], data, now);
+      return json({ ok: true, updatedAt: now });
     }
 
     // 오답 노트 사진: 기기에서 줄여 보낸 JPEG(base64)

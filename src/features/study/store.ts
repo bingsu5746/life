@@ -116,6 +116,8 @@ export async function resetLocal() {
     // 무시
   }
   await idb.clear('studyPhotos');
+  // 계정 동기화가 기억한 서버 판도 잊게 한다 (다음에 꼭 받아서 합치게)
+  if (typeof window !== 'undefined') window.dispatchEvent(new Event('my-study-reset'));
 }
 
 /** 계정 동기화가 합친 자료를 넣는다 (다시 올리지 않게 조용히) */

@@ -15,11 +15,12 @@ export interface LoadDay {
   heavy: boolean;
 }
 
-export function weekLoad(plans: LoadPlan[], today: DateStr): LoadDay[] {
+/** start 부터 7일. today 는 오늘 (오늘 분량은 고정된 것) */
+export function weekLoad(plans: LoadPlan[], start: DateStr, today: DateStr = start): LoadDay[] {
   const out: LoadDay[] = [];
   for (let i = 0; i < 7; i++) {
-    const date = addDays(today, i);
-    const parts = plans.map((p) => ({ name: p.name, n: i === 0 ? p.today.length : (p.days.find((x) => x.date === date)?.items.length ?? 0) })).filter((x) => x.n > 0);
+    const date = addDays(start, i);
+    const parts = plans.map((p) => ({ name: p.name, n: date === today ? p.today.length : (p.days.find((x) => x.date === date)?.items.length ?? 0) })).filter((x) => x.n > 0);
     out.push({ date, total: parts.reduce((a, x) => a + x.n, 0), parts, heavy: false });
   }
   const busy = out.filter((x) => x.total > 0);

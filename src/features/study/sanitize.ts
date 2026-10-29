@@ -462,6 +462,7 @@ const FIX: Record<Collection, Fix> = {
     log: isObj(x.log) ? Object.fromEntries(Object.entries(x.log).filter(([d, t]) => isDate(d) && typeof t === 'number' && Number.isFinite(t))) : undefined,
     created: optDate(x.created) ?? '2000-01-01',
     archived: x.archived === true ? true : undefined,
+    morning: x.morning === true ? true : undefined,
   }),
   assessments: (x) => (isDate(x.due) ? { ...x, subjectId: str(x.subjectId), title: str(x.title, '수행평가'), steps: lines(x.steps), done: bool(x.done), memo: optStr(x.memo), created: num(x.created) } : null),
   blanks: (x) => ({
@@ -581,6 +582,16 @@ export function sanitizeSettings(s: unknown): StudySettings & { updatedAt: numbe
     monthlyBudget: score(x.monthlyBudget, 1, 1e10),
     bbGoals: isObj(x.bbGoals) ? { ft: score((x.bbGoals as Obj).ft, 1, 100), fg: score((x.bbGoals as Obj).fg, 1, 100), tp: score((x.bbGoals as Obj).tp, 1, 100) } : undefined,
     readingGoal: score(x.readingGoal, 1, 1000),
+    weekTargets: isObj(x.weekTargets)
+      ? Object.fromEntries(
+          Object.entries(x.weekTargets)
+            .filter(([k, v]) => isDate(k) && Array.isArray(v))
+            .sort(([a], [b]) => a.localeCompare(b))
+            .slice(-20)
+            .map(([k, v]) => [k, Array.from({ length: 7 }, (_, i) => Math.round(cl((v as unknown[])[i], 0, 1440, 0)))]),
+        )
+      : undefined,
+    morningOff: x.morningOff === true ? true : undefined,
     weeklyLimit: score(x.weeklyLimit, 1, 1e9),
     weatherPlace:
       isObj(x.weatherPlace) && typeof x.weatherPlace.lat === 'number' && Math.abs(x.weatherPlace.lat) <= 90 && typeof x.weatherPlace.lon === 'number' && Math.abs(x.weatherPlace.lon) <= 180

@@ -433,6 +433,12 @@ function LifeSettings() {
   return (
     <>
       <section className="st-card st-form">
+        <h3 className="st-h">메인</h3>
+        <label className="st-inline">
+          <input type="checkbox" checked={!s.morningOff} onChange={(e) => setSettings({ morningOff: e.target.checked ? undefined : true })} /> 아침 루틴 보기 (일어난 시각 · 아침 습관 · 오늘 꼭 할 것 3개)
+        </label>
+      </section>
+      <section className="st-card st-form">
         <h3 className="st-h">운동</h3>
         <div className="st-inline wrap">
           일주일에
