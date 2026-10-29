@@ -1,9 +1,10 @@
 // 농구 혼자 연습: 오늘의 연습(약한 부분 위주) · 드릴 설명 · 슛 기록
 import { useState } from 'react';
-import { shortDate } from '../study/dates';
+import { addDays, shortDate } from '../study/dates';
 import { alive, newId, type BasketballStat, type Workout } from '../study/model';
 import { putMany, useStudy } from '../study/store';
 import { Check, Empty, go, toast, useToday } from '../study/ui';
+import { ShotCounter, ShotSummary } from './ShotCounter';
 import { AREA_NAME, buildSession, DRILLS, recentStats, totalMinutes, weaknesses, type Drill, type Need } from './drills';
 
 const MIN = [20, 30, 45, 60];
@@ -43,8 +44,9 @@ export function DrillsPage() {
   const stats = recentStats(d, today);
   const weak = weaknesses(stats);
   const day = Math.floor(Date.parse(`${today}T00:00:00Z`) / 86_400_000);
-  const plan = buildSession({ minutes, have, weak, salt: day * 7 + salt + minutes, maxLevel: level });
   const logs = alive(d.drillLogs).sort((a, b) => b.date.localeCompare(a.date) || b.created - a.created);
+  const recent = [...new Set(logs.filter((l) => l.date >= addDays(today, -3)).map((l) => l.drillId))];
+  const plan = buildSession({ minutes, have, weak, salt: day * 7 + salt + minutes, maxLevel: level, recent });
 
   function finish() {
     const done = plan.filter((x) => checked.has(x.id));
@@ -72,6 +74,8 @@ export function DrillsPage() {
       <div className="st-page-head">
         <h2>농구 연습</h2>
       </div>
+      <ShotCounter />
+      <ShotSummary />
       <section className="st-card dr-opts">
         <div className="st-chips" aria-label="시간">
           {MIN.map((m) => (
@@ -198,11 +202,18 @@ export function DrillsPage() {
 
 function Steps({ x }: { x: Drill }) {
   return (
-    <ol className="dr-steps">
-      {x.steps.map((s, i) => (
-        <li key={i}>{s}</li>
-      ))}
-    </ol>
+    <>
+      <ol className="dr-steps">
+        {x.steps.map((s, i) => (
+          <li key={i}>{s}</li>
+        ))}
+      </ol>
+      {x.from && x.src && (
+        <a className="dr-src" href={x.src} target="_blank" rel="noreferrer noopener" onClick={(e) => e.stopPropagation()}>
+          {x.from}의 연습에서 따옴 · 자료 보기
+        </a>
+      )}
+    </>
   );
 }
 
@@ -211,7 +222,10 @@ function DrillRow({ x, on, open, made, onToggle, onOpen, onMade }: { x: Drill; o
     <div className="st-item dr-row">
       <Check on={on} label={`${x.name} 했어요`} onClick={onToggle} />
       <div className="st-item-main st-tap" onClick={onOpen} role="button" tabIndex={0} onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && onOpen()}>
-        <div className={`st-item-title ${on ? 'done' : ''}`}>{x.name}</div>
+        <div className={`st-item-title ${on ? 'done' : ''}`}>
+          {x.name}
+          {x.from && <small className="dr-from"> · {x.from}</small>}
+        </div>
         <div className="st-item-sub">
           {AREA_NAME[x.area]} · {x.minutes}분 · {x.reps}
         </div>

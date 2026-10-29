@@ -4994,3 +4994,68 @@ body {
 .dr-one:last-child {
   border-bottom: 0;
 }
+
+/* 슛 세기 */
+.sc-row {
+  display: grid;
+  grid-template-columns: 3.4em 1fr 1fr 7.5em;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 0;
+}
+.sc-name {
+  font-weight: 650;
+}
+.sc-btn {
+  min-height: 46px;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-weight: 650;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+.sc-btn.in:active {
+  background: rgba(48, 164, 108, 0.18);
+  border-color: rgb(48, 164, 108);
+}
+.sc-btn.out:active {
+  background: rgba(229, 72, 77, 0.14);
+  border-color: rgb(229, 72, 77);
+}
+.sc-count {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  font-size: 0.9rem;
+}
+.sc-table {
+  display: grid;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+.sc-table > div {
+  display: grid;
+  grid-template-columns: 4em repeat(3, 1fr);
+  gap: 8px;
+  align-items: baseline;
+}
+.sc-table b {
+  font-size: 0.92rem;
+  font-variant-numeric: tabular-nums;
+}
+.sc-head small {
+  color: var(--muted);
+}
+.dr-src {
+  display: inline-block;
+  margin: 2px 0 4px 1.2em;
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+.dr-from {
+  color: var(--muted);
+  font-weight: 400;
+}

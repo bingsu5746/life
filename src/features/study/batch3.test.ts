@@ -352,12 +352,21 @@ describe('농구 혼자 연습 (drills)', () => {
   it('시간 안에서 오늘의 연습을 짜고, 골대가 없으면 골대 드릴을 뺀다', async () => {
     const { buildSession, totalMinutes } = await import('../life/drills');
     const hoop = buildSession({ minutes: 45, have: 'hoop', weak: [{ area: 'ft', why: '' }, { area: 'three', why: '' }], salt: 1, maxLevel: 2 });
-    expect(hoop.some((x) => x.id === 'ft')).toBe(true);
+    expect(hoop.some((x) => x.area === 'ft')).toBe(true);
     expect(hoop.some((x) => x.area === 'three')).toBe(true);
     expect(totalMinutes(hoop)).toBeLessThanOrEqual(55);
     const none = buildSession({ minutes: 30, have: 'any', weak: [{ area: 'ft', why: '' }], salt: 2, maxLevel: 3 });
     expect(none.every((x) => x.need === 'any')).toBe(true);
     expect(none.length).toBeGreaterThan(0);
     expect(buildSession({ minutes: 30, have: 'hoop', weak: [], salt: 5, maxLevel: 2 }).map((x) => x.id)).toEqual(buildSession({ minutes: 30, have: 'hoop', weak: [], salt: 5, maxLevel: 2 }).map((x) => x.id));
+  });
+});
+
+describe('넣은 슛 합 (shotsBetween)', () => {
+  it('기간 안의 농구 기록만 더한다', async () => {
+    const { shotsBetween } = await import('../life/drills');
+    const w = (id: string, date: string, bb: object, kind = '농구') => ({ id, kind, date, bb, updatedAt: 1 });
+    const d = { workouts: Object.fromEntries([w('a', '2026-10-27', { mode: 'practice', fgm: 5, fga: 10, tpm: 2, tpa: 8 }), w('b', '2026-10-28', { mode: 'game', ftm: 3, fta: 4, fgm: 1, fga: 3 }), w('c', '2026-10-20', { mode: 'practice', fgm: 9, fga: 9 }), w('d', '2026-10-28', { fgm: 9, fga: 9 }, '헬스')].map((x) => [x.id, x])) } as never;
+    expect(shotsBetween(d, '2026-10-26', '2026-10-28')).toEqual({ fg: { m: 6, a: 13 }, tp: { m: 2, a: 8 }, ft: { m: 3, a: 4 } });
   });
 });

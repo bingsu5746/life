@@ -23,6 +23,10 @@ export interface Drill {
   shots?: number;
   /** 어떤 슛 기록에 더할지 */
   shotKind?: 'ft' | 'fg' | 'tp';
+  /** 어느 선수의 연습에서 따왔는지 (자료가 있는 것만) */
+  from?: string;
+  /** 그 자료 */
+  src?: string;
 }
 
 export const DRILLS: Drill[] = [
@@ -154,6 +158,206 @@ export const DRILLS: Drill[] = [
     shotKind: 'fg',
     steps: ['골대 둘레 5곳을 정해요', '한 곳에서 넣으면 다음 곳으로, 놓치면 한 번 더 기회', '한 바퀴를 마치면 끝. 던진 개수와 성공 수를 적어요', '혼자 하는 게임이라 집중력과 슈팅 감각을 함께 키워요'],
   },
+  // ---- 선수들의 연습에서 따온 것 (자료 링크가 있는 것만, 양은 혼자 하기 좋게 줄임) ----
+  {
+    id: 'ray',
+    name: '같은 자리 루틴',
+    area: 'shoot',
+    minutes: 15,
+    need: 'hoop',
+    level: 2,
+    reps: '5곳 × 5개 + 자유투 10개',
+    shots: 35,
+    shotKind: 'fg',
+    from: '레이 앨런',
+    src: 'https://www.espn.com/blog/playbook/visuals/post/_/id/1900/short-film-captures-ray-allens-routine',
+    steps: ['매번 똑같은 5곳(양 코너·양 윙·탑)에서 같은 순서로 던져요', '자리마다 5개, 마지막에 자유투 10개', '레이 앨런은 경기마다 같은 자리·같은 순서로 슛 연습을 했다고 해요 — 핵심은 "늘 같게"', '성공 수를 적어 매번 비교'],
+  },
+  {
+    id: 'kobe',
+    name: '넣을 때까지 스팟 슈팅',
+    area: 'shoot',
+    minutes: 15,
+    need: 'hoop',
+    level: 3,
+    reps: '5곳에서 각 5개 넣기 (던진 수도 세기)',
+    shots: 40,
+    shotKind: 'fg',
+    from: '코비 브라이언트',
+    src: 'https://www.espn.com/nba/story/_/id/15179469/kobe-bryant-famous-pregame-shooting-routine',
+    steps: ['던진 개수가 아니라 「넣은 개수」로 끝나는 연습이에요', '한 곳에서 5개를 넣어야 다음 곳으로 (코비는 자리마다 10~20개를 넣었다고 해요)', '3점 라인 바깥부터 시작해 점점 안쪽으로', '던진 총 개수를 세어 두면 성공률이 나와요 (기록 칸에는 넣은 수/던진 수)'],
+  },
+  {
+    id: 'tennis',
+    name: '테니스공 드리블',
+    area: 'handle',
+    minutes: 6,
+    need: 'any',
+    level: 3,
+    reps: '손마다 1분 × 2',
+    from: '스테픈 커리',
+    src: 'https://www.aol.com/news/2015-11-07-stephen-curry-does-a-dribbling-drill-with-blinding-glasses-and-a-21260663.html',
+    steps: ['한 손으로 농구공을 계속 드리블하면서 다른 손으로 테니스공을 위로 던졌다 받아요', '눈은 테니스공, 드리블은 손 감각으로', '익숙해지면 벽에 테니스공을 튀겨 받거나 손을 바꿔요', '커리가 트레이너와 하던 연습으로 알려져 있어요'],
+  },
+  {
+    id: 'curry2ball',
+    name: '투 볼 워밍업',
+    area: 'handle',
+    minutes: 6,
+    need: 'any',
+    level: 2,
+    reps: '동작마다 30초 (공 2개)',
+    from: '스테픈 커리',
+    src: 'https://global.espn.com/nba/story/_/id/22215844/steph-curry-pregame-show-anything-routine',
+    steps: ['경기 전 몸 풀기처럼: 두 공 동시에 → 번갈아 → 앞뒤로 밀고 당기기', '각 동작 30초, 쉬지 말고 다음 동작', '커리는 경기 전 두 공 드리블로 몸을 푼다고 해요', '공이 하나면 약한 손만 2분'],
+  },
+  {
+    id: 'kyrie',
+    name: '미칸 변형 4종',
+    area: 'finish',
+    minutes: 8,
+    need: 'hoop',
+    level: 3,
+    reps: '종류마다 30초',
+    from: '카이리 어빙',
+    src: 'https://www.breakthroughbasketball.com/training/kyrie-mikans.html',
+    steps: ['기본 미칸 → 역방향(백보드를 등지고) 미칸 → 약한 손만 미칸 → 두 발 점프 미칸', '종류마다 30초, 공은 어깨 높이에 두고 내리지 않기', '백보드의 여러 곳에 회전을 바꿔 가며 올려 보기', '카이리가 마무리 연습으로 쓰는 미칸 변형이에요'],
+  },
+  {
+    id: 'dirk',
+    name: '균형 잡기 슈팅',
+    area: 'shoot',
+    minutes: 10,
+    need: 'hoop',
+    level: 3,
+    reps: '자세마다 5개 (한 발·뱅크·약한 손)',
+    shots: 15,
+    shotKind: 'fg',
+    from: '디르크 노비츠키',
+    src: 'https://dallasnews.com/sports/mavericks/2014/02/04/mavericks-dirk-nowitzki-the-basket-looks-massive-on-shooting-run-like-this',
+    steps: ['골대 2~4m에서 한 발로 서서 점프 슛 5개 (안쪽 무릎을 들고)', '45도에서 백보드를 맞히는 뱅크 슛 5개', '약한 손으로 가까이서 5개', '노비츠키는 한 발 점퍼·뱅크 슛·반대 손 슛까지 섞어서 연습했다고 해요'],
+  },
+  // ---- 흔히 쓰는 기본 연습 ----
+  {
+    id: 'ft2',
+    name: '자유투 두 개 연속',
+    area: 'ft',
+    minutes: 6,
+    need: 'hoop',
+    level: 2,
+    reps: '연속 2개를 5번 성공할 때까지',
+    shots: 20,
+    shotKind: 'ft',
+    steps: ['자유투 2개를 연속으로 넣으면 1점, 하나라도 놓치면 0점', '5점이 될 때까지 (던진 개수를 세어요)', '경기처럼 두 번째 공에서 긴장하는 걸 연습해요', '숨이 찬 상태(줄넘기 뒤)에서 하면 더 실전 같아요'],
+  },
+  {
+    id: 'tired-ft',
+    name: '숨찬 자유투',
+    area: 'ft',
+    minutes: 8,
+    need: 'hoop',
+    level: 2,
+    reps: '왕복 달리기 → 자유투 2개 × 5번',
+    shots: 10,
+    shotKind: 'ft',
+    steps: ['코트 끝까지 왕복으로 달리고 바로 자유투 2개', '5번 반복', '지쳤을 때도 같은 루틴을 지키는 게 목표', '넣은 개수를 적어 보통 자유투와 비교'],
+  },
+  {
+    id: 'elbow',
+    name: '엘보 점퍼',
+    area: 'shoot',
+    minutes: 8,
+    need: 'hoop',
+    level: 2,
+    reps: '양쪽 엘보 번갈아 20개',
+    shots: 20,
+    shotKind: 'fg',
+    steps: ['자유투 라인 양 끝(엘보)을 오가며 슛', '공을 잡고 한 번에 슛 자세로 (스텝은 안쪽 발 먼저)', '리바운드해서 반대쪽 엘보로 드리블한 뒤 바로 슛', '미드레인지는 경기에서 가장 자주 나오는 거리예요'],
+  },
+  { id: 'one-min-3', name: '1분 3점', area: 'three', minutes: 5, need: 'hoop', level: 2, reps: '1분 × 3세트', shots: 30, shotKind: 'tp', steps: ['1분 동안 3점을 최대한 많이 던져요 (스스로 리바운드)', '빨라져도 발 모양과 팔 각도는 그대로', '넣은 개수를 세고 세트마다 비교', '세트 사이 1분 쉬기'] },
+  {
+    id: 'stepback',
+    name: '스텝백 점퍼',
+    area: 'three',
+    minutes: 8,
+    need: 'hoop',
+    level: 3,
+    reps: '양쪽 6개씩',
+    shots: 12,
+    shotKind: 'fg',
+    steps: ['앞으로 드리블 → 앞발로 바닥을 밀며 뒤로 한 걸음', '두 발로 착지해 균형을 잡고 바로 슛', '처음엔 미드레인지, 익숙해지면 3점 라인', '뒤로 기울지 않게 위로 뛰는 게 핵심'],
+  },
+  { id: 'floater', name: '플로터', area: 'finish', minutes: 6, need: 'hoop', level: 2, reps: '양쪽 8개씩', steps: ['골대 3~4m 앞에서 한 발로 뛰어 손끝으로 공을 높이 띄워요', '키 큰 수비 위로 넘기는 상상', '공을 손바닥이 아닌 손끝으로 밀어 부드럽게', '오른손·왼손 모두'] },
+  {
+    id: 'power',
+    name: '파워 레이업',
+    area: 'finish',
+    minutes: 5,
+    need: 'hoop',
+    level: 1,
+    reps: '양쪽 8개씩',
+    steps: ['한 번 드리블해 두 발로 동시에 멈추고(점프 스톱) 양발로 올라가 마무리', '몸을 수비 쪽으로 향하게 해 부딪쳐도 버티기', '공은 두 손으로 턱 높이에 단단히', '골밑 몸싸움이 약할 때 좋아요'],
+  },
+  { id: 'figure8', name: '8자 드리블', area: 'handle', minutes: 5, need: 'any', level: 1, reps: '1분 × 3', steps: ['다리를 넓게 벌리고 두 다리 사이로 8자를 그리며 낮게 드리블', '반대 방향으로도', '공을 보지 않고 할 수 있으면 다음 단계', '손가락 끝으로 공을 다뤄요'] },
+  {
+    id: 'combo',
+    name: '연속 무브 (크로스-레그-비하인드)',
+    area: 'handle',
+    minutes: 6,
+    need: 'any',
+    level: 2,
+    reps: '30초 × 6',
+    steps: ['크로스오버 → 다리 사이 → 등 뒤를 한 세트로 계속 이어요', '무브 사이에 공을 세게 한 번 튀기기 (파운드)', '눈은 앞, 무릎은 굽혀 낮게', '빨라질수록 공이 몸에서 멀어지지 않게'],
+  },
+  {
+    id: 'hesi',
+    name: '속도 바꾸기 (헤지테이션)',
+    area: 'handle',
+    minutes: 6,
+    need: 'any',
+    level: 2,
+    reps: '코트 길이 왕복 × 4',
+    steps: ['드리블하며 달리다 갑자기 멈칫(속도를 줄이며 몸을 세움) → 다시 폭발적으로 출발', '멈칫할 때 공은 높게, 출발할 때 낮게', '물병을 수비수 삼아 앞에서 하기', '수비를 따돌리는 가장 기본 기술'],
+  },
+  {
+    id: 'jab',
+    name: '잽 스텝 + 슛',
+    area: 'foot',
+    minutes: 8,
+    need: 'hoop',
+    level: 2,
+    reps: '양쪽 8개씩',
+    shots: 16,
+    shotKind: 'fg',
+    steps: ['공을 잡고 피벗 발을 고정한 채 앞발로 짧게 찔러요(잽)', '수비가 물러났다고 생각하고 바로 슛', '잽 → 돌파(한 번 드리블) → 풀업으로도', '축발이 떨어지면 트래블링이에요'],
+  },
+  { id: 'jumpstop', name: '점프 스톱 시리즈', area: 'foot', minutes: 6, need: 'hoop', level: 1, reps: '10번', steps: ['드리블로 달려가 두 발로 동시에 멈추기 (점프 스톱)', '멈춘 뒤 피벗 → 슛 · 펌프 페이크 → 레이업', '멈출 때 무릎을 굽혀 균형', '복잡한 골밑에서 공을 지키는 기본'] },
+  { id: 'ladder', name: '사다리 발놀림 (선 이용)', area: 'foot', minutes: 6, need: 'any', level: 1, reps: '패턴마다 4번', steps: ['바닥 선이나 테이프로 사다리 칸을 만들어요', '한 칸에 두 발 · 옆으로 들어갔다 나오기 · 한 발씩', '발 앞쪽으로 빠르고 가볍게', '방향 전환과 빠른 첫발에 도움'] },
+  { id: 'wall-tip', name: '벽 손끝 튕기기', area: 'reb', minutes: 4, need: 'wall', level: 1, reps: '30초 × 4 (양손·한 손)', steps: ['팔을 머리 위로 뻗고 공을 벽에 손끝으로 계속 튕겨요', '양손 → 오른손 → 왼손', '리바운드할 때 공을 손끝으로 따내는 감각', '팔이 떨어지지 않게 끝까지'] },
+  { id: 'onehand-wall', name: '한 손 벽 패스', area: 'pass', minutes: 5, need: 'wall', level: 2, reps: '손마다 25번', steps: ['드리블에서 바로 한 손으로 벽에 패스 (푸시 패스)', '돌아오는 공을 한 손으로 받아 바로 드리블', '오른손·왼손 모두', '실전 패스는 대부분 한 손으로 나가요'] },
+  {
+    id: 'suicides',
+    name: '왕복 달리기',
+    area: 'cond',
+    minutes: 6,
+    need: 'any',
+    level: 2,
+    reps: '4세트 (세트 사이 1분)',
+    steps: ['출발선 → 가까운 선 → 출발선 → 중간 → 출발선 → 먼 선 → 출발선', '선을 손으로 짚고 돌아요', '마지막 세트까지 같은 속도를 목표로', '농구는 짧게 달리고 멈추기를 반복하는 운동이에요'],
+  },
+  { id: 'core', name: '코어 · 하체', area: 'cond', minutes: 8, need: 'any', level: 1, reps: '플랭크 40초 · 런지 10번 · 스쿼트 15번 × 2', steps: ['플랭크 40초', '좌우 런지 10번씩', '맨몸 스쿼트 15번', '두 바퀴. 슛이 짧아지는 건 하체가 지쳐서인 경우가 많아요'] },
+  {
+    id: 'beat',
+    name: '프로 이기기 (슈팅 게임)',
+    area: 'shoot',
+    minutes: 10,
+    need: 'hoop',
+    level: 2,
+    reps: '한 판 (11점 먼저)',
+    shots: 20,
+    shotKind: 'fg',
+    steps: ['넣으면 나 +1점, 놓치면 「프로」 +2점', '먼저 11점을 내면 승리', '자리를 매번 바꿔 가며 (양 코너·윙·탑·엘보)', '긴장감 속에서 한 개씩 집중하는 연습'],
+  },
 ];
 
 export interface Stats {
@@ -226,6 +430,8 @@ export interface SessionOpts {
   salt: number;
   /** 초보면 쉬운 것 위주 */
   maxLevel: 1 | 2 | 3;
+  /** 최근에 한 드릴 (되도록 다른 것을 고른다) */
+  recent?: string[];
 }
 
 const has = (have: Need, need: Need) => need === 'any' || have === 'hoop' || (have === 'wall' && need === 'wall');
@@ -234,7 +440,14 @@ const has = (have: Need, need: Need) => need === 'any' || have === 'hoop' || (ha
 export function buildSession(o: SessionOpts): Drill[] {
   const rand = rng(o.salt);
   const ok = DRILLS.filter((x) => has(o.have, x.need) && x.level <= o.maxLevel);
-  const pick = (cands: Drill[]) => (cands.length ? cands[Math.floor(rand() * cands.length)] : undefined);
+  const fresh = (cands: Drill[]) => {
+    const f = cands.filter((x) => !o.recent?.includes(x.id));
+    return f.length ? f : cands;
+  };
+  const pick = (cands: Drill[]) => {
+    const c = fresh(cands);
+    return c.length ? c[Math.floor(rand() * c.length)] : undefined;
+  };
   const used = new Set<string>();
   const out: Drill[] = [];
   const add = (x?: Drill) => {
@@ -250,15 +463,41 @@ export function buildSession(o: SessionOpts): Drill[] {
   const areas = [...o.weak.map((w) => w.area), 'shoot', 'handle', 'finish', 'pass'] as DrillArea[];
   for (const a of areas) {
     if (budget < 5) break;
-    const x = pick(ok.filter((y) => y.area === a && !used.has(y.id) && y.id !== 'ft' && y.minutes <= budget + 2));
+    const x = pick(ok.filter((y) => y.area === a && !used.has(y.id) && !['ft', 'ft2'].includes(y.id) && y.minutes <= budget + 2));
     if (x) {
       add(x);
       budget -= x.minutes;
     }
     if (out.length >= 5) break;
   }
-  if (o.have === 'hoop') add(DRILLS.find((x) => x.id === 'ft'));
+  // 마무리 자유투 (자유투 드릴 중 하나)
+  if (o.have === 'hoop') add(pick(ok.filter((x) => x.area === 'ft' && x.id !== 'tired-ft')));
   return out;
 }
 
 export const totalMinutes = (list: Drill[]) => list.reduce((a, x) => a + x.minutes, 0);
+
+export interface ShotLine {
+  m: number;
+  a: number;
+}
+export interface ShotSum {
+  fg: ShotLine;
+  tp: ShotLine;
+  ft: ShotLine;
+}
+
+/** from~to (포함) 동안 적은 슛 (경기·연습 모두) */
+export function shotsBetween(d: Pick<StudyData, 'workouts'>, from: DateStr, to: DateStr): ShotSum {
+  const out: ShotSum = { fg: { m: 0, a: 0 }, tp: { m: 0, a: 0 }, ft: { m: 0, a: 0 } };
+  for (const w of alive(d.workouts)) {
+    if (w.kind !== '농구' || !w.bb || w.date < from || w.date > to) continue;
+    out.fg.m += w.bb.fgm ?? 0;
+    out.fg.a += w.bb.fga ?? 0;
+    out.tp.m += w.bb.tpm ?? 0;
+    out.tp.a += w.bb.tpa ?? 0;
+    out.ft.m += w.bb.ftm ?? 0;
+    out.ft.a += w.bb.fta ?? 0;
+  }
+  return out;
+}
