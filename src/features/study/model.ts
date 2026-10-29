@@ -621,6 +621,45 @@ export interface Passage extends Stamp {
   created: number;
 }
 
+/** 게임 (하는 중 · 하고 싶은 것 · 끝낸 것) */
+export interface Game extends Stamp {
+  id: Id;
+  title: string;
+  /** 기기: PC · 스위치 · 플스 · 폰 … */
+  platform?: string;
+  status: 'want' | 'playing' | 'done';
+  /** 0.5 ~ 5 */
+  rating?: number;
+  /** 한 시간 (대략) */
+  hours?: number;
+  note?: string;
+  started?: DateStr;
+  finished?: DateStr;
+  created: number;
+}
+
+/** 음반 (LP 등): 가진 것 · 사고 싶은 것 */
+export interface MusicRecord extends Stamp {
+  id: Id;
+  /** 앨범 이름 */
+  title: string;
+  artist: string;
+  format: 'lp' | 'cd' | 'tape' | 'digital';
+  status: 'have' | 'want';
+  year?: number;
+  /** 산 값 (원) · 산 날 · 산 곳 */
+  price?: number;
+  bought?: DateStr;
+  shop?: string;
+  /** 판 상태 (민트 · 좋음 …) */
+  condition?: string;
+  rating?: number;
+  note?: string;
+  /** 들은 날들 */
+  listens?: DateStr[];
+  created: number;
+}
+
 /** 반복 할 일: 정한 요일마다 그날 할 일이 생긴다 */
 export interface TodoRule extends Stamp {
   id: Id;
@@ -792,12 +831,14 @@ export interface StudyData {
   drillLogs: Record<Id, DrillLog>;
   todoRules: Record<Id, TodoRule>;
   passages: Record<Id, Passage>;
+  games: Record<Id, Game>;
+  records: Record<Id, MusicRecord>;
 }
 
 /** 단어는 많아질 수 있어 따로 묶는다 */
 export type WordsData = Record<Id, Word>;
 
-export const COLLECTIONS = ['subjects', 'exams', 'books', 'plans', 'tutors', 'homework', 'notes', 'decks', 'cards', 'wordLists', 'sessions', 'todos', 'habits', 'grades', 'previews', 'assessments', 'blanks', 'conditions', 'weekNotes', 'papers', 'workouts', 'bodyLogs', 'moneyTx', 'savings', 'hobbies', 'hobbyLogs', 'wishes', 'diary', 'moneyRules', 'movies', 'reads', 'drillLogs', 'todoRules', 'passages'] as const;
+export const COLLECTIONS = ['subjects', 'exams', 'books', 'plans', 'tutors', 'homework', 'notes', 'decks', 'cards', 'wordLists', 'sessions', 'todos', 'habits', 'grades', 'previews', 'assessments', 'blanks', 'conditions', 'weekNotes', 'papers', 'workouts', 'bodyLogs', 'moneyTx', 'savings', 'hobbies', 'hobbyLogs', 'wishes', 'diary', 'moneyRules', 'movies', 'reads', 'drillLogs', 'todoRules', 'passages', 'games', 'records'] as const;
 export type Collection = (typeof COLLECTIONS)[number];
 
 export const DEFAULT_SETTINGS: StudySettings = {
@@ -851,6 +892,8 @@ export function emptyStudy(): StudyData {
     drillLogs: {},
     todoRules: {},
     passages: {},
+    games: {},
+    records: {},
   };
 }
 

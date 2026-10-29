@@ -19,7 +19,6 @@ export const AREAS = [
   { key: 'fitness', label: '운동' },
   { key: 'money', label: '돈' },
   { key: 'hobby', label: '취미' },
-  { key: 'movies', label: '영화' },
   { key: 'diary', label: '일기' },
 ] as const;
 export type AreaKey = (typeof AREAS)[number]['key'];
@@ -29,7 +28,12 @@ export interface AreaItem {
   key: string;
   label: string;
   icon: string;
+  /** 영역 밖 주소로 갈 때 (취미 안의 영화 · 게임 · 음악) */
+  to?: string;
 }
+
+/** 취미 영역에 함께 들어 있는 주소 맨 앞 칸 */
+export const HOBBY_PARTS = ['movies', 'games', 'music'] as const;
 
 /** 공부를 뺀 영역마다 왼쪽(폰은 아래) 메뉴: 영역을 누르면 메인 대신 이 칸들이 나온다 */
 export const AREA_ITEMS: Record<Exclude<AreaKey, 'home' | 'study'>, AreaItem[]> = {
@@ -48,12 +52,9 @@ export const AREA_ITEMS: Record<Exclude<AreaKey, 'home' | 'study'>, AreaItem[]> 
     { key: '', label: '취미', icon: 'area-hobby' },
     { key: 'wish', label: '하고 싶은 것', icon: 'life' },
     { key: 'reading', label: '독서', icon: 'books' },
-  ],
-  movies: [
-    { key: '', label: '극장가', icon: 'area-movies' },
-    { key: 'watched', label: '내 영화', icon: 'life' },
-    { key: 'find', label: '찾기', icon: 'search' },
-    { key: 'rec', label: '추천', icon: 'area-hobby' },
+    { key: 'movies', label: '영화', icon: 'area-movies', to: '/movies' },
+    { key: 'games', label: '게임', icon: 'game', to: '/games' },
+    { key: 'music', label: '음악', icon: 'music', to: '/music' },
   ],
   diary: [
     { key: '', label: '일기', icon: 'area-diary' },
@@ -62,9 +63,9 @@ export const AREA_ITEMS: Record<Exclude<AreaKey, 'home' | 'study'>, AreaItem[]> 
   ],
 };
 
-/** 지금 주소의 두 번째 칸에서 어느 메뉴가 켜져 있는지 */
-export function activeItem(area: keyof typeof AREA_ITEMS, sub?: string): string {
-  if (area === 'movies') return sub === 'watched' || sub === 'want' || sub === 'quotes' || sub === 'awards' || sub === 'ceremony' ? 'watched' : sub === 'find' || sub === 'rec' ? sub : '';
+/** 지금 주소에서 어느 메뉴가 켜져 있는지 */
+export function activeItem(area: keyof typeof AREA_ITEMS, sub?: string, p0?: string): string {
+  if (area === 'hobby' && (HOBBY_PARTS as readonly string[]).includes(p0 ?? '')) return p0!;
   if (area === 'diary') return sub === 'dream' || sub === 'form' ? sub : '';
   if (area === 'money') return sub === 'fixed' || sub === 'saving' ? sub : '';
   if (area === 'fitness') return sub === 'body' || sub === 'basketball' || sub === 'drills' ? sub : '';

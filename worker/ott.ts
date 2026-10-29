@@ -1,4 +1,4 @@
-// 어느 OTT 에 있는지: TMDB(The Movie Database) 의 「시청 가능한 곳」 (JustWatch 자료). 키는 비밀값 TMDB_KEY.
+// 어느 OTT 에 있는지: TMDB(The Movie Database) 의 「시청 가능한 곳」 (JustWatch 자료). 키는 비밀값 TMDB_KEY (「Tmdb」 도 받는다).
 const BASE = 'https://api.themoviedb.org/3';
 
 /** v3 키는 주소에, v4 읽기 토큰(긴 값)은 머리글에 */

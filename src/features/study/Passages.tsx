@@ -1,6 +1,6 @@
 // 국어·영어 지문: 넣기(붙여넣기·사진 글자 읽기) · 헷갈린 점 · 영어는 해석 · 다시 보기
 import { useEffect, useState } from 'react';
-import { isLoggedIn, translate, wordMeanings } from '../auth/api';
+import { dictKo, isLoggedIn, translate, wordMeanings } from '../auth/api';
 import { addToInbox } from './actions';
 import { shortDate } from './dates';
 import { alive, newId, type Passage } from './model';
@@ -102,7 +102,7 @@ function PassageView({ p, today, onEdit, edit, onCloseEdit }: { p: Passage; toda
       <div className="ps-text" lang={p.lang}>
         {p.text}
       </div>
-      {p.lang === 'en' && <WordPick from={p.title} today={today} />}
+      {p.lang === 'en' ? <WordPick from={p.title} today={today} /> : <KoPick p={p} />}
       {p.lang === 'en' && p.translation && (
         <>
           <button className="st-link" onClick={() => setShowTr(!showTr)}>
@@ -269,6 +269,82 @@ function WordPick({ from, today }: { from: string; today: string }) {
       >
         {busy ? '넣는 중…' : '단어장에 넣기'}
       </button>
+    </div>
+  );
+}
+
+/** 국어 지문: 낱말을 길게 눌러 고르면 표준국어대사전 뜻을 보여 주고, 「헷갈린 점」에 적어 둘 수 있다 */
+function KoPick({ p }: { p: Passage }) {
+  const [term, setTerm] = useState('');
+  const [senses, setSenses] = useState<{ word: string; pos?: string; definition: string }[] | null>(null);
+  const [busy, setBusy] = useState(false);
+  useEffect(() => {
+    const on = () => {
+      const sel = window.getSelection();
+      const t = sel?.toString().trim() ?? '';
+      const inText = !!sel?.anchorNode?.parentElement?.closest('.ps-text');
+      if (inText && /^[가-힣]{1,12}$/.test(t)) {
+        setTerm(t);
+        setSenses(null);
+      }
+    };
+    document.addEventListener('selectionchange', on);
+    return () => document.removeEventListener('selectionchange', on);
+  }, []);
+  if (!term) return <small className="st-muted">모르는 낱말은 길게 눌러 고르면 국어사전 뜻을 볼 수 있어요.</small>;
+  return (
+    <div className="ps-pick ko">
+      <div className="st-inline between">
+        <b>{term}</b>
+        {senses === null ? (
+          <button
+            className="btn btn-sm btn-primary"
+            disabled={busy}
+            onClick={async () => {
+              if (!isLoggedIn()) return toast('국어사전은 로그인한 뒤에 쓸 수 있어요');
+              setBusy(true);
+              try {
+                setSenses((await dictKo(term)).senses);
+              } catch (e) {
+                toast(e instanceof Error ? e.message : '뜻을 찾지 못했어요');
+              } finally {
+                setBusy(false);
+              }
+            }}
+          >
+            {busy ? '찾는 중…' : '뜻 찾기'}
+          </button>
+        ) : (
+          <button className="st-link" onClick={() => setTerm('')}>
+            닫기
+          </button>
+        )}
+      </div>
+      {senses && !senses.length && <small className="st-muted">사전에서 찾지 못했어요. 「-다」를 붙인 기본형(예: 먹다)으로 골라 보세요.</small>}
+      {senses && senses.length > 0 && (
+        <>
+          <ol className="ps-senses">
+            {senses.slice(0, 4).map((s, i) => (
+              <li key={i}>
+                {s.word !== term && <b>{s.word} </b>}
+                {s.pos && <small className="st-muted">「{s.pos}」 </small>}
+                {s.definition}
+              </li>
+            ))}
+          </ol>
+          <button
+            className="st-link"
+            onClick={() => {
+              put('passages', { ...p, note: `${p.note ? `${p.note}\n` : ''}${term}: ${senses[0].definition}`.slice(0, 5000) });
+              toast('헷갈린 점에 적었어요');
+              setTerm('');
+            }}
+          >
+            헷갈린 점에 적기
+          </button>
+          <small className="st-muted">자료: 국립국어원 표준국어대사전</small>
+        </>
+      )}
     </div>
   );
 }

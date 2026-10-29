@@ -75,6 +75,7 @@ export function Home(_: { loggedIn: boolean; onLogin: () => void }) {
     hobby: {
       lines: [
         `이번 주 취미 ${minutesText(hobbyMin)}`,
+        [seen.length ? `본 영화 ${seen.length}편` : '', alive(d.records).filter((r) => r.status === 'have').length ? `LP·음반 ${alive(d.records).filter((r) => r.status === 'have').length}장` : '', alive(d.games).filter((g) => g.status === 'playing').length ? `하는 게임 ${alive(d.games).filter((g) => g.status === 'playing').length}개` : ''].filter(Boolean).join(' · '),
         doing.length
           ? `하는 중: ${doing
               .slice(0, 2)
@@ -82,6 +83,7 @@ export function Home(_: { loggedIn: boolean; onLogin: () => void }) {
               .join(', ')}`
           : '',
       ].filter(Boolean),
+      badge: nextOpen ? { big: dday(today, nextOpen.release!), small: nextOpen.title } : undefined,
     },
     movies: {
       lines: [`본 영화 ${seen.length}편 · 올해 ${seen.filter((m) => m.watched?.startsWith(today.slice(0, 4))).length}편`, `보고 싶어요 ${movies.length - seen.length}편`],

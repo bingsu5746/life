@@ -28,6 +28,8 @@ const Home = lazy(() => import('../life/Home').then((m) => ({ default: m.Home })
 const Fitness = lazy(() => import('../life/Fitness').then((m) => ({ default: m.Fitness })));
 const Money = lazy(() => import('../life/Money').then((m) => ({ default: m.Money })));
 const Hobby = lazy(() => import('../life/Hobby').then((m) => ({ default: m.Hobby })));
+const Games = lazy(() => import('../life/Games').then((m) => ({ default: m.Games })));
+const Music = lazy(() => import('../life/Music').then((m) => ({ default: m.Music })));
 const Movies = lazy(() => import('../life/Movies').then((m) => ({ default: m.Movies })));
 const Search = lazy(() => import('../life/Search').then((m) => ({ default: m.Search })));
 const LifeWeekPage = lazy(() => import('../life/LifeWeek').then((m) => ({ default: m.LifeWeekPage })));
@@ -38,9 +40,9 @@ const Translate = lazy(() => import('./Translate').then((m) => ({ default: m.Tra
 const Tutors = lazy(() => import('./Tutors').then((m) => ({ default: m.Tutors })));
 const Words = lazy(() => import('./Words').then((m) => ({ default: m.Words })));
 
-const PRELOAD = [() => import('../life/Home'), () => import('../life/Fitness'), () => import('../life/Money'), () => import('../life/Hobby'), () => import('../life/Movies'), () => import('../life/Diary'), () => import('./Books'), () => import('./Life'), () => import('./Review'), () => import('./Settings'), () => import('./Time'), () => import('./Translate'), () => import('./Preview'), () => import('./Tutors'), () => import('./Words')];
+const PRELOAD = [() => import('../life/Home'), () => import('../life/Fitness'), () => import('../life/Money'), () => import('../life/Hobby'), () => import('../life/Movies'), () => import('../life/Games'), () => import('../life/Music'), () => import('../life/Diary'), () => import('./Books'), () => import('./Life'), () => import('./Review'), () => import('./Settings'), () => import('./Time'), () => import('./Translate'), () => import('./Preview'), () => import('./Tutors'), () => import('./Words')];
 
-import { activeItem, AREA_ITEMS, AREAS, TABS, type AreaKey } from './tabs';
+import { activeItem, AREA_ITEMS, AREAS, HOBBY_PARTS, TABS, type AreaKey } from './tabs';
 export { TABS };
 /** 메뉴에는 없지만 열 수 있는 화면 (설정은 맨 위 막대의 톱니) */
 const HIDDEN = ['settings'];
@@ -55,7 +57,7 @@ export function Study({ path, loggedIn, syncReady = true, onLogin }: { path: str
   const isSearch = p0 === 'search';
   const isWeek = p0 === 'week' || p0 === 'month';
   const isCheckin = p0 === 'checkin';
-  const area: AreaKey = !p0 || isSearch || isWeek || isCheckin ? 'home' : (AREAS.some((a) => a.key === p0) && p0 !== 'study' ? p0 : 'study') as AreaKey;
+  const area: AreaKey = !p0 || isSearch || isWeek || isCheckin ? 'home' : (HOBBY_PARTS as readonly string[]).includes(p0) ? 'hobby' : ((AREAS.some((a) => a.key === p0) && p0 !== 'study' ? p0 : 'study') as AreaKey);
   const spath = p0 === 'study' ? path.slice(1) : path;
   const tab = area !== 'study' ? '' : TABS.some((t) => t.key === spath[0]) || HIDDEN.includes(spath[0]) ? spath[0] : 'today';
   const [, id, sub] = area === 'study' ? spath : path;
@@ -118,8 +120,10 @@ export function Study({ path, loggedIn, syncReady = true, onLogin }: { path: str
   else if (area === 'home') content = <Home loggedIn={loggedIn} onLogin={onLogin} />;
   else if (area === 'fitness') content = <Fitness sub={path[1]} sub2={path[2]} />;
   else if (area === 'money') content = <Money sub={path[1]} />;
+  else if (p0 === 'movies') content = <Movies sub={path[1]} />;
+  else if (p0 === 'games') content = <Games sub={path[1]} />;
+  else if (p0 === 'music') content = <Music sub={path[1]} />;
   else if (area === 'hobby') content = <Hobby sub={path[1]} sub2={path[2]} />;
-  else if (area === 'movies') content = <Movies sub={path[1]} />;
   else if (area === 'diary') content = <Diary sub={path[1]} />;
   else if (tab === 'books') content = <Books id={id} sub={sub} />;
   else if (tab === 'tutor') content = <Tutors sub={id} />;
@@ -155,9 +159,9 @@ export function Study({ path, loggedIn, syncReady = true, onLogin }: { path: str
             <span className="st-tab-short">메인</span>
           </button>
           {AREA_ITEMS[area].map((it) => {
-            const on = activeItem(area, path[1]) === it.key;
+            const on = activeItem(area, path[1], p0) === it.key;
             return (
-              <button key={it.key} className={`st-tab ${on ? 'on' : ''}`} aria-current={on ? 'page' : undefined} onClick={() => go(it.key ? `/${area}/${it.key}` : `/${area}`)}>
+              <button key={it.key} className={`st-tab ${on ? 'on' : ''}`} aria-current={on ? 'page' : undefined} onClick={() => go(it.to ?? (it.key ? `/${area}/${it.key}` : `/${area}`))}>
                 <Icon name={it.icon} />
                 <span className="st-tab-label">{it.label}</span>
                 <span className="st-tab-short">{it.label}</span>

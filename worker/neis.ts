@@ -1,4 +1,4 @@
-// 나이스(NEIS) 교육정보 개방 포털: 학교 찾기 · 급식 · 학사일정 · 고등학교 시간표. 키는 비밀값 NEIS_KEY.
+// 나이스(NEIS) 교육정보 개방 포털: 학교 찾기 · 급식 · 학사일정 · 고등학교 시간표. 키는 비밀값 NEIS_KEY (Cloudflare 에 「Nice」 로 넣은 것도 받는다).
 const BASE = 'https://open.neis.go.kr/hub';
 
 export interface SchoolCodes {

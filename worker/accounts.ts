@@ -15,6 +15,7 @@ import { DurableObject } from 'cloudflare:workers';
 import { COOKIE_NAME, cutText, Limiter, passwordProblem, readCookie } from './security';
 import { fetchBoxOffice, fetchCatalogPage, fetchUpcoming } from './kobis';
 import { fetchEvents, fetchMeals, fetchTimetable, findSchool } from './neis';
+import { lookupKo } from './stdict';
 import { fetchProviders } from './ott';
 import { buildRecommendInput, normTitle, readRecommendations, readRecommendRequest } from './recommend';
 import { allowedEndpoint, localDate, makeVapid, nextFire, sendPush, type PushSub, type Vapid } from './push';
@@ -198,6 +199,7 @@ export class Accounts extends DurableObject<Env> {
     if (path === 'movies/recommend' && req.method === 'POST') return this.recommend(user, body);
     if (path === 'movies/ott' && req.method === 'POST') return this.ott(body);
     if (path === 'school' && req.method === 'POST') return this.school(body);
+    if (path === 'dict/ko' && req.method === 'POST') return this.dictKo(body);
     if (path === 'movies/catalog/sync' && req.method === 'POST') return this.catalogSync(req.headers.get('x-life-kobis-key') ?? undefined);
     if (path === 'notify' || path.startsWith('notify/')) return this.notifyRoute(req, path, user, body);
     if (path === 'me/nickname' && req.method === 'PUT') {
@@ -551,7 +553,8 @@ export class Accounts extends DurableObject<Env> {
 
   /** OTT: 영화마다 한국에서 구독으로 볼 수 있는 서비스 (TMDB, 7일 저장) */
   private async ott(body: Record<string, unknown>): Promise<Response> {
-    const key = (this.env as unknown as { TMDB_KEY?: string }).TMDB_KEY;
+    const env = this.env as unknown as { TMDB_KEY?: string; Tmdb?: string };
+    const key = env.TMDB_KEY || env.Tmdb;
     if (!key) return fail('OTT 정보를 쓰려면 TMDB 키(TMDB_KEY)가 필요해요.', 503);
     const list = Array.isArray(body.items) ? (body.items as { title?: unknown; year?: unknown }[]).slice(0, 12) : [];
     const providers: (string[] | null)[] = [];
@@ -582,7 +585,8 @@ export class Accounts extends DurableObject<Env> {
 
   /** 학교: 급식 · 학사일정 · 시간표 (나이스). 학교 코드는 30일, 나머지는 6시간 저장 */
   private async school(b: Record<string, unknown>): Promise<Response> {
-    const key = (this.env as unknown as { NEIS_KEY?: string }).NEIS_KEY;
+    const env = this.env as unknown as { NEIS_KEY?: string; Nice?: string };
+    const key = env.NEIS_KEY || env.Nice;
     if (!key) return fail('학교 정보를 쓰려면 나이스 키(NEIS_KEY)가 필요해요.', 503);
     const name = typeof b.name === 'string' ? b.name.normalize('NFC').trim().slice(0, 40) : '';
     const day = (v: unknown) => (typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v) ? v : '');
@@ -612,6 +616,27 @@ export class Accounts extends DurableObject<Env> {
       const msg = e instanceof Error ? e.message : String(e);
       console.error('neis failed', msg);
       return fail(msg.startsWith('나이스') ? msg : '나이스에서 정보를 받지 못했어요. 잠시 뒤 다시 해 주세요.', 502);
+    }
+  }
+
+  /** 국어 낱말 뜻 (표준국어대사전, 30일 저장) */
+  private async dictKo(b: Record<string, unknown>): Promise<Response> {
+    const env = this.env as unknown as { STDICT_KEY?: string; Onyongu?: string };
+    const key = env.STDICT_KEY || env.Onyongu;
+    if (!key) return fail('국어사전을 쓰려면 국립국어원 키(STDICT_KEY)가 필요해요.', 503);
+    const q = typeof b.word === 'string' ? b.word.normalize('NFC').trim().slice(0, 30) : '';
+    if (!q || !/[가-힣]/.test(q)) return fail('찾을 낱말을 한글로 골라 주세요.');
+    const ck = `stdict:${q}`;
+    const c = this.sql.exec<{ data: string; at: number }>('SELECT data, at FROM cache WHERE key = ?', ck).toArray()[0];
+    if (c && Date.now() - c.at < 30 * 86_400_000) return json({ senses: JSON.parse(c.data) });
+    try {
+      const senses = await lookupKo(key, q);
+      this.sql.exec('INSERT OR REPLACE INTO cache (key, data, at) VALUES (?, ?, ?)', ck, JSON.stringify(senses), Date.now());
+      return json({ senses });
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      console.error('stdict failed', msg);
+      return fail(msg.startsWith('사전') ? msg : '국어사전에서 뜻을 받지 못했어요.', 502);
     }
   }
 

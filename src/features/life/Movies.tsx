@@ -52,6 +52,20 @@ export function Movies({ sub }: { sub?: string }) {
           <Icon name="plus" />
         </button>
       </div>
+      <div className="st-seg mv-top-tabs" role="tablist" aria-label="영화">
+        {(
+          [
+            ['now', '극장가', '/movies'],
+            ['mine', '내 영화', '/movies/watched'],
+            ['find', '찾기', '/movies/find'],
+            ['rec', '추천', '/movies/rec'],
+          ] as const
+        ).map(([k, label, to]) => (
+          <button key={k} role="tab" aria-selected={tab === k} className={tab === k ? 'on' : ''} onClick={() => go(to)}>
+            {label}
+          </button>
+        ))}
+      </div>
       {tab === 'mine' && (
         <nav className="mv-sub" aria-label="내 영화">
           <button className={mineSub === 'watched' ? 'on' : ''} onClick={() => go('/movies/watched')}>

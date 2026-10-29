@@ -58,6 +58,14 @@ export function searchAll(d: StudyData, words: Record<string, Word>, query: stri
     })),
   );
   add(
+    '게임',
+    alive(d.games ?? {}).map((g) => ({ title: g.title, text: [g.platform, g.note].filter(Boolean).join(' · '), to: '/games', fields: [g.title, g.platform, g.note] })),
+  );
+  add(
+    '음악',
+    alive(d.records ?? {}).map((r) => ({ title: `${r.artist} — ${r.title}`, text: [r.note, r.shop].filter(Boolean).join(' · '), to: '/music', fields: [r.title, r.artist, r.note] })),
+  );
+  add(
     '책',
     alive(d.reads).map((b) => ({ title: b.title, text: [b.author, b.comment, b.review].filter(Boolean).join(' · '), to: '/hobby/reading', fields: [b.title, b.author, b.comment, b.review] })),
   );

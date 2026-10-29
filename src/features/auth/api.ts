@@ -294,3 +294,8 @@ export interface SchoolPeriod {
 export async function schoolInfo(body: { name: string; grade?: number; cls?: string; from: string; to: string; want: ('meals' | 'events' | 'timetable')[] }) {
   return call<{ school: string; meals?: SchoolMeal[]; events?: SchoolEvent[]; timetable?: SchoolPeriod[] }>('school', 'POST', body);
 }
+
+/** 국어 낱말 뜻 (표준국어대사전, 로그인한 사람만) */
+export async function dictKo(word: string) {
+  return call<{ senses: { word: string; pos?: string; definition: string }[] }>('dict/ko', 'POST', { word });
+}
