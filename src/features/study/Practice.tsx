@@ -1,5 +1,6 @@
 // 영단어 연습: 카드 넘기기 · 4지선다 · 예문 빈칸 · 듣고 쓰기 (받아쓰기).
 // 「오늘 외우기」와 달리 상자(다시 볼 날)는 바꾸지 않는다. 틀린 횟수만 세서 「자주 틀리는 단어」에 쓰인다.
+import { playWord } from '../../lib/engDict';
 import { useMemo, useRef, useState } from 'react';
 import { alive, type Word } from './model';
 import { listWords } from './select';
@@ -23,15 +24,9 @@ function shuffle<T>(xs: T[]): T[] {
   return a;
 }
 
+// 원어민 발음(영영 사전에 소리가 있으면), 없으면 기기 읽어 주기
+const speak = (text: string) => void playWord(text);
 const canSpeak = () => typeof window !== 'undefined' && 'speechSynthesis' in window;
-function speak(text: string) {
-  if (!canSpeak()) return;
-  window.speechSynthesis.cancel();
-  const u = new SpeechSynthesisUtterance(text);
-  u.lang = 'en-US';
-  u.rate = 0.9;
-  window.speechSynthesis.speak(u);
-}
 
 interface Item {
   w: Word;

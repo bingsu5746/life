@@ -1,4 +1,5 @@
 // 영단어 (설계 §9.4~9.9): 목록 · 넣기(PDF·붙여넣기·사진) · 목록 하나 · 외우기(카드·객관식)
+import { lookupEn, playWord, type EnEntry } from '../../lib/engDict';
 import { expectedScore, knowChance } from './wordTest';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { addDays, dday, shortDate } from './dates';
@@ -415,7 +416,9 @@ function ListSettings({ list, onClose }: { list: WordList; onClose: () => void }
 }
 
 function WordSheet({ w, onClose }: { w: Word; onClose: () => void }) {
-  const intervals = useStudy().settings.intervals;
+  const sd = useStudy();
+  const intervals = sd.settings.intervals;
+  const lang = sd.wordLists[w.listId]?.lang;
   const [term, setTerm] = useState(w.term);
   const [meaning, setMeaning] = useState(w.meaning);
   const [day, setDay] = useState(w.day === undefined ? '' : String(w.day));
@@ -431,6 +434,7 @@ function WordSheet({ w, onClose }: { w: Word; onClose: () => void }) {
         <Field label="Day">
           <input className="st-input xs" inputMode="numeric" value={day} onChange={(e) => setDay(e.target.value.replace(/\D/g, ''))} />
         </Field>
+        {lang !== 'ko' && <EnDictBox word={w.term} />}
         <p className="st-hint">
           {w.box === 0 ? '새 단어' : w.learned ? '외움' : `${boxLabel(w.box, intervals)} · 다음 ${shortDate(w.due)}`} · 틀린 횟수 {w.wrong}
           {w.from && ` · 「${w.from}」에서`}
@@ -981,4 +985,45 @@ export function KeyHelp({ quiz, shown, onShow, onReply, onPick }: { quiz: boolea
     return () => window.removeEventListener('keydown', k);
   });
   return <p className="st-hint center st-keys">{quiz ? '키보드 1~4로 고르기' : '스페이스: 보기 · ←: 몰랐다 · →: 알았다'}</p>;
+}
+
+/** 영영 사전: 발음 기호 · 🔊 원어민 발음 · 뜻 · 예문 · 동의어 */
+function EnDictBox({ word }: { word: string }) {
+  const [e, setE] = useState<EnEntry | null | undefined>(undefined);
+  useEffect(() => {
+    let on = true;
+    setE(undefined);
+    lookupEn(word)
+      .then((v) => on && setE(v))
+      .catch(() => on && setE(null));
+    return () => {
+      on = false;
+    };
+  }, [word]);
+  if (e === undefined) return <small className="st-muted">영영 사전 찾는 중…</small>;
+  if (!e)
+    return (
+      <button type="button" className="btn btn-sm" onClick={() => void playWord(word)}>
+        🔊 발음
+      </button>
+    );
+  return (
+    <section className="ed">
+      <div className="st-inline">
+        <button type="button" className="btn btn-sm" onClick={() => void playWord(word)} aria-label={`${word} 발음 듣기`}>
+          🔊
+        </button>
+        {e.phonetic && <span className="ed-ph">{e.phonetic}</span>}
+      </div>
+      <ol className="ed-list">
+        {e.senses.slice(0, 4).map((x, i) => (
+          <li key={i}>
+            <small className="st-muted">{x.pos}</small> {x.def}
+            {x.example && <div className="ed-ex">“{x.example}”</div>}
+          </li>
+        ))}
+      </ol>
+      {e.synonyms.length > 0 && <small className="st-muted">비슷한 말: {e.synonyms.slice(0, 8).join(', ')}</small>}
+    </section>
+  );
 }

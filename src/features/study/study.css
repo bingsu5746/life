@@ -6607,3 +6607,26 @@ body.focus-on {
   text-align: left;
   cursor: pointer;
 }
+
+/* 영영 사전 */
+.ed {
+  display: grid;
+  gap: 6px;
+  padding: 12px;
+  border-radius: 12px;
+  background: var(--soft);
+}
+.ed-ph {
+  color: var(--muted);
+}
+.ed-list {
+  margin: 0;
+  padding-left: 18px;
+  display: grid;
+  gap: 6px;
+  font-size: 0.9rem;
+}
+.ed-ex {
+  color: var(--muted);
+  font-style: italic;
+}

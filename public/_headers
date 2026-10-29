@@ -1,7 +1,7 @@
 # Cloudflare Workers 정적 파일에 붙는 보안 머리글 (https://developers.cloudflare.com/workers/static-assets/headers/)
 # - CSP: 이 사이트 파일만 실행. 예외는 글자 인식 도구(tesseract.js 7.0.0, src/lib/ocr.ts 와 판을 맞춤)가 받는 jsdelivr 의 정해진 경로, 글꼴(Google Fonts)
 /*
-  Content-Security-Policy: default-src 'self'; script-src 'self' 'wasm-unsafe-eval' https://cdn.jsdelivr.net/npm/tesseract.js@v7.0.0/ https://cdn.jsdelivr.net/npm/tesseract.js-core@v7.0.0/ blob:; worker-src 'self' blob:; connect-src 'self' https://api.open-meteo.com https://cdn.jsdelivr.net/npm/tesseract.js-core@v7.0.0/ https://cdn.jsdelivr.net/npm/@tesseract.js-data/; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' blob: data: https://tile.openstreetmap.org; media-src 'self' blob:; object-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'; upgrade-insecure-requests
+  Content-Security-Policy: default-src 'self'; script-src 'self' 'wasm-unsafe-eval' https://cdn.jsdelivr.net/npm/tesseract.js@v7.0.0/ https://cdn.jsdelivr.net/npm/tesseract.js-core@v7.0.0/ blob:; worker-src 'self' blob:; connect-src 'self' https://api.open-meteo.com https://api.dictionaryapi.dev https://cdn.jsdelivr.net/npm/tesseract.js-core@v7.0.0/ https://cdn.jsdelivr.net/npm/@tesseract.js-data/; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' blob: data: https://tile.openstreetmap.org; media-src 'self' blob: https://api.dictionaryapi.dev https://ssl.gstatic.com; object-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'; upgrade-insecure-requests
   X-Content-Type-Options: nosniff
   X-Frame-Options: DENY
   Referrer-Policy: strict-origin-when-cross-origin
