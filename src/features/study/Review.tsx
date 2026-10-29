@@ -566,7 +566,6 @@ function NoteRun() {
         ) : null}
         {!revealed ? (
           <div className="st-row center">
-            <p className="st-hint">답을 보기 전에 직접 풀어 보세요</p>
             <button className="btn btn-lg btn-primary" onClick={() => setRevealed(true)}>
               다 풀었어요 · 답 확인
             </button>
@@ -619,7 +618,6 @@ function Cards({ today, adding: add }: { today: string; adding?: boolean }) {
           <p className="st-sub">
             오늘 볼 카드 <b>{due.length}</b> · 전체 {cards.length}장 · 외움 {cards.filter((c) => c.learned).length}
           </p>
-          <p className="st-hint">단어는 「단어」 탭이 더 좋아요 (단어장 계획·객관식).</p>
         </div>
         {due.length > 0 && (
           <button className="btn btn-primary btn-lg" onClick={() => go('/review/cards-run')}>

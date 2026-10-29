@@ -103,7 +103,6 @@ export function Movies({ sub }: { sub?: string }) {
       {mineSub === 'watched' &&
         (!watched.length ? (
           <Empty title="본 영화를 기록해 보세요">
-            <p>별점과 한줄 감상평, 긴 리뷰를 남길 수 있어요.</p>
             <button className="btn btn-primary" onClick={() => setEdit({ status: 'watched' })}>
               본 영화 넣기
             </button>
@@ -152,7 +151,7 @@ export function Movies({ sub }: { sub?: string }) {
                   </div>
                   {(m.quote || m.comment) && <p className="mv-comment">“{m.quote || m.comment}”</p>}
                   {m.review && <p className="mv-review">{m.review}</p>}
-                  
+
                   {m.tags && m.tags.length > 0 && <small className="mv-tags">{m.tags.map((x) => `#${x}`).join(' ')}</small>}
                 </article>
               ))}
@@ -208,7 +207,6 @@ export function Movies({ sub }: { sub?: string }) {
       {mineSub === 'want' &&
         (!want.length ? (
           <Empty title="보고 싶은 영화가 없어요">
-            <p>「극장가」나 「찾기」에서 영화를 눌러 담거나 직접 넣어 보세요.</p>
             <button className="btn btn-primary" onClick={() => setEdit({ status: 'want' })}>
               보고 싶은 영화 넣기
             </button>

@@ -77,7 +77,13 @@ export function Home(_: { loggedIn: boolean; onLogin: () => void }) {
     hobby: {
       lines: [
         `이번 주 취미 ${minutesText(hobbyMin)}`,
-        [seen.length ? `본 영화 ${seen.length}편` : '', alive(d.records).filter((r) => r.status === 'have').length ? `LP·음반 ${alive(d.records).filter((r) => r.status === 'have').length}장` : '', alive(d.games).filter((g) => g.status === 'playing').length ? `하는 게임 ${alive(d.games).filter((g) => g.status === 'playing').length}개` : ''].filter(Boolean).join(' · '),
+        [
+          seen.length ? `본 영화 ${seen.length}편` : '',
+          alive(d.records).filter((r) => r.status === 'have').length ? `LP·음반 ${alive(d.records).filter((r) => r.status === 'have').length}장` : '',
+          alive(d.games).filter((g) => g.status === 'playing').length ? `하는 게임 ${alive(d.games).filter((g) => g.status === 'playing').length}개` : '',
+        ]
+          .filter(Boolean)
+          .join(' · '),
         doing.length
           ? `하는 중: ${doing
               .slice(0, 2)
@@ -113,7 +119,6 @@ export function Home(_: { loggedIn: boolean; onLogin: () => void }) {
           <WeatherChip />
         </div>
         <p className="st-sub">
-          오늘도 하나씩 해 봐요 ·{' '}
           <button className="st-link" onClick={() => go('/week')}>
             이번 주 돌아보기
           </button>{' '}
@@ -176,7 +181,6 @@ export function Home(_: { loggedIn: boolean; onLogin: () => void }) {
           </p>
         );
       })()}
-      <p className="st-hint">메인에 보일 영역은 설정에서 고를 수 있어요.</p>
     </div>
   );
 }

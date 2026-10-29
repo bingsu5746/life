@@ -19,7 +19,6 @@ export function Search({ q0 = '' }: { q0?: string }) {
       </div>
       <input ref={ref} className="st-input" value={q} onChange={(e) => setQ(e.target.value)} placeholder="일기·영화·책·할 일·시험·오답·단어… 모두에서 찾기" aria-label="검색" type="search" />
       {q.trim() && !hits.length && <p className="st-hint">찾은 것이 없어요.</p>}
-      {!q.trim() && <p className="st-hint">이 기기에 있는 모든 기록에서 찾아요. 검색한 글자는 서버로 보내지 않아요.</p>}
       {groups.map((g) => (
         <section key={g} className="st-card">
           <small className="aw-label">{g}</small>

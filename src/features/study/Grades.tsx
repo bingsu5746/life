@@ -142,17 +142,10 @@ export function Grades({ sub }: { sub?: string }) {
               </span>
             </div>
             {records.length > 1 ? (
-              <LineChart
-                label={`${KIND_LABEL[kind]} 과목 평균 ${METRIC_NAME[metric]} 흐름`}
-                points={records.map((r, i) => ({ label: shortDate(r.date).replace(/\(.\)/, ''), title: r.name, y: avg[i] }))}
-                invert={metric === 'grade'}
-                {...axis(metric, avg)}
-                format={fmt(metric)}
-              />
+              <LineChart label={`${KIND_LABEL[kind]} 과목 평균 ${METRIC_NAME[metric]} 흐름`} points={records.map((r, i) => ({ label: shortDate(r.date).replace(/\(.\)/, ''), title: r.name, y: avg[i] }))} invert={metric === 'grade'} {...axis(metric, avg)} format={fmt(metric)} />
             ) : (
               <p className="st-hint">성적을 두 번 넣으면 흐름 그래프가 보여요.</p>
             )}
-            {metric === 'grade' && <p className="st-hint">등급은 1등급이 맨 위예요.</p>}
           </section>
 
           <div className="gr-grid">
@@ -170,7 +163,12 @@ export function Grades({ sub }: { sub?: string }) {
                   <div className="gr-subject-head">
                     <b>
                       {name}
-                      {goal !== undefined && <small className="gr-goal"> 목표 {goal}등급{lastV !== null && (lastV <= goal ? ' · 달성' : ` · ${Math.round((lastV - goal) * 10) / 10}등급 남음`)}</small>}
+                      {goal !== undefined && (
+                        <small className="gr-goal">
+                          {' '}
+                          목표 {goal}등급{lastV !== null && (lastV <= goal ? ' · 달성' : ` · ${Math.round((lastV - goal) * 10) / 10}등급 남음`)}
+                        </small>
+                      )}
                     </b>
                     <span>
                       <b>{lastV === null ? '—' : fmt(metric)(lastV)}</b>
@@ -178,15 +176,7 @@ export function Grades({ sub }: { sub?: string }) {
                     </span>
                   </div>
                   {has.length > 1 && (
-                    <LineChart
-                      height={120}
-                      label={`${name} ${METRIC_NAME[metric]} 흐름`}
-                      points={records.map((r, i) => ({ label: shortDate(r.date).replace(/\(.\)/, ''), title: r.name, y: ys[i] }))}
-                      invert={metric === 'grade'}
-                      {...axis(metric, ys, goal)}
-                      goal={goal}
-                      format={fmt(metric)}
-                    />
+                    <LineChart height={120} label={`${name} ${METRIC_NAME[metric]} 흐름`} points={records.map((r, i) => ({ label: shortDate(r.date).replace(/\(.\)/, ''), title: r.name, y: ys[i] }))} invert={metric === 'grade'} {...axis(metric, ys, goal)} goal={goal} format={fmt(metric)} />
                   )}
                 </section>
               );
@@ -264,7 +254,6 @@ function PrepVsScore({ records, metric }: { records: GradeRecord[]; metric: Metr
           ))}
         </tbody>
       </table>
-      <p className="st-hint">「기록」의 공부 시간과 오늘 화면의 잠 기록으로 셌어요. 같이 보이는 것이지, 잠이나 공부 시간 때문에 성적이 달라졌다고 단정할 수는 없어요.</p>
     </section>
   );
 }
@@ -275,9 +264,7 @@ function StudyVsScore({ records, metric }: { records: GradeRecord[]; metric: Met
   if (records.length < 1) return null;
   const cur = records[records.length - 1];
   const prev = records.length > 1 ? records[records.length - 2] : null;
-  const rows = cur.scores
-    .map((s) => ({ name: s.subject, now: studyBefore(d, s.subject, cur.date), before: prev ? studyBefore(d, s.subject, prev.date) : null, c: prev ? change(scoreValue(findScore(prev, s.subject), metric), scoreValue(s, metric), metric) : null }))
-    .filter((r) => r.now !== null);
+  const rows = cur.scores.map((s) => ({ name: s.subject, now: studyBefore(d, s.subject, cur.date), before: prev ? studyBefore(d, s.subject, prev.date) : null, c: prev ? change(scoreValue(findScore(prev, s.subject), metric), scoreValue(s, metric), metric) : null })).filter((r) => r.now !== null);
   if (!rows.length || rows.every((r) => !r.now && !r.before)) return null;
   const max = Math.max(1, ...rows.map((r) => Math.max(r.now ?? 0, r.before ?? 0)));
   return (
@@ -299,7 +286,6 @@ function StudyVsScore({ records, metric }: { records: GradeRecord[]; metric: Met
           </div>
         ))}
       </div>
-      <p className="st-hint">이 앱의 「기록」에 넣은 공부 시간을 이름이 같은 과목끼리 맞춰 셌어요.{prev && ' 위 막대가 이번, 아래 흐린 막대가 지난번 시험 전이에요.'}</p>
     </section>
   );
 }
@@ -462,9 +448,7 @@ function GradeSheet({ record, kind: kind0, level: level0, fromExamId, onSaved, o
             </label>
           </div>
         </div>
-        <p className="st-hint">
-          아는 칸만 채우면 돼요.{school ? ' 등급은 학교에서 받은 대로(5등급제·9등급제) 넣어요.' : ''}
-        </p>
+        <p className="st-hint">아는 칸만 채우면 돼요.{school ? ' 등급은 학교에서 받은 대로(5등급제·9등급제) 넣어요.' : ''}</p>
         {bad.length > 0 && <p className="bad">숫자를 확인해 주세요: {bad.slice(0, 3).join(', ')}</p>}
         <Field label="메모 (선택)">
           <input className="st-input" value={memo} onChange={(e) => setMemo(e.target.value)} placeholder="예: 수학 서술형에서 많이 깎임" />
@@ -547,7 +531,6 @@ function GoalGap({ records, names, goalOf, onEdit }: { records: GradeRecord[]; n
           </tbody>
         </table>
       </div>
-      <p className="st-hint">「시간 더」: 목표까지 남은 과목 중 최근 4주 공부 시간이 평균보다 적은 과목이에요. 공부 시간은 이 앱의 기록에서 이름이 같은 과목끼리 셌어요.</p>
     </section>
   );
 }
@@ -567,7 +550,6 @@ function GoalSheet({ kind, names, onClose }: { kind: GradeRecord['kind']; names:
             등급
           </div>
         ))}
-        <p className="st-hint">비워 두면 목표가 없는 과목이에요.</p>
         <div className="st-row end">
           <button
             className="btn btn-primary"

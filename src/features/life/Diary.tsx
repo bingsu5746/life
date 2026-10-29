@@ -81,7 +81,6 @@ function List({ month, today }: { month: string; today: string }) {
           </section>
         ))
       )}
-      <p className="st-hint">일기는 이 기기에 저장되고, 로그인하면 내 계정 서버에도 저장돼요 (다른 사람은 볼 수 없어요).</p>
     </div>
   );
 }

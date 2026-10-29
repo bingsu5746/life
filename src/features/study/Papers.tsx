@@ -110,24 +110,17 @@ export function Papers({ sub }: { sub?: string }) {
                 <b>{minutesText(totalMin)}</b>
               </div>
             </div>
-            {subject && pts.length > 1 && (
-              <LineChart label="점수 흐름 (100점 기준)" points={pts.map((p) => ({ label: md(p.date), title: p.title, y: percent(p) }))} domain={[0, 100]} format={(v) => `${Math.round(v)}`} />
-            )}
-            {!subject && subjects.length > 1 && <p className="st-hint">과목을 고르면 점수 흐름 그래프를 보여 드려요.</p>}
-            {subject && pts.length < 2 && <p className="st-hint">점수를 두 번 넣으면 흐름 그래프가 보여요.</p>}
+            {subject && pts.length > 1 && <LineChart label="점수 흐름 (100점 기준)" points={pts.map((p) => ({ label: md(p.date), title: p.title, y: percent(p) }))} domain={[0, 100]} format={(v) => `${Math.round(v)}`} />}
           </section>
 
           {freq.counts.size > 0 && subject && (
             <section className="st-card">
               <h3 className="st-h">자주 틀리는 번호</h3>
-              <p className="st-sub">
-                {top.map(([q, c]) => `${q}번(${c}번)`).join(' · ')}
-              </p>
+              <p className="st-sub">{top.map(([q, c]) => `${q}번(${c}번)`).join(' · ')}</p>
               <BarChart label="번호대별 틀린 수" height={140} bars={groups} format={(v) => `${v}개`} />
               <TableView head={['번호', '틀린 횟수']} rows={[...freq.counts.entries()].sort((a, b) => a[0] - b[0]).map(([q, c]) => [`${q}번`, `${c}번`])} />
             </section>
           )}
-          {freq.counts.size > 0 && !subject && <p className="st-hint">과목을 고르면 자주 틀리는 번호를 보여 드려요.</p>}
 
           <section className="st-card">
             {[...list].reverse().map((p) => (

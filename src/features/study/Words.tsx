@@ -173,7 +173,10 @@ function ListDetail({ id }: { id: string }) {
   const v = wordListViews(d, allWords, today, plans).find((x) => x.list.id === id)!;
   const ws = v.words;
   const doneDays = listDoneDays(list, ws);
-  const weak = ws.filter((w) => w.wrong > 0).sort((a, b) => b.wrong - a.wrong).slice(0, 20);
+  const weak = ws
+    .filter((w) => w.wrong > 0)
+    .sort((a, b) => b.wrong - a.wrong)
+    .slice(0, 20);
   const shown = ws.filter((w) => (filter === 'new' ? w.box === 0 : filter === 'learning' ? w.box > 0 && !w.learned : filter === 'learned' ? w.learned : true)).filter((w) => !q || w.term.toLowerCase().includes(q.toLowerCase()) || w.meaning.includes(q));
   const days = Math.min(MAX_DAYS, list.days ?? 0);
 
@@ -239,7 +242,8 @@ function ListDetail({ id }: { id: string }) {
           <details className="st-explain">
             <summary>단계가 뭐예요?</summary>
             <p>
-              단어를 맞힐 때마다 한 단계씩 올라가고, 단계가 높을수록 더 오래 있다가 다시 나와요 ({d.settings.intervals.map((n, i) => `${i + 1}단계 ${n}일`).join(' · ')}). 틀리면 1단계로 돌아가요. {d.settings.intervals.length}단계에서 또 맞히면 「외움」이에요. 잊어버릴 때쯤 다시 보게 해서 오래 기억하게 하는 방법이에요. 간격은 설정에서 바꿀 수 있어요.
+              단어를 맞힐 때마다 한 단계씩 올라가고, 단계가 높을수록 더 오래 있다가 다시 나와요 ({d.settings.intervals.map((n, i) => `${i + 1}단계 ${n}일`).join(' · ')}). 틀리면 1단계로 돌아가요. {d.settings.intervals.length}단계에서 또 맞히면 「외움」이에요. 잊어버릴 때쯤 다시 보게 해서 오래
+              기억하게 하는 방법이에요. 간격은 설정에서 바꿀 수 있어요.
             </p>
           </details>
         </div>
@@ -302,9 +306,7 @@ function ListDetail({ id }: { id: string }) {
                   </button>
                 </p>
               )}
-              {planning && (
-                <PlanForm target="words" targetId={id} units={dayUnits(days)} done={doneDays} reserved={new Set()} existing={v.plan?.plan} today={today} onDone={() => setPlanning(false)} />
-              )}
+              {planning && <PlanForm target="words" targetId={id} units={dayUnits(days)} done={doneDays} reserved={new Set()} existing={v.plan?.plan} today={today} onDone={() => setPlanning(false)} />}
               <div className="st-days">
                 {Array.from({ length: days }, (_, i) => i + 1).map((day) => {
                   const dw = ws.filter((w) => w.day === day);
@@ -316,7 +318,6 @@ function ListDetail({ id }: { id: string }) {
                   );
                 })}
               </div>
-              <p className="st-hint">Day를 누르면 다 외운 것으로 체크·해제해요. 단어를 넣은 Day는 모두 한 번 익히면 저절로 체크돼요.</p>
             </>
           )}
         </section>
@@ -480,7 +481,15 @@ function ImportSheet({ list, existing, onClose }: { list: WordList; existing: Wo
   const [keepSentences, setKeepSentences] = useState(false);
   const [skip, setSkip] = useState<Set<number>>(new Set());
   const abort = useRef<AbortController | null>(null);
-  const rows: ParsedWord[] = useMemo(() => parseWords(text, existing.map((w) => w.term), list.lang ?? 'en'), [text, existing, list.lang]);
+  const rows: ParsedWord[] = useMemo(
+    () =>
+      parseWords(
+        text,
+        existing.map((w) => w.term),
+        list.lang ?? 'en',
+      ),
+    [text, existing, list.lang],
+  );
   const good = rows.filter((r, i) => !skip.has(i) && (!r.problem || r.problem === '뜻이 비어 있어요'));
   useEffect(() => () => abort.current?.abort(), []);
 
@@ -571,24 +580,29 @@ function ImportSheet({ list, existing, onClose }: { list: WordList; existing: Wo
           if (s) replace.set(x.line, `${x.term}\t${s.definition}`);
         }
       else
-      for (let i = 0; i < empty.length; i += 60) {
-        const part = empty.slice(i, i + 60);
-        setBusy(`뜻 찾는 중… ${i}/${empty.length}`);
-        const r = await wordMeanings(part.map((x) => x.term));
-        // 서버가 겹친 단어를 하나로 줄였을 수 있어 이름으로 맞춘다
-        const byTerm = new Map(r.words.map((w, j) => [w.toLowerCase(), r.meanings[j]]));
-        for (const x of part) {
-          const m = byTerm.get(x.term.toLowerCase());
-          if (m) replace.set(x.line, `${x.term}\t${m}`);
+        for (let i = 0; i < empty.length; i += 60) {
+          const part = empty.slice(i, i + 60);
+          setBusy(`뜻 찾는 중… ${i}/${empty.length}`);
+          const r = await wordMeanings(part.map((x) => x.term));
+          // 서버가 겹친 단어를 하나로 줄였을 수 있어 이름으로 맞춘다
+          const byTerm = new Map(r.words.map((w, j) => [w.toLowerCase(), r.meanings[j]]));
+          for (const x of part) {
+            const m = byTerm.get(x.term.toLowerCase());
+            if (m) replace.set(x.line, `${x.term}\t${m}`);
+          }
         }
-      }
     } catch (e) {
       toast(e instanceof Error ? e.message : '뜻을 찾지 못했어요');
     } finally {
       setBusy(null);
     }
     if (replace.size) {
-      setText((t) => t.split(/\r?\n/).map((l) => replace.get(l) ?? l).join('\n'));
+      setText((t) =>
+        t
+          .split(/\r?\n/)
+          .map((l) => replace.get(l) ?? l)
+          .join('\n'),
+      );
       toast(`${replace.size}단어의 뜻을 채웠어요. AI가 찾은 뜻이라 한 번 확인해 주세요`);
     }
   }
@@ -620,7 +634,6 @@ function ImportSheet({ list, existing, onClose }: { list: WordList; existing: Wo
       </div>
       {tab === 'pdf' && (
         <div className="st-form">
-          <p className="st-hint">단어장 PDF는 이 기기 안에서만 읽고 어디에도 올리지 않아요. 단어와 뜻만 저장해요.</p>
           <input type="file" accept="application/pdf,.pdf" onChange={(e) => e.target.files?.[0] && void openPdf(e.target.files[0])} />
           {needPw && (
             <div className="st-inline">
@@ -650,29 +663,30 @@ function ImportSheet({ list, existing, onClose }: { list: WordList; existing: Wo
                   </button>
                 )}
               </div>
-              <p className="st-hint">스캔한 PDF(글자 없음)는 글자 인식으로 읽어 시간이 걸려요. 쪽 범위를 좁혀 보세요.</p>
             </>
           )}
         </div>
       )}
       {tab === 'photo' && (
         <div className="st-form">
-          <p className="st-hint">단어장 쪽을 찍어 주세요. 두 단으로 된 쪽은 한 단씩 잘라 찍으면 더 잘 읽어요. 사진은 저장하지 않아요.</p>
           <input type="file" accept="image/*" multiple onChange={(e) => e.target.files?.length && void readPhotos(e.target.files)} />
         </div>
       )}
       {tab === 'mark' && (
         <div className="st-form">
-          <p className="st-hint">
-            책·프린트에서 모르는 단어에 형광펜을 칠하고 찍으면, 칠한 영어 단어만 골라 넣어요. 이어서 칠한 낱말(숙어)은 한 줄로 묶어요. 뜻은 아래 「뜻 자동으로 채우기」로 넣을 수 있어요. 사진은 이
-            기기 안에서만 읽고 저장하지 않아요.
-          </p>
+          <p className="st-hint">책·프린트에서 모르는 단어에 형광펜을 칠하고 찍으면, 칠한 영어 단어만 골라 넣어요. 이어서 칠한 낱말(숙어)은 한 줄로 묶어요. 뜻은 아래 「뜻 자동으로 채우기」로 넣을 수 있어요. 사진은 이 기기 안에서만 읽고 저장하지 않아요.</p>
           <input type="file" accept="image/*" multiple onChange={(e) => e.target.files?.length && void readMarked(e.target.files)} />
-          <p className="st-hint">잘 찍는 법: 밝은 곳에서, 종이가 화면에 꽉 차게, 그림자 없이. 노랑·연두·분홍 형광펜이 잘 읽혀요.</p>
         </div>
       )}
       {busy && <p className="st-muted">{busy}</p>}
-      <Field label={tab === 'paste' ? '한 줄에 단어 하나' : '읽은 글 (고칠 수 있어요)'} hint={<>예: <code>apple 사과</code> · <code>1. give up 포기하다</code> · <code>abandon, 버리다</code> · 엑셀에서 두 칸 복사 · <code>Day 3</code> 줄로 Day 나누기. 다른 사이트에서 만든 단어장도 한 줄에 「단어 뜻」 모양이면 그대로 붙여 넣을 수 있고, 단어만 있으면 「뜻 자동으로 채우기」를 눌러요.</>}>
+      <Field
+        label={tab === 'paste' ? '한 줄에 단어 하나' : '읽은 글 (고칠 수 있어요)'}
+        hint={
+          <>
+            예: <code>apple 사과</code> · <code>1. give up 포기하다</code> · <code>abandon, 버리다</code> · 엑셀에서 두 칸 복사 · <code>Day 3</code> 줄로 Day 나누기. 다른 사이트에서 만든 단어장도 한 줄에 「단어 뜻」 모양이면 그대로 붙여 넣을 수 있고, 단어만 있으면 「뜻 자동으로 채우기」를 눌러요.
+          </>
+        }
+      >
         <textarea className="st-input mono" rows={tab === 'paste' ? 10 : 6} value={text} onChange={(e) => (setText(e.target.value), setSkip(new Set()))} placeholder={'Day 1\nabandon 버리다\nabsorb 흡수하다'} />
       </Field>
       {rows.length > 0 && (
@@ -717,7 +731,7 @@ function ImportSheet({ list, existing, onClose }: { list: WordList; existing: Wo
                       </td>
                       <td className="st-term">{r.term}</td>
                       <td>{r.meaning || <span className="bad">{r.problem}</span>}</td>
-                      <td>{r.problem && r.meaning ? <span className="bad">{r.problem}</span> : r.day ?? ''}</td>
+                      <td>{r.problem && r.meaning ? <span className="bad">{r.problem}</span> : (r.day ?? '')}</td>
                     </tr>
                   );
                 })}
@@ -766,7 +780,12 @@ function WordRun({ listId, mode }: { listId: string; mode: 'learn' | 'prep' | 'w
     let ids: string[];
     // 시험 대비: 맞힐 가능성이 낮은 단어부터 (점수를 가장 많이 올릴 단어)
     if (mode === 'prep') ids = [...ws].sort((a, b) => knowChance(a, today) - knowChance(b, today) || Math.random() - 0.5).map((w) => w.id);
-    else if (mode === 'weak') ids = ws.filter((w) => w.wrong > 0).sort((a, b) => b.wrong - a.wrong).slice(0, 20).map((w) => w.id);
+    else if (mode === 'weak')
+      ids = ws
+        .filter((w) => w.wrong > 0)
+        .sort((a, b) => b.wrong - a.wrong)
+        .slice(0, 20)
+        .map((w) => w.id);
     else ids = [...(v?.due ?? []), ...(v?.fresh ?? [])].map((w) => w.id);
     if (mode === 'weak') ids = ids.sort(() => Math.random() - 0.5);
     setQueue(ids);
@@ -804,10 +823,10 @@ function WordRun({ listId, mode }: { listId: string; mode: 'learn' | 'prep' | 'w
           <Field group label="방향">
             <div className="st-seg">
               <button className={dir === 'en' ? 'on' : ''} onClick={() => setDir('en')}>
-                {list.lang === "ko" ? "낱말 → 뜻" : "영어 → 뜻"}
+                {list.lang === 'ko' ? '낱말 → 뜻' : '영어 → 뜻'}
               </button>
               <button className={dir === 'ko' ? 'on' : ''} onClick={() => setDir('ko')}>
-                {list.lang === "ko" ? "뜻 → 낱말" : "뜻 → 영어"}
+                {list.lang === 'ko' ? '뜻 → 낱말' : '뜻 → 영어'}
               </button>
             </div>
           </Field>
@@ -835,7 +854,9 @@ function WordRun({ listId, mode }: { listId: string; mode: 'learn' | 'prep' | 'w
           <p>
             {total}단어 중 처음에 맞힌 것 {right}개 ({total ? Math.round((right / total) * 100) : 0}%)
           </p>
-          <p className="st-hint">{mode === 'prep' ? '틀린 단어는 1단계로 내려가' : '틀린 단어는'} {d.settings.intervals[0] === 1 ? '내일' : `${d.settings.intervals[0]}일 뒤에`} 다시 나와요.</p>
+          <p className="st-hint">
+            {mode === 'prep' ? '틀린 단어는 1단계로 내려가' : '틀린 단어는'} {d.settings.intervals[0] === 1 ? '내일' : `${d.settings.intervals[0]}일 뒤에`} 다시 나와요.
+          </p>
           <div className="st-row">
             {right < total && (
               <button

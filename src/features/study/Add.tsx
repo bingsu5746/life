@@ -88,7 +88,6 @@ function AddSheet({ today, tab, onClose }: { today: string; tab: string; onClose
           }}
         >
           <input className="st-input" autoFocus placeholder={quick === 'todo' ? '예: 수행평가 자료 찾기' : '예: resilience 회복력'} value={text} onChange={(e) => setText(e.target.value)} />
-          <p className="st-hint">Enter로 넣어요. 여러 개를 계속 넣을 수 있어요.</p>
         </form>
       </Sheet>
     );

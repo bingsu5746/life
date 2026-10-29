@@ -1,6 +1,8 @@
 // 자세히 보기: 영역마다 쌓인 기록을 숫자 · 순위 · 그래프로
 import { BarChart } from '../study/charts';
 import { useStudy } from '../study/store';
+import { Analysis } from '../study/Time';
+import { alive } from '../study/model';
 import { Bar, Empty, go, useToday } from '../study/ui';
 import { fitnessInsights, gradeInsights, hobbyInsights, moneyInsights, studyInsights, type Section } from './insights';
 
@@ -31,6 +33,7 @@ export function InsightsPage({ tab: t0 }: { tab?: string }) {
           </button>
         ))}
       </div>
+      {tab === 'study' && alive(d.sessions).length > 0 && <Analysis sessions={alive(d.sessions)} today={today} />}
       {!sections.length && <Empty title="아직 볼 기록이 없어요" />}
       {sections.map((s) => (
         <section key={s.title} className="st-card">

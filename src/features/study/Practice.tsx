@@ -130,7 +130,6 @@ export function Practice({ listId }: { listId?: string }) {
         </div>
         {mode === 'blank' && noExample > 0 && <p className="st-hint">예문이 없는 단어 {noExample}개는 빠져요. 단어 목록 화면의 「예문 만들기」로 예문을 넣을 수 있어요.</p>}
         {mode === 'listen' && !canSpeak() && <p className="bad">이 브라우저는 읽어 주기를 지원하지 않아요.</p>}
-        {mode === 'choice' && <p className="st-hint">틀린 보기는 내가 넣은 다른 단어에서 골라요 (단어가 4개 넘게 있어야 해요).</p>}
         <button className="btn btn-primary btn-lg" disabled={!usable.length || (mode === 'listen' && !canSpeak())} onClick={() => start()}>
           시작 ({Math.min(count, usable.length)}문제)
         </button>

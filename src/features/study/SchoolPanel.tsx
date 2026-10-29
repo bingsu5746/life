@@ -182,8 +182,7 @@ export function SchoolSettings() {
             </option>
           ))}
         </select>
-        <input className="st-input xs" inputMode="numeric" value={cls} onChange={(e) => setCls(e.target.value.replace(/\D/g, '').slice(0, 2))} placeholder="반" aria-label="반" />
-        반
+        <input className="st-input xs" inputMode="numeric" value={cls} onChange={(e) => setCls(e.target.value.replace(/\D/g, '').slice(0, 2))} placeholder="반" aria-label="반" />반
         <button className="btn btn-sm btn-primary" disabled={!changed || !name.trim()} onClick={() => (setSettings({ school: { name: name.trim(), grade, cls: cls || undefined } }), toast('학교를 저장했어요'))}>
           저장
         </button>
@@ -199,7 +198,6 @@ export function SchoolSettings() {
           {busy && <small className="st-muted">{busy}</small>}
         </div>
       )}
-      <p className="st-hint">급식·학사일정은 오늘 화면과 시험 화면에 보여요. 자료: 나이스 교육정보 개방 포털.</p>
     </section>
   );
 }

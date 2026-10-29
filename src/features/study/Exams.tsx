@@ -227,7 +227,6 @@ function ProgressSheet({ subject, today, onClose }: { subject: Subject; today: s
         }}
       >
         <input className="st-input" autoFocus placeholder="오늘 어디까지 나갔나요? (예: 2단원 3절, 교과서 54쪽)" value={text} onChange={(e) => setText(e.target.value)} aria-label="학교 진도" />
-        <p className="st-hint">Enter로 저장해요. 같은 날 다시 적으면 그날 기록을 고쳐요.</p>
       </form>
       {list.length > 0 && (
         <div className="st-progress-log">
@@ -235,11 +234,7 @@ function ProgressSheet({ subject, today, onClose }: { subject: Subject; today: s
             <div key={p.date} className="st-item">
               <small className="st-muted nowrap">{shortDate(p.date)}</small>
               <div className="st-item-main">{p.text}</div>
-              <button
-                className="st-x"
-                aria-label="이 기록 지우기"
-                onClick={() => put('subjects', { ...subject, progress: (subject.progress ?? []).filter((x) => x.date !== p.date) })}
-              >
+              <button className="st-x" aria-label="이 기록 지우기" onClick={() => put('subjects', { ...subject, progress: (subject.progress ?? []).filter((x) => x.date !== p.date) })}>
                 ✕
               </button>
             </div>
@@ -523,7 +518,11 @@ function ExamDetail({ id }: { id: string }) {
             {s.note && <p className="st-hint">{s.note}</p>}
             {(() => {
               const last = d.subjects[s.subjectId]?.progress?.slice(-1)[0];
-              return last ? <p className="st-hint">학교 진도: {last.text} ({shortDate(last.date)})</p> : null;
+              return last ? (
+                <p className="st-hint">
+                  학교 진도: {last.text} ({shortDate(last.date)})
+                </p>
+              ) : null;
             })()}
           </section>
         );
@@ -640,10 +639,11 @@ export function DdayHero({ today }: { today: string }) {
         <div>
           <strong>{e.name}</strong>
           <small>{examPeriodText(e)}</small>
-          {left <= 0 && (() => {
-            const t = timetable(e).find((x) => x.date === today);
-            return t?.subjectIds.length ? <small>오늘 시험: {t.subjectIds.map((sid) => d.subjects[sid]?.name ?? '과목').join(' · ')}</small> : null;
-          })()}
+          {left <= 0 &&
+            (() => {
+              const t = timetable(e).find((x) => x.date === today);
+              return t?.subjectIds.length ? <small>오늘 시험: {t.subjectIds.map((sid) => d.subjects[sid]?.name ?? '과목').join(' · ')}</small> : null;
+            })()}
         </div>
       </div>
       {p.total > 0 && (

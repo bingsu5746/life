@@ -192,7 +192,6 @@ export function Settings({ cat: cat0 }: { cat?: string }) {
           </section>
           <section className="st-card st-form">
             <h3 className="st-h">공부 메뉴에 보일 칸</h3>
-            <p className="st-hint">안 쓰는 칸은 꺼 두면 메뉴에서 숨겨요. 넣어 둔 자료는 지워지지 않고, 다시 켜면 그대로 보여요.</p>
             <div className="st-chips">
               {TABS.filter((t) => t.key !== 'today').map((t) => {
                 const on = !s.hiddenTabs?.includes(t.key);
@@ -220,7 +219,6 @@ export function Settings({ cat: cat0 }: { cat?: string }) {
 
           <section className="st-card st-form">
             <h3 className="st-h">학교 시간표</h3>
-            {s.school && <p className="st-hint">「내 학교」에서 나이스 시간표를 가져올 수 있어요.</p>}
             <TimetableEditor />
           </section>
         </>
@@ -242,7 +240,6 @@ export function Settings({ cat: cat0 }: { cat?: string }) {
         <>
           <section className="st-card st-form">
             <h3 className="st-h">백업</h3>
-            <p className="st-hint">공부 자료와 단어를 파일 하나로 내려받아요 (오답 사진은 빠져요). 다시 넣으면 지금 자료와 합쳐져요.</p>
             <div className="st-row">
               <button className="btn btn-sm" onClick={exportBackup}>
                 백업 파일 내려받기
@@ -392,7 +389,6 @@ function NotifySettings() {
               </>
             )}
           </div>
-          <p className="st-hint">알림 내용은 이 기기에서 계산해 두었다가 보내요. 앱을 며칠 안 열면 짧은 기본 알림만 가요. 아이폰은 홈 화면에 추가한 사이트에서만 알림을 받을 수 있어요.</p>
         </>
       )}
     </section>

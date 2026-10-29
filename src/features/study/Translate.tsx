@@ -122,7 +122,16 @@ export function Translate({ loggedIn, onLogin }: { loggedIn: boolean; onLogin: (
   const word = shown && shown.target === 'ko' && isShortEnglish(shown.from) ? shown.from.trim() : shown && shown.target === 'en' && isShortEnglish(shown.to) ? shown.to.trim() : '';
   const senses = shown?.r?.senses;
   // 단어 모음에 넣을 뜻: 사전 보기면 앞의 두 품사 뜻
-  const meaning = word ? (shown!.target === 'ko' ? (senses?.length ? senses.slice(0, 2).map((x) => x.text).join('; ') : shown!.to) : shown!.from) : '';
+  const meaning = word
+    ? shown!.target === 'ko'
+      ? senses?.length
+        ? senses
+            .slice(0, 2)
+            .map((x) => x.text)
+            .join('; ')
+        : shown!.to
+      : shown!.from
+    : '';
 
   return (
     <div className="st-page narrow">
@@ -254,7 +263,6 @@ export function Translate({ loggedIn, onLogin }: { loggedIn: boolean; onLogin: (
               </button>
             )}
           </div>
-          <p className="st-hint">AI 번역이라 틀릴 수 있어요. 시험·숙제에 쓸 때는 사전이나 교과서로 한 번 더 확인해 주세요.</p>
         </section>
       )}
 

@@ -129,7 +129,6 @@ function TimeHome({ sub }: { sub?: string }) {
       {timer && focus && <FocusTimer timer={timer} update={update} onStop={() => (setFocus(false), stop())} onExit={() => setFocus(false)} />}
 
       <Stats sessions={sessions} today={today} todayMin={todayMin} />
-      {sessions.length > 0 && <Analysis sessions={sessions} today={today} />}
       {sessions.some((s) => s.place) && <PlaceTime sessions={sessions} today={today} />}
       <SleepStudy today={today} />
       {memoFor && d.sessions[memoFor] && <MemoSheet id={memoFor} onClose={() => setMemoFor(null)} />}
@@ -153,44 +152,44 @@ function RunningTimer({ timer, update, onStop, onFocus }: { timer: TimerState; u
   const pomo = timer.pomo ?? d.settings.pomo;
   const v = view(timer, now, pomo);
   return (
-          <div className="st-timer-run">
-            <Ring progress={v!.progress} phase={timer.kind === 'watch' ? 'work' : timer.phase}>
-              <span className="st-timer-label">
-                <SubjectDot id={timer.subjectId} d={d} /> {timer.label}
-              </span>
-              <b className="st-clock">{clock(v!.shownMs)}</b>
-              <span className="st-muted">{timer.kind === 'watch' ? '스톱워치' : timer.phase === 'work' ? `공부 ${timer.round}번째` : timer.phase === 'long' ? '긴 휴식' : '휴식'}</span>
-            </Ring>
-            {v!.finished && (
-              <p className="st-alert" role="alert">
-                {timer.phase === 'work' ? `${pomo.work}분 공부 끝!` : '휴식 끝!'}
-                {v!.overMs > 60_000 && ` (${Math.floor(v!.overMs / 60_000)}분 전)`}
-              </p>
-            )}
-            <div className="st-row center">
-              {timer.kind === 'pomo' && (v!.finished || timer.phase !== 'work') && (
-                <button className="btn btn-primary btn-lg" onClick={() => (primeAudio(), update(nextPhase(timer, Date.now(), pomo).state))}>
-                  {timer.phase === 'work' ? '휴식 시작' : '다음 공부 시작'}
-                </button>
-              )}
-              {!v!.finished &&
-                (timer.runningSince === null ? (
-                  <button className="btn btn-lg" onClick={() => (primeAudio(), update(resume(timer, Date.now())))}>
-                    이어서 하기
-                  </button>
-                ) : (
-                  <button className="btn btn-lg" onClick={() => update(pause(timer, Date.now()))}>
-                    잠깐 멈추기
-                  </button>
-                ))}
-              <button className="btn btn-lg" onClick={onStop}>
-                끝내고 기록
-              </button>
-            </div>
-            <button className="st-link center" onClick={onFocus}>
-              집중 화면
+    <div className="st-timer-run">
+      <Ring progress={v!.progress} phase={timer.kind === 'watch' ? 'work' : timer.phase}>
+        <span className="st-timer-label">
+          <SubjectDot id={timer.subjectId} d={d} /> {timer.label}
+        </span>
+        <b className="st-clock">{clock(v!.shownMs)}</b>
+        <span className="st-muted">{timer.kind === 'watch' ? '스톱워치' : timer.phase === 'work' ? `공부 ${timer.round}번째` : timer.phase === 'long' ? '긴 휴식' : '휴식'}</span>
+      </Ring>
+      {v!.finished && (
+        <p className="st-alert" role="alert">
+          {timer.phase === 'work' ? `${pomo.work}분 공부 끝!` : '휴식 끝!'}
+          {v!.overMs > 60_000 && ` (${Math.floor(v!.overMs / 60_000)}분 전)`}
+        </p>
+      )}
+      <div className="st-row center">
+        {timer.kind === 'pomo' && (v!.finished || timer.phase !== 'work') && (
+          <button className="btn btn-primary btn-lg" onClick={() => (primeAudio(), update(nextPhase(timer, Date.now(), pomo).state))}>
+            {timer.phase === 'work' ? '휴식 시작' : '다음 공부 시작'}
+          </button>
+        )}
+        {!v!.finished &&
+          (timer.runningSince === null ? (
+            <button className="btn btn-lg" onClick={() => (primeAudio(), update(resume(timer, Date.now())))}>
+              이어서 하기
             </button>
-          </div>
+          ) : (
+            <button className="btn btn-lg" onClick={() => update(pause(timer, Date.now()))}>
+              잠깐 멈추기
+            </button>
+          ))}
+        <button className="btn btn-lg" onClick={onStop}>
+          끝내고 기록
+        </button>
+      </div>
+      <button className="st-link center" onClick={onFocus}>
+        집중 화면
+      </button>
+    </div>
   );
 }
 
@@ -300,7 +299,6 @@ function Stats({ sessions, today, todayMin }: { sessions: StudySession[]; today:
               더 보기
             </button>
           )}
-          <p className="st-hint">누르면 고치거나 지울 수 있어요.</p>
         </section>
       )}
       <WeeklyGoals />
@@ -339,7 +337,7 @@ function WeeklyGoals() {
 }
 
 /** 공부 시간 분석: 기간을 골라 날짜별·주별·요일별·과목별로 */
-function Analysis({ sessions, today }: { sessions: StudySession[]; today: string }) {
+export function Analysis({ sessions, today }: { sessions: StudySession[]; today: string }) {
   const d = useStudy();
   const [range, setRange] = useState<14 | 30 | 90>(30);
   const byDate = minutesByDate(sessions);
@@ -356,8 +354,7 @@ function Analysis({ sessions, today }: { sessions: StudySession[]; today: string
   const h = (m: number) => (m >= 60 ? `${Math.round((m / 60) * 10) / 10}시간` : `${m}분`);
   // 2시간이 넘는 그래프는 눈금을 시간 단위로
   const unit = (vals: number[]) => (Math.max(0, ...vals) >= 120 ? 60 : 1);
-  const cmpText = (c: { now: number; before: number; pct: number | null }) =>
-    c.pct === null ? (c.now ? '앞 기간 기록이 없어요' : '') : c.pct === 0 ? '앞 기간과 같아요' : `앞 기간보다 ${Math.abs(c.pct)}% ${c.pct > 0 ? '많아요' : '적어요'}`;
+  const cmpText = (c: { now: number; before: number; pct: number | null }) => (c.pct === null ? (c.now ? '앞 기간 기록이 없어요' : '') : c.pct === 0 ? '앞 기간과 같아요' : `앞 기간보다 ${Math.abs(c.pct)}% ${c.pct > 0 ? '많아요' : '적어요'}`);
   const md = (x: string) => shortDate(x).replace(/\(.\)/, '');
   return (
     <section className="st-card ta">
@@ -454,7 +451,8 @@ function ManualSheet({ today, session, onClose }: { today: string; session?: Stu
         </Field>
         <div className="st-inline wrap">
           <input className="st-input sm" type="date" value={date} max={today} onChange={(e) => setDate(e.target.value)} aria-label="날짜" />
-          <input className="st-input xs" inputMode="numeric" value={hours} onChange={(e) => setHours(e.target.value.replace(/\D/g, '').slice(0, 2))} aria-label="시간" />시간
+          <input className="st-input xs" inputMode="numeric" value={hours} onChange={(e) => setHours(e.target.value.replace(/\D/g, '').slice(0, 2))} aria-label="시간" />
+          시간
           <input className="st-input xs" inputMode="numeric" value={mins} onChange={(e) => setMins(e.target.value.replace(/\D/g, '').slice(0, 3))} aria-label="분" />분
         </div>
         <PlaceChips value={place} onChange={setPlace} />
@@ -563,7 +561,6 @@ function SleepStudy({ today }: { today: string }) {
         </div>
       </div>
       <SleepBuckets today={today} />
-      <p className="st-hint">기록한 날끼리 평균을 낸 것이라, 잠 때문에 공부 시간이 달라졌다고 단정할 수는 없어요.</p>
     </section>
   );
 }

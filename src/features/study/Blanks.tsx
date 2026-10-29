@@ -20,7 +20,6 @@ export function Blanks({ today, adding }: { today: string; adding?: boolean }) {
   };
   return (
     <>
-      <p className="st-hint">단원 이름만 보고 기억나는 내용을 먼저 써 본 뒤, 핵심 내용과 비교해서 빠뜨린 것을 찾아요. 빠뜨린 게 있으면 내일, 다 떠올리면 점점 길게 간격을 두고 다시 나와요.</p>
       {!all.length ? (
         <Empty title="백지 복습할 단원을 넣어 보세요">
           <p>단원 이름과 꼭 기억해야 할 핵심 내용(한 줄에 하나)을 넣어요. 교과서·노트 정리에서 옮겨 적으면 돼요.</p>

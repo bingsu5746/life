@@ -178,7 +178,7 @@ export function Money({ sub }: { sub?: string }) {
             </button>
           </div>
           {!rules.length ? (
-            <p className="st-hint">넷플릭스·통신비처럼 정해진 날마다 나가는 돈, 용돈처럼 들어오는 돈을 넣어 두면 그날 자동으로 적어요.</p>
+            <p className="st-muted">고정 지출·수입이 없어요.</p>
           ) : (
             <>
               <p className="st-sub">
@@ -352,7 +352,6 @@ function BudgetSheet({ onClose }: { onClose: () => void }) {
         <div className="st-inline">
           <input className="st-input" inputMode="numeric" value={v} onChange={(e) => setV(e.target.value.replace(/\D/g, '') ? Number(e.target.value.replace(/\D/g, '').slice(0, 10)).toLocaleString('ko-KR') : '')} placeholder="예: 200,000" aria-label="한 달 예산 (원)" />원
         </div>
-        <p className="st-hint">비우고 저장하면 예산을 없애요.</p>
         <div className="st-row end">
           <button className="btn btn-primary" onClick={() => (setSettings({ monthlyBudget: readWon(v) || undefined }), onClose())}>
             저장
@@ -513,7 +512,6 @@ function RuleSheet({ item, today, onClose }: { item?: MoneyRule; today: string; 
             <input type="checkbox" checked={paused} onChange={(e) => setPaused(e.target.checked)} /> 잠시 멈추기 (구독을 쉬는 동안)
           </label>
         )}
-        <p className="st-hint">그날이 되면 자동으로 기록에 들어가요. 시작하는 날을 지난날로 정하면 최근 90일 안의 것은 바로 들어가요. 자동으로 들어간 기록을 지우면 다시 생기지 않아요.</p>
         <div className="st-row end">
           {item && (
             <button
