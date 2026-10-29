@@ -3,8 +3,8 @@ import { addDays, weekStart, weekday } from '../study/dates';
 import { habitOn } from '../study/habits';
 import { alive, type DateStr, type Movie, type StudyData } from '../study/model';
 import { shiftMonth } from './calc';
-import { shotsBetween, type ShotSum } from './drills';
-import { pagesBetween } from './Reading';
+import { shotsBetween, type ShotSum } from './bb';
+import { pagesBetween } from './readingCalc';
 
 export interface LifeWeek {
   from: DateStr;

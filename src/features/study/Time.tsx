@@ -79,7 +79,7 @@ function TimeHome({ sub }: { sub?: string }) {
       <div className="st-page-head">
         <h2>공부 기록</h2>
         <div className="st-inline">
-          <button className="btn btn-sm" onClick={() => go('/time/week')}>
+          <button className="st-link" onClick={() => go('/time/week')}>
             주간 돌아보기
           </button>
           <button className="btn btn-sm" onClick={() => setManual(true)}>

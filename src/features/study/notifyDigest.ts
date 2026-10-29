@@ -135,6 +135,11 @@ export function buildDigest(d: StudyData, words: WordsData, today: DateStr, time
       const am = Number(t.slice(0, 2)) < 15;
       const y = am ? awardsYear(d, date) : null;
       const weak = am && weakQuiz(words, date).length > 0;
+      // 일기 알림: 그날 일기가 없을 때만 (썼으면 그 시각의 원래 알림)
+      if (d.settings.diaryTime === t && !(d.diary[date] && !d.diary[date].deleted)) {
+        out.push({ date, slot, title: '일기 쓸 시간이에요', body: '오늘 하루를 짧게라도 남겨 볼까요? 꿈 꾼 게 있으면 그것도요', url: `/diary/${date}` });
+        return;
+      }
       const checkin = d.settings.checkinTime === t;
       if (checkin) {
         out.push({ date, slot, title: '오늘 어땠어요?', body: '기분 · 공부 · 운동을 눌러서 하루를 마감해요', url: '/checkin' });

@@ -3,7 +3,7 @@ import { addDays, weekStart } from '../study/dates';
 import { useState } from 'react';
 import { setSettings, useStudy } from '../study/store';
 import { Bar, useToday } from '../study/ui';
-import { shotsBetween, type ShotLine } from './drills';
+import { shotsBetween, type ShotLine } from './bb';
 
 type Kind = 'fg' | 'tp' | 'ft';
 const NAME: Record<Kind, string> = { fg: '2점', tp: '3점', ft: '자유투' };

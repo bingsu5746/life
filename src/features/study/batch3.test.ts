@@ -533,3 +533,14 @@ describe('하루 마감 체크인 알림', () => {
     expect(e[0].title).toBe('오늘 할 것');
   });
 });
+
+describe('일기 알림', () => {
+  it('일기를 안 쓴 날만 일기 알림, 쓴 날은 원래 알림', () => {
+    const d = emptyStudy();
+    d.settings.diaryTime = '22:30';
+    d.diary['2026-10-29'] = { id: '2026-10-29', text: '씀', updatedAt: 1 } as never;
+    const e = buildDigest(d, {}, '2026-10-28', ['22:30'], 2);
+    expect(e[0]).toMatchObject({ date: '2026-10-28', title: '일기 쓸 시간이에요', url: '/diary/2026-10-28' });
+    expect(e[1].title).toBe('내일 준비');
+  });
+});

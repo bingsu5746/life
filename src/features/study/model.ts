@@ -44,6 +44,8 @@ export interface StudySettings {
   monthlyBudget?: number;
   /** 내신 목표 역산: 과목마다 학기 목표 점수(100점 환산)와 반영 비율 · 이미 받은 점수 */
   semesterGoals?: Record<Id, SemesterGoal>;
+  /** 일기 쓰라는 알림 시각 HH:MM */
+  diaryTime?: string;
   /** 하루 마감 체크인 알림 시각 HH:MM */
   checkinTime?: string;
   /** 잠 목표 (시간) */

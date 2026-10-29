@@ -6,7 +6,7 @@ import { alive, newId, type BasketballStat, type PracticeItem, type Workout } fr
 import { DRILLS, guessKind, practiceTotals } from './drills';
 import { put, remove, useStudy } from '../study/store';
 import { minutesText } from '../study/timer';
-import { BbGoals, ShotSummary } from './ShotCounter';
+import { BbGoals, ShotSummary } from './BbStats';
 import { confirmDelete, Empty, go, Icon, Sheet, tap, toast, useToday } from '../study/ui';
 
 const md = (x: string) => shortDate(x).replace(/\(.\)/, '');

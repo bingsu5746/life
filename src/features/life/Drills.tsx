@@ -4,7 +4,7 @@ import { addDays, shortDate } from '../study/dates';
 import { alive, newId, type BasketballStat, type Workout } from '../study/model';
 import { putMany, useStudy } from '../study/store';
 import { Check, Empty, go, toast, useToday } from '../study/ui';
-import { BbGoals, ShotSummary } from './ShotCounter';
+import { BbGoals, ShotSummary } from './BbStats';
 import { AREA_NAME, buildSession, DRILLS, recentStats, totalMinutes, weaknesses, type Drill, type Need } from './drills';
 
 const MIN = [20, 30, 45, 60];

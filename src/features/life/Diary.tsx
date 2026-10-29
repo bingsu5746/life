@@ -7,6 +7,7 @@ import { put, remove, setSettings, useStudy } from '../study/store';
 import { confirmDelete, go, tap, toast, useToday } from '../study/ui';
 import { monthLabel, monthOf, shiftMonth } from './calc';
 import { daySummary, DIARY_PARTS, dreamDates, formOf } from './diaryForm';
+import { NotifyTime } from './NotifyTime';
 
 /** 기분 점: 좋을수록 진하게 */
 const Mood = ({ m }: { m?: number }) => (m ? <i className={`dy-mood m${m}`} aria-hidden /> : null);
@@ -260,6 +261,7 @@ function Form() {
             </label>
           );
         })}
+        <NotifyTime k="diaryTime" label="일기 알림" fallback="22:30" />
         {form.parts.includes('done') && (
           <label className="st-toggle">
             <input type="checkbox" checked={form.autoFill} onChange={(e) => set(form.parts, e.target.checked)} /> 새 일기를 열면 「오늘 한 것」을 앱 기록으로 미리 채우기

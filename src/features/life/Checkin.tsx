@@ -2,10 +2,10 @@
 import { useState } from 'react';
 import { habitOn, toggleHabit } from '../study/habits';
 import { alive, newId, type DiaryEntry, type Workout } from '../study/model';
-import { enableNotify, localTimes } from '../study/notify';
-import { put, setSettings, useStudy } from '../study/store';
+import { put, useStudy } from '../study/store';
 import { go, toast, useToday } from '../study/ui';
 import { daySummary } from './diaryForm';
+import { NotifyTime } from './NotifyTime';
 
 const MOOD = ['', '나쁨', '별로', '보통', '좋음', '최고'];
 const FEEL = ['아쉬워요', '보통', '뿌듯해요'];
@@ -95,53 +95,7 @@ export function CheckinPage() {
       <button className="btn btn-primary btn-lg" disabled={!mood && !feel && !kind && !line.trim()} onClick={save}>
         하루 마감
       </button>
-      <CheckinTime />
+      <NotifyTime k="checkinTime" label="체크인 알림" fallback="22:00" />
     </div>
-  );
-}
-
-/** 매일 정해진 시각에 체크인 알림 */
-function CheckinTime() {
-  const d = useStudy();
-  const cur = d.settings.checkinTime;
-  const [t, setT] = useState(cur ?? '22:00');
-  const [msg, setMsg] = useState('');
-  async function apply(next: string | undefined) {
-    setSettings({ checkinTime: next });
-    const times = localTimes();
-    if (!times) {
-      setMsg(next ? '이 기기에서 알림이 꺼져 있어요. 설정 → 알림에서 먼저 켜 주세요.' : '');
-      return;
-    }
-    const others = times.filter((x) => x !== cur);
-    const want = next ? [...new Set([...others, next])].sort() : others;
-    if (want.length > 3) {
-      setMsg('알림 시각은 3개까지예요. 설정 → 알림에서 하나를 지운 뒤 다시 해 주세요.');
-      setSettings({ checkinTime: cur });
-      return;
-    }
-    try {
-      await enableNotify(want);
-      setMsg(next ? `매일 ${next}에 알려 드려요` : '체크인 알림을 껐어요');
-    } catch (e) {
-      setMsg(e instanceof Error ? e.message : '알림을 바꾸지 못했어요');
-    }
-  }
-  return (
-    <details className="ck-time">
-      <summary>{cur ? `매일 ${cur}에 알림` : '매일 정해진 시각에 알림 받기'}</summary>
-      <div className="st-inline">
-        <input className="st-input sm" type="time" value={t} onChange={(e) => setT(e.target.value)} aria-label="체크인 알림 시각" />
-        <button className="btn btn-sm btn-primary" onClick={() => void apply(t)}>
-          저장
-        </button>
-        {cur && (
-          <button className="st-link" onClick={() => void apply(undefined)}>
-            끄기
-          </button>
-        )}
-      </div>
-      {msg && <p className="st-hint">{msg}</p>}
-    </details>
   );
 }

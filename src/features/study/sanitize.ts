@@ -419,6 +419,7 @@ export function sanitizeSettings(s: unknown): StudySettings & { updatedAt: numbe
     readingGoal: score(x.readingGoal, 1, 1000),
     weeklyLimit: score(x.weeklyLimit, 1, 1e9),
     sleepGoal: score(x.sleepGoal, 3, 12),
+    diaryTime: typeof x.diaryTime === 'string' && /^([01]\d|2[0-3]):[0-5]\d$/.test(x.diaryTime) ? x.diaryTime : undefined,
     checkinTime: typeof x.checkinTime === 'string' && /^([01]\d|2[0-3]):[0-5]\d$/.test(x.checkinTime) ? x.checkinTime : undefined,
     semesterGoals: isObj(x.semesterGoals)
       ? Object.fromEntries(

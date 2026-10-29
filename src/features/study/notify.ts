@@ -1,6 +1,5 @@
 // 이 기기에서 알림 켜기·끄기, 알림 글 올리기 (worker/push.ts · notifyDigest.ts)
 import { isLoggedIn, notifyDigest, notifyInfo, notifyOff, notifyOn } from '../auth/api';
-import { buildDigest } from './notifyDigest';
 import { getStudy, getWords } from './store';
 
 const KEY = 'my-study.notify.times';
@@ -78,6 +77,8 @@ export async function uploadDigest(force = false) {
   const times = localTimes();
   if (!times?.length || !isLoggedIn()) return;
   const { studyDate } = await import('./dates');
+  // 알림 글 계산은 여러 영역을 읽어서 크다: 알림을 켠 기기에서만 받는다
+  const { buildDigest } = await import('./notifyDigest');
   const d = getStudy();
   const entries = buildDigest(d, getWords(), studyDate(Date.now(), d.settings.dayStart), times);
   const key = JSON.stringify(entries);

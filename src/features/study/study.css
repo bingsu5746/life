@@ -4995,42 +4995,7 @@ body {
   border-bottom: 0;
 }
 
-/* 슛 세기 */
-.sc-row {
-  display: grid;
-  grid-template-columns: 3.4em 1fr 1fr 7.5em;
-  align-items: center;
-  gap: 8px;
-  padding: 6px 0;
-}
-.sc-name {
-  font-weight: 650;
-}
-.sc-btn {
-  min-height: 46px;
-  border-radius: 12px;
-  border: 1px solid var(--line);
-  background: var(--surface);
-  color: var(--text);
-  font: inherit;
-  font-weight: 650;
-  cursor: pointer;
-  -webkit-tap-highlight-color: transparent;
-  touch-action: manipulation;
-}
-.sc-btn.in:active {
-  background: rgba(48, 164, 108, 0.18);
-  border-color: rgb(48, 164, 108);
-}
-.sc-btn.out:active {
-  background: rgba(229, 72, 77, 0.14);
-  border-color: rgb(229, 72, 77);
-}
-.sc-count {
-  text-align: right;
-  font-variant-numeric: tabular-nums;
-  font-size: 0.9rem;
-}
+/* 넣은 슛 표 */
 .sc-table {
   display: grid;
   gap: 6px;
@@ -5281,4 +5246,77 @@ body {
 }
 .ck-time > * {
   margin-top: 8px;
+}
+
+/* 좁은 화면: 줄 안의 입력 칸이 화면 밖으로 밀어내지 않게 */
+.st-input {
+  min-width: 0;
+}
+.st-inline > .st-input:not(.xs):not(.sm) {
+  flex: 1 1 auto;
+}
+.st-inline > button,
+.st-inline > .btn {
+  flex-shrink: 0;
+}
+
+/* 넘기는 카드: 뒤집는 중간(90°)에 앞·뒷면을 바꿔 보여 준다 (iOS 사파리에서 앞면 글자가 비치는 문제) */
+.sw-face {
+  transition: visibility 0s linear 0.22s;
+}
+.sw-inner.flipped .sw-front,
+.sw-inner:not(.flipped) .sw-back {
+  visibility: hidden;
+}
+.sw-front {
+  transform: rotateY(0deg);
+}
+
+/* 세로 화면: 카드를 화면 높이에 맞춰 크게 */
+.sw-card {
+  min-height: clamp(260px, 48vh, 560px);
+}
+@media (orientation: portrait) {
+  .sw {
+    max-width: 640px;
+  }
+  .sw-card {
+    min-height: clamp(300px, 56vh, 640px);
+  }
+  .sw-text {
+    font-size: clamp(1.7rem, 8vw, 3rem);
+  }
+  .sw-back .sw-text {
+    font-size: clamp(1.25rem, 5.5vw, 2rem);
+  }
+  .sw-btn {
+    min-height: 52px;
+  }
+}
+@media (orientation: landscape) and (max-height: 520px) {
+  .sw-card {
+    min-height: 58vh;
+  }
+}
+
+/* ---------- 머리 단추 통일: 화면 맨 위 오른쪽 단추는 둥근 알약 모양, 아이콘만 있으면 동그라미 ---------- */
+.st-page-head > .btn,
+.st-page-head > .st-inline > .btn {
+  min-height: 36px;
+  height: 36px;
+  padding: 0 14px;
+  border-radius: 999px;
+  font-size: 0.86rem;
+}
+.st-page-head > .btn[aria-label]:has(> .st-icon:only-child) {
+  width: 36px;
+  padding: 0;
+}
+.st-page-head > .btn .st-icon {
+  width: 16px;
+  height: 16px;
+}
+.st-page-head > .btn:last-child,
+.st-page-head > .st-inline:last-child {
+  margin-left: auto;
 }
