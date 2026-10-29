@@ -7,7 +7,9 @@ import { put, remove, useStudy } from '../study/store';
 import { confirmDelete, Field, Sheet, toast } from '../study/ui';
 
 /** 본 곳: 영화관 종류와 집·OTT */
-export const PLACES = ['일반 영화관', '아이맥스', '스크린X', '4DX', '돌비', '집', '넷플릭스', 'Apple TV', '티빙', '디즈니+', '쿠팡플레이', '웨이브', '왓챠', '기타'];
+export const PLACES = ['일반 영화관', '아이맥스', '스크린X', '돌비', '집'];
+/** 고르는 태그 */
+export const MOVIE_TAGS = ['혼자', '친구와', '가족과', '울었다', '웃었다', '소름', '반전', '여운', '영상미', '음악', '연기', '명작', '또 볼래', '지루함'];
 
 /** ★★★½☆ 처럼 */
 export function starText(r?: number) {
@@ -49,15 +51,15 @@ export function MovieView({ item, today, onClose, onEdit }: { item: Movie; today
             ))}
           </div>
         )}
-        {item.comment && <blockquote className="mv-quote">{item.comment}</blockquote>}
-        {(item.why || item.recBy) && <small className="st-muted">보기 전: {[item.why, item.recBy && `${item.recBy} 추천`].filter(Boolean).join(' · ')}</small>}
+        {(item.quote || item.comment) && <blockquote className="mv-quote">{item.quote || item.comment}</blockquote>}
+        {item.why && <small className="st-muted">보기 전: {item.why}</small>}
         {item.review ? (
           <div className="mv-review-full">
             <small className="st-muted">리뷰</small>
             <p>{item.review}</p>
           </div>
         ) : (
-          !item.comment && <p className="st-muted">아직 감상평이 없어요.</p>
+          !item.quote && !item.comment && <p className="st-muted">아직 리뷰가 없어요.</p>
         )}
         {times > 1 && (
           <small className="st-muted">
@@ -90,7 +92,7 @@ export function MovieView({ item, today, onClose, onEdit }: { item: Movie; today
             </button>
           )}
           <button className="btn btn-primary" onClick={onEdit}>
-            {item.comment || item.review ? '고치기' : '감상평 쓰기'}
+            {item.quote || item.review ? '고치기' : '리뷰 쓰기'}
           </button>
         </div>
       </div>
@@ -126,25 +128,21 @@ export function MovieSheet({ item, today, onClose }: { item: Partial<Movie>; tod
   const [year, setYear] = useState(item.year?.toString() ?? '');
   const [status, setStatus] = useState<Movie['status']>(item.status ?? 'watched');
   const [rating, setRating] = useState(item.rating ?? 0);
-  const [comment, setComment] = useState(item.comment ?? '');
+  const [quote, setQuote] = useState(item.quote ?? '');
   const [review, setReview] = useState(item.review ?? '');
   const [watched, setWatched] = useState(item.watched ?? today);
+  // 개봉일은 목록에서 고르면 따라온다 (관심 영화 개봉 알림용)
   const [release, setRelease] = useState(item.release ?? '');
   const [where, setWhere] = useState(item.where ?? '');
   const [tags, setTags] = useState<string[]>(item.tags ?? []);
   const [why, setWhy] = useState(item.why ?? '');
-  const [recBy, setRecBy] = useState(item.recBy ?? '');
   const [tagText, setTagText] = useState('');
   const [meta, setMeta] = useState({ genre: item.genre, nation: item.nation, director: item.director });
   const isNew = !item.id;
   // 자주 쓴 태그
   const used = new Map<string, number>();
   for (const m of alive(d.movies)) for (const t of m.tags ?? []) used.set(t, (used.get(t) ?? 0) + 1);
-  const suggest = [...used]
-    .sort((a, b) => b[1] - a[1])
-    .map(([t]) => t)
-    .filter((t) => !tags.includes(t))
-    .slice(0, 6);
+  const choices = [...new Set([...MOVIE_TAGS, ...[...used].sort((a, b) => b[1] - a[1]).map(([t]) => t), ...tags])];
   const addTag = (t: string) => {
     const v = t.trim().replace(/^#/, '').slice(0, 12);
     if (v && !tags.includes(v) && tags.length < 10) setTags([...tags, v]);
@@ -152,9 +150,11 @@ export function MovieSheet({ item, today, onClose }: { item: Partial<Movie>; tod
   };
   // 제목을 치면 서버에 쌓아 둔 영화 목록(1990년~)에서 찾아 준다
   const [found, setFound] = useState<CatalogFilm[]>([]);
+  // 목록에서 하나 고르면 제목을 다시 칠 때까지 더 찾지 않는다
+  const [picked, setPicked] = useState(!!item.title);
   useEffect(() => {
     const q = title.trim();
-    if (!isNew || q.length < 1) return setFound([]);
+    if (!isNew || picked || q.length < 1) return setFound([]);
     let on = true;
     const t = setTimeout(() => {
       catalogSearch(q)
@@ -165,12 +165,12 @@ export function MovieSheet({ item, today, onClose }: { item: Partial<Movie>; tod
       on = false;
       clearTimeout(t);
     };
-  }, [title, isNew, year]);
+  }, [title, isNew, year, picked]);
   return (
     <Sheet title={isNew ? (item.title ? `「${item.title}」` : '영화 넣기') : '영화 고치기'} onClose={onClose}>
       <div className="st-form">
         <div className="st-inline">
-          <input className="st-input" autoFocus={!item.title} value={title} onChange={(e) => setTitle(e.target.value)} placeholder="영화 제목" aria-label="영화 제목" />
+          <input className="st-input" autoFocus={!item.title} value={title} onChange={(e) => (setTitle(e.target.value), setPicked(false))} placeholder="영화 제목" aria-label="영화 제목" />
           <input className="st-input xs" inputMode="numeric" value={year} onChange={(e) => setYear(e.target.value.replace(/\D/g, '').slice(0, 4))} placeholder="연도" aria-label="개봉 연도 (선택)" />
         </div>
         {found.length > 0 && (
@@ -186,6 +186,7 @@ export function MovieSheet({ item, today, onClose }: { item: Partial<Movie>; tod
                   setTitle(f.title);
                   setYear(f.open.slice(0, 4));
                   setRelease(f.open);
+                  setPicked(true);
                   setMeta({ genre: f.genre ?? undefined, nation: f.nation ?? undefined, director: f.director ?? undefined });
                   setFound([]);
                 }}
@@ -207,17 +208,17 @@ export function MovieSheet({ item, today, onClose }: { item: Partial<Movie>; tod
         {status === 'watched' ? (
           <>
             <StarInput value={rating} onChange={setRating} />
-            <Field label="한줄 감상평">
-              <textarea className="st-input" rows={2} value={comment} onChange={(e) => setComment(e.target.value)} placeholder="한 문장으로 남기기" aria-label="한줄 감상평" />
+            <Field label="명대사">
+              <textarea className="st-input" rows={2} value={quote} onChange={(e) => setQuote(e.target.value)} aria-label="명대사" />
             </Field>
             <Field label={`리뷰${review.trim() ? ` · ${review.trim().length.toLocaleString('ko-KR')}자` : ''}`}>
               <textarea className="st-input mv-review-input" rows={8} value={review} onChange={(e) => setReview(e.target.value)} placeholder="줄거리, 좋았던 장면, 아쉬운 점… 길게 써도 돼요" aria-label="리뷰" />
             </Field>
-            <Field label="태그">
-              <div className="mv-tagedit">
-                {tags.map((t) => (
-                  <button key={t} type="button" className="st-chip on" aria-label={`${t} 빼기`} onClick={() => setTags(tags.filter((x) => x !== t))}>
-                    #{t} ✕
+            <Field group label="태그">
+              <div className="st-chips">
+                {choices.map((t) => (
+                  <button key={t} type="button" className={`st-chip ${tags.includes(t) ? 'on' : ''}`} aria-pressed={tags.includes(t)} onClick={() => setTags(tags.includes(t) ? tags.filter((x) => x !== t) : tags.length < 10 ? [...tags, t] : tags)}>
+                    {t}
                   </button>
                 ))}
                 <input
@@ -231,19 +232,10 @@ export function MovieSheet({ item, today, onClose }: { item: Partial<Movie>; tod
                     }
                   }}
                   onBlur={() => tagText && addTag(tagText)}
-                  placeholder={tags.length ? '' : '혼자 · 울었다 … Enter'}
-                  aria-label="태그 추가"
+                  placeholder="+ 직접"
+                  aria-label="태그 직접 넣기"
                 />
               </div>
-              {suggest.length > 0 && (
-                <div className="st-chips">
-                  {suggest.map((t) => (
-                    <button key={t} type="button" className="st-chip" onClick={() => addTag(t)}>
-                      #{t}
-                    </button>
-                  ))}
-                </div>
-              )}
             </Field>
             <label className="st-cond-time">
               본 날
@@ -258,11 +250,6 @@ export function MovieSheet({ item, today, onClose }: { item: Partial<Movie>; tod
             <Field label="왜 보고 싶어요? (선택)">
               <textarea className="st-input" rows={2} value={why} onChange={(e) => setWhy(e.target.value)} placeholder="예고편이 좋아서, 감독 전작이 좋았어서…" aria-label="보고 싶은 이유" />
             </Field>
-            <input className="st-input" value={recBy} onChange={(e) => setRecBy(e.target.value)} placeholder="추천해 준 사람 (선택)" aria-label="추천해 준 사람" />
-            <label className="st-cond-time">
-              개봉일 (알면)
-              <input className="st-input sm" type="date" value={release} onChange={(e) => setRelease(e.target.value)} />
-            </label>
           </>
         )}
         <div className="st-row end">
@@ -285,14 +272,13 @@ export function MovieSheet({ item, today, onClose }: { item: Partial<Movie>; tod
                 year: y >= 1880 && y <= 2200 ? y : undefined,
                 status,
                 rating: status === 'watched' && rating ? rating : undefined,
-                comment: status === 'watched' ? comment.trim() || undefined : item.comment,
+                quote: status === 'watched' ? quote.trim() || undefined : item.quote,
                 review: status === 'watched' ? review.trim() || undefined : item.review,
                 tags: status === 'watched' && tags.length ? tags : undefined,
                 watched: status === 'watched' ? watched || undefined : undefined,
                 release: release || undefined,
                 where: status === 'watched' ? where || undefined : undefined,
                 why: why.trim() || undefined,
-                recBy: recBy.trim() || undefined,
               } as Movie);
               toast('저장했어요');
               onClose();

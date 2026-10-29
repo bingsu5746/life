@@ -223,8 +223,7 @@ export function FindTab({ onWatched, onOpen }: Common) {
         </div>
       </div>
       {err && <p className="st-hint bad">{err}</p>}
-      {count === 0 && <p className="st-hint">영화 목록이 아직 비어 있어요. 「극장가」 탭에서 「영화 목록 받기」를 먼저 해 주세요.</p>}
-      {!active && !err && count !== 0 && <p className="st-hint">제목이나 감독을 쓰거나, 장르·나라·연도를 골라 보세요.</p>}
+      {count === 0 && <p className="st-hint">영화 목록이 비어 있어요 (극장가 → 영화 목록 받기)</p>}
       {active && !busy && !items.length && !err && <p className="st-muted">찾은 영화가 없어요.</p>}
       <div>
         {items.map((x) => (
@@ -303,7 +302,7 @@ export function RecTab({ onWatched, onOpen }: Common) {
       )}
       {mode === 'taste' ? (
         <div className="st-inline between wrap">
-          <small className="st-muted">{rated.length ? `별점을 준 ${rated.length}편의 별점·감상평을 보고 골라요 (4점 이상은 좋아함, 2.5점 이하는 별로)` : '별점을 준 영화가 없어요. 본 영화에 별점을 남겨 보세요.'}</small>
+          <small className="st-muted">{rated.length ? `별점 준 ${rated.length}편 기준` : '별점 준 영화가 없어요'}</small>
           <button className="btn btn-primary btn-sm" disabled={busy || !rated.length} onClick={() => void run('')}>
             {busy ? '고르는 중…' : '추천받기'}
           </button>
@@ -346,7 +345,6 @@ export function RecTab({ onWatched, onOpen }: Common) {
           ))}
         </div>
       )}
-      <p className="st-hint">AI가 고른 제목 중 KOBIS 영화 목록에서 확인된 영화만 보여 줘요. 취향은 추측이라 틀릴 수 있어요.</p>
       {ott.off && <p className="st-hint">{ott.off}</p>}
     </section>
   );
@@ -386,9 +384,7 @@ function TasteCard({ onExplore }: { onExplore: (genre: string) => void }) {
   return (
     <details className="tm" open>
       <summary>내 취향 지도</summary>
-      {t.withInfo === 0 ? (
-        <p className="st-hint">장르·감독 정보는 「찾기」나 「극장가」에서 골라 담은 영화에만 있어요.</p>
-      ) : (
+      {t.withInfo === 0 ? null : (
         <>
           {rows('장르', t.genres)}
           {rows('나라', t.nations)}

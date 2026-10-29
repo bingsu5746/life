@@ -29,7 +29,7 @@ const md = (x: string) => shortDate(x).replace(/\(.\)/, '');
 export function Hobby({ sub, sub2 }: { sub?: string; sub2?: string }) {
   if (sub === 'movies') return <MovedToMovies sub={sub2} />;
   if (sub === 'reading') return <ReadingPage />;
-  return <HobbyMain sub={sub} view={sub === 'wish' ? 'wish' : 'main'} />;
+  return <HobbyMain sub={sub} view="main" />;
 }
 
 function MovedToMovies({ sub }: { sub?: string }) {

@@ -52,20 +52,6 @@ export function Movies({ sub }: { sub?: string }) {
           <Icon name="plus" />
         </button>
       </div>
-      <div className="st-seg mv-top-tabs" role="tablist" aria-label="영화">
-        {(
-          [
-            ['now', '극장가', '/movies'],
-            ['mine', '내 영화', '/movies/watched'],
-            ['find', '찾기', '/movies/find'],
-            ['rec', '추천', '/movies/rec'],
-          ] as const
-        ).map(([k, label, to]) => (
-          <button key={k} role="tab" aria-selected={tab === k} className={tab === k ? 'on' : ''} onClick={() => go(to)}>
-            {label}
-          </button>
-        ))}
-      </div>
       {tab === 'mine' && (
         <nav className="mv-sub" aria-label="내 영화">
           <button className={mineSub === 'watched' ? 'on' : ''} onClick={() => go('/movies/watched')}>
@@ -74,9 +60,9 @@ export function Movies({ sub }: { sub?: string }) {
           <button className={mineSub === 'want' ? 'on' : ''} onClick={() => go('/movies/want')}>
             보고 싶어요{want.length ? ` ${want.length}` : ''}
           </button>
-          {watched.some((m) => m.comment) && (
+          {watched.some((m) => m.quote || m.comment) && (
             <button className={mineSub === 'quotes' ? 'on' : ''} onClick={() => go('/movies/quotes')}>
-              한줄평
+              명대사
             </button>
           )}
           <button className={mineSub === 'awards' ? 'on' : ''} onClick={() => go('/movies/awards')}>
@@ -164,9 +150,9 @@ export function Movies({ sub }: { sub?: string }) {
                     </span>
                     <small className="st-muted">{[m.watched && shortDate(m.watched), m.where].filter(Boolean).join(' · ')}</small>
                   </div>
-                  {m.comment && <p className="mv-comment">“{m.comment}”</p>}
+                  {(m.quote || m.comment) && <p className="mv-comment">“{m.quote || m.comment}”</p>}
                   {m.review && <p className="mv-review">{m.review}</p>}
-                  {!m.comment && !m.review && <small className="st-muted">감상평 없음 · 눌러서 쓰기</small>}
+                  
                   {m.tags && m.tags.length > 0 && <small className="mv-tags">{m.tags.map((x) => `#${x}`).join(' ')}</small>}
                 </article>
               ))}
@@ -192,10 +178,10 @@ export function Movies({ sub }: { sub?: string }) {
           </div>
           <div className="mq-list">
             {watched
-              .filter((m) => m.comment)
+              .filter((m) => m.quote || m.comment)
               .map((m) => (
                 <button key={m.id} className="mq-item" onClick={() => setView(m.id)}>
-                  <p>“{m.comment}”</p>
+                  <p>“{m.quote || m.comment}”</p>
                   <small>
                     <b>{m.title}</b>
                     {[m.rating && starText(m.rating), m.watched && shortDate(m.watched)].filter(Boolean).map((x) => ` · ${x}`)}
@@ -203,7 +189,6 @@ export function Movies({ sub }: { sub?: string }) {
                 </button>
               ))}
           </div>
-          {!watched.some((m) => m.comment) && <p className="st-hint">한줄 감상평을 남긴 영화가 아직 없어요.</p>}
         </>
       )}
 
@@ -237,7 +222,7 @@ export function Movies({ sub }: { sub?: string }) {
                   {m.year && <small className="st-muted">{m.year}</small>}
                 </div>
                 <Badges p={wantOtt.of({ title: m.title, year: m.year })} />
-                {(m.why || m.recBy) && <p className="mv-review">{[m.why, m.recBy && `${m.recBy} 추천`].filter(Boolean).join(' · ')}</p>}
+                {m.why && <p className="mv-review">{m.why}</p>}
                 <div className="mv-meta">
                   <small className="st-muted">{m.release ? `${shortDate(m.release)} 개봉${m.release >= today ? ` · ${dday(today, m.release)}` : ''}` : '개봉일 모름'}</small>
                   <button

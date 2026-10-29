@@ -28,6 +28,7 @@ const Home = lazy(() => import('../life/Home').then((m) => ({ default: m.Home })
 const Fitness = lazy(() => import('../life/Fitness').then((m) => ({ default: m.Fitness })));
 const Money = lazy(() => import('../life/Money').then((m) => ({ default: m.Money })));
 const Hobby = lazy(() => import('../life/Hobby').then((m) => ({ default: m.Hobby })));
+const Travel = lazy(() => import('../life/Travel').then((m) => ({ default: m.Travel })));
 const Games = lazy(() => import('../life/Games').then((m) => ({ default: m.Games })));
 const Music = lazy(() => import('../life/Music').then((m) => ({ default: m.Music })));
 const Movies = lazy(() => import('../life/Movies').then((m) => ({ default: m.Movies })));
@@ -42,7 +43,7 @@ const Words = lazy(() => import('./Words').then((m) => ({ default: m.Words })));
 
 const PRELOAD = [() => import('../life/Home'), () => import('../life/Fitness'), () => import('../life/Money'), () => import('../life/Hobby'), () => import('../life/Movies'), () => import('../life/Games'), () => import('../life/Music'), () => import('../life/Diary'), () => import('./Books'), () => import('./Life'), () => import('./Review'), () => import('./Settings'), () => import('./Time'), () => import('./Translate'), () => import('./Preview'), () => import('./Tutors'), () => import('./Words')];
 
-import { activeItem, AREA_ITEMS, AREAS, HOBBY_PARTS, TABS, type AreaKey } from './tabs';
+import { activeItem, AREA_ITEMS, AREAS, HOBBY_PARTS, MOVIE_ITEMS, movieItem, TABS, type AreaKey } from './tabs';
 export { TABS };
 /** 메뉴에는 없지만 열 수 있는 화면 (설정은 맨 위 막대의 톱니) */
 const HIDDEN = ['settings'];
@@ -123,6 +124,7 @@ export function Study({ path, loggedIn, syncReady = true, onLogin }: { path: str
   else if (p0 === 'movies') content = <Movies sub={path[1]} />;
   else if (p0 === 'games') content = <Games sub={path[1]} />;
   else if (p0 === 'music') content = <Music sub={path[1]} />;
+  else if (p0 === 'travel') content = <Travel />;
   else if (area === 'hobby') content = <Hobby sub={path[1]} sub2={path[2]} />;
   else if (area === 'diary') content = <Diary sub={path[1]} />;
   else if (tab === 'books') content = <Books id={id} sub={sub} />;
@@ -158,8 +160,8 @@ export function Study({ path, loggedIn, syncReady = true, onLogin }: { path: str
             <span className="st-tab-label">메인으로</span>
             <span className="st-tab-short">메인</span>
           </button>
-          {AREA_ITEMS[area].map((it) => {
-            const on = activeItem(area, path[1], p0) === it.key;
+          {(p0 === 'movies' ? MOVIE_ITEMS : AREA_ITEMS[area]).map((it) => {
+            const on = (p0 === 'movies' ? movieItem(path[1]) : activeItem(area, path[1], p0)) === it.key;
             return (
               <button key={it.key} className={`st-tab ${on ? 'on' : ''}`} aria-current={on ? 'page' : undefined} onClick={() => go(it.to ?? (it.key ? `/${area}/${it.key}` : `/${area}`))}>
                 <Icon name={it.icon} />

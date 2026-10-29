@@ -65,7 +65,6 @@ export function NowShowing({ today, onWatched, onOpen }: { today: string; onWatc
           ))}
         </section>
       )}
-      <p className="st-hint">자료: 영화진흥위원회 영화관입장권통합전산망(KOBIS). 6시간마다 새로 받아요. 넷플릭스·Apple TV 등 OTT 표시는 TMDB(JustWatch) 자료예요.</p>
     </div>
   );
 }
@@ -120,8 +119,8 @@ export function CatalogBar() {
     <section className="st-card">
       <div className="st-inline between wrap">
         <div>
-          <h3 className="st-h">영화 목록 (1990년~, 단편·성인물 포함)</h3>
-          <small className="st-muted">{state.count ? `${state.count.toLocaleString('ko-KR')}편 저장됨 · 「영화 넣기」에서 제목을 치면 찾아 줘요` : '아직 안 받았어요'}</small>
+          <h3 className="st-h">영화 목록</h3>
+          <small className="st-muted">{state.count ? `${state.count.toLocaleString('ko-KR')}편 저장됨` : '아직 안 받았어요'}</small>
         </div>
         {run ? (
           <button className="btn btn-sm" onClick={() => (stop.current = true)}>

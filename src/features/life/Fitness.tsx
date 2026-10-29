@@ -158,52 +158,108 @@ function BodyPage() {
 function BodyCard({ today }: { today: string }) {
   const d = useStudy();
   const logs = alive(d.bodyLogs).sort((a, b) => a.id.localeCompare(b.id));
-  const todayLog = d.bodyLogs[today]?.deleted ? undefined : d.bodyLogs[today];
+  // 적을 날 (지난 날도 고칠 수 있게)
+  const [day, setDay] = useState(today);
+  const dayLog = d.bodyLogs[day]?.deleted ? undefined : d.bodyLogs[day];
   const lastH = [...logs].reverse().find((l) => l.height)?.height;
   const lastW = [...logs].reverse().find((l) => l.weight)?.weight;
-  const [w, setW] = useState(todayLog?.weight?.toString() ?? '');
-  const [h, setH] = useState(todayLog?.height?.toString() ?? '');
-  const ws = logs.filter((l) => l.weight).slice(-30);
-  const hs = logs.filter((l) => l.height).slice(-30);
+  const [w, setW] = useState(dayLog?.weight?.toString() ?? '');
+  const [h, setH] = useState(dayLog?.height?.toString() ?? '');
+  const [range, setRange] = useState<90 | 365 | 0>(90);
+  const [all, setAll] = useState(false);
+  const from = range ? addDays(today, -range) : '0000';
+  const ws = logs.filter((l) => l.weight && l.id >= from);
+  const hs = logs.filter((l) => l.height && l.id >= from);
   const bmi = lastH && lastW ? Math.round((lastW / (lastH / 100) ** 2) * 10) / 10 : null;
+  const firstW = logs.find((l) => l.weight);
+  const firstH = logs.find((l) => l.height);
+  const pick = (id: string) => {
+    const l = d.bodyLogs[id];
+    setDay(id);
+    setW(l?.weight?.toString() ?? '');
+    setH(l?.height?.toString() ?? '');
+  };
   const save = () => {
     const nw = w.trim() ? Number(w.replace(',', '.')) : undefined;
     const nh = h.trim() ? Number(h.replace(',', '.')) : undefined;
     if ((nw !== undefined && !(nw >= 10 && nw <= 400)) || (nh !== undefined && !(nh >= 50 && nh <= 250))) return toast('숫자를 확인해 주세요');
     if (nw === undefined && nh === undefined) return;
-    put('bodyLogs', { ...(todayLog ?? {}), id: today, weight: nw !== undefined ? Math.round(nw * 10) / 10 : todayLog?.weight, height: nh !== undefined ? Math.round(nh * 10) / 10 : todayLog?.height } as never);
-    toast('오늘 기록을 적었어요');
+    put('bodyLogs', { ...(dayLog ?? {}), id: day, deleted: undefined, weight: nw !== undefined ? Math.round(nw * 10) / 10 : dayLog?.weight, height: nh !== undefined ? Math.round(nh * 10) / 10 : dayLog?.height } as never);
+    toast(day === today ? '오늘 기록을 적었어요' : `${shortDate(day)} 기록을 적었어요`);
   };
+  const hist = [...logs].reverse();
   return (
-    <section className="st-card">
-      <h3 className="st-h">키 · 몸무게</h3>
-      <div className="st-stat-row">
-        <div>
-          <small>키</small>
-          <b>{lastH ? `${lastH}cm` : '—'}</b>
+    <>
+      <section className="st-card">
+        <div className="st-stat-row">
+          <div>
+            <small>키</small>
+            <b>{lastH ? `${lastH}cm` : '—'}</b>
+            {firstH && lastH && firstH.height !== lastH && <small className="st-muted">처음보다 {Math.round((lastH - firstH.height!) * 10) / 10 > 0 ? '+' : ''}{Math.round((lastH - firstH.height!) * 10) / 10}</small>}
+          </div>
+          <div>
+            <small>몸무게</small>
+            <b>{lastW ? `${lastW}kg` : '—'}</b>
+            {firstW && lastW && firstW.weight !== lastW && <small className="st-muted">처음보다 {Math.round((lastW - firstW.weight!) * 10) / 10 > 0 ? '+' : ''}{Math.round((lastW - firstW.weight!) * 10) / 10}</small>}
+          </div>
+          <div>
+            <small>BMI</small>
+            <b>{bmi ?? '—'}</b>
+          </div>
         </div>
-        <div>
-          <small>몸무게</small>
-          <b>{lastW ? `${lastW}kg` : '—'}</b>
+        <div className="st-inline wrap">
+          <input className="st-input sm" type="date" max={today} value={day} onChange={(e) => e.target.value && pick(e.target.value)} aria-label="날짜" />
+          <input className="st-input xs" inputMode="decimal" value={h} onChange={(e) => setH(e.target.value)} placeholder={lastH ? String(lastH) : 'cm'} aria-label="키 (cm)" />
+          cm
+          <input className="st-input xs" inputMode="decimal" value={w} onChange={(e) => setW(e.target.value)} placeholder={lastW ? String(lastW) : 'kg'} aria-label="몸무게 (kg)" onKeyDown={(e) => e.key === 'Enter' && save()} />
+          kg
+          <button className="btn btn-sm btn-primary" onClick={save}>
+            적기
+          </button>
         </div>
-        <div>
-          <small>BMI</small>
-          <b>{bmi ?? '—'}</b>
-        </div>
-      </div>
-      <div className="st-inline wrap">
-        <input className="st-input xs" inputMode="decimal" value={h} onChange={(e) => setH(e.target.value)} placeholder={lastH ? String(lastH) : 'cm'} aria-label="오늘 키 (cm)" />
-        cm
-        <input className="st-input xs" inputMode="decimal" value={w} onChange={(e) => setW(e.target.value)} placeholder={lastW ? String(lastW) : 'kg'} aria-label="오늘 몸무게 (kg)" onKeyDown={(e) => e.key === 'Enter' && save()} />
-        kg
-        <button className="btn btn-sm" onClick={save}>
-          오늘 적기
-        </button>
-      </div>
-      {hs.length > 1 && <LineChart label="키 흐름" height={130} points={hs.map((l) => ({ label: md(l.id), title: shortDate(l.id), y: l.height ?? null }))} format={(x) => `${Math.round(x * 10) / 10}`} />}
-      {ws.length > 1 && <LineChart label="몸무게 흐름" height={130} points={ws.map((l) => ({ label: md(l.id), title: shortDate(l.id), y: l.weight ?? null }))} format={(x) => `${Math.round(x * 10) / 10}`} />}
-      <p className="st-hint">BMI는 몸무게(kg) ÷ 키(m)² 로 계산한 값이에요. 청소년은 나이·성별에 따른 기준표로 봐야 해서 여기서는 숫자만 보여 드려요.</p>
-    </section>
+      </section>
+      {(ws.length > 1 || hs.length > 1) && (
+        <section className="st-card">
+          <div className="st-seg sm">
+            {([90, 365, 0] as const).map((r) => (
+              <button key={r} className={range === r ? 'on' : ''} onClick={() => setRange(r)}>
+                {r === 90 ? '3달' : r === 365 ? '1년' : '전체'}
+              </button>
+            ))}
+          </div>
+          {ws.length > 1 && <LineChart label="몸무게" height={140} points={ws.map((l) => ({ label: md(l.id), title: shortDate(l.id), y: l.weight ?? null }))} format={(x) => `${Math.round(x * 10) / 10}`} />}
+          {hs.length > 1 && <LineChart label="키" height={120} points={hs.map((l) => ({ label: md(l.id), title: shortDate(l.id), y: l.height ?? null }))} format={(x) => `${Math.round(x * 10) / 10}`} />}
+        </section>
+      )}
+      {hist.length > 0 && (
+        <section className="st-card">
+          <h3 className="st-h">지난 기록 {hist.length}</h3>
+          {(all ? hist : hist.slice(0, 8)).map((l) => (
+            <div key={l.id} className="st-item st-tap" onClick={() => pick(l.id)}>
+              <small className="st-muted nowrap">{shortDate(l.id)}</small>
+              <div className="st-item-main">
+                <div className="st-item-title">{[l.height && `${l.height}cm`, l.weight && `${l.weight}kg`].filter(Boolean).join(' · ')}</div>
+              </div>
+              <button
+                className="st-x"
+                aria-label={`${shortDate(l.id)} 기록 지우기`}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (confirmDelete(`${shortDate(l.id)} 기록`)) remove('bodyLogs', l.id);
+                }}
+              >
+                ✕
+              </button>
+            </div>
+          ))}
+          {!all && hist.length > 8 && (
+            <button className="st-fold" onClick={() => setAll(true)}>
+              더 보기
+            </button>
+          )}
+        </section>
+      )}
+    </>
   );
 }
 

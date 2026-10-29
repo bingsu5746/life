@@ -58,6 +58,10 @@ export function searchAll(d: StudyData, words: Record<string, Word>, query: stri
     })),
   );
   add(
+    '여행',
+    alive(d.places ?? {}).map((p) => ({ title: p.name, text: [p.region, p.note].filter(Boolean).join(' · '), to: '/travel', fields: [p.name, p.region, p.note] })),
+  );
+  add(
     '게임',
     alive(d.games ?? {}).map((g) => ({ title: g.title, text: [g.platform, g.note].filter(Boolean).join(' · '), to: '/games', fields: [g.title, g.platform, g.note] })),
   );

@@ -33,7 +33,7 @@ export interface AreaItem {
 }
 
 /** 취미 영역에 함께 들어 있는 주소 맨 앞 칸 */
-export const HOBBY_PARTS = ['movies', 'games', 'music'] as const;
+export const HOBBY_PARTS = ['movies', 'games', 'music', 'travel'] as const;
 
 /** 공부를 뺀 영역마다 왼쪽(폰은 아래) 메뉴: 영역을 누르면 메인 대신 이 칸들이 나온다 */
 export const AREA_ITEMS: Record<Exclude<AreaKey, 'home' | 'study'>, AreaItem[]> = {
@@ -50,11 +50,11 @@ export const AREA_ITEMS: Record<Exclude<AreaKey, 'home' | 'study'>, AreaItem[]> 
   ],
   hobby: [
     { key: '', label: '취미', icon: 'area-hobby' },
-    { key: 'wish', label: '하고 싶은 것', icon: 'life' },
     { key: 'reading', label: '독서', icon: 'books' },
     { key: 'movies', label: '영화', icon: 'area-movies', to: '/movies' },
     { key: 'games', label: '게임', icon: 'game', to: '/games' },
     { key: 'music', label: '음악', icon: 'music', to: '/music' },
+    { key: 'travel', label: '여행', icon: 'pin', to: '/travel' },
   ],
   diary: [
     { key: '', label: '일기', icon: 'area-diary' },
@@ -62,6 +62,18 @@ export const AREA_ITEMS: Record<Exclude<AreaKey, 'home' | 'study'>, AreaItem[]> 
     { key: 'form', label: '양식', icon: 'settings' },
   ],
 };
+
+/** 영화 안에서의 메뉴 (취미로 돌아가기 + 영화 칸들) */
+export const MOVIE_ITEMS: AreaItem[] = [
+  { key: 'hobby', label: '취미', icon: 'area-hobby', to: '/hobby' },
+  { key: 'now', label: '극장가', icon: 'area-movies', to: '/movies' },
+  { key: 'watched', label: '내 영화', icon: 'life', to: '/movies/watched' },
+  { key: 'find', label: '찾기', icon: 'search', to: '/movies/find' },
+  { key: 'rec', label: '추천', icon: 'area-hobby', to: '/movies/rec' },
+];
+
+/** 영화 주소의 두 번째 칸 → 켜진 영화 메뉴 */
+export const movieItem = (sub?: string) => (sub === 'watched' || sub === 'want' || sub === 'quotes' || sub === 'awards' || sub === 'ceremony' ? 'watched' : sub === 'find' || sub === 'rec' ? sub : 'now');
 
 /** 지금 주소에서 어느 메뉴가 켜져 있는지 */
 export function activeItem(area: keyof typeof AREA_ITEMS, sub?: string, p0?: string): string {

@@ -484,6 +484,8 @@ export interface Movie extends Stamp {
   /** 0.5 ~ 5 (0.5 단위) */
   rating?: number;
   comment?: string;
+  /** 명대사 */
+  quote?: string;
   /** 긴 리뷰 */
   review?: string;
   /** 영화 목록에서 골랐을 때 따라오는 정보 (시상식 요약용) */
@@ -660,6 +662,21 @@ export interface MusicRecord extends Stamp {
   created: number;
 }
 
+/** 여행 · 가 볼 곳 (맛집 · 관광지 · 카페 …) */
+export interface TravelPlace extends Stamp {
+  id: Id;
+  name: string;
+  kind: 'food' | 'cafe' | 'sight' | 'stay' | 'etc';
+  /** 지역 (예: 부산 해운대) */
+  region?: string;
+  status: 'want' | 'visited';
+  visited?: DateStr;
+  rating?: number;
+  /** 메뉴 · 가격 · 팁 */
+  note?: string;
+  created: number;
+}
+
 /** 반복 할 일: 정한 요일마다 그날 할 일이 생긴다 */
 export interface TodoRule extends Stamp {
   id: Id;
@@ -833,12 +850,13 @@ export interface StudyData {
   passages: Record<Id, Passage>;
   games: Record<Id, Game>;
   records: Record<Id, MusicRecord>;
+  places: Record<Id, TravelPlace>;
 }
 
 /** 단어는 많아질 수 있어 따로 묶는다 */
 export type WordsData = Record<Id, Word>;
 
-export const COLLECTIONS = ['subjects', 'exams', 'books', 'plans', 'tutors', 'homework', 'notes', 'decks', 'cards', 'wordLists', 'sessions', 'todos', 'habits', 'grades', 'previews', 'assessments', 'blanks', 'conditions', 'weekNotes', 'papers', 'workouts', 'bodyLogs', 'moneyTx', 'savings', 'hobbies', 'hobbyLogs', 'wishes', 'diary', 'moneyRules', 'movies', 'reads', 'drillLogs', 'todoRules', 'passages', 'games', 'records'] as const;
+export const COLLECTIONS = ['subjects', 'exams', 'books', 'plans', 'tutors', 'homework', 'notes', 'decks', 'cards', 'wordLists', 'sessions', 'todos', 'habits', 'grades', 'previews', 'assessments', 'blanks', 'conditions', 'weekNotes', 'papers', 'workouts', 'bodyLogs', 'moneyTx', 'savings', 'hobbies', 'hobbyLogs', 'wishes', 'diary', 'moneyRules', 'movies', 'reads', 'drillLogs', 'todoRules', 'passages', 'games', 'records', 'places'] as const;
 export type Collection = (typeof COLLECTIONS)[number];
 
 export const DEFAULT_SETTINGS: StudySettings = {
@@ -894,6 +912,7 @@ export function emptyStudy(): StudyData {
     passages: {},
     games: {},
     records: {},
+    places: {},
   };
 }
 
