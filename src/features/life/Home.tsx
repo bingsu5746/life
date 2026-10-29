@@ -1,4 +1,5 @@
 // 메인: 공부 · 운동 · 돈 · 취미 · 일기를 한눈에. 누르면 그 영역으로
+import { exportBackup } from '../study/backup';
 import { dday, longDate, weekStart } from '../study/dates';
 import { upcomingExams } from '../study/exams';
 import { alive } from '../study/model';
@@ -129,6 +130,19 @@ export function Home(_: { loggedIn: boolean; onLogin: () => void }) {
           );
         })}
       </div>
+      {(() => {
+        const last = d.settings.lastBackup;
+        const days = last ? Math.floor((Date.parse(today) - Date.parse(last)) / 86_400_000) : null;
+        if (days !== null && days < 30) return null;
+        return (
+          <p className="st-hint">
+            {days === null ? '아직 백업 파일을 내려받은 적이 없어요.' : `백업한 지 ${days}일 지났어요.`}{' '}
+            <button className="st-link" onClick={() => exportBackup()}>
+              지금 내려받기
+            </button>
+          </p>
+        );
+      })()}
       <p className="st-hint">메인에 보일 영역은 설정에서 고를 수 있어요.</p>
     </div>
   );

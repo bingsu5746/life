@@ -1,7 +1,7 @@
 // 백업 파일: 공부 자료·단어를 JSON 파일로 내려받고, 다시 넣을 때는 지금 자료와 합친다 (사진은 빠짐)
 import { mergeStudy, mergeWords } from './merge';
 import type { StudyData, WordsData } from './model';
-import { getStudy, getWords, normalize, replaceStudy, replaceWords } from './store';
+import { getStudy, getWords, normalize, replaceStudy, replaceWords, setSettings } from './store';
 import { sanitizeWords } from './sanitize';
 import { notifyChange } from '../../lib/dataSync';
 
@@ -21,6 +21,14 @@ export function exportBackup() {
   a.download = `내공부-백업-${new Date().toISOString().slice(0, 10)}.json`;
   a.click();
   setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+  setSettings({ lastBackup: new Date(Date.now() + 9 * 3600_000).toISOString().slice(0, 10) });
+}
+
+/** 백업을 알려 줄 날: 마지막 백업 30일 뒤 (한 번도 안 했으면 오늘). 그 전이면 null */
+export function backupDue(lastBackup: string | undefined, today: string): string | null {
+  if (!lastBackup) return today;
+  const due = new Date(Date.parse(`${lastBackup}T00:00:00Z`) + 30 * 86_400_000).toISOString().slice(0, 10);
+  return due <= today ? today : due;
 }
 
 /** 백업 파일 읽기 → 합치기. 잘못된 파일이면 오류 */

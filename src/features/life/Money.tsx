@@ -5,7 +5,7 @@ import { shortDate } from '../study/dates';
 import { alive, newId, type MoneyRule, type MoneyTx, type SavingGoal } from '../study/model';
 import { put, remove, setSettings, useStudy } from '../study/store';
 import { Bar, confirmDelete, Empty, Field, go, Icon, Sheet, tap, toast, useToday } from '../study/ui';
-import { budgetView, compareMonths, monthlyAmount, monthLabel, monthlyOut, monthOf, monthSummary, readWon, saved, shiftMonth, upcomingRules, won } from './calc';
+import { budgetView, compareMonths, weekSpent, monthlyAmount, monthLabel, monthlyOut, monthOf, monthSummary, readWon, saved, shiftMonth, upcomingRules, won } from './calc';
 import { WEEKDAYS } from '../study/dates';
 
 const OUT = ['식비', '간식·카페', '교통', '쇼핑', '문화·여가', '교육·책', '통신', '선물', '기타'];
@@ -53,162 +53,160 @@ export function Money({ sub }: { sub?: string }) {
       </div>
       {view === 'month' && (
         <>
-
-      <section className="st-card">
-        <div className="st-inline between">
-          <button className="btn btn-sm" onClick={() => go(`/money/${shiftMonth(month, -1)}`)} aria-label="지난달">
-            ‹
-          </button>
-          <b>{monthLabel(month)}</b>
-          <button className="btn btn-sm" disabled={month >= monthOf(today)} onClick={() => go(`/money/${shiftMonth(month, 1)}`)} aria-label="다음 달">
-            ›
-          </button>
-        </div>
-        <div className="st-stat-row">
-          <div>
-            <small>쓴 돈</small>
-            <b>{won(s.out)}</b>
-          </div>
-          <div>
-            <small>들어온 돈</small>
-            <b>{won(s.in)}</b>
-          </div>
-          <div>
-            <small>남은 돈</small>
-            <b className={s.in - s.out < 0 ? 'bad' : ''}>{won(s.in - s.out)}</b>
-          </div>
-        </div>
-        {cmp && (
-          <p className={`st-hint ${cmp.diff > 0 ? 'bad' : ''}`}>
-            {cmp.partial ? '지난달 같은 날까지보다' : '지난달보다'} {cmp.diff === 0 ? '똑같이 썼어요' : `${won(Math.abs(cmp.diff))} ${cmp.diff > 0 ? '더' : '덜'} 썼어요`}
-          </p>
-        )}
-        {budget ? (
-          <>
-            <Bar value={Math.min(s.out, budget)} max={budget} label="예산 쓴 정도" />
-            <p className={`st-hint ${bv!.left < 0 ? 'bad' : ''}`}>
-              예산 {won(budget)} 중 {bv!.left >= 0 ? `${won(bv!.left)} 남았어요` : `${won(-bv!.left)} 넘었어요`}
-              {bv!.perDay !== null && bv!.left > 0 && ` · 남은 ${bv!.daysLeft}일 동안 하루 ${won(bv!.perDay)}씩 쓸 수 있어요`}{' '}
-              <button className="st-link" onClick={() => setBudgetOpen(true)}>
-                예산 고치기
+          <section className="st-card">
+            <div className="st-inline between">
+              <button className="btn btn-sm" onClick={() => go(`/money/${shiftMonth(month, -1)}`)} aria-label="지난달">
+                ‹
               </button>
-            </p>
-          </>
-        ) : (
-          <button className="st-link" onClick={() => setBudgetOpen(true)}>
-            한 달 예산 정하기
-          </button>
-        )}
-      </section>
-
-      {!alive(d.moneyTx).length ? (
-        <Empty icon="💰" title="쓴 돈을 적어 보세요">
-          <p>쓴 돈과 받은 용돈·알바비를 적으면 한 달에 어디에 얼마나 썼는지, 예산이 얼마 남았는지 보여 드려요.</p>
-          <button className="btn btn-primary" onClick={() => setEdit('new')}>
-            처음 적기
-          </button>
-        </Empty>
-      ) : (
-        <>
-          {s.byCategory.length > 0 && (
-            <section className="st-card">
-              <h3 className="st-h">어디에 썼나</h3>
-              {s.byCategory.map((c) => (
-                <div key={c.category} className="st-subj-row">
-                  <span>{c.category}</span>
-                  <Bar value={c.amount} max={catMax} label={`${c.category} 지출`} />
-                  <small>
-                    {won(c.amount)} · {s.out ? Math.round((c.amount / s.out) * 100) : 0}%{cmp?.byCategory.find((x) => x.category === c.category) && ` · ${delta(cmp.byCategory.find((x) => x.category === c.category)!.diff)}`}
-                  </small>
-                </div>
-              ))}
-            </section>
-          )}
-          <section className="st-card">
-            <h3 className="st-h">달별 쓴 돈 (최근 6달)</h3>
-            <BarChart label="달별 지출" height={150} bars={months.map((m) => ({ label: `${Number(m.month.slice(5))}월`, title: monthLabel(m.month), value: m.amount, strong: m.month === month }))} format={short} avg={budget} avgLabel="예산" />
+              <b>{monthLabel(month)}</b>
+              <button className="btn btn-sm" disabled={month >= monthOf(today)} onClick={() => go(`/money/${shiftMonth(month, 1)}`)} aria-label="다음 달">
+                ›
+              </button>
+            </div>
+            <div className="st-stat-row">
+              <div>
+                <small>쓴 돈</small>
+                <b>{won(s.out)}</b>
+              </div>
+              <div>
+                <small>들어온 돈</small>
+                <b>{won(s.in)}</b>
+              </div>
+              <div>
+                <small>남은 돈</small>
+                <b className={s.in - s.out < 0 ? 'bad' : ''}>{won(s.in - s.out)}</b>
+              </div>
+            </div>
+            {cmp && (
+              <p className={`st-hint ${cmp.diff > 0 ? 'bad' : ''}`}>
+                {cmp.partial ? '지난달 같은 날까지보다' : '지난달보다'} {cmp.diff === 0 ? '똑같이 썼어요' : `${won(Math.abs(cmp.diff))} ${cmp.diff > 0 ? '더' : '덜'} 썼어요`}
+              </p>
+            )}
+            {budget ? (
+              <>
+                <Bar value={Math.min(s.out, budget)} max={budget} label="예산 쓴 정도" />
+                <p className={`st-hint ${bv!.left < 0 ? 'bad' : ''}`}>
+                  예산 {won(budget)} 중 {bv!.left >= 0 ? `${won(bv!.left)} 남았어요` : `${won(-bv!.left)} 넘었어요`}
+                  {bv!.perDay !== null && bv!.left > 0 && ` · 남은 ${bv!.daysLeft}일 동안 하루 ${won(bv!.perDay)}씩 쓸 수 있어요`}{' '}
+                  <button className="st-link" onClick={() => setBudgetOpen(true)}>
+                    예산 고치기
+                  </button>
+                </p>
+              </>
+            ) : (
+              <button className="st-link" onClick={() => setBudgetOpen(true)}>
+                한 달 예산 정하기
+              </button>
+            )}
+            {month === monthOf(today) && <WeekLimit today={today} />}
           </section>
-          <section className="st-card">
-            <h3 className="st-h">{monthLabel(month)} 기록</h3>
-            {!s.tx.length && <p className="st-hint">이 달에 적은 것이 없어요.</p>}
-            {[...byDate.entries()].map(([date, list]) => (
-              <div key={date} className="mn-day">
-                <small className="st-muted">{shortDate(date)}</small>
-                {list.map((t) => (
-                  <div key={t.id} className="st-item st-tap" {...tap(() => setEdit(t))}>
-                    <div className="st-item-main">
-                      <div className="st-item-title">{t.memo || t.category}</div>
-                      <div className="st-item-sub">
-                        {t.category}
-                        {t.ruleId ? ' · 고정' : ''}
-                      </div>
+
+          {!alive(d.moneyTx).length ? (
+            <Empty icon="💰" title="쓴 돈을 적어 보세요">
+              <p>쓴 돈과 받은 용돈·알바비를 적으면 한 달에 어디에 얼마나 썼는지, 예산이 얼마 남았는지 보여 드려요.</p>
+              <button className="btn btn-primary" onClick={() => setEdit('new')}>
+                처음 적기
+              </button>
+            </Empty>
+          ) : (
+            <>
+              {s.byCategory.length > 0 && (
+                <section className="st-card">
+                  <h3 className="st-h">어디에 썼나</h3>
+                  {s.byCategory.map((c) => (
+                    <div key={c.category} className="st-subj-row">
+                      <span>{c.category}</span>
+                      <Bar value={c.amount} max={catMax} label={`${c.category} 지출`} />
+                      <small>
+                        {won(c.amount)} · {s.out ? Math.round((c.amount / s.out) * 100) : 0}%{cmp?.byCategory.find((x) => x.category === c.category) && ` · ${delta(cmp.byCategory.find((x) => x.category === c.category)!.diff)}`}
+                      </small>
                     </div>
-                    <b className={t.type === 'in' ? 'mn-in' : ''}>
-                      {t.type === 'in' ? '+' : '−'}
-                      {won(t.amount)}
-                    </b>
+                  ))}
+                </section>
+              )}
+              <section className="st-card">
+                <h3 className="st-h">달별 쓴 돈 (최근 6달)</h3>
+                <BarChart label="달별 지출" height={150} bars={months.map((m) => ({ label: `${Number(m.month.slice(5))}월`, title: monthLabel(m.month), value: m.amount, strong: m.month === month }))} format={short} avg={budget} avgLabel="예산" />
+              </section>
+              <section className="st-card">
+                <h3 className="st-h">{monthLabel(month)} 기록</h3>
+                {!s.tx.length && <p className="st-hint">이 달에 적은 것이 없어요.</p>}
+                {[...byDate.entries()].map(([date, list]) => (
+                  <div key={date} className="mn-day">
+                    <small className="st-muted">{shortDate(date)}</small>
+                    {list.map((t) => (
+                      <div key={t.id} className="st-item st-tap" {...tap(() => setEdit(t))}>
+                        <div className="st-item-main">
+                          <div className="st-item-title">{t.memo || t.category}</div>
+                          <div className="st-item-sub">
+                            {t.category}
+                            {t.ruleId ? ' · 고정' : ''}
+                          </div>
+                        </div>
+                        <b className={t.type === 'in' ? 'mn-in' : ''}>
+                          {t.type === 'in' ? '+' : '−'}
+                          {won(t.amount)}
+                        </b>
+                      </div>
+                    ))}
                   </div>
                 ))}
-              </div>
-            ))}
-          </section>
-        </>
-      )}
-
+              </section>
+            </>
+          )}
         </>
       )}
 
       {view === 'fixed' && (
-      <section className="st-card">
-        <div className="st-inline between">
-          <h3 className="st-h">고정 지출 · 수입</h3>
-          <button className="st-link" onClick={() => setRule('new')}>
-            ＋ 추가
-          </button>
-        </div>
-        {!rules.length ? (
-          <p className="st-hint">넷플릭스·통신비처럼 정해진 날마다 나가는 돈, 용돈처럼 들어오는 돈을 넣어 두면 그날 자동으로 적어요.</p>
-        ) : (
-          <>
-            <p className="st-sub">
-              한 달에 나가는 돈 약 {won(fixedOut)}
-              {fixedIn > 0 && ` · 들어오는 돈 약 ${won(fixedIn)}`}
-            </p>
-            {rules.map((r) => (
-              <div key={r.id} className={`st-item st-tap ${r.paused ? 'mn-paused' : ''}`} {...tap(() => setRule(r))}>
-                <div className="st-item-main">
-                  <div className="st-item-title">{r.name}</div>
-                  <div className="st-item-sub">
-                    {ruleText(r)} · {r.category}
-                    {r.paused ? ' · 멈춤' : ''}
+        <section className="st-card">
+          <div className="st-inline between">
+            <h3 className="st-h">고정 지출 · 수입</h3>
+            <button className="st-link" onClick={() => setRule('new')}>
+              ＋ 추가
+            </button>
+          </div>
+          {!rules.length ? (
+            <p className="st-hint">넷플릭스·통신비처럼 정해진 날마다 나가는 돈, 용돈처럼 들어오는 돈을 넣어 두면 그날 자동으로 적어요.</p>
+          ) : (
+            <>
+              <p className="st-sub">
+                한 달에 나가는 돈 약 {won(fixedOut)}
+                {fixedIn > 0 && ` · 들어오는 돈 약 ${won(fixedIn)}`}
+              </p>
+              {rules.map((r) => (
+                <div key={r.id} className={`st-item st-tap ${r.paused ? 'mn-paused' : ''}`} {...tap(() => setRule(r))}>
+                  <div className="st-item-main">
+                    <div className="st-item-title">{r.name}</div>
+                    <div className="st-item-sub">
+                      {ruleText(r)} · {r.category}
+                      {r.paused ? ' · 멈춤' : ''}
+                    </div>
                   </div>
+                  <b className={r.type === 'in' ? 'mn-in' : ''}>
+                    {r.type === 'in' ? '+' : '−'}
+                    {won(r.amount)}
+                  </b>
                 </div>
-                <b className={r.type === 'in' ? 'mn-in' : ''}>
-                  {r.type === 'in' ? '+' : '−'}
-                  {won(r.amount)}
-                </b>
-              </div>
-            ))}
-            {soon.length > 0 && <p className="st-hint">다가오는 것: {soon.map((x) => `${shortDate(x.date)} ${x.rule.name}`).join(' · ')}</p>}
-          </>
-        )}
-      </section>
-
+              ))}
+              {soon.length > 0 && <p className="st-hint">다가오는 것: {soon.map((x) => `${shortDate(x.date)} ${x.rule.name}`).join(' · ')}</p>}
+            </>
+          )}
+        </section>
       )}
 
       {view === 'saving' && (
-      <section className="st-card">
-        <div className="st-inline between">
-          <h3 className="st-h">모으기</h3>
-          <button className="st-link" onClick={() => setGoal('new')}>
-            ＋ 목표 만들기
-          </button>
-        </div>
-        {!goals.length && <p className="st-hint">사고 싶은 것·여행처럼 모으고 싶은 돈의 목표를 만들어 보세요.</p>}
-        {goals.map((g) => (
-          <SavingRow key={g.id} g={g} today={today} onEdit={() => setGoal(g)} />
-        ))}
-      </section>
+        <section className="st-card">
+          <div className="st-inline between">
+            <h3 className="st-h">모으기</h3>
+            <button className="st-link" onClick={() => setGoal('new')}>
+              ＋ 목표 만들기
+            </button>
+          </div>
+          {!goals.length && <p className="st-hint">사고 싶은 것·여행처럼 모으고 싶은 돈의 목표를 만들어 보세요.</p>}
+          {goals.map((g) => (
+            <SavingRow key={g.id} g={g} today={today} onEdit={() => setGoal(g)} />
+          ))}
+        </section>
       )}
 
       {edit && <TxSheet item={edit === 'new' ? undefined : edit} today={today} onClose={close} />}
@@ -532,5 +530,49 @@ function RuleSheet({ item, today, onClose }: { item?: MoneyRule; today: string; 
         </div>
       </div>
     </Sheet>
+  );
+}
+
+/** 이번 주 쓴 돈 · 일주일 한도 (넘으면 저녁 알림) */
+function WeekLimit({ today }: { today: string }) {
+  const d = useStudy();
+  const lim = d.settings.weeklyLimit;
+  const [edit, setEdit] = useState(false);
+  const [v, setV] = useState(lim ? lim.toLocaleString('ko-KR') : '');
+  const spent = weekSpent(d, today);
+  if (edit)
+    return (
+      <div className="st-inline">
+        일주일에
+        <input className="st-input sm" inputMode="numeric" autoFocus value={v} onChange={(e) => setV(e.target.value)} placeholder="예: 50,000" aria-label="일주일 한도" />
+        원까지
+        <button
+          className="btn btn-sm btn-primary"
+          onClick={() => {
+            const n = readWon(v);
+            setSettings({ weeklyLimit: n || undefined });
+            setEdit(false);
+          }}
+        >
+          저장
+        </button>
+      </div>
+    );
+  if (!lim)
+    return (
+      <button className="st-link" onClick={() => setEdit(true)}>
+        일주일 한도 정하기 (넘으면 알림)
+      </button>
+    );
+  return (
+    <div className="mn-week">
+      <Bar value={Math.min(spent, lim)} max={lim} label="이번 주 한도" />
+      <p className={`st-hint ${spent > lim ? 'bad' : ''}`}>
+        이번 주 {won(spent)} / 한도 {won(lim)} {spent > lim ? `· ${won(spent - lim)} 넘었어요` : `· ${won(lim - spent)} 남음`}{' '}
+        <button className="st-link" onClick={() => setEdit(true)}>
+          고치기
+        </button>
+      </p>
+    </div>
   );
 }

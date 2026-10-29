@@ -1,12 +1,13 @@
 // 알림 글 만들기: 앞으로 7일 동안 날짜·시각마다 「오늘 할 것」「내일 준비」를 미리 계산해 서버에 맡긴다.
 // (서버는 공부 자료를 열어 보지 않고, 정한 시각에 이 글을 그대로 보낸다)
-import { addDays, diffDays, weekday } from './dates';
+import { addDays, diffDays, weekday, weekStart } from './dates';
 import { upcomingExams, timetable } from './exams';
 import { buildExamPlan } from './examPlan';
 import { alive, type DateStr, type StudyData, type WordsData } from './model';
 import { planViews, homeworkViews } from './select';
 import { classesOn } from './timetable';
-import { ruleDates } from '../life/calc';
+import { ruleDates, weekSpent } from '../life/calc';
+import { backupDue } from './backup';
 import { lifeWeek } from '../life/lifeWeek';
 
 export interface DigestEntry {
@@ -83,6 +84,7 @@ export function morning(d: StudyData, words: WordsData, today: DateStr, date: Da
   }
   const rv = reviewCount(d, words, date);
   if (rv) parts.push(`복습 ${rv}개`);
+  if (backupDue(d.settings.lastBackup, today) === date && (d.settings.lastBackup || date === today)) parts.push('백업 파일을 내려받을 때예요 (설정 → 백업)');
   const q = weakQuiz(words, date);
   if (q.length) parts.push(`단어 퀴즈: ${q.join(' · ')} 뜻은?`);
   const y = awardsYear(d, date);
@@ -110,6 +112,9 @@ export function evening(d: StudyData, today: DateStr, date: DateStr): string {
   if (hw.length) parts.push(`내일 마감 숙제 ${hw.length}개`);
   const opens = alive(d.movies).filter((m) => m.status === 'want' && m.release === next);
   if (opens.length) parts.push(`내일 개봉: ${opens.map((m) => m.title).join('·')}`);
+  const lim = d.settings.weeklyLimit;
+  const spent = lim ? weekSpent(d, date < today ? date : today) : 0;
+  if (lim && spent > lim && weekStart(date) === weekStart(today)) parts.push(`이번 주 쓴 돈 ${spent.toLocaleString('ko-KR')}원 · 한도 ${lim.toLocaleString('ko-KR')}원을 넘었어요`);
   const pay = alive(d.moneyRules).filter((r) => !r.paused && r.type === 'out' && ruleDates(r, next, next).length);
   if (pay.length) parts.push(`내일 빠져나가는 돈: ${pay[0].name} ${pay[0].amount.toLocaleString('ko-KR')}원${pay.length > 1 ? ` 외 ${pay.length - 1}건` : ''}`);
   const pv = alive(d.previews).filter((p) => !p.done && p.date === next);

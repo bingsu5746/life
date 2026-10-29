@@ -7,6 +7,7 @@ import { sleepMinutes, splitStudy } from './condition';
 import { bySubject, compare, daily, minutesByDate, studyStreak, weekdayAverage, weekly } from './timeStats';
 import { alive, type StudySession } from './model';
 import { addSession } from './actions';
+import { placeTimeStats, STUDY_PLACES } from './timeStats';
 import { getStudy, put, remove, useStudy } from './store';
 import { askNotify, loadTimer, primeAudio, saveTimer } from './timerStore';
 import { clock, finish, minutesText, nextPhase, pause, resume, start, view, type TimerState } from './timer';
@@ -24,6 +25,21 @@ function TimeHome({ sub }: { sub?: string }) {
   const [timer, setTimer] = useState<TimerState | null>(loadTimer);
   const [subjectId, setSubjectId] = useState(timer?.subjectId ?? subjectsOf(d)[0]?.id ?? '');
   const [kind, setKind] = useState<TimerState['kind']>(timer?.kind ?? 'pomo');
+  const [place, setPlace] = useState<string>(() => {
+    try {
+      return localStorage.getItem('my-study.study.place') ?? '';
+    } catch {
+      return '';
+    }
+  });
+  const pickPlace = (p: string) => {
+    setPlace(p);
+    try {
+      localStorage.setItem('my-study.study.place', p);
+    } catch {
+      /* 무시 */
+    }
+  };
   const [manual, setManual] = useState(sub === 'manual');
   const pomo = d.settings.pomo;
   const update = (t: TimerState | null) => {
@@ -34,7 +50,7 @@ function TimeHome({ sub }: { sub?: string }) {
   function begin() {
     if (!subjectId) return toast('과목을 골라 주세요');
     askNotify();
-    update(start(kind, d.subjects[subjectId]?.name ?? '', Date.now(), subjectId));
+    update({ ...start(kind, d.subjects[subjectId]?.name ?? '', Date.now(), subjectId), place: place || undefined });
   }
   function stop() {
     if (!timer) return;
@@ -48,7 +64,7 @@ function TimeHome({ sub }: { sub?: string }) {
       min = Math.min(n, min);
     }
     if (min > 0) {
-      addSession({ subjectId: timer.subjectId, bookId: timer.bookId, start: timer.startedAt, end: Date.now(), minutes: min, date: today, kind: timer.kind });
+      addSession({ subjectId: timer.subjectId, bookId: timer.bookId, start: timer.startedAt, end: Date.now(), minutes: min, date: today, kind: timer.kind, place: timer.place });
       toast(`${minutesText(min)} 기록했어요`);
     } else toast('1분이 안 돼서 기록하지 않았어요');
     update(null);
@@ -84,6 +100,7 @@ function TimeHome({ sub }: { sub?: string }) {
                 스톱워치
               </button>
             </div>
+            <PlaceChips value={place} onChange={pickPlace} />
             <button className="btn btn-primary btn-lg" onClick={begin}>
               공부 시작
             </button>
@@ -95,6 +112,7 @@ function TimeHome({ sub }: { sub?: string }) {
 
       <Stats sessions={sessions} today={today} todayMin={todayMin} />
       {sessions.length > 0 && <Analysis sessions={sessions} today={today} />}
+      {sessions.some((s) => s.place) && <PlaceTime sessions={sessions} today={today} />}
       <SleepStudy today={today} />
       {manual && (
         <ManualSheet
@@ -395,6 +413,7 @@ function ManualSheet({ today, session, onClose }: { today: string; session?: Stu
   const start0 = session?.minutes ?? 60;
   const [hours, setHours] = useState(String(Math.floor(start0 / 60)));
   const [mins, setMins] = useState(String(start0 % 60));
+  const [place, setPlace] = useState(session?.place ?? '');
   const n = (Number(hours) || 0) * 60 + (Number(mins) || 0);
   return (
     <Sheet title={session ? '공부 기록 고치기' : '공부 시간 직접 넣기'} onClose={onClose}>
@@ -410,6 +429,7 @@ function ManualSheet({ today, session, onClose }: { today: string; session?: Stu
           <input className="st-input xs" inputMode="numeric" value={hours} onChange={(e) => setHours(e.target.value.replace(/\D/g, '').slice(0, 2))} aria-label="시간" />시간
           <input className="st-input xs" inputMode="numeric" value={mins} onChange={(e) => setMins(e.target.value.replace(/\D/g, '').slice(0, 3))} aria-label="분" />분
         </div>
+        <PlaceChips value={place} onChange={setPlace} />
         {n > 720 && <p className="bad">하루에 {minutesText(n)}은 너무 길어요. 다시 확인해 주세요.</p>}
         <div className="st-row end">
           {session && (
@@ -431,11 +451,11 @@ function ManualSheet({ today, session, onClose }: { today: string; session?: Stu
               if (session) {
                 // 날짜를 바꾸면 그날 낮 12시에 한 것으로 (시작 시각을 알 수 없으므로)
                 const start = date === session.date ? session.start : new Date(`${date}T12:00:00`).getTime();
-                put('sessions', { ...session, subjectId: subjectId || undefined, date, minutes: n, start, end: start + n * 60_000 });
+                put('sessions', { ...session, subjectId: subjectId || undefined, date, minutes: n, start, end: start + n * 60_000, place: place || undefined });
               } else {
                 // 오늘이면 지금 끝난 것으로, 지난 날이면 그날 낮 12시부터 한 것으로
                 const end = date === today ? Date.now() : new Date(`${date}T12:00:00`).getTime() + n * 60_000;
-                addSession({ subjectId: subjectId || undefined, start: end - n * 60_000, end, minutes: n, date, kind: 'manual' });
+                addSession({ subjectId: subjectId || undefined, start: end - n * 60_000, end, minutes: n, date, kind: 'manual', place: place || undefined });
               }
               onClose();
             }}
@@ -515,6 +535,57 @@ function SleepStudy({ today }: { today: string }) {
         </div>
       </div>
       <p className="st-hint">기록한 날끼리 평균을 낸 것이라, 잠 때문에 공부 시간이 달라졌다고 단정할 수는 없어요.</p>
+    </section>
+  );
+}
+
+/** 공부한 곳 고르기 (안 골라도 됨, 다시 누르면 빠짐) */
+function PlaceChips({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  return (
+    <div className="st-chips" role="group" aria-label="공부한 곳 (선택)">
+      {STUDY_PLACES.map((p) => (
+        <button key={p} type="button" className={`st-chip ${value === p ? 'on' : ''}`} aria-pressed={value === p} onClick={() => onChange(value === p ? '' : p)}>
+          {p}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+/** 어디서 · 언제 공부가 잘됐나 (최근 90일) */
+function PlaceTime({ sessions, today }: { sessions: StudySession[]; today: string }) {
+  const r = placeTimeStats(sessions, addDays(today, -89), today);
+  const h = (m: number) => (m >= 60 ? `${Math.round((m / 60) * 10) / 10}시간` : `${m}분`);
+  const max = (bs: { minutes: number }[]) => Math.max(1, ...bs.map((b) => b.minutes));
+  const rows = (bs: ReturnType<typeof placeTimeStats>['places']) =>
+    bs.map((b) => (
+      <div key={b.name} className="st-subj-row">
+        <span>{b.name}</span>
+        <Bar value={b.minutes} max={max(bs)} label={`${b.name} 공부 시간`} />
+        <small>
+          {h(b.minutes)}
+          {b.avg !== null ? ` · 한 번 ${b.avg}분` : ''}
+        </small>
+      </div>
+    ));
+  return (
+    <section className="st-card">
+      <h3 className="st-h">어디서 · 언제 (최근 90일)</h3>
+      {(r.bestPlace || r.bestSlot) && (
+        <p className="st-sub">
+          {r.bestPlace && `${r.bestPlace.name}에서 한 번에 가장 오래 (평균 ${r.bestPlace.avg}분)`}
+          {r.bestPlace && r.bestSlot && ' · '}
+          {r.bestSlot && `${r.bestSlot.name.replace(/ \(.*\)/, '')}에 가장 오래 (평균 ${r.bestSlot.avg}분)`} 집중했어요
+        </p>
+      )}
+      {r.places.length > 0 && rows(r.places)}
+      {r.slots.length > 0 && (
+        <>
+          <h4 className="ta-h">시간대</h4>
+          {rows(r.slots)}
+        </>
+      )}
+      <small className="st-muted">한 번 평균은 스톱워치·직접 넣은 기록으로 세요 (뽀모도로는 길이가 정해져 있어서 빼요). 시간대는 타이머 기록만.</small>
     </section>
   );
 }

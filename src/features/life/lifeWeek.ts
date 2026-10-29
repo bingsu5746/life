@@ -2,6 +2,7 @@
 import { addDays, weekStart, weekday } from '../study/dates';
 import { habitOn } from '../study/habits';
 import { alive, type DateStr, type Movie, type StudyData } from '../study/model';
+import { shiftMonth } from './calc';
 import { shotsBetween, type ShotSum } from './drills';
 import { pagesBetween } from './Reading';
 
@@ -25,9 +26,19 @@ const kst = (ms: number) => new Date(ms + 9 * 3600_000).toISOString().slice(0, 1
 
 export function lifeWeek(d: StudyData, anyDay: DateStr, today: DateStr): LifeWeek {
   const from = weekStart(anyDay);
-  const to = addDays(from, 6);
-  const pf = addDays(from, -7);
-  const pt = addDays(from, -1);
+  return lifeRange(d, from, addDays(from, 6), addDays(from, -7), addDays(from, -1), today);
+}
+
+/** 한 달 (YYYY-MM) 과 지난달 */
+export function lifeMonth(d: StudyData, month: string, today: DateStr): LifeWeek {
+  const from = `${month}-01`;
+  const to = addDays(`${shiftMonth(month, 1)}-01`, -1);
+  const pm = shiftMonth(month, -1);
+  return lifeRange(d, from, to, `${pm}-01`, addDays(from, -1), today);
+}
+
+/** from~to 와 그 앞 기간(pf~pt) */
+export function lifeRange(d: StudyData, from: DateStr, to: DateStr, pf: DateStr, pt: DateStr, today: DateStr): LifeWeek {
   const inR = (x: string | undefined, a: string, b: string) => !!x && x >= a && x <= b;
   const sum = <T>(xs: T[], f: (x: T) => number) => xs.reduce((n, x) => n + f(x), 0);
   const sessions = alive(d.sessions);
@@ -94,3 +105,25 @@ export function lifeWeek(d: StudyData, anyDay: DateStr, today: DateStr): LifeWee
 
 /** 일요일인지 (주간 돌아보기 알림) */
 export const isSunday = (date: DateStr) => weekday(date) === 0;
+
+/** 최근 n 달의 공부 시간 · 운동한 날 · 쓴 돈 (오래된 달부터) */
+export function monthTrend(d: StudyData, month: string, n = 6): { month: string; study: number; workoutDays: number; spent: number }[] {
+  return Array.from({ length: n }, (_, i) => {
+    const m = shiftMonth(month, i - (n - 1));
+    const inM = (x: string | undefined) => !!x && x.startsWith(m);
+    return {
+      month: m,
+      study: alive(d.sessions)
+        .filter((s) => inM(s.date))
+        .reduce((a, s) => a + s.minutes, 0),
+      workoutDays: new Set(
+        alive(d.workouts)
+          .filter((w) => inM(w.date))
+          .map((w) => w.date),
+      ).size,
+      spent: alive(d.moneyTx)
+        .filter((t) => t.type === 'out' && inM(t.date))
+        .reduce((a, t) => a + t.amount, 0),
+    };
+  });
+}

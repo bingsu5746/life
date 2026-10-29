@@ -187,3 +187,11 @@ export function compareMonths(d: StudyData, month: string, today: DateStr): Mont
   const byCategory = [...cats].map((category) => ({ category, diff: (cur.byCategory.find((c) => c.category === category)?.amount ?? 0) - (p.get(category) ?? 0) })).filter((c) => c.diff !== 0).sort((a, b) => Math.abs(b.diff) - Math.abs(a.diff));
   return { prevOut, diff: cur.out - prevOut, byCategory, partial };
 }
+
+/** date 가 든 주(월~일)에 date 까지 쓴 돈 */
+export function weekSpent(d: Pick<StudyData, 'moneyTx'>, date: DateStr): number {
+  const from = weekStart(date);
+  return alive(d.moneyTx)
+    .filter((t) => t.type === 'out' && t.date >= from && t.date <= date)
+    .reduce((a, t) => a + t.amount, 0);
+}

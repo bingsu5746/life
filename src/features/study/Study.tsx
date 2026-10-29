@@ -48,7 +48,7 @@ export function Study({ path, loggedIn, syncReady = true, onLogin }: { path: str
   // 영역: 주소 맨 앞이 없으면 메인, fitness·money·hobby·movies 면 그 영역, 그 밖(study·공부 칸들·설정)은 공부
   const p0 = path[0];
   const isSearch = p0 === 'search';
-  const isWeek = p0 === 'week';
+  const isWeek = p0 === 'week' || p0 === 'month';
   const area: AreaKey = !p0 || isSearch || isWeek ? 'home' : (AREAS.some((a) => a.key === p0) && p0 !== 'study' ? p0 : 'study') as AreaKey;
   const spath = p0 === 'study' ? path.slice(1) : path;
   const tab = area !== 'study' ? '' : TABS.some((t) => t.key === spath[0]) || HIDDEN.includes(spath[0]) ? spath[0] : 'today';
@@ -95,10 +95,10 @@ export function Study({ path, loggedIn, syncReady = true, onLogin }: { path: str
   }, []);
 
   const reviewCount = reviewCountToday(d, today);
-  const running = id && (sub === 'learn' || sub === 'prep' || sub === 'weak' || (tab === 'review' && (id === 'redo' || id?.startsWith('cards-run') || id?.startsWith('blank-run'))));
+  const running = id && (sub === 'learn' || sub === 'prep' || sub === 'weak' || (tab === 'review' && (id === 'redo' || id?.startsWith('redo?') || id?.startsWith('cards-run') || id?.startsWith('blank-run'))));
 
   let content;
-  if (isWeek) content = <LifeWeekPage day={path[1]} />;
+  if (isWeek) content = <LifeWeekPage day={path[1]} monthly={p0 === 'month'} />;
   else if (isSearch) content = <Search q0={path[1] ? decodeURIComponent(path[1]) : ''} />;
   else if (area === 'home') content = <Home loggedIn={loggedIn} onLogin={onLogin} />;
   else if (area === 'fitness') content = <Fitness sub={path[1]} sub2={path[2]} />;

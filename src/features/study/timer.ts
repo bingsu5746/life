@@ -6,6 +6,8 @@ export type Phase = 'work' | 'short' | 'long';
 export interface TimerState {
   kind: 'pomo' | 'watch';
   subjectId?: Id;
+  /** 공부하는 곳 */
+  place?: string;
   bookId?: Id;
   label: string;
   /** 뽀모도로: 지금 단계, 몇 번째 공부인지(1부터) */

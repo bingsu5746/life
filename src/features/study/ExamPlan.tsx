@@ -2,7 +2,7 @@
 import { useState } from 'react';
 import { dday, shortDate } from './dates';
 import { buildExamPlan, DEFAULT_PLAN, reviewExamPlan, suggestedMinutes, todayExamItems, toggleItem, type PlanDay } from './examPlan';
-import type { Exam, ExamPlanSettings } from './model';
+import { alive, type Exam, type ExamPlanSettings } from './model';
 import { put, setSettings, useStudy } from './store';
 import { examEnd } from './exams';
 import { Bar, Check, Empty, Field, go, SubjectDot, toast, useToday } from './ui';
@@ -88,6 +88,14 @@ export function ExamPlanPage({ id }: { id: string }) {
                   ))}
                 </div>
                 <small className="st-muted">{s.why}</small>
+                {(() => {
+                  const n = alive(d.notes).filter((x) => x.subjectId === s.subjectId && !x.learned).length;
+                  return n > 0 ? (
+                    <button className="st-link" onClick={() => go(`/review/redo?subject=${s.subjectId}`)}>
+                      이 과목 오답 {n}개 다시 풀기
+                    </button>
+                  ) : null;
+                })()}
               </div>
             ))}
           </section>
@@ -221,12 +229,12 @@ export function ExamToday({ today }: { today: string }) {
             {items.map((it) => (
               <div key={it.id} className="st-item">
                 <Check on={it.done} label={`${it.text} 했어요`} onClick={() => put('exams', toggleItem(exam, it.id, today))} />
-                <div className="st-item-main">
+                <div className={`st-item-main ${it.kind === 'notes' ? 'st-tap' : ''}`} onClick={it.kind === 'notes' ? () => go(`/review/redo?subject=${it.subjectId}`) : undefined}>
                   <div className={`st-item-title ${it.done ? 'done' : ''}`}>
                     <SubjectDot id={it.subjectId} d={d} /> {it.text}
                   </div>
                   <div className="st-item-sub">
-                    {KIND_LABEL[it.kind]} · {it.minutes}분
+                    {KIND_LABEL[it.kind]} · {it.minutes}분{it.kind === 'notes' ? ' · 눌러서 풀기' : ''}
                   </div>
                 </div>
               </div>

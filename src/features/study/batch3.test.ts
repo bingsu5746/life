@@ -403,3 +403,32 @@ describe('시험 계획 돌아보기 (reviewExamPlan)', () => {
     expect(r.perLine).toBe(50);
   });
 });
+
+describe('장소·시간대 (placeTimeStats)', () => {
+  it('장소별 합과 한 번 평균, 가장 오래 집중한 곳', async () => {
+    const { placeTimeStats } = await import('./timeStats');
+    const at = (h: number) => Date.parse(`2026-10-20T${String(h - 9 < 0 ? h + 15 : h - 9).padStart(2, '0')}:00:00Z`);
+    const s = (id: string, place: string, min: number, h: number, kind = 'watch') => ({ id, place, minutes: min, start: at(h), end: 0, date: '2026-10-20', kind, updatedAt: 1 });
+    const list = [s('a', '독서실', 60, 19), s('b', '독서실', 50, 20), s('c', '독서실', 70, 19), s('d', '집', 20, 10), s('e', '집', 30, 11), s('f', '집', 25, 10), s('g', '집', 25, 10, 'pomo')] as never;
+    const r = placeTimeStats(list, '2026-10-01', '2026-10-31');
+    expect(r.places[0]).toEqual({ name: '독서실', minutes: 180, count: 3, avg: 60 });
+    expect(r.places[1]).toMatchObject({ name: '집', minutes: 100, count: 4, avg: 25 });
+    expect(r.bestPlace?.name).toBe('독서실');
+    expect(r.bestSlot?.name).toBe('저녁 (18~22시)');
+  });
+});
+
+describe('백업 알림 날 (backupDue) · 이번 주 쓴 돈 (weekSpent)', () => {
+  it('30일이 지나면 오늘, 아니면 그날', async () => {
+    const { backupDue } = await import('./backup');
+    expect(backupDue(undefined, '2026-10-28')).toBe('2026-10-28');
+    expect(backupDue('2026-10-01', '2026-10-28')).toBe('2026-10-31');
+    expect(backupDue('2026-09-01', '2026-10-28')).toBe('2026-10-28');
+  });
+  it('월요일부터 그날까지', async () => {
+    const { weekSpent } = await import('../life/calc');
+    const t = (id: string, date: string, amount: number, type = 'out') => ({ id, date, amount, type, category: '식비', created: 1, updatedAt: 1 });
+    const d = { moneyTx: Object.fromEntries([t('a', '2026-10-26', 5000), t('b', '2026-10-28', 3000), t('c', '2026-10-29', 9000), t('d', '2026-10-25', 7000), t('e', '2026-10-27', 1000, 'in')].map((x) => [x.id, x])) } as never;
+    expect(weekSpent(d, '2026-10-28')).toBe(8000);
+  });
+});

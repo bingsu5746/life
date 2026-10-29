@@ -42,6 +42,10 @@ export interface StudySettings {
   fitnessGoal?: { perWeek?: number; minutes?: number };
   /** 한 달 지출 예산 (원) */
   monthlyBudget?: number;
+  /** 일주일에 쓸 돈 한도 (넘으면 저녁 알림) */
+  weeklyLimit?: number;
+  /** 마지막으로 백업 파일을 내려받은 날 */
+  lastBackup?: DateStr;
   /** 농구 목표 성공률 (%) */
   bbGoals?: { ft?: number; fg?: number; tp?: number };
   /** 올해 읽을 책 수 */
@@ -451,6 +455,9 @@ export interface Movie extends Stamp {
   genre?: string;
   nation?: string;
   director?: string;
+  /** 보고 싶은 이유 · 추천해 준 사람 (보기 전 메모) */
+  why?: string;
+  recBy?: string;
   /** 본 영화 중 또 보고 싶은 것 */
   rewish?: boolean;
   /** 태그 (혼자 · 울었다 …) */
@@ -654,6 +661,8 @@ export interface StudySession extends Stamp {
   minutes: number;
   date: DateStr;
   kind: 'pomo' | 'watch' | 'manual';
+  /** 공부한 곳 (집 · 독서실 …) */
+  place?: string;
 }
 
 export interface Todo extends Stamp {

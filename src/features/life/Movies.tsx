@@ -191,6 +191,7 @@ export function Movies({ sub }: { sub?: string }) {
                   {m.year && <small className="st-muted">{m.year}</small>}
                 </div>
                 <Badges p={wantOtt.of({ title: m.title, year: m.year })} />
+                {(m.why || m.recBy) && <p className="mv-review">{[m.why, m.recBy && `${m.recBy} 추천`].filter(Boolean).join(' · ')}</p>}
                 <div className="mv-meta">
                   <small className="st-muted">{m.release ? `${shortDate(m.release)} 개봉${m.release >= today ? ` · ${dday(today, m.release)}` : ''}` : '개봉일 모름'}</small>
                   <button

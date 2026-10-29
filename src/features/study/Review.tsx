@@ -12,7 +12,7 @@ import { Bar, confirmDelete, Empty, Field, go, Menu, Sheet, SubjectDot, SubjectP
 import { SwipeCard } from './SwipeCard';
 
 export function Review({ sub }: { sub?: string }) {
-  if (sub === 'redo') return <NoteRun />;
+  if (sub === 'redo' || sub?.startsWith('redo?')) return <NoteRun />;
   if (sub?.startsWith('cards-run')) return <CardRun />;
   if (sub?.startsWith('blank-run-')) return <BlankRun id={sub.slice(10)} />;
   if (sub?.startsWith('deck-')) return <DeckView id={sub.slice(5)} />;
@@ -425,7 +425,16 @@ function NoteSheet({ note, today, onClose }: { note?: WrongNote; today: string; 
 function NoteRun() {
   const d = useStudy();
   const today = useToday();
-  const [queue, setQueue] = useState<string[]>(() => dueToday(alive(getStudy().notes), today).map((n) => n.id));
+  // ?subject=과목 이면 그 과목의 아직 못 익힌 오답 전부 (시험 공부 계획에서 열 때)
+  const subject = new URLSearchParams(window.location.hash.split('?')[1] ?? '').get('subject');
+  const [queue, setQueue] = useState<string[]>(() =>
+    subject
+      ? alive(getStudy().notes)
+          .filter((x) => x.subjectId === subject && !x.learned)
+          .sort((a, b) => b.wrong - a.wrong || a.created - b.created)
+          .map((x) => x.id)
+      : dueToday(alive(getStudy().notes), today).map((x) => x.id),
+  );
   const [total] = useState(queue.length);
   const [revealed, setRevealed] = useState(false);
   const [first, setFirst] = useState<Map<string, boolean>>(new Map());
@@ -434,7 +443,7 @@ function NoteRun() {
     return (
       <div className="st-page narrow">
         <div className="st-card st-done-card">
-          <h2>오늘 다시 풀기 끝!</h2>
+          <h2>{subject ? `${d.subjects[subject]?.name ?? ''} 오답 다시 풀기 끝!` : '오늘 다시 풀기 끝!'}</h2>
           <p>
             {total}문제 중 {[...first.values()].filter(Boolean).length}문제를 맞혔어요
           </p>

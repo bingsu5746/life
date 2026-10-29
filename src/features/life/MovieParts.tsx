@@ -50,6 +50,7 @@ export function MovieView({ item, today, onClose, onEdit }: { item: Movie; today
           </div>
         )}
         {item.comment && <blockquote className="mv-quote">{item.comment}</blockquote>}
+        {(item.why || item.recBy) && <small className="st-muted">보기 전: {[item.why, item.recBy && `${item.recBy} 추천`].filter(Boolean).join(' · ')}</small>}
         {item.review ? (
           <div className="mv-review-full">
             <small className="st-muted">리뷰</small>
@@ -131,6 +132,8 @@ export function MovieSheet({ item, today, onClose }: { item: Partial<Movie>; tod
   const [release, setRelease] = useState(item.release ?? '');
   const [where, setWhere] = useState(item.where ?? '');
   const [tags, setTags] = useState<string[]>(item.tags ?? []);
+  const [why, setWhy] = useState(item.why ?? '');
+  const [recBy, setRecBy] = useState(item.recBy ?? '');
   const [tagText, setTagText] = useState('');
   const [meta, setMeta] = useState({ genre: item.genre, nation: item.nation, director: item.director });
   const isNew = !item.id;
@@ -251,10 +254,16 @@ export function MovieSheet({ item, today, onClose }: { item: Partial<Movie>; tod
             </Field>
           </>
         ) : (
-          <label className="st-cond-time">
-            개봉일 (알면)
-            <input className="st-input sm" type="date" value={release} onChange={(e) => setRelease(e.target.value)} />
-          </label>
+          <>
+            <Field label="왜 보고 싶어요? (선택)">
+              <textarea className="st-input" rows={2} value={why} onChange={(e) => setWhy(e.target.value)} placeholder="예고편이 좋아서, 감독 전작이 좋았어서…" aria-label="보고 싶은 이유" />
+            </Field>
+            <input className="st-input" value={recBy} onChange={(e) => setRecBy(e.target.value)} placeholder="추천해 준 사람 (선택)" aria-label="추천해 준 사람" />
+            <label className="st-cond-time">
+              개봉일 (알면)
+              <input className="st-input sm" type="date" value={release} onChange={(e) => setRelease(e.target.value)} />
+            </label>
+          </>
         )}
         <div className="st-row end">
           {item.id && (
@@ -282,6 +291,8 @@ export function MovieSheet({ item, today, onClose }: { item: Partial<Movie>; tod
                 watched: status === 'watched' ? watched || undefined : undefined,
                 release: release || undefined,
                 where: status === 'watched' ? where || undefined : undefined,
+                why: why.trim() || undefined,
+                recBy: recBy.trim() || undefined,
               } as Movie);
               toast('저장했어요');
               onClose();
