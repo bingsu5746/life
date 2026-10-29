@@ -267,7 +267,6 @@ function MockScreen({ state, onRestart, onQuit }: { state: MockState; onRestart:
   const s = v.subject;
   const name = state.title ? s.name.replace('탐구', state.title) : s.name;
   const total = s.parts[s.parts.length - 1].to - s.parts[0].from;
-  const left = Math.ceil(v.leftMs / 60_000);
   return (
     <div className={`focus mock ${shown ? 'show' : ''}`} onPointerDown={poke}>
       <div className="focus-top">
@@ -279,7 +278,7 @@ function MockScreen({ state, onRestart, onQuit }: { state: MockState; onRestart:
       <div className="focus-main">
         <AnalogClock min={v.clockMin} />
       </div>
-      <div className="focus-bottom">{v.done ? <span>시험 끝</span> : <span>남은 시간 {left >= 60 ? `${Math.floor(left / 60)}시간 ${left % 60}분` : `${left}분`}</span>}</div>
+      <div className="focus-bottom">{v.done && <span>시험 끝</span>}</div>
       <div className="focus-ctl" onPointerDown={(e) => e.stopPropagation()}>
         {!v.done && (
           <div className="focus-noise">

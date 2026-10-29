@@ -281,15 +281,15 @@ function NoteSheet({ note, today, onClose }: { note?: WrongNote; today: string; 
   const [busy, setBusy] = useState(false);
   const [ocr, setOcr] = useState<string | null>(null);
   /** 사진의 글자를 읽어 「문제」 칸에 넣는다 (기기 안에서만, 수식·그림은 못 읽음) */
-  async function readQuestion() {
+  async function readQuestion(ids: string[] = f.photos) {
     setOcr('읽는 중…');
     try {
       const { readImageText } = await import('../../lib/ocr');
       let all = '';
-      for (const [i, id] of f.photos.entries()) {
+      for (const [i, id] of ids.entries()) {
         const blob = await photoBlob(id);
         if (!blob) continue;
-        all += (await readImageText(blob, (_s, r) => setOcr(`읽는 중 ${i + 1}/${f.photos.length} ${Math.round(r * 100)}%`))).trim() + '\n';
+        all += (await readImageText(blob, (_s, r) => setOcr(`읽는 중 ${i + 1}/${ids.length} ${Math.round(r * 100)}%`))).trim() + '\n';
       }
       const t = all.replace(/\n{3,}/g, '\n\n').trim();
       if (!t) toast('사진에서 글자를 찾지 못했어요');
@@ -332,6 +332,8 @@ function NoteSheet({ note, today, onClose }: { note?: WrongNote; today: string; 
     }
     setF((x) => ({ ...x, photos: [...x.photos, ...ids] }));
     setBusy(false);
+    // 문제 칸이 비어 있으면 사진 글자를 바로 읽어 채운다
+    if (ids.length && !f.question.trim()) void readQuestion(ids);
   }
   function save() {
     if (!f.subjectId) return toast('과목을 골라 주세요');
