@@ -99,7 +99,7 @@ export interface PushSub {
 }
 
 /** 한 곳에 보내기. gone: 그 구독이 없어졌음 (지워야 함) */
-export async function sendPush(sub: PushSub, message: { title: string; body: string }, v: Vapid, subject: string): Promise<{ ok: boolean; gone: boolean; status: number }> {
+export async function sendPush(sub: PushSub, message: { title: string; body: string; url?: string }, v: Vapid, subject: string): Promise<{ ok: boolean; gone: boolean; status: number }> {
   if (!allowedEndpoint(sub.endpoint)) return { ok: false, gone: true, status: 0 };
   const body = await encryptPayload(enc.encode(JSON.stringify(message)), sub.p256dh, sub.auth);
   const jwt = await vapidJwt(v, sub.endpoint, subject);

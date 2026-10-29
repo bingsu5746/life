@@ -241,3 +241,97 @@ describe('영화 시상식 (awards)', () => {
     expect(watchedYears(d)).toEqual([2026, 2025]);
   });
 });
+
+describe('일기 양식 (diaryForm)', () => {
+  it('그날 기록 요약과 꿈 날짜', async () => {
+    const { daySummary, dreamDates, formOf } = await import('../life/diaryForm');
+    const d = {
+      settings: {},
+      sessions: { s: { id: 's', date: '2026-10-28', minutes: 90, updatedAt: 1 } },
+      todos: {}, workouts: { w: { id: 'w', date: '2026-10-28', kind: '농구', minutes: 60, updatedAt: 1 } },
+      movies: { m: { id: 'm', title: '존 윅', status: 'watched', watched: '2026-10-28', rating: 5, updatedAt: 1 } },
+      hobbyLogs: {}, hobbies: {}, moneyTx: {}, habits: {},
+      diary: { '2026-10-27': { id: '2026-10-27', text: '', parts: { dream: '하늘을 날았다' }, updatedAt: 1 }, '2026-10-26': { id: '2026-10-26', text: 'x', updatedAt: 1 } },
+    } as never;
+    expect(daySummary(d, '2026-10-28')).toEqual(['공부 1시간 30분', '운동: 농구 60분', '영화: 존 윅 ★5']);
+    expect(dreamDates(d)).toEqual(['2026-10-27']);
+    expect(formOf(d).parts).toEqual(['done', 'good', 'dream']);
+  });
+});
+
+describe('습관 요일별 달성률 (weekdayRates)', () => {
+  it('하기로 한 날 중 한 비율, 안 한 오늘은 안 센다', async () => {
+    const { weekdayRates } = await import('./habits');
+    // 2026-10-28 은 수요일. 매일 하는 습관, 10/21(수) 만 하고 10/14(수) 는 안 함
+    const h = { weekdays: [], checks: ['2026-10-21', '2026-10-27'], created: '2026-10-07' };
+    const r = weekdayRates([h], '2026-10-28', 3);
+    expect(r[3]).toEqual({ weekday: 3, due: 2, done: 1, pct: 50 });
+    expect(r[2]).toMatchObject({ due: 3, done: 1 });
+    expect(r[0].due).toBe(3);
+  });
+});
+
+describe('시험 공부 자동 계획 (buildExamPlan)', () => {
+  const mk = (over: Record<string, unknown> = {}, lines = 8) => {
+    const L = (p: string, n: number) => Array.from({ length: n }, (_, i) => ({ id: `${p}${i}`, text: `${p} ${i + 1}단원`, done: false }));
+    const exam = { id: 'e', name: '중간고사', date: '2026-11-10', kind: 'school', updatedAt: 1, scopes: [{ id: 'sm', subjectId: 'math', lines: L('m', lines) }, { id: 'se', subjectId: 'eng', lines: L('e', lines / 2), date: '2026-11-11' }], plan: { on: true, weekday: 180, weekend: 300, perLine: 40, review: 0.35, ...over } };
+    return { settings: { offDates: [], restDays: [], tutorRatio: 0.5 }, subjects: { math: { id: 'math', name: '수학' }, eng: { id: 'eng', name: '영어' } }, exams: { e: exam }, sessions: {}, tutors: {}, notes: {}, grades: {} } as never;
+  };
+  it('모든 처음 공부를 시험 전에 넣고 하루 시간을 크게 넘기지 않는다', async () => {
+    const { buildExamPlan } = await import('./examPlan');
+    const d = mk();
+    const r = buildExamPlan(d, (d as { exams: { e: never } }).exams.e, '2026-10-26')!;
+    const ids = r.days.flatMap((x) => x.items.map((i) => i.id));
+    for (let i = 0; i < 8; i++) expect(ids).toContain(`L:m${i}`);
+    for (let i = 0; i < 4; i++) expect(ids).toContain(`L:e${i}`);
+    expect(r.overflow).toEqual([]);
+    expect(r.short).toBe(0);
+    for (const day of r.days) expect(day.minutes).toBeLessThanOrEqual(Math.max(day.capacity * 1.15, 60));
+    // 수학 시험 전날(11/9)에 수학 훑어보기, 영어는 11/10
+    expect(r.days.find((x) => x.date === '2026-11-09')!.items.some((i) => i.id === 'S:sm')).toBe(true);
+    expect(r.days.find((x) => x.date === '2026-11-10')!.items.some((i) => i.id === 'S:se')).toBe(true);
+    // 시험 날(11/10)에는 수학 공부가 없다
+    expect(r.days.find((x) => x.date === '2026-11-10')!.items.some((i) => i.subjectId === 'math')).toBe(false);
+  });
+  it('시간이 모자라면 모자라는 만큼 알린다', async () => {
+    const { buildExamPlan } = await import('./examPlan');
+    const d = mk({ weekday: 30, weekend: 30 }, 20);
+    const r = buildExamPlan(d, (d as { exams: { e: never } }).exams.e, '2026-11-05')!;
+    expect(r.short).toBeGreaterThan(0);
+    expect(r.extraPerDay).toBeGreaterThan(0);
+  });
+  it('오늘 고정한 목록은 그대로, 끝낸 줄은 다음 계산에서 빠진다', async () => {
+    const { buildExamPlan, toggleItem } = await import('./examPlan');
+    const d = mk() as { exams: { e: { plan: { lock?: unknown } } } };
+    const first = buildExamPlan(d as never, d.exams.e as never, '2026-10-26')!;
+    const todayIds = first.days[0].items.map((i) => i.id);
+    expect(todayIds.length).toBeGreaterThan(0);
+    d.exams.e.plan.lock = { date: '2026-10-26', ids: todayIds };
+    const again = buildExamPlan(d as never, toggleItem(d.exams.e as never, `L:${todayIds.find((x) => x.startsWith('L:'))!.slice(2)}`, '2026-10-26', Date.parse('2026-10-26T03:00:00Z')) as never, '2026-10-26')!;
+    expect(again.days[0].items.map((i) => i.id).sort()).toEqual([...todayIds].sort());
+    const later = again.days.slice(1).flatMap((x) => x.items.map((i) => i.id));
+    for (const id of todayIds) expect(later).not.toContain(id);
+  });
+  it('꺼져 있으면 null', async () => {
+    const { buildExamPlan } = await import('./examPlan');
+    const d = mk({ on: false });
+    expect(buildExamPlan(d, (d as { exams: { e: never } }).exams.e, '2026-10-26')).toBeNull();
+  });
+});
+
+describe('통합 검색 (searchAll)', () => {
+  it('여러 기록에서 글자로 찾고 둘레 글을 보여 준다', async () => {
+    const { searchAll, snippet } = await import('../life/search');
+    const d = {
+      diary: { '2026-10-27': { id: '2026-10-27', text: '오늘은 존 윅을 봤다', parts: { dream: '하늘을 날았다' }, updatedAt: 1 } },
+      movies: { m: { id: 'm', title: '존 윅', status: 'watched', comment: '총 쏘는 맛', updatedAt: 1 } },
+      reads: {}, todos: {}, exams: {}, assessments: {}, notes: {}, cards: {}, books: {}, workouts: {}, hobbyLogs: {}, hobbies: {}, wishes: {}, moneyTx: {},
+    } as never;
+    const hits = searchAll(d, {}, '존 윅');
+    expect(hits.map((h) => h.group)).toEqual(['일기', '영화']);
+    expect(hits[0].to).toBe('/diary/2026-10-27');
+    expect(searchAll(d, {}, '하늘')[0].snippet).toContain('하늘');
+    expect(searchAll(d, {}, '없는말')).toEqual([]);
+    expect(snippet('가나다라마바사아자차카타파하', '마바', 3)).toBe('…나다라마바사아자…');
+  });
+});

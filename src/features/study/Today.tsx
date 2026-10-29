@@ -1,4 +1,6 @@
 // 「오늘」 화면 (설계 §7): 과외 숙제 → 문제집 오늘 분량 → 영단어 → 복습 → 할 일·습관 → 공부 시간
+import { ExamToday } from './ExamPlan';
+import { todayExamItems } from './examPlan';
 import { useMemo, useState } from 'react';
 import { addDays, dday, longDate, shortDate, weekStart } from './dates';
 import { habitOn, streak, toggleHabit } from './habits';
@@ -59,7 +61,8 @@ export function Today() {
   if (wordsLeft) count(false);
   if (notesDue.length + cardsDue.length) count(false);
 
-  const empty = !hws.length && !plans.length && !lists.length && !alive(d.notes).length && !alive(d.cards).length && !todos.length && !habits.length && !previews.length && !tasks.length;
+  const examTodo = todayExamItems(d, today).some((x) => x.items.length > 0);
+  const empty = !examTodo && !hws.length && !plans.length && !lists.length && !alive(d.notes).length && !alive(d.cards).length && !todos.length && !habits.length && !previews.length && !tasks.length;
 
   return (
     <div className="st-today">
@@ -196,6 +199,8 @@ export function Today() {
           ))}
         </section>
       )}
+
+      <ExamToday today={today} />
 
       {bookPlans.length > 0 && <Week plans={bookPlans} today={today} />}
     </div>

@@ -2,6 +2,7 @@
 import { useState } from 'react';
 import { Badges, FindTab, RecTab, useOtt } from './MovieFind';
 import { AwardsView } from './Awards';
+import { Ceremony } from './Ceremony';
 import { CatalogBar, NowShowing } from './MovieNow';
 import { MovieSheet, MovieView, starText } from './MovieParts';
 import { BarChart } from '../study/charts';
@@ -20,7 +21,7 @@ export function Movies({ sub }: { sub?: string }) {
   const d = useStudy();
   const today = useToday();
   const mineSub: Mine | null = sub === 'watched' || sub === 'want' || sub === 'awards' ? sub : null;
-  const tab: Tab = mineSub ? 'mine' : sub === 'find' ? 'find' : sub === 'rec' ? 'rec' : 'now';
+  const tab: Tab = mineSub || sub === 'ceremony' ? 'mine' : sub === 'find' ? 'find' : sub === 'rec' ? 'rec' : 'now';
   const [sort, setSort] = useState<'recent' | 'rating'>('recent');
   const [tag, setTag] = useState('');
   const [edit, setEdit] = useState<Partial<Movie> | null>(sub === 'new' ? {} : null);
@@ -43,11 +44,6 @@ export function Movies({ sub }: { sub?: string }) {
     setEdit(null);
     if (sub === 'new') go('/movies');
   };
-  const t = (k: string, label: string, on: boolean) => (
-    <button role="tab" aria-selected={on} className={on ? 'on' : ''} onClick={() => go(k ? `/movies/${k}` : '/movies')}>
-      {label}
-    </button>
-  );
   return (
     <div className="st-page">
       <div className="st-page-head">
@@ -55,12 +51,6 @@ export function Movies({ sub }: { sub?: string }) {
         <button className="btn btn-sm btn-primary" onClick={() => setEdit({})} aria-label="영화 넣기">
           <Icon name="plus" />
         </button>
-      </div>
-      <div className="st-seg" role="tablist" aria-label="영화">
-        {t('', '극장가', tab === 'now')}
-        {t(mineSub ?? 'watched', '내 영화', tab === 'mine')}
-        {t('find', '찾기', tab === 'find')}
-        {t('rec', '추천', tab === 'rec')}
       </div>
       {tab === 'mine' && (
         <nav className="mv-sub" aria-label="내 영화">
@@ -171,6 +161,19 @@ export function Movies({ sub }: { sub?: string }) {
           </>
         ))}
 
+      {mineSub === 'want' && watched.some((m) => m.rewish) && (
+        <section className="st-card">
+          <small className="aw-label">다시 보고 싶은 영화</small>
+          {watched
+            .filter((m) => m.rewish)
+            .map((m) => (
+              <button key={m.id} className="aw-film" onClick={() => setView(m.id)}>
+                <b>{m.title}</b>
+                <span>{starText(m.rating)}</span>
+              </button>
+            ))}
+        </section>
+      )}
       {mineSub === 'want' &&
         (!want.length ? (
           <Empty title="보고 싶은 영화가 없어요">
@@ -205,6 +208,7 @@ export function Movies({ sub }: { sub?: string }) {
           </div>
         ))}
 
+      {sub === 'ceremony' && <Ceremony onClose={() => go('/movies/awards')} />}
       {viewing && !viewing.deleted && (
         <MovieView
           item={viewing}

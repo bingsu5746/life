@@ -4756,3 +4756,206 @@ body {
 .mv-row .st-item-main * {
   text-decoration: none;
 }
+
+.dy-load {
+  margin-left: 10px;
+  font-weight: 400;
+}
+.dy-form-row {
+  align-items: flex-start;
+}
+
+.st-weekdays {
+  margin-top: 8px;
+}
+.st-weekdays summary {
+  cursor: pointer;
+  color: var(--muted);
+  font-size: 0.88rem;
+}
+.st-weekdays > * {
+  margin-top: 8px;
+}
+
+/* 영화 시상식 화면 */
+.cer {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  background: var(--bg);
+  display: grid;
+  place-items: center;
+}
+.cer-x {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  z-index: 2;
+  width: 40px;
+  height: 40px;
+  border: 0;
+  border-radius: 50%;
+  background: var(--soft);
+  color: var(--text);
+  font-size: 1rem;
+  cursor: pointer;
+}
+.cer-body {
+  position: absolute;
+  inset: 0;
+  border: 0;
+  background: none;
+  color: var(--text);
+  font: inherit;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+}
+.cer-slide {
+  display: grid;
+  gap: 14px;
+  justify-items: center;
+  text-align: center;
+  max-width: 28em;
+  animation: cer-in 0.5s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.cer-slide small {
+  color: var(--muted);
+  letter-spacing: 0.12em;
+  font-size: 0.85rem;
+}
+.cer-slide h2 {
+  margin: 0;
+  font-size: clamp(2rem, 9vw, 3.4rem);
+  letter-spacing: -0.04em;
+  line-height: 1.15;
+  word-break: keep-all;
+}
+.cer-slide p {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.6;
+}
+.cer-stars {
+  font-size: 1.4rem;
+  letter-spacing: 4px;
+}
+.cer-slide.win h2 {
+  font-size: clamp(2.4rem, 11vw, 4.2rem);
+}
+.cer-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 12px;
+  font-size: 1.1rem;
+}
+.cer-list span {
+  color: var(--muted);
+  font-size: 0.85rem;
+  letter-spacing: 1px;
+  margin-left: 8px;
+}
+.cer-dots {
+  position: absolute;
+  bottom: 28px;
+  display: flex;
+  gap: 6px;
+}
+.cer-dots i {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--line-strong);
+}
+.cer-dots i.past {
+  background: var(--muted);
+}
+.cer-dots i.on {
+  background: var(--text);
+  width: 18px;
+  border-radius: 3px;
+}
+@keyframes cer-in {
+  from {
+    opacity: 0;
+    transform: translateY(14px) scale(0.98);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .cer-slide {
+    animation: none;
+  }
+}
+.aw-years .aw-open {
+  margin-left: auto;
+  color: var(--text);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+/* 시험 공부 계획 */
+.xp-subj {
+  display: grid;
+  gap: 6px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--line);
+}
+.xp-subj:last-child {
+  border-bottom: 0;
+}
+.xp-mult {
+  justify-self: start;
+}
+.xp-time {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 18px;
+}
+.xp-day {
+  padding: 10px 0;
+  border-bottom: 1px solid var(--line);
+}
+.xp-day:last-of-type {
+  border-bottom: 0;
+}
+.xp-day.today {
+  background: var(--softer);
+  margin: 0 -8px;
+  padding: 10px 8px;
+  border-radius: 10px;
+}
+.xp-settings summary {
+  cursor: pointer;
+  color: var(--muted);
+}
+.xp-settings .st-form {
+  margin-top: 12px;
+}
+
+/* 통합 검색 */
+.sr-hit {
+  display: grid;
+  gap: 2px;
+  width: 100%;
+  text-align: left;
+  padding: 10px 0;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  background: none;
+  color: var(--text);
+  font: inherit;
+  cursor: pointer;
+}
+.sr-hit:last-child {
+  border-bottom: 0;
+}
+.sr-hit small {
+  color: var(--muted);
+  line-height: 1.5;
+}
+.gear-btn.search-btn {
+  margin-right: 2px;
+}

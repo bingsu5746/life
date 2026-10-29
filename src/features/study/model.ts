@@ -42,6 +42,8 @@ export interface StudySettings {
   fitnessGoal?: { perWeek?: number; minutes?: number };
   /** 한 달 지출 예산 (원) */
   monthlyBudget?: number;
+  /** 일기 양식: 쓸 칸들 · 새 일기에 오늘 한 것을 미리 채울지 */
+  diaryForm?: { parts: string[]; autoFill: boolean };
   /** 메인 화면에서 숨긴 영역 (예: 'money') */
   hiddenAreas?: string[];
   /** 목표 등급: 성적 종류마다 과목 이름 → 등급 */
@@ -99,6 +101,24 @@ export interface ExamDay {
 /** school: 내신(학교 시험), mock: 모의고사·수능, other: 그 밖 */
 export type ExamKind = 'school' | 'mock' | 'other';
 
+/** 시험 공부 자동 계획 설정 (시험마다) */
+export interface ExamPlanSettings {
+  on: boolean;
+  /** 하루에 쓸 수 있는 시간 (분): 평일 · 주말 */
+  weekday: number;
+  weekend: number;
+  /** 범위 한 줄을 처음 공부하는 데 드는 시간 (분) */
+  perLine: number;
+  /** 복습 시간 = 처음 공부 시간 × 이 값 */
+  review: number;
+  /** 과목마다 내가 정한 시간 배수 */
+  weights?: Record<Id, number>;
+  /** 복습·훑어보기·오답 항목을 끝낸 날 */
+  done?: Record<string, DateStr>;
+  /** 오늘 할 것을 고정한 목록 */
+  lock?: { date: DateStr; ids: string[] };
+}
+
 export interface Exam extends Stamp {
   id: Id;
   name: string;
@@ -110,6 +130,8 @@ export interface Exam extends Stamp {
   /** 날짜별 시험 과목 (여러 날 보는 시험) */
   days?: ExamDay[];
   scopes?: ExamScope[];
+  /** 자동 계획 설정 */
+  plan?: ExamPlanSettings;
 }
 
 /** 성적 한 과목 */
@@ -421,6 +443,8 @@ export interface Movie extends Stamp {
   genre?: string;
   nation?: string;
   director?: string;
+  /** 본 영화 중 또 보고 싶은 것 */
+  rewish?: boolean;
   /** 태그 (혼자 · 울었다 …) */
   tags?: string[];
   /** 처음 본 뒤에 또 본 기록 */
@@ -518,6 +542,28 @@ export interface DiaryEntry extends Stamp {
   mood?: number;
   title?: string;
   text: string;
+  /** 양식 칸마다 쓴 것 (오늘 한 것 · 좋았던 것 · 꿈 …) */
+  parts?: Record<string, string>;
+}
+
+/** 읽은 책 · 읽는 중 · 읽고 싶은 책 */
+export interface Reading extends Stamp {
+  id: Id;
+  title: string;
+  author?: string;
+  status: 'want' | 'reading' | 'done';
+  /** 전체 쪽수 · 지금 읽은 곳(쪽) */
+  pages?: number;
+  read?: number;
+  /** 읽은 곳을 고친 날과 그때 쪽 (날마다 마지막 것) */
+  log?: { date: DateStr; read: number }[];
+  /** 0.5 ~ 5 */
+  rating?: number;
+  comment?: string;
+  review?: string;
+  started?: DateStr;
+  finished?: DateStr;
+  created: number;
 }
 
 export interface CardDeck extends Stamp {
@@ -638,12 +684,13 @@ export interface StudyData {
   diary: Record<Id, DiaryEntry>;
   moneyRules: Record<Id, MoneyRule>;
   movies: Record<Id, Movie>;
+  reads: Record<Id, Reading>;
 }
 
 /** 단어는 많아질 수 있어 따로 묶는다 */
 export type WordsData = Record<Id, Word>;
 
-export const COLLECTIONS = ['subjects', 'exams', 'books', 'plans', 'tutors', 'homework', 'notes', 'decks', 'cards', 'wordLists', 'sessions', 'todos', 'habits', 'grades', 'previews', 'assessments', 'blanks', 'conditions', 'weekNotes', 'papers', 'workouts', 'bodyLogs', 'moneyTx', 'savings', 'hobbies', 'hobbyLogs', 'wishes', 'diary', 'moneyRules', 'movies'] as const;
+export const COLLECTIONS = ['subjects', 'exams', 'books', 'plans', 'tutors', 'homework', 'notes', 'decks', 'cards', 'wordLists', 'sessions', 'todos', 'habits', 'grades', 'previews', 'assessments', 'blanks', 'conditions', 'weekNotes', 'papers', 'workouts', 'bodyLogs', 'moneyTx', 'savings', 'hobbies', 'hobbyLogs', 'wishes', 'diary', 'moneyRules', 'movies', 'reads'] as const;
 export type Collection = (typeof COLLECTIONS)[number];
 
 export const DEFAULT_SETTINGS: StudySettings = {
@@ -693,6 +740,7 @@ export function emptyStudy(): StudyData {
     diary: {},
     moneyRules: {},
     movies: {},
+    reads: {},
   };
 }
 

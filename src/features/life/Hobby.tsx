@@ -5,6 +5,7 @@ import { shortDate, weekStart } from '../study/dates';
 import { alive, newId, type Hobby as HobbyT, type HobbyLog, type WishItem } from '../study/model';
 import { put, remove, useStudy } from '../study/store';
 import { minutesText } from '../study/timer';
+import { ReadingPage } from './Reading';
 import { Bar, confirmDelete, Empty, Field, go, Icon, Sheet, tap, toast, useToday } from '../study/ui';
 import { hobbyWeek, weeklyMinutes } from './calc';
 
@@ -27,7 +28,8 @@ const md = (x: string) => shortDate(x).replace(/\(.\)/, '');
 /** sub: 'new' 이면 기록 넣기 창. 예전 주소 /hobby/movies 는 영화 영역으로 */
 export function Hobby({ sub, sub2 }: { sub?: string; sub2?: string }) {
   if (sub === 'movies') return <MovedToMovies sub={sub2} />;
-  return <HobbyMain sub={sub} />;
+  if (sub === 'reading') return <ReadingPage />;
+  return <HobbyMain sub={sub} view={sub === 'wish' ? 'wish' : 'main'} />;
 }
 
 function MovedToMovies({ sub }: { sub?: string }) {
@@ -35,7 +37,7 @@ function MovedToMovies({ sub }: { sub?: string }) {
   return null;
 }
 
-function HobbyMain({ sub }: { sub?: string }) {
+function HobbyMain({ sub, view }: { sub?: string; view: 'main' | 'wish' }) {
   const d = useStudy();
   const today = useToday();
   const [log, setLog] = useState<HobbyLog | 'new' | null>(sub === 'new' ? 'new' : null);
@@ -52,16 +54,24 @@ function HobbyMain({ sub }: { sub?: string }) {
   const h = (m: number) => (m >= 60 ? `${Math.round((m / 60) * 10) / 10}시간` : `${m}분`);
   const close = () => {
     setLog(null);
-    if (sub) go('/hobby');
+    if (sub === 'new') go('/hobby');
   };
   return (
     <div className="st-page">
       <div className="st-page-head">
-        <h2>취미</h2>
-        <button className="btn btn-sm btn-primary" onClick={() => (hobbies.length ? setLog('new') : setHobbyEdit('new'))}>
-          <Icon name="plus" /> {hobbies.length ? '한 것 넣기' : '취미 만들기'}
-        </button>
+        <h2>{view === 'wish' ? '하고 싶은 것' : '취미'}</h2>
+        {view === 'wish' ? (
+          <button className="btn btn-sm btn-primary" onClick={() => setWish('new')} aria-label="넣기">
+            <Icon name="plus" />
+          </button>
+        ) : (
+          <button className="btn btn-sm btn-primary" onClick={() => (hobbies.length ? setLog('new') : setHobbyEdit('new'))}>
+            <Icon name="plus" /> {hobbies.length ? '한 것 넣기' : '취미 만들기'}
+          </button>
+        )}
       </div>
+      {view === 'main' && (
+        <>
 
       <section className="st-card">
         <div className="st-inline between">
@@ -117,6 +127,10 @@ function HobbyMain({ sub }: { sub?: string }) {
         </section>
       )}
 
+        </>
+      )}
+
+      {view === 'wish' && (
       <section className="st-card">
         <div className="st-inline between wrap">
           <div className="st-seg" aria-label="하고 싶은 것">
@@ -153,8 +167,9 @@ function HobbyMain({ sub }: { sub?: string }) {
           ))
         )}
       </section>
+      )}
 
-      {!hobbies.length && !alive(d.wishes).length && (
+      {view === 'main' && !hobbies.length && !alive(d.wishes).length && (
         <Empty icon="🎸" title="좋아하는 것을 넣어 보세요">
           <p>공부만 하면 지쳐요. 취미에 쓴 시간도 적어 두면 한 주를 돌아볼 때 도움이 돼요.</p>
         </Empty>

@@ -65,3 +65,32 @@ export function mergeHabitChecks(a: Pick<Habit, 'checks' | 'log'>, b: Pick<Habit
   const keep = Object.keys(log).sort().slice(-KEEP);
   return { checks, log: Object.fromEntries(keep.map((d) => [d, log[d]])) };
 }
+
+export interface WeekdayRate {
+  /** 0 일 ~ 6 토 */
+  weekday: number;
+  /** 하기로 한 날 수 · 한 날 수 */
+  due: number;
+  done: number;
+  /** 0~100, 하기로 한 날이 없으면 null */
+  pct: number | null;
+}
+
+/** 최근 weeks 주 동안 요일별 달성률. 오늘은 안 했으면 아직 안 센다 */
+export function weekdayRates(habits: Pick<Habit, 'weekdays' | 'checks' | 'created'>[], today: DateStr, weeks = 12): WeekdayRate[] {
+  const out: WeekdayRate[] = Array.from({ length: 7 }, (_, weekdayIdx) => ({ weekday: weekdayIdx, due: 0, done: 0, pct: null }));
+  for (const h of habits) {
+    const checks = new Set(h.checks);
+    for (let i = 0; i < weeks * 7; i++) {
+      const d = addDays(today, -i);
+      if (d < h.created || !habitOn(h, d)) continue;
+      const on = checks.has(d);
+      if (d === today && !on) continue;
+      const r = out[weekday(d)];
+      r.due++;
+      if (on) r.done++;
+    }
+  }
+  for (const r of out) r.pct = r.due ? Math.round((r.done / r.due) * 100) : null;
+  return out;
+}

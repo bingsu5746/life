@@ -5,6 +5,7 @@ import { addProgress, daysAgo, examDates, examEnd, examProgress, MAX_EXAM_DAYS, 
 import { alive, newId, SUBJECT_COLORS, type Exam, type ExamDay, type ExamKind, type ExamScope, type Subject } from './model';
 import { put, useStudy } from './store';
 import { removeExam } from './actions';
+import { ExamPlanPage } from './ExamPlan';
 import { Bar, Check, confirmDelete, Empty, Field, go, Icon, Menu, Sheet, SubjectDot, SubjectPicker, subjectsOf, toast, useToday, tap } from './ui';
 
 // 성적 화면은 그래프가 있어 열 때 받는다
@@ -27,6 +28,7 @@ export function Exams({ id, sub }: { id?: string; sub?: string }) {
         <Assessments sub={sub} />
       </Suspense>
     );
+  if (id && sub === 'plan') return <ExamPlanPage id={id} />;
   if (id && id !== 'new' && id !== 'progress') return <ExamDetail id={id} />;
   return <ExamList adding={id === 'new'} progress={id === 'progress'} />;
 }
@@ -394,6 +396,7 @@ function ExamDetail({ id }: { id: string }) {
           items={[
             { label: '과목 범위 넣기', onClick: () => setScope('new') },
             { label: '이름·날짜·과목 고치기', onClick: () => setEdit(true) },
+            { label: '공부 계획', onClick: () => go(`/exams/${exam.id}/plan`) },
             { label: '이 시험 성적 넣기', onClick: () => go(`/exams/grades/from-${exam.id}`) },
             {
               label: '시험 지우기',
@@ -447,6 +450,12 @@ function ExamDetail({ id }: { id: string }) {
             ))}
           </div>
         </section>
+      )}
+
+      {scopes.length > 0 && examEnd(exam) >= today && (
+        <button className="st-addline" onClick={() => go(`/exams/${exam.id}/plan`)}>
+          <Icon name="target" /> {exam.plan?.on ? '공부 계획 보기' : '공부 계획 자동으로 만들기'}
+        </button>
       )}
 
       {examEnd(exam) < today && !alive(d.grades).some((g) => g.examId === exam.id) && (

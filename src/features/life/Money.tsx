@@ -15,6 +15,7 @@ const IN = ['용돈', '알바', '선물', '기타'];
 export function Money({ sub }: { sub?: string }) {
   const d = useStudy();
   const today = useToday();
+  const view: 'month' | 'fixed' | 'saving' = sub === 'fixed' ? 'fixed' : sub === 'saving' ? 'saving' : 'month';
   const month = sub && /^\d{4}-\d{2}$/.test(sub) ? sub : monthOf(today);
   const [edit, setEdit] = useState<MoneyTx | 'new' | null>(sub === 'new' ? 'new' : null);
   const [budgetOpen, setBudgetOpen] = useState(false);
@@ -43,11 +44,15 @@ export function Money({ sub }: { sub?: string }) {
   return (
     <div className="st-page">
       <div className="st-page-head">
-        <h2>돈</h2>
-        <button className="btn btn-sm btn-primary" onClick={() => setEdit('new')}>
-          <Icon name="plus" /> 쓴 것·받은 것
-        </button>
+        <h2>{view === 'fixed' ? '고정 지출 · 수입' : view === 'saving' ? '모으기' : '돈'}</h2>
+        {view === 'month' && (
+          <button className="btn btn-sm btn-primary" onClick={() => setEdit('new')}>
+            <Icon name="plus" /> 쓴 것·받은 것
+          </button>
+        )}
       </div>
+      {view === 'month' && (
+        <>
 
       <section className="st-card">
         <div className="st-inline between">
@@ -150,6 +155,10 @@ export function Money({ sub }: { sub?: string }) {
         </>
       )}
 
+        </>
+      )}
+
+      {view === 'fixed' && (
       <section className="st-card">
         <div className="st-inline between">
           <h3 className="st-h">고정 지출 · 수입</h3>
@@ -185,6 +194,9 @@ export function Money({ sub }: { sub?: string }) {
         )}
       </section>
 
+      )}
+
+      {view === 'saving' && (
       <section className="st-card">
         <div className="st-inline between">
           <h3 className="st-h">모으기</h3>
@@ -197,6 +209,7 @@ export function Money({ sub }: { sub?: string }) {
           <SavingRow key={g.id} g={g} today={today} onEdit={() => setGoal(g)} />
         ))}
       </section>
+      )}
 
       {edit && <TxSheet item={edit === 'new' ? undefined : edit} today={today} onClose={close} />}
       {budgetOpen && <BudgetSheet onClose={() => setBudgetOpen(false)} />}

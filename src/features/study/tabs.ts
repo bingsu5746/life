@@ -23,3 +23,51 @@ export const AREAS = [
   { key: 'diary', label: '일기' },
 ] as const;
 export type AreaKey = (typeof AREAS)[number]['key'];
+
+export interface AreaItem {
+  /** 주소의 두 번째 칸 ('' 이면 영역 처음) */
+  key: string;
+  label: string;
+  icon: string;
+}
+
+/** 공부를 뺀 영역마다 왼쪽(폰은 아래) 메뉴: 영역을 누르면 메인 대신 이 칸들이 나온다 */
+export const AREA_ITEMS: Record<Exclude<AreaKey, 'home' | 'study'>, AreaItem[]> = {
+  fitness: [
+    { key: '', label: '운동', icon: 'area-fitness' },
+    { key: 'body', label: '몸', icon: 'tutor' },
+    { key: 'basketball', label: '농구', icon: 'ball' },
+    { key: 'drills', label: '농구 연습', icon: 'target' },
+  ],
+  money: [
+    { key: '', label: '이번 달', icon: 'area-money' },
+    { key: 'fixed', label: '고정', icon: 'review' },
+    { key: 'saving', label: '모으기', icon: 'target' },
+  ],
+  hobby: [
+    { key: '', label: '취미', icon: 'area-hobby' },
+    { key: 'wish', label: '하고 싶은 것', icon: 'life' },
+    { key: 'reading', label: '독서', icon: 'books' },
+  ],
+  movies: [
+    { key: '', label: '극장가', icon: 'area-movies' },
+    { key: 'watched', label: '내 영화', icon: 'life' },
+    { key: 'find', label: '찾기', icon: 'search' },
+    { key: 'rec', label: '추천', icon: 'area-hobby' },
+  ],
+  diary: [
+    { key: '', label: '일기', icon: 'area-diary' },
+    { key: 'dream', label: '꿈', icon: 'moon' },
+    { key: 'form', label: '양식', icon: 'settings' },
+  ],
+};
+
+/** 지금 주소의 두 번째 칸에서 어느 메뉴가 켜져 있는지 */
+export function activeItem(area: keyof typeof AREA_ITEMS, sub?: string): string {
+  if (area === 'movies') return sub === 'watched' || sub === 'want' || sub === 'awards' || sub === 'ceremony' ? 'watched' : sub === 'find' || sub === 'rec' ? sub : '';
+  if (area === 'diary') return sub === 'dream' || sub === 'form' ? sub : '';
+  if (area === 'money') return sub === 'fixed' || sub === 'saving' ? sub : '';
+  if (area === 'fitness') return sub === 'body' || sub === 'basketball' || sub === 'drills' ? sub : '';
+  if (area === 'hobby') return sub === 'wish' || sub === 'reading' ? sub : '';
+  return '';
+}

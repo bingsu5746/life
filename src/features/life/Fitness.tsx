@@ -14,23 +14,10 @@ const CARDIO = ['달리기', '걷기', '자전거', '수영'];
 const EFFORT = ['', '가볍게', '보통', '힘들게'];
 const md = (x: string) => shortDate(x).replace(/\(.\)/, '');
 
-/** 운동 · 농구 바꾸기 */
-export function FitnessTabs({ on }: { on: 'all' | 'bb' }) {
-  return (
-    <div className="st-seg" role="tablist" aria-label="운동">
-      <button role="tab" aria-selected={on === 'all'} className={on === 'all' ? 'on' : ''} onClick={() => go('/fitness')}>
-        운동
-      </button>
-      <button role="tab" aria-selected={on === 'bb'} className={on === 'bb' ? 'on' : ''} onClick={() => go('/fitness/basketball')}>
-        농구
-      </button>
-    </div>
-  );
-}
-
 /** sub: 'new' 이면 넣기 창, 'basketball' 이면 농구 */
 export function Fitness({ sub, sub2 }: { sub?: string; sub2?: string }) {
   if (sub === 'basketball') return <Basketball sub={sub2} />;
+  if (sub === 'body') return <BodyPage />;
   return <FitnessAll sub={sub} />;
 }
 
@@ -68,7 +55,6 @@ function FitnessAll({ sub }: { sub?: string }) {
           <Icon name="plus" /> 운동 넣기
         </button>
       </div>
-      <FitnessTabs on="all" />
 
       <section className="st-card">
         <div className="st-inline between">
@@ -149,10 +135,20 @@ function FitnessAll({ sub }: { sub?: string }) {
         </>
       )}
 
-      <BodyCard today={today} />
-
       {edit && <WorkoutSheet item={edit === 'new' ? undefined : edit} today={today} onClose={close} />}
       {goalOpen && <GoalSheet onClose={() => setGoalOpen(false)} />}
+    </div>
+  );
+}
+
+function BodyPage() {
+  const today = useToday();
+  return (
+    <div className="st-page">
+      <div className="st-page-head">
+        <h2>몸</h2>
+      </div>
+      <BodyCard today={today} />
     </div>
   );
 }

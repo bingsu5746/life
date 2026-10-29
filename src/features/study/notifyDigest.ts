@@ -2,15 +2,19 @@
 // (서버는 공부 자료를 열어 보지 않고, 정한 시각에 이 글을 그대로 보낸다)
 import { addDays, diffDays } from './dates';
 import { upcomingExams, timetable } from './exams';
+import { buildExamPlan } from './examPlan';
 import { alive, type DateStr, type StudyData, type WordsData } from './model';
 import { planViews, homeworkViews } from './select';
 import { classesOn } from './timetable';
+import { ruleDates } from '../life/calc';
 
 export interface DigestEntry {
   date: DateStr;
   slot: number;
   title: string;
   body: string;
+  /** 눌렀을 때 열 화면 (앱 안 주소) */
+  url?: string;
 }
 
 const names = (d: StudyData, ids: string[]) => ids.map((id) => d.subjects[id]?.name ?? '과목').join('·');
@@ -19,6 +23,25 @@ const names = (d: StudyData, ids: string[]) => ids.map((id) => d.subjects[id]?.n
 function reviewCount(d: StudyData, words: WordsData, date: DateStr): number {
   const due = (r: { box: number; due: DateStr; learned?: boolean }) => r.box > 0 && !r.learned && r.due <= date;
   return alive(d.notes).filter(due).length + alive(d.cards).filter(due).length + alive(words).filter(due).length + alive(d.blanks).filter(due).length;
+}
+
+/** 자주 틀린 단어 중 그날 낼 세 개 (날짜마다 바뀐다) */
+export function weakQuiz(words: WordsData, date: DateStr, n = 3): string[] {
+  const weak = alive(words)
+    .filter((w) => w.wrong > 0 && w.meaning)
+    .sort((a, b) => b.wrong - a.wrong || a.term.localeCompare(b.term))
+    .slice(0, 12);
+  if (!weak.length) return [];
+  const day = Math.floor(Date.parse(`${date}T00:00:00Z`) / 86_400_000);
+  const start = (day * n) % weak.length;
+  return Array.from({ length: Math.min(n, weak.length) }, (_, i) => weak[(start + i) % weak.length].term);
+}
+
+/** 1월 1일이면 지난해 (본 영화가 있을 때만) */
+export function awardsYear(d: StudyData, date: DateStr): number | null {
+  if (date.slice(5) !== '01-01') return null;
+  const y = Number(date.slice(0, 4)) - 1;
+  return alive(d.movies).some((m) => m.status === 'watched' && m.watched?.startsWith(String(y))) ? y : null;
 }
 
 /** 그날 아침: 오늘 할 것 */
@@ -42,8 +65,17 @@ export function morning(d: StudyData, words: WordsData, today: DateStr, date: Da
   if (pv.length) parts.push(`오늘 수업 예습 ${pv.length}개`);
   const opens = alive(d.movies).filter((m) => m.status === 'want' && m.release === date);
   if (opens.length) parts.push(`오늘 개봉: ${opens.map((m) => m.title).join('·')}`);
+  for (const e of alive(d.exams)) {
+    const day = buildExamPlan(d, e, today)?.days.find((x) => x.date === date);
+    const left = day?.items.filter((i) => !i.done) ?? [];
+    if (left.length) parts.push(`${e.name} 공부 ${left.length}개 (${left.reduce((n, i) => n + i.minutes, 0)}분)`);
+  }
   const rv = reviewCount(d, words, date);
   if (rv) parts.push(`복습 ${rv}개`);
+  const q = weakQuiz(words, date);
+  if (q.length) parts.push(`단어 퀴즈: ${q.join(' · ')} 뜻은?`);
+  const y = awardsYear(d, date);
+  if (y) parts.unshift(`${y}년 영화 시상식이 열렸어요`);
   return parts.length ? parts.join(' · ') : '오늘 정해 둔 것이 없어요. 공부 기록을 남겨 보세요';
 }
 
@@ -67,6 +99,8 @@ export function evening(d: StudyData, today: DateStr, date: DateStr): string {
   if (hw.length) parts.push(`내일 마감 숙제 ${hw.length}개`);
   const opens = alive(d.movies).filter((m) => m.status === 'want' && m.release === next);
   if (opens.length) parts.push(`내일 개봉: ${opens.map((m) => m.title).join('·')}`);
+  const pay = alive(d.moneyRules).filter((r) => !r.paused && r.type === 'out' && ruleDates(r, next, next).length);
+  if (pay.length) parts.push(`내일 빠져나가는 돈: ${pay[0].name} ${pay[0].amount.toLocaleString('ko-KR')}원${pay.length > 1 ? ` 외 ${pay.length - 1}건` : ''}`);
   const pv = alive(d.previews).filter((p) => !p.done && p.date === next);
   if (pv.length) parts.push(`내일 수업 예습 ${pv.length}개`);
   else {
@@ -83,7 +117,9 @@ export function buildDigest(d: StudyData, words: WordsData, today: DateStr, time
     const date = addDays(today, i);
     times.forEach((t, slot) => {
       const am = Number(t.slice(0, 2)) < 15;
-      out.push({ date, slot, title: am ? '오늘 할 것' : '내일 준비', body: am ? morning(d, words, today, date) : evening(d, today, date) });
+      const y = am ? awardsYear(d, date) : null;
+      const weak = am && weakQuiz(words, date).length > 0;
+      out.push({ date, slot, title: y ? '🏆 영화 시상식' : am ? '오늘 할 것' : '내일 준비', body: am ? morning(d, words, today, date) : evening(d, today, date), url: y ? '/movies/ceremony' : weak ? '/words' : undefined });
     });
   }
   return out.slice(0, 24);

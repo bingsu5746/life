@@ -634,7 +634,10 @@ export class Accounts extends DurableObject<Env> {
       const entries = (Array.isArray(b.entries) ? b.entries : [])
         .filter((e): e is { date: string; slot: number; title: string; body: string } => !!e && typeof e === 'object' && /^\d{4}-\d{2}-\d{2}$/.test((e as { date?: unknown }).date as string) && Number.isInteger((e as { slot?: unknown }).slot) && typeof (e as { title?: unknown }).title === 'string' && typeof (e as { body?: unknown }).body === 'string')
         .slice(0, 24)
-        .map((e) => ({ date: e.date, slot: Math.max(0, Math.min(2, e.slot)), title: e.title.slice(0, 60), body: e.body.slice(0, 240) }));
+                .map((e) => {
+          const u = (e as { url?: unknown }).url;
+          return { date: e.date, slot: Math.max(0, Math.min(2, e.slot)), title: e.title.slice(0, 60), body: e.body.slice(0, 240), url: typeof u === 'string' && /^\/[\w/-]{0,60}$/.test(u) ? u : undefined };
+        });
       this.sql.exec('UPDATE notify SET digest = ? WHERE user_id = ?', JSON.stringify(entries), user.id);
       return json({ ok: true });
     }
@@ -648,7 +651,7 @@ export class Accounts extends DurableObject<Env> {
   }
 
   /** 여러 기기에 보내기 (없어진 구독은 지운다). 보낸 수 */
-  private async pushTo(subs: PushSub[], message: { title: string; body: string }, origin: string): Promise<number> {
+  private async pushTo(subs: PushSub[], message: { title: string; body: string; url?: string }, origin: string): Promise<number> {
     const v = await this.vapid();
     let ok = 0;
     for (const s of subs) {
@@ -673,10 +676,10 @@ export class Accounts extends DurableObject<Env> {
       const date = localDate(n.next_at, n.tz);
       const hhmm = new Date(n.next_at + n.tz * 60_000).toISOString().slice(11, 16);
       const slot = Math.max(0, times.indexOf(hhmm));
-      const entries = JSON.parse(n.digest) as { date: string; slot: number; title: string; body: string }[];
+      const entries = JSON.parse(n.digest) as { date: string; slot: number; title: string; body: string; url?: string }[];
       const e = entries.find((x) => x.date === date && x.slot === slot);
       // 기기를 오래 안 열어 날짜 글이 없으면 짧은 기본 글 (한참 지난 내용을 보내지 않게)
-      const message = e ? { title: e.title, body: e.body } : { title: 'Life', body: '오늘 할 것을 확인해 보세요' };
+      const message = e ? { title: e.title, body: e.body, url: e.url } : { title: 'Life', body: '오늘 할 것을 확인해 보세요' };
       const subs = this.sql.exec<PushSub & { [k: string]: SqlStorageValue }>('SELECT endpoint, p256dh, auth FROM push_subs WHERE user_id = ?', n.user_id).toArray();
       if (subs.length) await this.pushTo(subs, message, n.origin);
       this.sql.exec('UPDATE notify SET next_at = ? WHERE user_id = ?', nextFire(times, n.tz, Math.max(now, n.next_at) + 1000), n.user_id);

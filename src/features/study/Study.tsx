@@ -1,4 +1,5 @@
 // 공부 도우미: 탭과 하위 화면 (설계 docs/superpowers/specs/2026-10-23-study-planner-design.md)
+import { pendingExamLocks } from './examPlan';
 import { lazy, Suspense, useEffect, useState } from 'react';
 import './study.css';
 import { AddButton } from './Add';
@@ -24,6 +25,7 @@ const Fitness = lazy(() => import('../life/Fitness').then((m) => ({ default: m.F
 const Money = lazy(() => import('../life/Money').then((m) => ({ default: m.Money })));
 const Hobby = lazy(() => import('../life/Hobby').then((m) => ({ default: m.Hobby })));
 const Movies = lazy(() => import('../life/Movies').then((m) => ({ default: m.Movies })));
+const Search = lazy(() => import('../life/Search').then((m) => ({ default: m.Search })));
 const Diary = lazy(() => import('../life/Diary').then((m) => ({ default: m.Diary })));
 const Preview = lazy(() => import('./Preview').then((m) => ({ default: m.Preview })));
 const Translate = lazy(() => import('./Translate').then((m) => ({ default: m.Translate })));
@@ -32,7 +34,7 @@ const Words = lazy(() => import('./Words').then((m) => ({ default: m.Words })));
 
 const PRELOAD = [() => import('../life/Home'), () => import('../life/Fitness'), () => import('../life/Money'), () => import('../life/Hobby'), () => import('../life/Movies'), () => import('../life/Diary'), () => import('./Books'), () => import('./Life'), () => import('./Review'), () => import('./Settings'), () => import('./Time'), () => import('./Translate'), () => import('./Preview'), () => import('./Tutors'), () => import('./Words')];
 
-import { AREAS, TABS, type AreaKey } from './tabs';
+import { activeItem, AREA_ITEMS, AREAS, TABS, type AreaKey } from './tabs';
 export { TABS };
 /** 메뉴에는 없지만 열 수 있는 화면 (설정은 맨 위 막대의 톱니) */
 const HIDDEN = ['settings'];
@@ -43,7 +45,8 @@ export function Study({ path, loggedIn, syncReady = true, onLogin }: { path: str
   const today = useToday();
   // 영역: 주소 맨 앞이 없으면 메인, fitness·money·hobby·movies 면 그 영역, 그 밖(study·공부 칸들·설정)은 공부
   const p0 = path[0];
-  const area: AreaKey = !p0 ? 'home' : (AREAS.some((a) => a.key === p0) && p0 !== 'study' ? p0 : 'study') as AreaKey;
+  const isSearch = p0 === 'search';
+  const area: AreaKey = !p0 || isSearch ? 'home' : (AREAS.some((a) => a.key === p0) && p0 !== 'study' ? p0 : 'study') as AreaKey;
   const spath = p0 === 'study' ? path.slice(1) : path;
   const tab = area !== 'study' ? '' : TABS.some((t) => t.key === spath[0]) || HIDDEN.includes(spath[0]) ? spath[0] : 'today';
   const [, id, sub] = area === 'study' ? spath : path;
@@ -55,6 +58,12 @@ export function Study({ path, loggedIn, syncReady = true, onLogin }: { path: str
     const locks = pendingLocks(d, words, today);
     if (locks.length) putMany(locks.map((p) => ({ c: 'plans' as const, item: p as never })));
   }, [d, words, today, syncReady]);
+  // 시험 공부 계획: 오늘 할 것을 오늘 처음 볼 때 고정한다 (오늘 동안 바뀌지 않게)
+  useEffect(() => {
+    if (!syncReady) return;
+    const locks = pendingExamLocks(d, today);
+    if (locks.length) putMany(locks.map((e) => ({ c: 'exams' as const, item: e as never })));
+  }, [d, today, syncReady]);
   // 고정 지출·수입: 날이 된 것을 자동으로 넣는다 (같은 날·같은 규칙은 같은 id 라 두 기기에서 넣어도 하나)
   useEffect(() => {
     if (!syncReady) return;
@@ -80,7 +89,8 @@ export function Study({ path, loggedIn, syncReady = true, onLogin }: { path: str
   const running = id && (sub === 'learn' || sub === 'prep' || sub === 'weak' || (tab === 'review' && (id === 'redo' || id?.startsWith('cards-run') || id?.startsWith('blank-run'))));
 
   let content;
-  if (area === 'home') content = <Home loggedIn={loggedIn} onLogin={onLogin} />;
+  if (isSearch) content = <Search q0={path[1] ? decodeURIComponent(path[1]) : ''} />;
+  else if (area === 'home') content = <Home loggedIn={loggedIn} onLogin={onLogin} />;
   else if (area === 'fitness') content = <Fitness sub={path[1]} sub2={path[2]} />;
   else if (area === 'money') content = <Money sub={path[1]} />;
   else if (area === 'hobby') content = <Hobby sub={path[1]} sub2={path[2]} />;
@@ -100,15 +110,34 @@ export function Study({ path, loggedIn, syncReady = true, onLogin }: { path: str
 
   return (
     <main className={`study ${running ? 'running' : ''}`}>
-      {!running && area !== 'study' && (
+      {!running && area === 'home' && (
         <nav className="st-nav" aria-label="영역">
-          {AREAS.filter((a) => a.key === 'home' || a.key === area || !d.settings.hiddenAreas?.includes(a.key)).map((a) => (
+          {AREAS.filter((a) => a.key === 'home' || !d.settings.hiddenAreas?.includes(a.key)).map((a) => (
             <button key={a.key} className={`st-tab ${area === a.key ? 'on' : ''}`} aria-current={area === a.key ? 'page' : undefined} onClick={() => go(a.key === 'home' ? '/' : `/${a.key}`)}>
               <Icon name={`area-${a.key}`} />
               <span className="st-tab-label">{a.label}</span>
               <span className="st-tab-short">{a.label}</span>
             </button>
           ))}
+        </nav>
+      )}
+      {!running && area !== 'home' && area !== 'study' && (
+        <nav className="st-nav" aria-label={`${AREAS.find((a) => a.key === area)?.label} 메뉴`}>
+          <button className="st-tab st-tab-home" onClick={() => go('/')}>
+            <Icon name="area-home" />
+            <span className="st-tab-label">메인으로</span>
+            <span className="st-tab-short">메인</span>
+          </button>
+          {AREA_ITEMS[area].map((it) => {
+            const on = activeItem(area, path[1]) === it.key;
+            return (
+              <button key={it.key} className={`st-tab ${on ? 'on' : ''}`} aria-current={on ? 'page' : undefined} onClick={() => go(it.key ? `/${area}/${it.key}` : `/${area}`)}>
+                <Icon name={it.icon} />
+                <span className="st-tab-label">{it.label}</span>
+                <span className="st-tab-short">{it.label}</span>
+              </button>
+            );
+          })}
         </nav>
       )}
       {!running && area === 'study' && (

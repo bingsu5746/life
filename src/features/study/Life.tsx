@@ -1,7 +1,8 @@
 // 할 일 · 습관 (4단계)
 import { useState } from 'react';
 import { addDays, shortDate, WEEKDAYS } from './dates';
-import { bestStreak, habitOn, streak, toggleHabit } from './habits';
+import { bestStreak, habitOn, streak, toggleHabit, weekdayRates } from './habits';
+import { BarChart } from './charts';
 import { alive, newId, type Habit, type Todo } from './model';
 import { resplit } from './splitHomework';
 import { getStudy, put, remove, useStudy } from './store';
@@ -241,6 +242,7 @@ function Habits({ today, adding }: { today: string; adding?: boolean }) {
           ))}
         </div>
       )}
+      {habits.length > 0 && <HabitWeekdays habits={habits} today={today} />}
       {edit && (
         <HabitSheet
           h={edit === 'new' ? undefined : edit}
@@ -252,6 +254,33 @@ function Habits({ today, adding }: { today: string; adding?: boolean }) {
         />
       )}
     </section>
+  );
+}
+
+/** 요일별 달성률: 어느 요일에 잘 빠지는지 (한 주 이상 지난 습관부터) */
+function HabitWeekdays({ habits, today }: { habits: Habit[]; today: string }) {
+  const [pick, setPick] = useState('');
+  const list = pick ? habits.filter((h) => h.id === pick) : habits;
+  const rates = weekdayRates(list, today);
+  if (rates.reduce((n, r) => n + r.due, 0) < 7) return null;
+  const known = rates.filter((r) => r.pct !== null && r.due >= 3);
+  const worst = known.length > 1 ? [...known].sort((a, b) => a.pct! - b.pct!)[0] : null;
+  return (
+    <details className="st-weekdays">
+      <summary>요일별 달성률{worst && ` · ${WEEKDAYS[worst.weekday]}요일에 제일 잘 빠져요`}</summary>
+      {habits.length > 1 && (
+        <select className="st-input sm" value={pick} onChange={(e) => setPick(e.target.value)} aria-label="습관 고르기">
+          <option value="">모든 습관</option>
+          {habits.map((h) => (
+            <option key={h.id} value={h.id}>
+              {h.name}
+            </option>
+          ))}
+        </select>
+      )}
+      <BarChart label="요일별 달성률" height={130} bars={[1, 2, 3, 4, 5, 6, 0].map((w) => ({ label: WEEKDAYS[w], title: `${WEEKDAYS[w]}요일 ${rates[w].done}/${rates[w].due}`, value: rates[w].pct ?? 0, strong: worst?.weekday === w }))} format={(v) => `${v}%`} tickUnit={50} />
+      <small className="st-muted">최근 12주 기준 · 하기로 한 날 중 한 비율</small>
+    </details>
   );
 }
 

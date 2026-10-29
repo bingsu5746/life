@@ -43,6 +43,18 @@ export default function App() {
   // 맨 위 막대: 지금 있는 영역 이름 (누르면 그 영역 처음으로)
   const area = AREAS.find((a) => a.key === path[0]);
   const crumb = !path[0] ? null : path[0] === 'settings' ? { label: '설정', to: '/settings' } : area ? { label: area.label, to: `/${area.key}` } : { label: '공부', to: '/study' };
+  // 「/」 를 누르면 검색 (글 쓰는 칸에서는 빼고)
+  useEffect(() => {
+    const k = (e: KeyboardEvent) => {
+      const t = e.target as HTMLElement;
+      if (e.key === '/' && !e.ctrlKey && !e.metaKey && !['INPUT', 'TEXTAREA', 'SELECT'].includes(t.tagName) && !t.isContentEditable) {
+        e.preventDefault();
+        window.location.hash = '/search';
+      }
+    };
+    window.addEventListener('keydown', k);
+    return () => window.removeEventListener('keydown', k);
+  }, []);
   useEffect(() => {
     void syncAll();
   }, [userId]);
@@ -60,6 +72,11 @@ export default function App() {
           </button>
         )}
         <div className="account">
+          <button className="gear-btn search-btn" aria-label="검색" title="검색 ( / )" onClick={() => (window.location.hash = '/search')}>
+            <svg viewBox="0 0 24 24" aria-hidden>
+              <path d="M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14zM20 20l-4-4" />
+            </svg>
+          </button>
           <button className="gear-btn" aria-label="설정" title="설정" onClick={() => (window.location.hash = '/settings')}>
             <svg viewBox="0 0 24 24" aria-hidden>
               <path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z" />

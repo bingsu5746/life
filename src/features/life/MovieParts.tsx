@@ -80,6 +80,9 @@ export function MovieView({ item, today, onClose, onEdit }: { item: Movie; today
           </Field>
         )}
         <div className="st-row end">
+          <button className="st-link" onClick={() => put('movies', { ...item, rewish: item.rewish ? undefined : true } as Movie)}>
+            {item.rewish ? '다시 보고 싶은 영화에서 빼기' : '다시 보고 싶어요'}
+          </button>
           {!asking && (
             <button className="st-link" onClick={() => setAsking(true)}>
               또 봤어요

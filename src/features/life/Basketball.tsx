@@ -6,7 +6,6 @@ import { alive, newId, type BasketballStat, type Workout } from '../study/model'
 import { put, remove, useStudy } from '../study/store';
 import { minutesText } from '../study/timer';
 import { confirmDelete, Empty, go, Icon, Sheet, tap, toast, useToday } from '../study/ui';
-import { FitnessTabs } from './Fitness';
 
 const md = (x: string) => shortDate(x).replace(/\(.\)/, '');
 const pct = (m: number, a: number) => (a ? `${Math.round((m / a) * 1000) / 10}%` : '—');
@@ -48,7 +47,6 @@ export function Basketball({ sub }: { sub?: string }) {
           <Icon name="plus" /> 농구 기록
         </button>
       </div>
-      <FitnessTabs on="bb" />
       {!all.length ? (
         <Empty title="농구 기록을 넣어 보세요">
           <p>경기에서 넣은 점수·리바운드·어시스트와 슛 성공 수를 적으면 평균과 성공률, 점수 흐름을 보여 드려요. 연습은 슈팅 몇 개 중 몇 개 넣었는지만 적어도 돼요.</p>

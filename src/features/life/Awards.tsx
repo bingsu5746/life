@@ -2,7 +2,7 @@
 import { useState } from 'react';
 import { alive, type Movie } from '../study/model';
 import { useStudy } from '../study/store';
-import { Empty } from '../study/ui';
+import { Empty, go } from '../study/ui';
 import { awards, watchedYears, type Tally } from './awards';
 import { starText } from './MovieParts';
 
@@ -44,6 +44,9 @@ export function AwardsView({ onOpen }: { onOpen: (m: Movie) => void }) {
             {y}
           </button>
         ))}
+        <button className="aw-open" onClick={() => go('/movies/ceremony')}>
+          시상식 열기
+        </button>
         <button role="tab" aria-selected={year === null} className={year === null ? 'on' : ''} onClick={() => setYear(null)}>
           전체
         </button>

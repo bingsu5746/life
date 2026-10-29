@@ -191,7 +191,7 @@ export async function notifyOn(subscription: PushSubscriptionJSON, times: string
 export async function notifyOff(endpoint?: string) {
   return call<{ ok: true }>('notify', 'DELETE', { endpoint });
 }
-export async function notifyDigest(entries: { date: string; slot: number; title: string; body: string }[]) {
+export async function notifyDigest(entries: { date: string; slot: number; title: string; body: string; url?: string }[]) {
   return call<{ ok: true }>('notify/digest', 'PUT', { entries });
 }
 export async function notifyTest() {
