@@ -1,7 +1,8 @@
 // 사이트 파일은 그대로 내보내고, /api/* 는 로그인·저장 서버(Durable Object 하나)로 넘긴다.
 import { Accounts } from './accounts';
+import { Relay } from './relay';
 
-export { Accounts };
+export { Accounts, Relay };
 
 interface Env {
   ACCOUNTS: DurableObjectNamespace<Accounts>;

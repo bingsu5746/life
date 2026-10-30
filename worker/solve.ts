@@ -94,11 +94,11 @@ export function readGemini(json: unknown): string {
 const GEM = 'https://generativelanguage.googleapis.com/v1beta';
 
 /** 모델 목록 (여러 쪽이면 끝까지). 못 고르면 알려진 이름으로 */
-export async function geminiModels(key: string): Promise<string[]> {
+export async function geminiModels(key: string, f: typeof fetch = fetch): Promise<string[]> {
   const all: unknown[] = [];
   let page = '';
   for (let i = 0; i < 5; i++) {
-    const res = await fetch(`${GEM}/models?pageSize=1000${page ? `&pageToken=${encodeURIComponent(page)}` : ''}`, { headers: { 'x-goog-api-key': key } });
+    const res = await f(`${GEM}/models?pageSize=1000${page ? `&pageToken=${encodeURIComponent(page)}` : ''}`, { headers: { 'x-goog-api-key': key } });
     if (!res.ok) break;
     const j = (await res.json()) as { models?: unknown[]; nextPageToken?: string };
     all.push(...(j.models ?? []));
@@ -110,8 +110,8 @@ export async function geminiModels(key: string): Promise<string[]> {
   return chain.length ? chain : GEMINI_KNOWN;
 }
 
-export async function askGemini(key: string, model: string, turns: SolveTurn[]): Promise<string> {
-  const res = await fetch(`${GEM}/models/${encodeURIComponent(model)}:generateContent`, { method: 'POST', headers: { 'content-type': 'application/json', 'x-goog-api-key': key }, body: JSON.stringify(geminiBody(turns, model)) });
+export async function askGemini(key: string, model: string, turns: SolveTurn[], f: typeof fetch = fetch): Promise<string> {
+  const res = await f(`${GEM}/models/${encodeURIComponent(model)}:generateContent`, { method: 'POST', headers: { 'content-type': 'application/json', 'x-goog-api-key': key }, body: JSON.stringify(geminiBody(turns, model)) });
   console.log('solve limit headers', 'gemini', JSON.stringify(limitHeaders(res.headers)));
   const j = (await res.json().catch(() => null)) as { error?: { message?: string } } | null;
   const em = j?.error?.message ?? '';
@@ -210,12 +210,14 @@ const SKIP = /embed|rerank|whisper|tts|audio|image-gen|flux|stable-diffusion|mod
 /** /models 응답에서 쓸 모델 고르기: 사진이면 사진을 읽는 모델(표시가 없으면 이름으로 짐작), 똑똑한 모델 먼저 */
 export function pickCompat(json: unknown, needImage: boolean, prefer?: RegExp): string[] {
   const data = (json as { data?: { id?: unknown; capabilities?: { vision?: unknown; completion_chat?: unknown } }[] })?.data ?? [];
-  return data
-    .map((m) => ({ id: s(m.id), vision: m.capabilities?.vision === true || (m.capabilities?.vision === undefined && VISION.test(s(m.id))), chat: m.capabilities?.completion_chat !== false }))
-    .filter((m) => m.id && m.chat && !SKIP.test(m.id) && (!needImage || m.vision))
-    // 사진 모델은 「Thinking」 판이 자주 바빠서(503) 뒤로
-    .sort((a, b) => (needImage ? Number(/thinking/i.test(a.id)) - Number(/thinking/i.test(b.id)) : 0) || (prefer ? Number(prefer.test(b.id)) - Number(prefer.test(a.id)) : 0) || Number(SMART.test(b.id)) - Number(SMART.test(a.id)) || Number(/latest/.test(b.id)) - Number(/latest/.test(a.id)))
-    .map((m) => m.id);
+  return (
+    data
+      .map((m) => ({ id: s(m.id), vision: m.capabilities?.vision === true || (m.capabilities?.vision === undefined && VISION.test(s(m.id))), chat: m.capabilities?.completion_chat !== false }))
+      .filter((m) => m.id && m.chat && !SKIP.test(m.id) && (!needImage || m.vision))
+      // 사진 모델은 「Thinking」 판이 자주 바빠서(503) 뒤로
+      .sort((a, b) => (needImage ? Number(/thinking/i.test(a.id)) - Number(/thinking/i.test(b.id)) : 0) || (prefer ? Number(prefer.test(b.id)) - Number(prefer.test(a.id)) : 0) || Number(SMART.test(b.id)) - Number(SMART.test(a.id)) || Number(/latest/.test(b.id)) - Number(/latest/.test(a.id)))
+      .map((m) => m.id)
+  );
 }
 
 /** 응답 머리글에서 남은 요청 수 (서비스마다 이름이 달라서 「remaining」 + 「request」 가 들어간 것) */

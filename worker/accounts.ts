@@ -18,6 +18,7 @@ import { fetchEvents, fetchMeals, fetchTimetable, findSchool } from './neis';
 import { koExamples, lookupKo } from './stdict';
 import { findBooksAladin, findBooksKakao, findGames, findRecords, similarArtists } from './lookup';
 import { fetchProviders } from './ott';
+import { relayFetch, type Relay } from './relay';
 import { monthOf, R2_FREE, R2_STOP, r2Block, rollMonth, type R2Use } from './r2guard';
 import { askCompat, askGemini, geminiDaily, pacificDay, askOpenRouter, COMPAT, compatModels, geminiModels, openRouterDaily, openRouterModels, pickCompat, SYSTEM as SOLVE_SYSTEM, type Engine, type SolveTurn } from './solve';
 import { filmFacets, searchFilms, type Film } from './catalog';
@@ -322,6 +323,11 @@ export class Accounts extends DurableObject<Env> {
     throw new Error(err || '모델 목록을 받지 못했어요');
   }
 
+  /** Gemini 는 미국 중계 서버를 거쳐 보낸다 (지원 지역 문제) */
+  private gemFetch(): typeof fetch {
+    return relayFetch((this.env as unknown as { RELAY?: DurableObjectNamespace<Relay> }).RELAY);
+  }
+
   private keyOf(engine: Engine): string | undefined {
     const env = this.env as unknown as Record<string, string | undefined>;
     if (engine === 'gemini') return env.Life_gemini_api_key || env.GEMINI_KEY;
@@ -411,7 +417,7 @@ export class Accounts extends DurableObject<Env> {
     let gemini: { flash: number; lite: number; gemma: number } | null = null;
     const gk = this.keyOf('gemini');
     if (gk) {
-      if (!this.gemList || Date.now() - this.gemList.at > DAY) this.gemList = { at: Date.now(), v: await geminiModels(gk).catch(() => []) };
+      if (!this.gemList || Date.now() - this.gemList.at > DAY) this.gemList = { at: Date.now(), v: await geminiModels(gk, this.gemFetch()).catch(() => []) };
       if (this.gemList.v.length) {
         const g = this.gemLeft(user.id);
         left.gemini = g.reduce((a, x) => a + x.left, 0);
@@ -481,7 +487,7 @@ export class Accounts extends DurableObject<Env> {
     };
     try {
       if (engine === 'gemini') {
-        if (!this.gemList || Date.now() - this.gemList.at > DAY) this.gemList = { at: Date.now(), v: await geminiModels(key) };
+        if (!this.gemList || Date.now() - this.gemList.at > DAY) this.gemList = { at: Date.now(), v: await geminiModels(key, this.gemFetch()) };
         // 한도가 남은 모델부터. 한 모델이 다 됐다고(429) 하면 그 모델만 막고 다음 모델로
         // 모델 목록에서 하나도 못 고르면 알려진 이름으로 해 본다
         const chain = this.gemLeft(user.id).map((x) => x.model);
@@ -490,7 +496,7 @@ export class Accounts extends DurableObject<Env> {
         const tried: string[] = [];
         for (const m of chain.slice(0, 8)) {
           try {
-            const text = await askGemini(key, m, turns);
+            const text = await askGemini(key, m, turns, this.gemFetch());
             this.bumpGem(user.id, m);
             return ok({ text, model: m });
           } catch (e) {
