@@ -8,6 +8,8 @@ export function cleanFact(t: string): string {
     .join(' ')
     .replace(/\(?\s*(source|via)\s*[:：][^)]*\)?\s*$/i, '')
     .replace(/https?:\/\/\S+/g, '')
+    .replace(/^>\s*/, '')
+    .replace(/[`*_]/g, '')
     .replace(/\s+/g, ' ')
     .trim()
     .slice(0, 600);

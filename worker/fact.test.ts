@@ -8,3 +8,10 @@ describe('쓸모없는 지식 다듬기', () => {
     expect(cleanFact('  Two\nlines  ')).toBe('Two lines');
   });
 });
+
+describe('실제 응답 모양 (2026-10-30 확인)', () => {
+  it('인용 기호 · 백틱 지우기', () => {
+    expect(cleanFact('> 10,000 Dutch cows pass through the Amsterdam airport each year.')).toBe('10,000 Dutch cows pass through the Amsterdam airport each year.');
+    expect(cleanFact('The `Golden Arches` of fast food chain McDonalds')).toBe('The Golden Arches of fast food chain McDonalds');
+  });
+});

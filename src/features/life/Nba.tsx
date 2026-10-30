@@ -171,7 +171,7 @@ const ATTR_KO: Record<string, string> = {
   freeThrow: '자유투',
   shotIQ: '슛 IQ',
   offensiveConsistency: '공격 일관성',
-  layup: '레이업',
+  drivingLayup: '드라이빙 레이업',
   standingDunk: '스탠딩 덩크',
   drivingDunk: '드라이빙 덩크',
   postHook: '포스트 훅',
@@ -199,7 +199,7 @@ const ATTR_KO: Record<string, string> = {
   vertical: '점프력',
   stamina: '체력',
   hustle: '허슬',
-  overallDurability: '내구성',
+  durability: '내구성',
 };
 const attrName = (k: string) => ATTR_KO[k] ?? k;
 const ORDER = Object.keys(ATTR_KO);

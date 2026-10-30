@@ -1464,9 +1464,10 @@ export class Accounts extends DurableObject<Env> {
   }
   /** 사이트에서 하나 받아 (이미 모아 둔 글이면 그 번역을 쓰고) 번역해서 모은다. id: 모아 둔 번호 (번역이 안 돼서 못 모았으면 없음) */
   private async factFetch(kind: 'random' | 'today'): Promise<{ en: string; ko: string; id?: number }> {
-    const res = await fetch(`https://uselessfacts.jsph.pl/api/v2/facts/${kind}?language=en`, { headers: { accept: 'text/plain' }, signal: AbortSignal.timeout(8000) });
+    // JSON 으로 받아 text 만 쓴다 (실제 응답 확인: { id, text, source, source_url, language, permalink }. text/plain 은 「> 글 · Source · Via」 마크다운이라 안 씀)
+    const res = await fetch(`https://uselessfacts.jsph.pl/api/v2/facts/${kind}?language=en`, { headers: { accept: 'application/json' }, signal: AbortSignal.timeout(8000) });
     if (!res.ok) throw new Error(`uselessfacts ${res.status}`);
-    const en = cleanFact(await res.text());
+    const en = cleanFact(String(((await res.json()) as { text?: unknown })?.text ?? ''));
     if (!en) throw new Error('uselessfacts 빈 답');
     const have = this.sql.exec<{ ko: string; id: number }>('SELECT ko, rowid AS id FROM facts WHERE en = ?', en).toArray()[0];
     if (have) return { en, ko: have.ko, id: have.id };

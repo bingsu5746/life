@@ -55,9 +55,11 @@ export async function fetch2k(key: string | undefined): Promise<Nba2kPlayer[]> {
   for (let i = 0; i < 12; i++) {
     const res = await fetch(`${BASE}/api/public/players?teamType=curr&limit=100${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ''}`, { signal: AbortSignal.timeout(15000) });
     if (!res.ok) throw new Error(`nba2k ${res.status} ${(await res.text()).slice(0, 100)}`);
-    const j = (await res.json()) as { meta?: { nextCursor?: unknown; cursor?: unknown }; nextCursor?: unknown; pagination?: { nextCursor?: unknown } };
+    // 실제 응답(2026-10-30 확인): { success, data: [...], meta: { pagination: { hasMore, nextCursor: "2", total } } }
+    const j = (await res.json()) as { meta?: { nextCursor?: unknown; pagination?: { nextCursor?: unknown; hasMore?: unknown } }; nextCursor?: unknown; pagination?: { nextCursor?: unknown } };
     all.push(...parse2k(j));
-    cursor = s(j?.meta?.nextCursor) || s(j?.nextCursor) || s(j?.pagination?.nextCursor);
+    const c = j?.meta?.pagination?.nextCursor ?? j?.meta?.nextCursor ?? j?.nextCursor ?? j?.pagination?.nextCursor;
+    cursor = j?.meta?.pagination?.hasMore === false ? '' : typeof c === 'number' ? String(c) : s(c);
     if (!cursor) break;
   }
   return all;
