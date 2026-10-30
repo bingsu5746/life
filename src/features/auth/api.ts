@@ -300,6 +300,14 @@ export interface SchoolPeriod {
   period: number;
   subject: string;
 }
+/** 공휴일 · 기념일 (한국천문연구원 특일 정보, 서버가 7일 기억) */
+export interface SpecialDay {
+  date: string;
+  name: string;
+  holiday: boolean;
+}
+export const specialDays = (year: number) => call<{ days: SpecialDay[] }>(`holidays?year=${year}`);
+
 export async function schoolInfo(body: { name: string; grade?: number; cls?: string; from: string; to: string; want: ('meals' | 'events' | 'timetable')[] }) {
   return call<{ school: string; meals?: SchoolMeal[]; events?: SchoolEvent[]; timetable?: SchoolPeriod[] }>('school', 'POST', body);
 }

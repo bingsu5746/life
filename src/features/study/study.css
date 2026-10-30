@@ -7148,3 +7148,11 @@ body.focus-on {
   stroke-linecap: round;
   stroke-linejoin: round;
 }
+.cal-k.holiday,
+.cal-tag.holiday {
+  background: var(--bad);
+}
+.cal-k.anniv,
+.cal-tag.anniv {
+  background: #db2777;
+}
