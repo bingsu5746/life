@@ -4,7 +4,7 @@ export const TABS = [
   { key: 'exams', label: '시험' },
   { key: 'books', label: '문제집' },
   { key: 'tutor', label: '과외' },
-  { key: 'review', label: '복습' },
+  { key: 'review', label: '저장소' },
   { key: 'words', label: '단어' },
   { key: 'translate', label: '번역' },
   { key: 'time', label: '기록' },

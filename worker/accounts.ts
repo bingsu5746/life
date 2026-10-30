@@ -411,7 +411,14 @@ export class Accounts extends DurableObject<Env> {
     this.sql.exec("INSERT OR REPLACE INTO cache (key, data, at) VALUES ('r2use', ?, ?)", JSON.stringify(u), Date.now());
   }
 
-  /** 사진 올리기: { mime, data(base64) } → { key } */
+  private cacheGet(key: string): string | undefined {
+    return this.sql.exec<{ data: string }>('SELECT data FROM cache WHERE key = ?', key).toArray()[0]?.data;
+  }
+  private cacheSet(key: string, data: string) {
+    this.sql.exec('INSERT OR REPLACE INTO cache (key, data, at) VALUES (?, ?, ?)', key, data, Date.now());
+  }
+
+  /** 사진 올리기: { mime, data(base64) } → { key }. 같은 사진(내용이 똑같은 파일)은 한 번만 저장하고 같은 열쇠를 준다 */
   private async solveImgPut(user: UserRow, b: Record<string, unknown>): Promise<Response> {
     const bucket = this.r2();
     if (!bucket) return fail('사진 저장소(R2)가 아직 연결되지 않았어요.', 503);
@@ -420,13 +427,71 @@ export class Accounts extends DurableObject<Env> {
     if (!mime || !data || !/^[A-Za-z0-9+/=]+$/.test(data)) return fail('사진이 잘못됐어요.');
     const bin = Uint8Array.from(atob(data), (c) => c.charCodeAt(0));
     if (bin.length > 800_000) return fail('사진이 너무 커요.', 413);
+    const sum = hex(await crypto.subtle.digest('SHA-256', bin));
+    const same = this.cacheGet(`r2hash:${user.id}:${sum}`);
+    if (same) return json({ key: same });
     const u = this.r2Use();
     const block = r2Block(u, 'put', bin.length);
     if (block) return fail(block, 507);
-    const key = `${user.id}/${Date.now().toString(36)}-${randomHex(4)}.${mime === 'image/webp' ? 'webp' : 'jpg'}`;
+    const key = `${user.id}/${sum.slice(0, 16)}-${sum.slice(16, 24)}.${mime === 'image/webp' ? 'webp' : 'jpg'}`;
     await bucket.put(key, bin, { httpMetadata: { contentType: mime } });
+    this.cacheSet(`r2hash:${user.id}:${sum}`, key);
     this.saveR2Use({ ...u, bytes: u.bytes + bin.length, a: u.a + 1 });
     return json({ key });
+  }
+
+  /** 예전에 올린 사진 중 똑같은 것은 하나만 남기고 지운다 (사람마다 한 번). 지운 열쇠는 남긴 사진으로 이어 준다 */
+  private dedupeRunning = new Set<string>();
+  private async r2Dedupe(userId: string): Promise<void> {
+    const bucket = this.r2();
+    if (!bucket || this.dedupeRunning.has(userId) || this.cacheGet(`r2dedup:${userId}`)) return;
+    this.dedupeRunning.add(userId);
+    try {
+      let u = this.r2Use();
+      const objs: { key: string; size: number; uploaded: number }[] = [];
+      let cursor: string | undefined;
+      let lists = 0;
+      do {
+        // 목록 읽기도 올리기(A) 횟수에 들어간다. 저장 공간이 찼어도 정리는 해야 하니 횟수만 본다
+        if (u.a + lists + 1 > R2_STOP.a) return;
+        const r = await bucket.list({ prefix: `${userId}/`, cursor, limit: 1000 });
+        lists++;
+        for (const o of r.objects) objs.push({ key: o.key, size: o.size, uploaded: o.uploaded.getTime() });
+        cursor = r.truncated ? r.cursor : undefined;
+      } while (cursor);
+      // 내용(SHA-256)이 같은 것끼리 묶기
+      const groups = new Map<string, typeof objs>();
+      let gets = 0;
+      for (const o of objs) {
+        if (r2Block({ ...u, a: u.a + lists, b: u.b + gets }, 'get')) break;
+        const obj = await bucket.get(o.key);
+        gets++;
+        if (!obj) continue;
+        const sum = hex(await crypto.subtle.digest('SHA-256', await obj.arrayBuffer()));
+        groups.set(sum, [...(groups.get(sum) ?? []), o]);
+      }
+      const drop: string[] = [];
+      let freed = 0;
+      for (const [sum, g] of groups) {
+        g.sort((a, b) => a.uploaded - b.uploaded);
+        const keep = g[0].key;
+        this.cacheSet(`r2hash:${userId}:${sum}`, keep);
+        for (const o of g.slice(1)) {
+          this.cacheSet(`r2alias:${o.key}`, keep);
+          drop.push(o.key);
+          freed += o.size;
+        }
+      }
+      for (let i = 0; i < drop.length; i += 1000) await bucket.delete(drop.slice(i, i + 1000));
+      u = this.r2Use();
+      this.saveR2Use({ ...u, bytes: Math.max(0, u.bytes - freed), a: u.a + lists, b: u.b + gets });
+      this.cacheSet(`r2dedup:${userId}`, JSON.stringify({ at: Date.now(), total: objs.length, removed: drop.length, freed }));
+      console.log('r2 dedupe', userId, objs.length, 'objects,', drop.length, 'removed,', freed, 'bytes freed');
+    } catch (e) {
+      console.error('r2 dedupe failed', userId, e instanceof Error ? e.message : String(e));
+    } finally {
+      this.dedupeRunning.delete(userId);
+    }
   }
 
   /** 사진 보기 (자기 것만). 읽기 횟수는 20번마다 저장 */
@@ -434,6 +499,8 @@ export class Accounts extends DurableObject<Env> {
     const bucket = this.r2();
     if (!bucket) return fail('사진 저장소가 없어요.', 503);
     if (!key.startsWith(`${user.id}/`)) return fail('볼 수 없는 사진이에요.', 403);
+    // 똑같은 사진이라 지운 것이면 남긴 사진으로
+    key = this.cacheGet(`r2alias:${key}`) ?? key;
     const u = this.r2Use();
     const block = r2Block({ ...u, b: u.b + this.r2Ops }, 'get');
     if (block) return fail(block, 507);
@@ -449,6 +516,8 @@ export class Accounts extends DurableObject<Env> {
 
   /** 모델 고르는 창: 키가 있는 모델 · 오늘 쓴 횟수 · 남은 횟수(알 수 있을 때) */
   private async solveUsage(user: UserRow): Promise<Response> {
+    // 같은 사진 정리는 한 번만, 뒤에서
+    if (this.r2() && !this.cacheGet(`r2dedup:${user.id}`)) this.ctx.waitUntil(this.r2Dedupe(user.id));
     const engines: Engine[] = ['gemini', 'openrouter', 'mistral', 'groq', 'siliconflow', 'nvidia', 'cloudflare'];
     const available = engines.filter((e) => this.keyOf(e));
     const orKey = this.keyOf('openrouter');

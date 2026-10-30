@@ -1,6 +1,7 @@
 // AI 풀이를 화면 밖에서도: 서버에 「풀어 줘」 를 맡기고 몇 초마다 끝났는지 물어본다.
 // 다른 칸·다른 앱으로 가도 서버는 계속 풀고, 돌아오면 바로 받아 온다. 푸는 동안은 맨 위에 작게 보인다.
 import { useSyncExternalStore } from 'react';
+import { put } from './store';
 import { ApiError, solveJobGet, solveJobStart, type SolveEngine, type SolveTurn } from '../auth/api';
 
 export interface Msg extends SolveTurn {
@@ -40,13 +41,18 @@ const store = (k: string, v: unknown) => {
   }
 };
 
-/** 대화는 글만 최근 20개 (사진은 저장하지 않는다: 저장 공간) */
+/** 대화는 글만 저장소(problems, 다른 기기와 같이 씀)에 둔다. 사진은 R2 열쇠만 */
 export function saveChat(c: Chat) {
-  const list = load<Chat[]>(CHATS_KEY, []).filter((x) => x.id !== c.id);
-  const slim: Chat = { ...c, msgs: c.msgs.map((m) => ({ role: m.role, text: m.text, model: m.model, error: m.error, imgKeys: m.imgKeys, images: undefined, thumbs: undefined })) };
-  store(CHATS_KEY, [slim, ...list].slice(0, 20));
+  put('problems', { id: c.id, title: c.title, subjectId: c.subjectId, at: c.at, msgs: c.msgs.map((m) => ({ role: m.role, text: m.text, model: m.model, error: m.error, imgKeys: m.imgKeys })) });
 }
-export const loadChat = (id: string) => load<Chat[]>(CHATS_KEY, []).find((c) => c.id === id);
+
+/** 예전에 이 기기에만 두던 대화를 저장소로 한 번 옮긴다 */
+export function migrateChats(have: Record<string, unknown>) {
+  const old = load<Chat[]>(CHATS_KEY, []);
+  if (!old.length) return;
+  for (const c of old) if (!have[c.id] && c.title) saveChat(c);
+  store(CHATS_KEY, null);
+}
 
 /** 예상 시간: 이 모델로 최근 푼 시간의 평균 (기록이 없으면 사진 20초 · 글 12초) */
 export function estimateMs(engine: SolveEngine, hasImage: boolean): number {

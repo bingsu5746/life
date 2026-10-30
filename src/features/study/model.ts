@@ -391,6 +391,15 @@ export interface WrongNote extends Stamp, Review {
   created: number;
 }
 
+/** AI 풀이 대화 (저장소에 모아 둔다. 사진은 R2 열쇠만) */
+export interface SolvedProblem extends Stamp {
+  id: Id;
+  title: string;
+  subjectId?: Id;
+  at: number;
+  msgs: { role: 'user' | 'assistant'; text: string; model?: string; error?: boolean; imgKeys?: string[] }[];
+}
+
 export interface NoteComment {
   id: Id;
   date: DateStr;
@@ -872,6 +881,7 @@ export interface StudyData {
   games: Record<Id, Game>;
   records: Record<Id, MusicRecord>;
   places: Record<Id, TravelPlace>;
+  problems: Record<Id, SolvedProblem>;
 }
 
 /** 단어는 많아질 수 있어 따로 묶는다 */
@@ -915,6 +925,7 @@ export const COLLECTIONS = [
   'games',
   'records',
   'places',
+  'problems',
 ] as const;
 export type Collection = (typeof COLLECTIONS)[number];
 
@@ -972,6 +983,7 @@ export function emptyStudy(): StudyData {
     games: {},
     records: {},
     places: {},
+    problems: {},
   };
 }
 

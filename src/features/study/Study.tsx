@@ -21,6 +21,7 @@ const PHONE_TABS: string[] = ['today', 'exams', 'books', 'review', 'words', 'tim
 // 오늘 화면 말고는 열 때 받는다 (처음 여는 속도)
 const Books = lazy(() => import('./Books').then((m) => ({ default: m.Books })));
 const Life = lazy(() => import('./Life').then((m) => ({ default: m.Life })));
+import { useVaultCounts, VAULT_ITEMS, vaultItem } from './vault';
 const Review = lazy(() => import('./Review').then((m) => ({ default: m.Review })));
 const Settings = lazy(() => import('./Settings').then((m) => ({ default: m.Settings })));
 const Time = lazy(() => import('./Time').then((m) => ({ default: m.Time })));
@@ -155,7 +156,7 @@ export function Study({ path, loggedIn, syncReady = true, onLogin }: { path: str
   else if (p0 === 'travel') content = <Travel />;
   else if (area === 'hobby') content = <Hobby sub={path[1]} sub2={path[2]} />;
   else if (area === 'diary') content = <Diary sub={path[1]} />;
-  else if (area === 'ai') content = <Solve />;
+  else if (area === 'ai') content = <Solve open={path[1]} />;
   else if (tab === 'books') content = <Books id={id} sub={sub} />;
   else if (tab === 'tutor') content = <Tutors sub={id} />;
   else if (tab === 'words') content = <Words id={id} sub={sub} />;
@@ -219,7 +220,8 @@ export function Study({ path, loggedIn, syncReady = true, onLogin }: { path: str
           })}
         </nav>
       )}
-      {!running && area === 'study' && tab !== 'settings' && (
+      {!running && tab === 'review' && <VaultNav sub={id} />}
+      {!running && area === 'study' && tab !== 'settings' && tab !== 'review' && (
         <nav className="st-nav" aria-label="공부 메뉴">
           <button className="st-tab st-tab-home" onClick={() => go('/')}>
             <Icon name="area-home" />
@@ -335,5 +337,28 @@ function LoginHint({ onLogin }: { onLogin: () => void }) {
         ✕
       </button>
     </div>
+  );
+}
+
+/** 저장소 안에서는 옆(폰은 아래) 메뉴가 저장소 칸들로 바뀐다 */
+function VaultNav({ sub }: { sub?: string }) {
+  const counts = useVaultCounts();
+  const on = vaultItem(sub);
+  return (
+    <nav className="st-nav" aria-label="저장소 메뉴">
+      <button className="st-tab st-tab-home" onClick={() => go('/study')}>
+        <Icon name="area-study" />
+        <span className="st-tab-label">공부로</span>
+        <span className="st-tab-short">공부</span>
+      </button>
+      {VAULT_ITEMS.map((it) => (
+        <button key={it.key} className={`st-tab ${on === it.key ? 'on' : ''}`} aria-current={on === it.key ? 'page' : undefined} onClick={() => go(it.to)}>
+          <Icon name={it.icon} />
+          <span className="st-tab-label">{it.label}</span>
+          <span className="st-tab-short">{it.short}</span>
+          {counts[it.key] > 0 && <b className="st-count">{counts[it.key]}</b>}
+        </button>
+      ))}
+    </nav>
   );
 }

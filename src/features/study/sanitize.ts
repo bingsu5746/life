@@ -261,6 +261,24 @@ const FIX: Record<Collection, Fix> = {
     finished: optDate(x.finished),
     created: num(x.created),
   }),
+  problems: (x) => ({
+    ...x,
+    title: str(x.title, '문제').slice(0, 120),
+    subjectId: optStr(x.subjectId),
+    at: num(x.at),
+    msgs: arr(x.msgs)
+      .filter(isObj)
+      .slice(0, 60)
+      .map((m) => ({
+        role: m.role === 'assistant' ? ('assistant' as const) : ('user' as const),
+        text: str(m.text).slice(0, 20000),
+        model: optStr(m.model)?.slice(0, 120),
+        error: m.error === true ? true : undefined,
+        imgKeys: arr(m.imgKeys)
+          .filter((k): k is string => typeof k === 'string' && /^[a-f0-9]{8,64}\/[a-z0-9]+-[a-f0-9]{8}\.(webp|jpg)$/.test(k))
+          .slice(0, 8),
+      })),
+  }),
   places: (x) => ({
     ...x,
     name: str(x.name, '장소').slice(0, 80),

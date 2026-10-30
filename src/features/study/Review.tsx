@@ -1,9 +1,9 @@
-// 복습: 오답 노트 · 암기 카드 (설계 §9.1~9.3)
+// 저장소: 오답 노트 · 암기 카드 · 백지 복습 · 지문 · AI 풀이 (설계 §9.1~9.3)
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { shortDate } from './dates';
 import { alive, newId, REASONS, type CardDeck, type MemoCard, type NoteComment, type WrongNote, type WrongReason } from './model';
 import { answer, dueText, dueToday } from './review';
-import { blanksToday, cardsToday } from './select';
+import { cardsToday } from './select';
 import { getStudy, put, putMany, remove, useStudy } from './store';
 import { addPhoto, photoBlob, photoUrl, removePhoto } from './photos';
 import { BlankRun, Blanks } from './Blanks';
@@ -11,10 +11,11 @@ import { requeue } from './wordSession';
 import { Bar, confirmDelete, Empty, Field, go, Menu, Sheet, SubjectDot, SubjectPicker, SubjectTag, subjectsOf, toast, useToday, tap } from './ui';
 import { SwipeCard } from './SwipeCard';
 import { Passages } from './Passages';
-import { dueAgain } from './passages';
 import { GRADUATE, guessNoteSubject, isCareless, mistakePatterns, redoAnswer } from './mistakes';
 import { loadTimer } from './timerStore';
 import { RetestSheet } from './RetestSheet';
+import { SavedProblems } from './SavedProblems';
+import { VAULT_ITEMS } from './vault';
 
 export function Review({ sub }: { sub?: string }) {
   if (sub === 'redo' || sub?.startsWith('redo?')) return <NoteRun />;
@@ -22,35 +23,17 @@ export function Review({ sub }: { sub?: string }) {
   if (sub?.startsWith('cards-run')) return <CardRun />;
   if (sub?.startsWith('blank-run-')) return <BlankRun id={sub.slice(10)} />;
   if (sub?.startsWith('deck-')) return <DeckView id={sub.slice(5)} />;
+  if (sub === 'ai') return <SavedProblems />;
   return <ReviewHome tab={sub === 'cards' || sub === 'new-deck' ? 'cards' : sub === 'blank' || sub === 'new-blank' ? 'blank' : sub === 'passages' || sub === 'new-passage' || sub?.startsWith('passage-') ? 'passages' : 'notes'} sub={sub} />;
 }
 
 /** sub: 'new-note' · 'new-deck' 이면 바로 넣기 창 (「＋」에서 올 때) */
 function ReviewHome({ tab, sub }: { tab: 'notes' | 'cards' | 'blank' | 'passages'; sub?: string }) {
-  const d = useStudy();
   const today = useToday();
-  const notesDue = dueToday(alive(d.notes), today);
-  const cardsDue = cardsToday(d, today);
-  const blanksDue = blanksToday(d, today).length;
-  const passDue = alive(d.passages).filter((x) => dueAgain(x, today)).length;
   return (
     <div className="st-page">
       <div className="st-page-head">
-        <h2>복습</h2>
-        <div className="st-seg">
-          <button className={tab === 'notes' ? 'on' : ''} onClick={() => go('/review')}>
-            오답 노트 {notesDue.length > 0 && <b className="st-count">{notesDue.length}</b>}
-          </button>
-          <button className={tab === 'cards' ? 'on' : ''} onClick={() => go('/review/cards')}>
-            암기 카드 {cardsDue.length > 0 && <b className="st-count">{cardsDue.length}</b>}
-          </button>
-          <button className={tab === 'blank' ? 'on' : ''} onClick={() => go('/review/blank')}>
-            백지 복습 {blanksDue > 0 && <b className="st-count">{blanksDue}</b>}
-          </button>
-          <button className={tab === 'passages' ? 'on' : ''} onClick={() => go('/review/passages')}>
-            지문 {passDue > 0 && <b className="st-count">{passDue}</b>}
-          </button>
-        </div>
+        <h2>{VAULT_ITEMS.find((x) => x.key === tab)?.label}</h2>
       </div>
       {tab === 'passages' ? (
         <Passages open={sub === 'new-passage' ? 'new' : sub?.startsWith('passage-') ? sub.slice(8) : undefined} />

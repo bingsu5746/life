@@ -1,9 +1,9 @@
 // 문제 풀이: AI 대화 화면. ＋ 로 사진 넣기 · 모델 고르기 · 보내기. 대화는 이 기기에만 저장(글만)
 import { useEffect, useRef, useState } from 'react';
 import { isLoggedIn, solveImgPut, solveImgUrl, solveUsage, type SolveEngine, type SolveTurn } from '../auth/api';
-import { CHATS_KEY, load, markJobSeen, saveChat, startSolve, useSolveJob, type Chat, type Msg } from './solveJob';
+import { load, markJobSeen, migrateChats, saveChat, startSolve, useSolveJob, type Chat, type Msg } from './solveJob';
 import { MathText } from '../../lib/mathText';
-import { compressProblemImage } from '../../lib/imageCompress';
+import { compressForStorage, compressProblemImage } from '../../lib/imageCompress';
 import { Icon, Sheet, subjectsOf, SubjectDot, toast, useNow } from './ui';
 import { useStudy } from './store';
 import { guessNoteSubject } from './mistakes';
@@ -28,7 +28,8 @@ const toB64 = async (b: Blob) => {
   return btoa(bin);
 };
 
-export function Solve() {
+/** open: 저장소에서 고른 대화 id (/ai/<id>) */
+export function Solve({ open }: { open?: string }) {
   const [engine, setEngine] = useState<SolveEngine>(() => load<SolveEngine>(ENGINE_KEY, 'gemini'));
   const d = useStudy();
   const job = useSolveJob();
@@ -50,6 +51,15 @@ export function Solve() {
       /* 무시 */
     }
   };
+  // 예전 대화를 저장소로 옮기기 · 저장소에서 고른 대화 열기
+  useEffect(() => migrateChats(d.problems), []); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    const p = open ? d.problems[open] : undefined;
+    if (p && !p.deleted) setChat({ id: p.id, at: p.at, title: p.title, subjectId: p.subjectId, msgs: p.msgs });
+  }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
+  const past = Object.values(d.problems)
+    .filter((p) => !p.deleted)
+    .sort((a, b) => b.at - a.at);
   const [text, setText] = useState('');
   const [files, setFiles] = useState<{ blob: Blob; url: string }[]>([]);
   const [busy, setBusy] = useState('');
@@ -135,7 +145,8 @@ export function Solve() {
     if (images?.length && usage?.r2) {
       setBusy('사진 저장 중');
       try {
-        imgKeys = (await Promise.all(images.map((i) => solveImgPut(i.mime, i.data)))).map((r) => r.key);
+        // 저장용은 더 작게 줄여서. 같은 사진은 서버가 하나만 둔다
+        imgKeys = (await Promise.all(pics.map(async (p) => solveImgPut('image/jpeg', await toB64(await compressForStorage(p.blob)))))).map((r) => r.key);
       } catch (e) {
         toast(e instanceof Error ? e.message : '사진을 저장하지 못했어요');
       }
@@ -251,7 +262,7 @@ export function Solve() {
             onChange={(e) => {
               const picked = [...(e.target.files ?? [])].slice(0, 4 - files.length);
               e.target.value = '';
-              // 넣는 순간 줄인다 (가로 1400px · WebP, 안 되는 기기는 JPEG)
+              // 넣는 순간 줄인다 (가로 1400px · JPEG)
               void Promise.all(picked.map((f) => compressProblemImage(f).catch(() => null))).then((blobs) => {
                 // 못 읽은 사진은 원본 그대로 보내지 않고 알려 준다 (형식이 맞지 않는 사진은 AI 가 거절함)
                 if (blobs.some((b) => !b)) toast('읽지 못한 사진이 있어요. 스크린샷이나 다른 사진으로 넣어 주세요');
@@ -375,12 +386,12 @@ export function Solve() {
       {history && (
         <Sheet title="지난 대화" onClose={() => setHistory(false)}>
           <div className="sv-pick">
-            {!load<Chat[]>(CHATS_KEY, []).length && <p className="st-muted">아직 없어요.</p>}
-            {load<Chat[]>(CHATS_KEY, []).map((c) => (
+            {!past.length && <p className="st-muted">아직 없어요.</p>}
+            {past.slice(0, 30).map((c) => (
               <button
                 key={c.id}
                 onClick={() => {
-                  setChat(c);
+                  setChat({ id: c.id, at: c.at, title: c.title, subjectId: c.subjectId, msgs: c.msgs });
                   setHistory(false);
                 }}
               >
