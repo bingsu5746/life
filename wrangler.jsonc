@@ -17,6 +17,8 @@
   "ai": { "binding": "AI" },
   // 로그 저장 (대시보드 Observability 에서 지난 오류도 볼 수 있게)
   "observability": { "enabled": true },
+  // 문제 사진 저장 (worker/r2guard.ts 가 무료 한도 90% 에서 막는다)
+  "r2_buckets": [{ "binding": "PROBLEMS", "bucket_name": "life" }],
   "durable_objects": {
     "bindings": [{ "name": "ACCOUNTS", "class_name": "Accounts" }]
   },
