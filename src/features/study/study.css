@@ -7425,3 +7425,48 @@ body.focus-on {
   font-size: 1.1rem;
   font-variant-numeric: tabular-nums;
 }
+.nba-teams {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+  gap: 8px;
+}
+.nba-tpick {
+  display: grid;
+  justify-items: center;
+  gap: 2px;
+  padding: 12px 6px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--surface);
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+.nba-tpick.fav {
+  border-color: var(--warn);
+}
+.nba-tpick small {
+  color: var(--muted);
+  font-size: 0.7rem;
+}
+.nba-tpick b {
+  font-weight: 600;
+  font-size: 0.85rem;
+}
+.nba-rhead {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+.nba-tlink {
+  border: 0;
+  background: none;
+  padding: 0;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+.nba-career-h {
+  margin-top: 16px;
+}

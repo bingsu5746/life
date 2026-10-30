@@ -20,7 +20,7 @@ import { findBooksAladin, findBooksKakao, findGames, findRecords, similarArtists
 import { fetchProviders } from './ott';
 import { relayFetch, type Relay } from './relay';
 import { fetchSpecialDays } from './holidays';
-import { fetchAverage, fetchBox, fetchGames, fetchNbaAverages, fetchNbaBox, fetchNbaStandings, fetchStandings, nbaGameId, Paid, seasonOf, seasonPage, standingsFrom, type NbaGame } from './nba';
+import { fetchAverage, fetchBox, fetchGames, fetchNbaAverages, fetchNbaBox, fetchNbaCareer, fetchNbaRoster, fetchNbaStandings, fetchStandings, nbaGameId, Paid, seasonOf, seasonPage, standingsFrom, type NbaGame } from './nba';
 import { monthOf, R2_FREE, R2_STOP, r2Block, rollMonth, type R2Use } from './r2guard';
 import { modelFamily, askCompat, askGemini, geminiDaily, pacificDay, askOpenRouter, COMPAT, compatModels, geminiModels, openRouterDaily, openRouterModels, pickCompat, SYSTEM as SOLVE_SYSTEM, type Engine, type SolveTurn } from './solve';
 import { filmFacets, searchFilms, type Film } from './catalog';
@@ -220,6 +220,8 @@ export class Accounts extends DurableObject<Env> {
     if (path === 'nba/standings' && req.method === 'GET') return this.nbaStandings();
     if (path === 'nba/box' && req.method === 'GET') return this.nbaBox(new URL(req.url).searchParams);
     if (path === 'nba/avg' && req.method === 'GET') return this.nbaAvg(new URL(req.url).searchParams);
+    if (path === 'nba/roster' && req.method === 'GET') return this.nbaRoster((new URL(req.url).searchParams.get('team') ?? '').toUpperCase());
+    if (path === 'nba/career' && req.method === 'GET') return this.nbaCareer(Number(new URL(req.url).searchParams.get('player')));
     if (path === 'holidays' && req.method === 'GET') return this.holidays(new URL(req.url).searchParams.get('year'));
     if (path === 'dict/ko' && req.method === 'POST') return this.dictKo(body);
     if (path === 'lookup' && req.method === 'POST') return this.lookup(body);
@@ -1251,6 +1253,32 @@ export class Accounts extends DurableObject<Env> {
       return json({ avg: r.v, at: r.at });
     } catch (e) {
       return this.nbaFail(e, '시즌 평균');
+    }
+  }
+
+  /** 팀 로스터 (NBA 공식, 12시간 기억) */
+  private async nbaRoster(team: string): Promise<Response> {
+    if (!/^[A-Z]{3}$/.test(team)) return fail('팀을 확인해 주세요.');
+    const season = seasonOf(new Date(Date.now() - 5 * 3600_000).toISOString().slice(0, 10));
+    try {
+      const r = await this.nbaCached(`nba:roster:${season}:${team}`, 12 * 3600_000, () => fetchNbaRoster(team, season));
+      return json({ season, players: r.v, at: r.at });
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      console.error('nba.com roster failed', team, msg);
+      return fail(`로스터를 받지 못했어요. (NBA 공식 데이터: ${msg.slice(0, 80)})`, 502);
+    }
+  }
+  /** 선수 커리어 (NBA 공식, 12시간 기억) */
+  private async nbaCareer(player: number): Promise<Response> {
+    if (!Number.isInteger(player) || player <= 0) return fail('선수를 확인해 주세요.');
+    try {
+      const r = await this.nbaCached(`nba:career:${player}`, 12 * 3600_000, () => fetchNbaCareer(player));
+      return json({ rows: r.v, at: r.at });
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      console.error('nba.com career failed', player, msg);
+      return fail(`커리어 기록을 받지 못했어요. (NBA 공식 데이터: ${msg.slice(0, 80)})`, 502);
     }
   }
 

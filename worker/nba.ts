@@ -240,10 +240,11 @@ const statsUrl = (endpoint: string, params: Record<string, string>) =>
     .sort(([a], [b]) => a.localeCompare(b))
     .map(([k, v]) => `${k}=${encodeURIComponent(v)}`)
     .join('&')}`;
-/** resultSets 의 첫 표 → 줄마다 { 이름: 값 } */
-function resultRows(json: unknown): Record<string, unknown>[] {
-  const j = json as { resultSets?: { headers?: string[]; rowSet?: unknown[][] }[] | { headers?: string[]; rowSet?: unknown[][] }; resultSet?: { headers?: string[]; rowSet?: unknown[][] } };
-  const rs = Array.isArray(j?.resultSets) ? j.resultSets[0] : (j?.resultSets ?? j?.resultSet);
+/** resultSets 의 표(이름이 없으면 첫 표) → 줄마다 { 이름: 값 } */
+function resultRows(json: unknown, name?: string): Record<string, unknown>[] {
+  type Set = { name?: string; headers?: string[]; rowSet?: unknown[][] };
+  const j = json as { resultSets?: Set[] | Set; resultSet?: Set };
+  const rs = Array.isArray(j?.resultSets) ? (name ? j.resultSets.find((x) => x.name === name) : j.resultSets[0]) : (j?.resultSets ?? j?.resultSet);
   const h = rs?.headers ?? [];
   return (rs?.rowSet ?? []).map((r) => Object.fromEntries(h.map((k, i) => [k, r[i]])));
 }
@@ -359,5 +360,65 @@ export async function fetchNbaAverages(season: number): Promise<NbaPlayerAvg[]> 
     fg3Pct: n(r.FG3_PCT),
     ftPct: n(r.FT_PCT),
     tov: n(r.TOV),
+  }));
+}
+
+export interface NbaRosterPlayer {
+  id: number;
+  name: string;
+  num: string;
+  pos: string;
+  height: string;
+  weight: string;
+  age: number;
+  exp: string;
+  school: string;
+}
+/** 팀 로스터 (commonteamroster) */
+export async function fetchNbaRoster(abbr: string, season: number): Promise<NbaRosterPlayer[]> {
+  const id = NBA_TEAM_IDS[abbr];
+  if (!id) throw new Error('팀을 확인해 주세요');
+  return resultRows(await getNba(statsUrl('commonteamroster', { LeagueID: '00', Season: seasonText(season), TeamID: String(id) }), true), 'CommonTeamRoster').map((r) => ({
+    id: n(r.PLAYER_ID),
+    name: s(r.PLAYER),
+    num: s(r.NUM),
+    pos: s(r.POSITION),
+    height: s(r.HEIGHT),
+    weight: s(r.WEIGHT),
+    age: n(r.AGE),
+    exp: s(r.EXP),
+    school: s(r.SCHOOL),
+  }));
+}
+
+export interface NbaCareerRow {
+  season: string;
+  team: string;
+  gp: number;
+  min: number;
+  pts: number;
+  reb: number;
+  ast: number;
+  stl: number;
+  blk: number;
+  fgPct: number;
+  fg3Pct: number;
+  ftPct: number;
+}
+/** 선수 커리어 (정규시즌 시즌별 경기당 평균, playercareerstats) */
+export async function fetchNbaCareer(playerId: number): Promise<NbaCareerRow[]> {
+  return resultRows(await getNba(statsUrl('playercareerstats', { LeagueID: '00', PerMode: 'PerGame', PlayerID: String(playerId) }), true), 'SeasonTotalsRegularSeason').map((r) => ({
+    season: s(r.SEASON_ID),
+    team: s(r.TEAM_ABBREVIATION),
+    gp: n(r.GP),
+    min: n(r.MIN),
+    pts: n(r.PTS),
+    reb: n(r.REB),
+    ast: n(r.AST),
+    stl: n(r.STL),
+    blk: n(r.BLK),
+    fgPct: n(r.FG_PCT),
+    fg3Pct: n(r.FG3_PCT),
+    ftPct: n(r.FT_PCT),
   }));
 }

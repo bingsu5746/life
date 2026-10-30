@@ -4,10 +4,10 @@
 // - 경기 선수 기록에서 선수를 누르면 그 선수 시즌 평균
 // 응원팀(★)은 경기 화면에서 정하고, 그 팀 경기가 맨 위에 온다
 import { useEffect, useState } from 'react';
-import { ApiError, isLoggedIn, nbaAvg, nbaBox, nbaGames, nbaStandings, type NbaAverage, type NbaGame, type NbaLine, type NbaStanding, type NbaTeam } from '../auth/api';
+import { ApiError, isLoggedIn, nbaAvg, nbaBox, nbaCareer, nbaGames, nbaRoster, nbaStandings, type NbaAverage, type NbaCareerRow, type NbaRosterPlayer, type NbaGame, type NbaLine, type NbaStanding, type NbaTeam } from '../auth/api';
 import { addDays, longDate } from '../study/dates';
 import { go, Sheet, toast } from '../study/ui';
-import { nbaLogo } from './nbaLogo';
+import { NBA_TEAMS, nbaLogo } from './nbaLogo';
 
 const FAV_KEY = 'my-study.nba.fav';
 /** 미국 동부 기준 오늘 (한국보다 13~14시간 늦다: 한국 아침이면 미국은 전날 밤) */
@@ -66,7 +66,7 @@ const seen = new Map<number, NbaGame>();
 const pct = (w: number, l: number) => (w + l ? w / (w + l) : 0);
 
 export function NbaPage({ sub }: { sub?: string }) {
-  const tab = sub === 'standings' ? 'standings' : sub?.startsWith('game-') ? 'game' : 'games';
+  const tab = sub === 'standings' ? 'standings' : sub?.startsWith('game-') ? 'game' : sub === 'roster' || sub?.startsWith('roster-') ? 'roster' : 'games';
   return (
     <div className="st-page narrow">
       {tab !== 'game' && (
@@ -79,10 +79,13 @@ export function NbaPage({ sub }: { sub?: string }) {
             <button className={tab === 'standings' ? 'on' : ''} onClick={() => go('/basketball/nba/standings')}>
               순위
             </button>
+            <button className={tab === 'roster' ? 'on' : ''} onClick={() => go('/basketball/nba/roster')}>
+              로스터
+            </button>
           </div>
         </div>
       )}
-      {!isLoggedIn() ? <p className="st-muted">NBA 는 로그인한 뒤에 볼 수 있어요.</p> : tab === 'standings' ? <Standings /> : tab === 'game' ? <GamePage id={Number(sub!.slice(5))} /> : <Games />}
+      {!isLoggedIn() ? <p className="st-muted">NBA 는 로그인한 뒤에 볼 수 있어요.</p> : tab === 'standings' ? <Standings /> : tab === 'game' ? <GamePage id={Number(sub!.slice(5))} /> : tab === 'roster' ? <Roster team={sub?.startsWith('roster-') ? sub.slice(7) : undefined} /> : <Games />}
     </div>
   );
 }
@@ -210,10 +213,10 @@ function Standings() {
               <tr key={t.abbr} className={`${t.abbr === fav ? 'fav' : ''} ${i === 5 || i === 9 ? 'cut' : ''}`}>
                 <td>{i + 1}</td>
                 <td className="l">
-                  <span className="nba-trow">
+                  <button className="nba-trow nba-tlink" onClick={() => go(`/basketball/nba/roster-${t.abbr}`)}>
                     <Logo abbr={t.abbr} size={24} />
                     {t.name}
-                  </span>
+                  </button>
                 </td>
                 <td>{t.w}</td>
                 <td>{t.l}</td>
@@ -381,32 +384,56 @@ function GamePage({ id }: { id: number }) {
           );
         })}
       {!!lines?.length && <p className="st-muted sm">선수 이름을 누르면 이번 시즌 평균이 나와요.</p>}
-      {player && <PlayerSheet line={player} season={season} src={src} onClose={() => setPlayer(null)} />}
+      {player && <PlayerSheet who={{ id: player.playerId, name: player.name, team: player.team, pos: player.pos, src }} season={season} onClose={() => setPlayer(null)} />}
     </>
   );
 }
 
 const minutes = (m: string) => Number(m.split(':')[0]) || 0;
 
-function PlayerSheet({ line, season, src, onClose }: { line: NbaLine; season: number; src: 'nba' | 'bdl'; onClose: () => void }) {
+/** 선수 창: 이번 시즌 평균 + 커리어(시즌별). src 'nba' 면 id 가 NBA 공식 번호 */
+interface PlayerRef {
+  id: number;
+  name: string;
+  team: string;
+  pos: string;
+  src: 'nba' | 'bdl';
+}
+const pctText = (x: number) => (x ? `${(x <= 1 ? x * 100 : x).toFixed(1)}%` : '-');
+
+function PlayerSheet({ who, season, onClose }: { who: PlayerRef; season: number; onClose: () => void }) {
   const [avg, setAvg] = useState<NbaAverage | null | undefined>(undefined);
   const [err, setErr] = useState('');
+  const [career, setCareer] = useState<NbaCareerRow[] | null>(null);
+  const [cErr, setCErr] = useState('');
   useEffect(() => {
     if (!season) return setErr('시즌을 알 수 없어요.');
     let live = true;
-    nbaAvg({ id: line.playerId, name: line.name, season, src })
+    nbaAvg({ id: who.id, name: who.name, season, src: who.src })
       .then((r) => live && setAvg(r.avg))
       .catch((e) => live && setErr(e instanceof Error ? e.message : '시즌 평균을 받지 못했어요'));
     return () => {
       live = false;
     };
-  }, [line.playerId, season, src]);
-  const p = (x: number) => (x ? `${(x <= 1 ? x * 100 : x).toFixed(1)}%` : '-');
+  }, [who.id, who.name, who.src, season]);
+  // 커리어는 NBA 공식 번호가 있어야 한다 (공식 기록에서 온 선수 · 아니면 시즌 평균에서 찾은 번호)
+  const nbaId = who.src === 'nba' ? who.id : avg?.id;
+  useEffect(() => {
+    if (!nbaId) return;
+    let live = true;
+    nbaCareer(nbaId)
+      .then((r) => live && setCareer(r.rows))
+      .catch((e) => live && setCErr(e instanceof Error ? e.message : '커리어 기록을 받지 못했어요'));
+    return () => {
+      live = false;
+    };
+  }, [nbaId]);
   return (
-    <Sheet title={line.name} onClose={onClose}>
-      <p className="st-muted sm">
-        {line.team}
-        {line.pos ? ` · ${line.pos}` : ''} · {season}-{String(season + 1).slice(2)} 시즌 평균
+    <Sheet title={who.name} onClose={onClose}>
+      <p className="st-muted sm nba-trow">
+        <Logo abbr={who.team} size={22} />
+        {who.team}
+        {who.pos ? ` · ${who.pos}` : ''} · {season}-{String(season + 1).slice(2)} 시즌 평균
       </p>
       {err && <p className="st-muted">{err}</p>}
       {!err && avg === undefined && <p className="st-muted">받는 중…</p>}
@@ -422,9 +449,9 @@ function PlayerSheet({ line, season, src, onClose }: { line: NbaLine; season: nu
             ['스틸', avg.stl.toFixed(1)],
             ['블록', avg.blk.toFixed(1)],
             ['턴오버', avg.tov.toFixed(1)],
-            ['야투율', p(avg.fgPct)],
-            ['3점 성공률', p(avg.fg3Pct)],
-            ['자유투율', p(avg.ftPct)],
+            ['야투율', pctText(avg.fgPct)],
+            ['3점 성공률', pctText(avg.fg3Pct)],
+            ['자유투율', pctText(avg.ftPct)],
           ].map(([k, v]) => (
             <div key={k}>
               <small>{k}</small>
@@ -433,6 +460,147 @@ function PlayerSheet({ line, season, src, onClose }: { line: NbaLine; season: nu
           ))}
         </div>
       )}
+      <h3 className="st-h nba-career-h">커리어 (정규시즌 경기당 평균)</h3>
+      {!nbaId && avg !== undefined && <p className="st-muted sm">NBA 공식 기록에서 이 선수를 찾지 못해서 커리어를 볼 수 없어요.</p>}
+      {cErr && <p className="st-muted sm">{cErr}</p>}
+      {nbaId && !cErr && career === null && <p className="st-muted sm">받는 중…</p>}
+      {!!career?.length && (
+        <div className="nba-scroll">
+          <table className="nba-table">
+            <thead>
+              <tr>
+                <th className="l">시즌</th>
+                <th className="l">팀</th>
+                <th>경기</th>
+                <th>분</th>
+                <th>득점</th>
+                <th>리바</th>
+                <th>어시</th>
+                <th>스틸</th>
+                <th>블록</th>
+                <th>야투</th>
+                <th>3점</th>
+                <th>자유투</th>
+              </tr>
+            </thead>
+            <tbody>
+              {career
+                .slice()
+                .reverse()
+                .map((r, i) => (
+                  <tr key={i}>
+                    <td className="l">{r.season}</td>
+                    <td className="l">{r.team}</td>
+                    <td>{r.gp}</td>
+                    <td>{r.min.toFixed(1)}</td>
+                    <td>
+                      <b>{r.pts.toFixed(1)}</b>
+                    </td>
+                    <td>{r.reb.toFixed(1)}</td>
+                    <td>{r.ast.toFixed(1)}</td>
+                    <td>{r.stl.toFixed(1)}</td>
+                    <td>{r.blk.toFixed(1)}</td>
+                    <td>{pctText(r.fgPct)}</td>
+                    <td>{pctText(r.fg3Pct)}</td>
+                    <td>{pctText(r.ftPct)}</td>
+                  </tr>
+                ))}
+            </tbody>
+          </table>
+        </div>
+      )}
     </Sheet>
+  );
+}
+
+/** 로스터: 팀 고르기 → 선수 목록 → 선수를 누르면 시즌 평균 · 커리어 */
+function Roster({ team }: { team?: string }) {
+  const [data, setData] = useState<{ season: number; players: NbaRosterPlayer[] } | null>(null);
+  const [err, setErr] = useState('');
+  const [who, setWho] = useState<PlayerRef | null>(null);
+  const fav = readFav();
+  useEffect(() => {
+    if (!team) return;
+    let live = true;
+    setData(null);
+    setErr('');
+    nbaRoster(team)
+      .then((r) => live && setData(r))
+      .catch((e) => live && setErr(e instanceof Error ? e.message : '로스터를 받지 못했어요'));
+    return () => {
+      live = false;
+    };
+  }, [team]);
+  if (!team || !NBA_TEAMS[team]) {
+    const list = Object.entries(NBA_TEAMS).sort(([a], [b]) => Number(b === fav) - Number(a === fav) || NBA_TEAMS[a].name.localeCompare(NBA_TEAMS[b].name));
+    return (
+      <div className="nba-teams">
+        {list.map(([abbr, t]) => (
+          <button key={abbr} className={`nba-tpick ${abbr === fav ? 'fav' : ''}`} onClick={() => go(`/basketball/nba/roster-${abbr}`)}>
+            <Logo abbr={abbr} size={44} />
+            <small>{t.city}</small>
+            <b>{t.name}</b>
+          </button>
+        ))}
+      </div>
+    );
+  }
+  const t = NBA_TEAMS[team];
+  return (
+    <>
+      <div className="nba-rhead">
+        <button className="btn btn-sm" onClick={() => go('/basketball/nba/roster')}>
+          ‹ 팀
+        </button>
+        <span className="nba-trow">
+          <Logo abbr={team} size={36} />
+          <span>
+            <small className="st-muted">{t.city}</small> <b>{t.name}</b>
+          </span>
+        </span>
+      </div>
+      {err && <p className="st-muted">{err}</p>}
+      {!err && !data && <p className="st-muted">로스터를 받는 중…</p>}
+      {data && (
+        <section className="st-card">
+          <div className="nba-scroll">
+            <table className="nba-table">
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th className="l">선수</th>
+                  <th className="l">포지션</th>
+                  <th>키</th>
+                  <th>몸무게</th>
+                  <th>나이</th>
+                  <th>경력</th>
+                </tr>
+              </thead>
+              <tbody>
+                {data.players.map((p) => (
+                  <tr key={p.id}>
+                    <td>{p.num}</td>
+                    <td className="l">
+                      <button className="st-link" onClick={() => setWho({ id: p.id, name: p.name, team, pos: p.pos, src: 'nba' })}>
+                        {p.name}
+                      </button>
+                    </td>
+                    <td className="l">{p.pos}</td>
+                    <td>{p.height}</td>
+                    <td>{p.weight ? `${p.weight}lb` : ''}</td>
+                    <td>{p.age || ''}</td>
+                    <td>{p.exp === 'R' ? '신인' : p.exp ? `${p.exp}년` : ''}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <p className="st-muted sm">
+            {data.season}-{String(data.season + 1).slice(2)} 시즌 · 선수를 누르면 시즌 평균과 커리어가 나와요.
+          </p>
+        </section>
+      )}
+      {who && data && <PlayerSheet who={who} season={data.season} onClose={() => setWho(null)} />}
+    </>
   );
 }

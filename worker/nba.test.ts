@@ -60,3 +60,32 @@ describe('NBA 공식 데이터 (nba_api 1.12.0 의 응답 모양)', () => {
     expect(seasonText(2099)).toBe('2099-00');
   });
 });
+
+describe('NBA 로스터 · 커리어 (resultSets 이름으로)', () => {
+  it('commonteamroster · playercareerstats 표 고르기', async () => {
+    const { fetchNbaRoster, fetchNbaCareer } = await import('./nba');
+    const real = globalThis.fetch;
+    globalThis.fetch = (async (u: string) => {
+      const body = String(u).includes('commonteamroster')
+        ? {
+            resultSets: [
+              { name: 'CommonTeamRoster', headers: ['PLAYER', 'NUM', 'POSITION', 'PLAYER_ID', 'EXP', 'AGE'], rowSet: [['Jayson Tatum', '0', 'F', 1628369, '8', 28]] },
+              { name: 'Coaches', headers: ['COACH_NAME'], rowSet: [['X']] },
+            ],
+          }
+        : {
+            resultSets: [
+              { name: 'SeasonTotalsRegularSeason', headers: ['SEASON_ID', 'TEAM_ABBREVIATION', 'GP', 'PTS'], rowSet: [['2025-26', 'BOS', 70, 27.1]] },
+              { name: 'CareerTotalsRegularSeason', headers: ['GP'], rowSet: [[600]] },
+            ],
+          };
+      return new Response(JSON.stringify(body));
+    }) as typeof fetch;
+    try {
+      expect((await fetchNbaRoster('BOS', 2026))[0]).toMatchObject({ id: 1628369, name: 'Jayson Tatum', num: '0', exp: '8' });
+      expect((await fetchNbaCareer(1628369))[0]).toMatchObject({ season: '2025-26', team: 'BOS', gp: 70, pts: 27.1 });
+    } finally {
+      globalThis.fetch = real;
+    }
+  });
+});
