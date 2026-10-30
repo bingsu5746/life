@@ -23,7 +23,7 @@ import { fetchSpecialDays } from './holidays';
 import { cleanFact } from './fact';
 import { fetch2k } from './nba2k';
 import { fetchHlBox, fetchHlPlayerSeasons, fetchHlStandings, hlMatchId, sameTeam } from './highlightly';
-import { fetchAverage, fetchBox, fetchGames, fetchNbaAverages, fetchBdlRoster, fetchNbaBox, fetchNbaCareer, fetchNbaRoster, fetchNbaStandings, fetchStandings, nbaGameId, Paid, seasonOf, seasonPage, standingsFrom, type NbaGame } from './nba';
+import { fetchGames, fetchNbaAverages, fetchBdlRoster, fetchNbaBox, fetchNbaCareer, fetchNbaRoster, fetchNbaStandings, fetchStandings, nbaGameId, Paid, seasonOf, seasonPage, standingsFrom, type NbaGame } from './nba';
 import { monthOf, R2_FREE, R2_STOP, r2Block, rollMonth, type R2Use } from './r2guard';
 import { modelFamily, askCompat, askGemini, geminiDaily, pacificDay, askOpenRouter, COMPAT, compatModels, geminiModels, openRouterDaily, openRouterModels, pickCompat, SYSTEM as SOLVE_SYSTEM, type Engine, type SolveTurn } from './solve';
 import { filmFacets, searchFilms, type Film } from './catalog';
@@ -1289,17 +1289,11 @@ export class Accounts extends DurableObject<Env> {
         console.error('highlightly box failed', game, m);
       }
     }
-    // 3) balldontlie (유료일 수 있음)
-    const key = this.nbaKey();
-    if (!key) return fail(why ? `선수 기록을 받지 못했어요. (${why.slice(0, 160)})` : 'NBA 를 보려면 balldontlie 키가 필요해요.', 503);
-    try {
-      const r = await this.nbaCached(`nba:box:${game}`, ms, () => fetchBox(key, game));
-      return json({ lines: r.v, at: r.at, src: 'bdl' });
-    } catch (e) {
-      if (why) console.error('box all failed', why);
-      return this.nbaFail(e, '선수 기록');
-    }
+    // balldontlie 경기 선수 기록은 유료(ALL-STAR)라서 부르지 않는다
+    if (why) console.error('box all failed', why);
+    return fail(final ? '이 경기 선수 기록을 찾지 못했어요. (NBA 공식 · Highlightly 둘 다 없음)' : '아직 선수 기록이 없어요. 경기가 시작하면 나와요.', 502);
   }
+
   /** 선수 시즌 평균: NBA 공식 전체 표(6시간 기억)에서 번호(공식 기록에서 온 선수) 또는 이름으로 찾고, 없으면 balldontlie */
   private async nbaAvg(q: URLSearchParams): Promise<Response> {
     const player = Number(q.get('player'));
@@ -1321,14 +1315,8 @@ export class Accounts extends DurableObject<Env> {
     } catch (e) {
       console.error('nba.com averages failed', e instanceof Error ? e.message : String(e));
     }
-    const key = this.nbaKey();
-    if (!key || src === 'nba' || !player) return fail('시즌 평균을 받지 못했어요. NBA 공식 데이터가 우리 서버에 답하지 않는 것 같아요.', 502);
-    try {
-      const r = await this.nbaCached(`nba:avg:${season}:${player}`, 12 * 3600_000, () => fetchAverage(key, player, season));
-      return json({ avg: r.v, at: r.at });
-    } catch (e) {
-      return this.nbaFail(e, '시즌 평균');
-    }
+    // balldontlie 시즌 평균은 유료(GOAT)라서 부르지 않는다. 화면이 Highlightly 시즌 기록을 대신 보여 준다
+    return fail('NBA 공식 기록 서버가 지금 우리 서버에 답하지 않아서, 아래 Highlightly 기록으로 보여 줘요.', 502);
   }
 
   /** 이번 시즌 모든 선수 경기당 평균 (선수 찾기 · 정렬용, 시즌 평균과 같은 표를 6시간 기억) */
