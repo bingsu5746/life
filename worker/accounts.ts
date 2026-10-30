@@ -123,6 +123,7 @@ export class Accounts extends DurableObject<Env> {
       CREATE TABLE IF NOT EXISTS notify (user_id TEXT PRIMARY KEY, times TEXT NOT NULL, tz INTEGER NOT NULL, next_at INTEGER, digest TEXT NOT NULL DEFAULT '[]', origin TEXT NOT NULL);
       CREATE TABLE IF NOT EXISTS vapid (id INTEGER PRIMARY KEY, pub TEXT NOT NULL, priv TEXT NOT NULL);
       CREATE TABLE IF NOT EXISTS cache (key TEXT PRIMARY KEY, data TEXT NOT NULL, at INTEGER NOT NULL);
+      CREATE TABLE IF NOT EXISTS facts (en TEXT NOT NULL UNIQUE, ko TEXT NOT NULL, at INTEGER NOT NULL);
       CREATE TABLE IF NOT EXISTS films (code TEXT PRIMARY KEY, title TEXT NOT NULL, norm TEXT NOT NULL, title_en TEXT, open TEXT NOT NULL, genre TEXT, nation TEXT, director TEXT, type TEXT);
       CREATE INDEX IF NOT EXISTS films_norm ON films (norm);
     `);
@@ -1317,25 +1318,60 @@ export class Accounts extends DurableObject<Env> {
   /** 쓸모없는 지식 (uselessfacts.jsph.pl, 영어 → 한국어로 번역). 오늘 것은 하루 기억, random 이면 아무거나 하나 (번역 한도를 같이 쓴다)
    *  글만 받으려고 Accept: text/plain (문서에 있는 형식). 출처 · 주소 같은 뒤에 붙은 글은 지운다 */
   private async uselessFact(user: UserRow, random: boolean): Promise<Response> {
-    const get = async () => {
-      const res = await fetch(`https://uselessfacts.jsph.pl/api/v2/facts/${random ? 'random' : 'today'}?language=en`, { headers: { accept: 'text/plain' }, signal: AbortSignal.timeout(8000) });
-      if (!res.ok) throw new Error(`uselessfacts ${res.status}`);
-      const en = cleanFact(await res.text());
-      if (!en) throw new Error('uselessfacts 빈 답');
-      return { en, ko: await this.factKo(en) };
-    };
     try {
       if (random) {
+        // 모아 둔 게 넉넉하면 대부분은 모아 둔 것에서 (번역 · 바깥 요청 없이 바로). 가끔은 새로 받아 모은다
+        const max = this.factMax();
+        if (max >= 20 && Math.random() < 0.8) {
+          const hit = this.factPick(max);
+          if (hit) return json(hit);
+        }
         const wait = this.translateByUser.hit(user.id);
-        if (wait) return fail(`너무 자주 눌렀어요. ${wait}초 뒤에 다시 해 주세요.`, 429);
-        return json(await get());
+        if (wait) {
+          const hit = max ? this.factPick(max) : null;
+          return hit ? json(hit) : fail(`너무 자주 눌렀어요. ${wait}초 뒤에 다시 해 주세요.`, 429);
+        }
+        return json(await this.factFetch('random'));
       }
       const day = new Date().toISOString().slice(0, 10);
-      const r = await this.nbaCached(`fact2:${day}`, DAY, get);
+      const fresh = !this.sql.exec<{ at: number }>('SELECT at FROM cache WHERE key = ?', `fact2:${day}`).toArray()[0];
+      const r = await this.nbaCached(`fact2:${day}`, DAY, () => this.factFetch('today'));
+      // 하루에 한 번, 뒤에서 몇 개 더 받아 번역해 모은다 (사이트가 새로 넣는 지식도 이렇게 조금씩 들어온다)
+      if (fresh) this.ctx.waitUntil(this.factGrow(8));
       return json({ ...r.v, day });
     } catch (e) {
       console.error('fact failed', e instanceof Error ? e.message : String(e));
       return fail('쓸모없는 지식을 받지 못했어요.', 502);
+    }
+  }
+  /** 쓸모없는 지식 저장소: 받아서 번역한 것을 모아 둔다 (같은 글은 한 번만) */
+  private factMax(): number {
+    return this.sql.exec<{ m: number | null }>('SELECT MAX(rowid) AS m FROM facts').toArray()[0]?.m ?? 0;
+  }
+  private factPick(max: number): { en: string; ko: string } | null {
+    return this.sql.exec<{ en: string; ko: string }>('SELECT en, ko FROM facts WHERE rowid >= ? ORDER BY rowid LIMIT 1', 1 + Math.floor(Math.random() * max)).toArray()[0] ?? null;
+  }
+  /** 사이트에서 하나 받아 (이미 모아 둔 글이면 그 번역을 쓰고) 번역해서 모은다 */
+  private async factFetch(kind: 'random' | 'today'): Promise<{ en: string; ko: string }> {
+    const res = await fetch(`https://uselessfacts.jsph.pl/api/v2/facts/${kind}?language=en`, { headers: { accept: 'text/plain' }, signal: AbortSignal.timeout(8000) });
+    if (!res.ok) throw new Error(`uselessfacts ${res.status}`);
+    const en = cleanFact(await res.text());
+    if (!en) throw new Error('uselessfacts 빈 답');
+    const have = this.sql.exec<{ ko: string }>('SELECT ko FROM facts WHERE en = ?', en).toArray()[0];
+    if (have) return { en, ko: have.ko };
+    const ko = await this.factKo(en);
+    if (ko) this.sql.exec('INSERT OR IGNORE INTO facts (en, ko, at) VALUES (?, ?, ?)', en, ko, Date.now());
+    return { en, ko };
+  }
+  private async factGrow(n: number) {
+    for (let i = 0; i < n; i++) {
+      try {
+        await this.factFetch('random');
+      } catch (e) {
+        console.error('fact grow failed', e instanceof Error ? e.message : String(e));
+        return;
+      }
+      await new Promise((r) => setTimeout(r, 1500));
     }
   }
   /** 영어 지식 → 한국어 (번역과 같은 모델 · 한도). 안 되면 빈 글 (그때는 영어로 보여 준다) */
