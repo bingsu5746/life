@@ -7,6 +7,7 @@ import { displayName, useAuth } from './features/auth/useAuth';
 import { isLoggedIn } from './features/auth/api';
 import { Study } from './features/study/Study';
 import { AREAS, HOBBY_PARTS } from './features/study/tabs';
+import { AiPill } from './features/study/AiPill';
 
 const safeDecode = (s: string) => {
   try {
@@ -88,6 +89,7 @@ export default function App() {
             {crumb.label}
           </button>
         )}
+        <AiPill onAi={path[0] === 'ai'} />
         <div className="account">
           <button className="gear-btn search-btn" aria-label="검색" title="검색 ( / )" onClick={() => (window.location.hash = '/search')}>
             <svg viewBox="0 0 24 24" aria-hidden>

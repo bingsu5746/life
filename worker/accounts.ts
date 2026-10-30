@@ -199,7 +199,8 @@ export class Accounts extends DurableObject<Env> {
     }
     if (path === 'me' && req.method === 'GET') return json({ user: this.publicUser(user) });
     if (path === 'translate' && req.method === 'POST') return this.translate(user, body);
-    if (path === 'solve' && req.method === 'POST') return this.solve(user, body, new URL(req.url).origin);
+    if (path === 'solve' && req.method === 'POST') return typeof body.jobId === 'string' ? this.solveStart(user, body, new URL(req.url).origin) : this.solve(user, body, new URL(req.url).origin);
+    if (path.startsWith('solve/job/') && req.method === 'GET') return this.solveJob(user, path.slice('solve/job/'.length));
     if (path === 'solve/usage' && req.method === 'GET') return this.solveUsage(user);
     if (path === 'solve/img' && req.method === 'POST') return this.solveImgPut(user, body);
     if (path.startsWith('solve/img/') && req.method === 'GET') return this.solveImgGet(user, path.slice('solve/img/'.length));
@@ -355,6 +356,46 @@ export class Accounts extends DurableObject<Env> {
     }
     if (typeof how.left === 'number') u.left[engine] = how.left;
     this.sql.exec('INSERT OR REPLACE INTO cache (key, data, at) VALUES (?, ?, ?)', `solveuse:${userId}:${day}`, JSON.stringify({ n: u.n, blocked: u.out, left: u.left }), Date.now());
+  }
+
+  // ===== 풀이를 뒤에서 (화면을 옮기거나 다른 앱으로 가도 계속) =====
+  /** 끝난 풀이: 번호 → (상태 코드 · 답). 가져가면 지운다 */
+  private jobs = new Map<string, { code: number; body: string }>();
+  private running = new Set<string>();
+
+  /** 풀이 시작: 바로 번호만 돌려주고, 끝나면 저장해 둔다 (기기는 몇 초마다 물어봄) */
+  private solveStart(user: UserRow, b: Record<string, unknown>, origin: string): Response {
+    const id = String(b.jobId);
+    if (!/^[a-z0-9]{6,32}$/.test(id)) return fail('잘못된 요청이에요.');
+    const key = `${user.id}:${id}`;
+    if (this.running.has(key) || this.jobs.has(key)) return json({ jobId: id }, 202);
+    this.running.add(key);
+    const work = this.solve(user, b, origin)
+      .then(async (res) => ({ code: res.status, body: await res.text() }))
+      .catch((e) => ({ code: 500, body: JSON.stringify({ error: `풀지 못했어요: ${e instanceof Error ? e.message : String(e)}` }) }))
+      .then((r) => {
+        this.running.delete(key);
+        this.jobs.set(key, r);
+        // 서버가 잠깐 내려가도 남게 저장 (가져가면 지움)
+        this.sql.exec('INSERT OR REPLACE INTO cache (key, data, at) VALUES (?, ?, ?)', `solvejob:${key}`, JSON.stringify(r), Date.now());
+      });
+    this.ctx.waitUntil(work);
+    return json({ jobId: id }, 202);
+  }
+
+  /** 풀이 상태: 아직이면 running, 끝났으면 답(한 번 주고 지운다) */
+  private solveJob(user: UserRow, id: string): Response {
+    const key = `${user.id}:${id}`;
+    if (this.running.has(key)) return json({ running: true });
+    let r = this.jobs.get(key);
+    if (!r) {
+      const row = this.sql.exec<{ data: string }>('SELECT data FROM cache WHERE key = ?', `solvejob:${key}`).toArray()[0];
+      if (row) r = JSON.parse(row.data) as { code: number; body: string };
+    }
+    if (!r) return json({ missing: true });
+    this.jobs.delete(key);
+    this.sql.exec('DELETE FROM cache WHERE key = ?', `solvejob:${key}`);
+    return json({ done: true, code: r.code, result: JSON.parse(r.body) });
   }
 
   // ===== 문제 사진 저장 (R2, 무료 한도 넘기 전에 막음) =====

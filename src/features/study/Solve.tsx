@@ -1,9 +1,10 @@
 // 문제 풀이: AI 대화 화면. ＋ 로 사진 넣기 · 모델 고르기 · 보내기. 대화는 이 기기에만 저장(글만)
 import { useEffect, useRef, useState } from 'react';
-import { ApiError, isLoggedIn, solveAsk, solveImgPut, solveImgUrl, solveUsage, type SolveEngine, type SolveTurn } from '../auth/api';
+import { isLoggedIn, solveImgPut, solveImgUrl, solveUsage, type SolveEngine, type SolveTurn } from '../auth/api';
+import { CHATS_KEY, load, markJobSeen, saveChat, startSolve, useSolveJob, type Chat, type Msg } from './solveJob';
 import { MathText } from '../../lib/mathText';
 import { compressProblemImage } from '../../lib/imageCompress';
-import { Icon, Sheet, subjectsOf, SubjectDot, toast } from './ui';
+import { Icon, Sheet, subjectsOf, SubjectDot, toast, useNow } from './ui';
 import { useStudy } from './store';
 import { guessNoteSubject } from './mistakes';
 
@@ -17,43 +18,8 @@ const ENGINES: { key: SolveEngine; name: string; desc: string }[] = [
   { key: 'cloudflare', name: 'Cloudflare AI', desc: '무료 · 사진은 Llama 3.2 Vision (어려운 문제는 약해요)' },
 ];
 
-interface Msg extends SolveTurn {
-  /** 사진 미리보기 (이 화면에서만) */
-  thumbs?: string[];
-  /** R2 에 올린 사진 (지난 대화에서도 보이게) */
-  imgKeys?: string[];
-  model?: string;
-  error?: boolean;
-}
-interface Chat {
-  id: string;
-  at: number;
-  title: string;
-  /** 과목 (나중에 문제 저장소로 모을 때) */
-  subjectId?: string;
-  msgs: Msg[];
-}
-
 const ENGINE_KEY = 'my-study.solve.engine';
 const SUBJECT_KEY = 'my-study.solve.subject';
-const CHATS_KEY = 'my-study.solve.chats';
-const load = <T,>(k: string, fb: T): T => {
-  try {
-    return (JSON.parse(localStorage.getItem(k) ?? 'null') as T) ?? fb;
-  } catch {
-    return fb;
-  }
-};
-/** 대화는 글만 최근 20개 (사진은 저장하지 않는다: 저장 공간) */
-function saveChat(c: Chat) {
-  try {
-    const list = load<Chat[]>(CHATS_KEY, []).filter((x) => x.id !== c.id);
-    const slim: Chat = { ...c, msgs: c.msgs.map((m) => ({ role: m.role, text: m.text, model: m.model, error: m.error, imgKeys: m.imgKeys, images: undefined, thumbs: undefined })) };
-    localStorage.setItem(CHATS_KEY, JSON.stringify([slim, ...list].slice(0, 20)));
-  } catch {
-    /* 가득 차면 저장하지 않는다 */
-  }
-}
 
 const toB64 = async (b: Blob) => {
   const buf = new Uint8Array(await b.arrayBuffer());
@@ -65,7 +31,11 @@ const toB64 = async (b: Blob) => {
 export function Solve() {
   const [engine, setEngine] = useState<SolveEngine>(() => load<SolveEngine>(ENGINE_KEY, 'gemini'));
   const d = useStudy();
-  const [chat, setChat] = useState<Chat>(() => ({ id: Date.now().toString(36), at: Date.now(), title: '', subjectId: load<string>(SUBJECT_KEY, '') || undefined, msgs: [] }));
+  const job = useSolveJob();
+  // 푸는 중이거나 아직 안 본 풀이가 있으면 그 대화를 보여 준다
+  const [chat, setChat] = useState<Chat>(() => (job && !job.seen ? (job.result ?? job.chat) : { id: Date.now().toString(36), at: Date.now(), title: '', subjectId: load<string>(SUBJECT_KEY, '') || undefined, msgs: [] }));
+  const now = useNow(1000);
+  const solving = job?.status === 'running' && job.chat.id === chat.id ? job : null;
   const [subPick, setSubPick] = useState(false);
   const subject = chat.subjectId && d.subjects[chat.subjectId] && !d.subjects[chat.subjectId].deleted ? d.subjects[chat.subjectId] : undefined;
   const setSubject = (id: string | undefined) => {
@@ -100,7 +70,7 @@ export function Solve() {
         })
         .catch(() => setUsage(null));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [picker, busy === '']);
+  }, [picker, busy === '', job?.status]);
   /** 한도에 걸린 질문: 다른 모델을 고르면 이걸 다시 보낸다 */
   const [retry, setRetry] = useState<Chat | null>(null);
   const shown = usage ? ENGINES.filter((e) => usage.available.includes(e.key)) : ENGINES;
@@ -128,8 +98,22 @@ export function Solve() {
     a.style.height = `${Math.min(a.scrollHeight, 200)}px`;
   }, [text]);
 
+  // 풀이가 끝나면 (다른 화면에 있다 왔어도) 이 대화에 붙인다. 못 풀었으면 다른 모델 고르기
+  useEffect(() => {
+    if (!job || job.status === 'running' || job.seen || !job.result) return;
+    if (job.chat.id === chat.id || !chat.msgs.length) {
+      setChat(job.result);
+      markJobSeen();
+      if (job.status === 'error' && job.code && (job.code === 429 || job.code >= 500)) {
+        setRetry(job.chat);
+        setPicker(true);
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [job?.status, job?.id]);
+
   async function send() {
-    if (busy || (!text.trim() && !files.length)) return;
+    if (busy || solving || (!text.trim() && !files.length)) return;
     if (!isLoggedIn()) return toast('풀이는 로그인한 뒤에 쓸 수 있어요');
     if (!chat.msgs.length && !topic.trim()) return toast('제목을 먼저 써 주세요');
     const pics = files;
@@ -165,27 +149,10 @@ export function Solve() {
     await ask(engine, next);
   }
 
-  /** 대화(마지막이 질문)를 그 모델로 보낸다. 한도에 걸리면 모델 고르는 창을 띄우고, 고르면 바로 다시 보낸다 */
+  /** 대화(마지막이 질문)를 그 모델로 서버에 맡긴다. 끝나면 위의 useEffect 가 받아 붙인다 */
   async function ask(eng: SolveEngine, next: Chat) {
-    const msgs = next.msgs;
-    setBusy('푸는 중');
-    try {
-      // 앞 대화는 글만 (사진은 이번 질문 것만 보내서 무겁지 않게)
-      const turns: SolveTurn[] = msgs.filter((m) => !m.error).map((m, i, all) => ({ role: m.role, text: m.text, images: i === all.length - 1 ? m.images : undefined }));
-      const r = await solveAsk(eng, turns);
-      const done = { ...next, at: Date.now(), msgs: [...msgs, { role: 'assistant' as const, text: r.text, model: r.model }] };
-      setChat(done);
-      saveChat(done);
-    } catch (e) {
-      const done = { ...next, msgs: [...msgs, { role: 'assistant' as const, text: e instanceof Error ? e.message : '풀지 못했어요', error: true }] };
-      setChat(done);
-      if (e instanceof ApiError && (e.status === 429 || e.status >= 500)) {
-        setRetry(next);
-        setPicker(true);
-      }
-    } finally {
-      setBusy('');
-    }
+    setBusy('');
+    await startSolve(eng, next);
   }
 
   return (
@@ -234,6 +201,11 @@ export function Solve() {
           ),
         )}
         {busy && <div className="sv-ai sv-busy">{busy}…</div>}
+        {solving && (
+          <div className="sv-ai sv-busy">
+            푸는 중… {Math.round((now - solving.startedAt) / 1000)}초 / 약 {Math.round(solving.estimate / 1000)}초<small className="st-muted"> · 다른 화면으로 가도 계속 풀어요</small>
+          </div>
+        )}
         <div ref={endRef} />
       </div>
 
@@ -308,7 +280,7 @@ export function Solve() {
             )}{' '}
             ▾
           </button>
-          <button className="sv-send" aria-label="보내기" disabled={!!busy || (!text.trim() && !files.length) || (!chat.msgs.length && !topic.trim())} onClick={() => void send()}>
+          <button className="sv-send" aria-label="보내기" disabled={!!busy || !!solving || (!text.trim() && !files.length) || (!chat.msgs.length && !topic.trim())} onClick={() => void send()}>
             <Icon name="up" />
           </button>
         </div>
