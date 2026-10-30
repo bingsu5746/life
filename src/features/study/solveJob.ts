@@ -1,7 +1,8 @@
 // AI 풀이를 화면 밖에서도: 서버에 「풀어 줘」 를 맡기고 몇 초마다 끝났는지 물어본다.
 // 다른 칸·다른 앱으로 가도 서버는 계속 풀고, 돌아오면 바로 받아 온다. 푸는 동안은 맨 위에 작게 보인다.
 import { useSyncExternalStore } from 'react';
-import { put } from './store';
+import { getStudy, put } from './store';
+import type { StudyData } from './model';
 import { ApiError, solveJobGet, solveJobStart, type SolveEngine, type SolveTurn } from '../auth/api';
 
 export interface Msg extends SolveTurn {
@@ -11,6 +12,10 @@ export interface Msg extends SolveTurn {
   imgKeys?: string[];
   model?: string;
   error?: boolean;
+  /** 답에만: 고른 서비스 · 걸린 시간(ms) · 사진 문제였는지 (예상 시간 계산에 씀) */
+  engine?: string;
+  ms?: number;
+  img?: boolean;
 }
 export interface Chat {
   id: string;
@@ -43,7 +48,7 @@ const store = (k: string, v: unknown) => {
 
 /** 대화는 글만 저장소(problems, 다른 기기와 같이 씀)에 둔다. 사진은 R2 열쇠만 */
 export function saveChat(c: Chat) {
-  put('problems', { id: c.id, title: c.title, subjectId: c.subjectId, at: c.at, msgs: c.msgs.map((m) => ({ role: m.role, text: m.text, model: m.model, error: m.error, imgKeys: m.imgKeys })) });
+  put('problems', { id: c.id, title: c.title, subjectId: c.subjectId, at: c.at, msgs: c.msgs.map((m) => ({ role: m.role, text: m.text, model: m.model, error: m.error, imgKeys: m.imgKeys, engine: m.engine, ms: m.ms, img: m.img })) });
 }
 
 /** 예전에 이 기기에만 두던 대화를 저장소로 한 번 옮긴다 */
@@ -54,9 +59,23 @@ export function migrateChats(have: Record<string, unknown>) {
   store(CHATS_KEY, null);
 }
 
-/** 예상 시간: 이 모델로 최근 푼 시간의 평균 (기록이 없으면 사진 20초 · 글 12초) */
+/** 예상 시간: 그 모델로 지난번까지 푼 시간 기록(저장소의 지난 대화, 다른 기기 것도)의 최근 10개 평균.
+ *  같은 서비스 안에서도 마지막에 답한 모델의 기록이 3개 넘게 있으면 그 모델 것만. 사진 문제와 글 문제는 따로.
+ *  기록이 없으면 이 기기에 남긴 시간 → 그것도 없으면 사진 20초 · 글 12초 */
 export function estimateMs(engine: SolveEngine, hasImage: boolean): number {
-  const list = load<Record<string, number[]>>(DUR_KEY, {})[`${engine}${hasImage ? ':img' : ''}`] ?? [];
+  return estimateFrom(getStudy().problems, engine, hasImage, load<Record<string, number[]>>(DUR_KEY, {})[`${engine}${hasImage ? ':img' : ''}`] ?? []);
+}
+export function estimateFrom(problems: StudyData['problems'], engine: string, hasImage: boolean, local: number[] = []): number {
+  const recs = Object.values(problems)
+    .filter((p) => !p.deleted)
+    .sort((a, b) => a.at - b.at)
+    .flatMap((p) => p.msgs)
+    .filter((m): m is typeof m & { ms: number } => m.role === 'assistant' && !m.error && m.engine === engine && typeof m.ms === 'number' && m.ms > 0);
+  const same = recs.filter((m) => !!m.img === hasImage);
+  const lastModel = same[same.length - 1]?.model;
+  const byModel = same.filter((m) => m.model === lastModel);
+  const pick = (byModel.length >= 3 ? byModel : same).slice(-10).map((m) => m.ms);
+  const list = pick.length ? pick : local;
   if (!list.length) return hasImage ? 20_000 : 12_000;
   return Math.round(list.reduce((a, b) => a + b, 0) / list.length);
 }
@@ -141,7 +160,8 @@ function finish(text: string, code: number, model?: string) {
   if (!job || job.status !== 'running') return;
   const ok = code >= 200 && code < 300;
   if (ok) recordDuration(job.engine, job.hasImage, Date.now() - job.startedAt);
-  const result: Chat = { ...job.chat, at: Date.now(), msgs: [...job.chat.msgs, { role: 'assistant', text, model, error: ok ? undefined : true }] };
+  const ms = Date.now() - job.startedAt;
+  const result: Chat = { ...job.chat, at: Date.now(), msgs: [...job.chat.msgs, { role: 'assistant', text, model, error: ok ? undefined : true, engine: job.engine, ms: ok ? ms : undefined, img: job.hasImage || undefined }] };
   if (ok) saveChat(result);
   setJob({ ...job, status: ok ? 'done' : 'error', result, code });
 }

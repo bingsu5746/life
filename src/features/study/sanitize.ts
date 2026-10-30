@@ -277,6 +277,9 @@ const FIX: Record<Collection, Fix> = {
         imgKeys: arr(m.imgKeys)
           .filter((k): k is string => typeof k === 'string' && /^[a-f0-9]{8,64}\/[a-z0-9]+-[a-f0-9]{8}\.(webp|jpg)$/.test(k))
           .slice(0, 8),
+        engine: optStr(m.engine)?.slice(0, 20),
+        ms: typeof m.ms === 'number' && m.ms > 0 && m.ms < 3_600_000 ? Math.round(m.ms) : undefined,
+        img: m.img === true ? true : undefined,
       })),
   }),
   places: (x) => ({

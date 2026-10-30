@@ -203,6 +203,7 @@ export function Solve({ open }: { open?: string }) {
                   </button>
                 </div>
               )}
+              {!m.error && typeof m.ms === 'number' && <small className="sv-took">{tookText(m.ms)} 걸림</small>}
             </div>
           ),
         )}
@@ -387,4 +388,10 @@ export function Solve({ open }: { open?: string }) {
 function Elapsed({ from }: { from: number }) {
   const now = useNow(1000);
   return <>{Math.round((now - from) / 1000)}</>;
+}
+
+/** 걸린 시간: 1분 안이면 「12초」, 넘으면 「1분 5초」 */
+function tookText(ms: number) {
+  const sec = Math.max(1, Math.round(ms / 1000));
+  return sec < 60 ? `${sec}초` : `${Math.floor(sec / 60)}분${sec % 60 ? ` ${sec % 60}초` : ''}`;
 }

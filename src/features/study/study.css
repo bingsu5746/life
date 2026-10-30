@@ -7115,3 +7115,10 @@ body.focus-on {
   color: var(--muted);
   font-size: 0.85em;
 }
+.sv-took {
+  display: block;
+  margin-top: 2px;
+  text-align: right;
+  color: var(--muted);
+  font-size: 0.75em;
+}

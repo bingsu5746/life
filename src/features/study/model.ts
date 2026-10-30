@@ -397,7 +397,8 @@ export interface SolvedProblem extends Stamp {
   title: string;
   subjectId?: Id;
   at: number;
-  msgs: { role: 'user' | 'assistant'; text: string; model?: string; error?: boolean; imgKeys?: string[] }[];
+  /** 답에는 고른 서비스(engine) · 걸린 시간(ms) · 사진 문제였는지(img) */
+  msgs: { role: 'user' | 'assistant'; text: string; model?: string; error?: boolean; imgKeys?: string[]; engine?: string; ms?: number; img?: boolean }[];
 }
 
 export interface NoteComment {
