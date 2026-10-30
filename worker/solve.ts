@@ -64,6 +64,7 @@ export async function geminiModels(key: string): Promise<{ flash: string[]; pro:
 
 export async function askGemini(key: string, model: string, turns: SolveTurn[]): Promise<string> {
   const res = await fetch(`${GEM}/models/${encodeURIComponent(model)}:generateContent`, { method: 'POST', headers: { 'content-type': 'application/json', 'x-goog-api-key': key }, body: JSON.stringify(geminiBody(turns)) });
+  console.log('solve limit headers', 'gemini', JSON.stringify(limitHeaders(res.headers)));
   const j = (await res.json().catch(() => null)) as { error?: { message?: string } } | null;
   if (!res.ok) throw new Error(res.status === 429 ? 'Gemini 무료 사용량을 다 썼어요' : `Gemini ${res.status}: ${j?.error?.message ?? ''}`.trim());
   const t = readGemini(j);
@@ -120,6 +121,7 @@ export async function askOpenRouter(key: string, model: string, turns: SolveTurn
     headers: { 'content-type': 'application/json', authorization: `Bearer ${key}`, 'HTTP-Referer': referer, 'X-Title': 'Life' },
     body: JSON.stringify({ model, messages: chatMessages(turns) }),
   });
+  console.log('solve limit headers', 'openrouter', JSON.stringify(limitHeaders(res.headers)));
   const j = (await res.json().catch(() => null)) as { error?: { message?: string } } | null;
   if (!res.ok) throw new Error(res.status === 429 ? 'OpenRouter 무료 사용량을 다 썼어요' : `OpenRouter ${res.status}: ${j?.error?.message ?? ''}`.trim());
   const t = readChat(j);
@@ -176,6 +178,15 @@ export function remainingFrom(h: Headers): number | null {
   return best;
 }
 
+/** 한도와 관련된 머리글만 (어떤 서비스가 무엇을 보내는지 로그로 확인하려고) */
+export function limitHeaders(h: Headers): Record<string, string> {
+  const out: Record<string, string> = {};
+  h.forEach((v, k) => {
+    if (/ratelimit|remaining|quota|retry-after/i.test(k)) out[k] = v;
+  });
+  return out;
+}
+
 export async function compatModels(base: string, key: string): Promise<unknown> {
   const res = await fetch(`${base}/models`, { headers: { authorization: `Bearer ${key}` } });
   if (!res.ok) throw new Error(`모델 목록 ${res.status}`);
@@ -186,6 +197,7 @@ export async function askCompat(base: string, key: string, model: string, turns:
   const res = await fetch(`${base}/chat/completions`, { method: 'POST', headers: { 'content-type': 'application/json', authorization: `Bearer ${key}` }, body: JSON.stringify({ model, messages: chatMessages(turns), max_tokens: 6000 }) });
   const j = (await res.json().catch(() => null)) as { error?: { message?: string } | string; message?: string } | null;
   const remaining = remainingFrom(res.headers);
+  console.log('solve limit headers', base, JSON.stringify(limitHeaders(res.headers)));
   if (!res.ok) {
     const m = typeof j?.error === 'string' ? j.error : (j?.error?.message ?? j?.message ?? '');
     throw new Error(res.status === 429 ? '무료 사용량을 다 썼어요' : res.status === 402 ? '크레딧이 없어요' : `${res.status}: ${m}`.trim());
