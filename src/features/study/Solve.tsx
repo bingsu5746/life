@@ -10,12 +10,12 @@ import { guessNoteSubject } from './mistakes';
 
 const ENGINES: { key: SolveEngine; name: string; desc: string }[] = [
   { key: 'gemini', name: 'Gemini Flash', desc: '무료 · 전 과목 올라운더' },
-  { key: 'siliconflow', name: 'SiliconFlow', desc: '무료 · 수학/물리 고난도 계산 특화' },
+  { key: 'cloudflare', name: 'Cloudflare AI', desc: '무료 · 사진은 Llama 3.2 Vision (어려운 문제는 약해요)' },
   { key: 'mistral', name: 'Mistral', desc: '무료 · 과학 표/그래프 · 복잡한 수식 사진 읽기 특화' },
   { key: 'groq', name: 'Groq', desc: '무료 · 영어 독해 · 초고속 답변' },
   { key: 'nvidia', name: 'NVIDIA NIM', desc: '무료 · 고3 4점 킬러 문항용 초대형 모델' },
   { key: 'openrouter', name: 'OpenRouter', desc: '무료 모델 자동 선택 · 사진 읽기' },
-  { key: 'cloudflare', name: 'Cloudflare AI', desc: '무료 · 사진은 Llama 3.2 Vision (어려운 문제는 약해요)' },
+  { key: 'siliconflow', name: 'SiliconFlow', desc: '무료 · 수학/물리 고난도 계산 특화' },
 ];
 
 const ENGINE_KEY = 'my-study.solve.engine';
