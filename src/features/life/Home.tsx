@@ -1,11 +1,10 @@
 // 메인: 공부 · 운동 · 돈 · 취미 · 일기를 한눈에. 누르면 그 영역으로
 import { exportBackup } from '../study/backup';
-import { addDays, dday, longDate, shortDate, weekStart, weekday } from '../study/dates';
+import { addDays, dday, longDate, weekStart, weekday } from '../study/dates';
 import { upcomingExams } from '../study/exams';
 import { SchoolHome } from '../study/SchoolPanel';
 import { EveBanner } from '../study/Eve';
 import { MorningCard } from './Morning';
-import { classesOn, nextSchoolDay } from '../study/timetable';
 import { alive } from '../study/model';
 import { todaySummary } from '../study/select';
 import { put, useStudy, useWords } from '../study/store';
@@ -29,9 +28,6 @@ export function Home(_: { loggedIn: boolean; onLogin: () => void }) {
   const studied = alive(d.sessions)
     .filter((s) => s.date === today)
     .reduce((a, s) => a + s.minutes, 0);
-  // 다음 수업 날 예습 (내 시간표 기준)
-  const classDay = d.settings.hiddenTabs?.includes('preview') ? null : nextSchoolDay(d.settings.schoolTimetable, today, d.settings.offDates);
-  const prevLeft = classDay ? [...new Set(classesOn(d.settings.schoolTimetable, classDay))].filter((id) => d.subjects[id] && !d.subjects[id].deleted && !alive(d.previews).some((p) => p.date === classDay && p.subjectId === id)).length : 0;
   // 운동
   const ws = weekStart(today);
   const wk = weekWorkouts(d, ws);
@@ -63,8 +59,7 @@ export function Home(_: { loggedIn: boolean; onLogin: () => void }) {
     }
   > = {
     study: {
-      lines: [sum.total ? (sum.left ? `오늘 할 것 ${sum.left}개 남음` : '오늘 할 것 다 했어요') : '오늘 정해 둔 공부가 없어요', `오늘 공부 ${minutesText(studied)}`, prevLeft ? `${classDay === addDays(today, 1) ? '내일' : shortDate(classDay!)} 수업 예습 ${prevLeft}과목 남음` : ''].filter(Boolean),
-      action: prevLeft ? { label: '예습하기', to: '/preview' } : undefined,
+      lines: [sum.total ? (sum.left ? `오늘 할 것 ${sum.left}개 남음` : '오늘 할 것 다 했어요') : '오늘 정해 둔 공부가 없어요', `오늘 공부 ${minutesText(studied)}`],
       badge: exam ? { big: dday(today, exam.date), small: exam.name } : undefined,
       streak: dayStreak(
         alive(d.sessions)

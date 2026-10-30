@@ -18,6 +18,7 @@ import { fetchEvents, fetchMeals, fetchTimetable, findSchool } from './neis';
 import { koExamples, lookupKo } from './stdict';
 import { findBooksAladin, findBooksKakao, findGames, findRecords, similarArtists } from './lookup';
 import { fetchProviders } from './ott';
+import { askGemini, askOpenRouter, geminiModels, openRouterModels, SYSTEM as SOLVE_SYSTEM, type Engine, type SolveTurn } from './solve';
 import { filmFacets, searchFilms, type Film } from './catalog';
 import { buildRecommendInput, normTitle, readRecommendations, readRecommendRequest } from './recommend';
 import { allowedEndpoint, localDate, makeVapid, nextFire, sendPush, type PushSub, type Vapid } from './push';
@@ -148,7 +149,7 @@ export class Accounts extends DurableObject<Env> {
 
     let body: Record<string, unknown> = {};
     if (req.method === 'POST' || req.method === 'PUT' || req.method === 'DELETE') {
-      const big = path.startsWith('store/') || path.startsWith('study-photo/');
+      const big = path.startsWith('store/') || path.startsWith('study-photo/') || path === 'solve';
       const text = await req.text();
       if (text.length > (big ? MAX_STORE + 1000 : path === 'translate' || path === 'notify/digest' ? 4 * MAX_SMALL_BODY : MAX_SMALL_BODY)) return fail('보낸 내용이 너무 커요.', 413);
       try {
@@ -196,6 +197,7 @@ export class Accounts extends DurableObject<Env> {
     }
     if (path === 'me' && req.method === 'GET') return json({ user: this.publicUser(user) });
     if (path === 'translate' && req.method === 'POST') return this.translate(user, body);
+    if (path === 'solve' && req.method === 'POST') return this.solve(user, body, new URL(req.url).origin);
     if (path === 'movies/catalog' && req.method === 'GET') return this.catalogSearch(new URL(req.url).searchParams);
     if (path === 'movies/recommend' && req.method === 'POST') return this.recommend(user, body);
     if (path === 'movies/ott' && req.method === 'POST') return this.ott(body);
@@ -267,6 +269,79 @@ export class Accounts extends DurableObject<Env> {
       }
     }
     return fail('없는 주소예요.', 404);
+  }
+
+  // ===== 문제 풀이 AI =====
+  private solveByUser = new Limiter(60, 60 * 60_000);
+  private gemList: { at: number; v: string[] } | null = null;
+  private orList: { at: number; v: { id: string; image: boolean }[] } | null = null;
+
+  /** { engine, turns: [{ role, text, images: [{ mime, data(base64) }] }] } → { text, model } */
+  private async solve(user: UserRow, b: Record<string, unknown>, origin: string): Promise<Response> {
+    const engine = (b.engine === 'openrouter' || b.engine === 'cloudflare' ? b.engine : 'gemini') as Engine;
+    const raw = Array.isArray(b.turns) ? b.turns.slice(-12) : [];
+    let bytes = 0;
+    const turns: SolveTurn[] = [];
+    for (const t of raw as Record<string, unknown>[]) {
+      if (!t || typeof t !== 'object') continue;
+      const images = (Array.isArray(t.images) ? t.images : [])
+        .slice(0, 4)
+        .filter((i): i is { mime: string; data: string } => !!i && typeof i === 'object' && /^image\/(jpeg|png|webp)$/.test(String((i as { mime?: unknown }).mime)) && typeof (i as { data?: unknown }).data === 'string' && /^[A-Za-z0-9+/=]+$/.test((i as { data: string }).data));
+      bytes += images.reduce((a, i) => a + i.data.length, 0);
+      turns.push({ role: t.role === 'assistant' ? 'assistant' : 'user', text: typeof t.text === 'string' ? t.text.slice(0, 8000) : '', images: images.length ? images : undefined });
+    }
+    if (!turns.length || turns[turns.length - 1].role !== 'user') return fail('물어볼 문제를 넣어 주세요.');
+    if (bytes > MAX_STORE) return fail('사진이 너무 커요. 사진 수를 줄여 주세요.', 413);
+    const wait = this.solveByUser.hit(user.id);
+    if (wait) return fail(`너무 자주 물었어요. ${wait}초 뒤에 다시 해 주세요.`, 429);
+    const env = this.env as unknown as Record<string, string | undefined>;
+    const needImage = turns.some((t) => t.images?.length);
+    try {
+      if (engine === 'gemini') {
+        const key = env.Life_gemini_api_key || env.GEMINI_KEY;
+        if (!key) return fail('Gemini 키가 아직 없어요.', 503);
+        if (!this.gemList || Date.now() - this.gemList.at > DAY) this.gemList = { at: Date.now(), v: await geminiModels(key) };
+        const models = this.gemList.v.length ? this.gemList.v : ['gemini-2.5-flash'];
+        let last = '';
+        for (const m of models.slice(0, 3)) {
+          try {
+            return json({ text: await askGemini(key, m, turns), model: m });
+          } catch (e) {
+            last = e instanceof Error ? e.message : String(e);
+            if (/무료 사용량/.test(last)) break;
+          }
+        }
+        throw new Error(last || 'Gemini 가 답하지 못했어요');
+      }
+      if (engine === 'openrouter') {
+        const key = env.Openrouter || env.OPENROUTER_KEY;
+        if (!key) return fail('OpenRouter 키가 아직 없어요.', 503);
+        if (!this.orList || Date.now() - this.orList.at > 6 * 3600_000) this.orList = { at: Date.now(), v: await openRouterModels() };
+        const models = this.orList.v.filter((m) => !needImage || m.image).map((m) => m.id);
+        if (!models.length) return fail(needImage ? '지금 사진을 읽는 무료 모델이 없어요. 글로 넣거나 다른 모델을 골라 주세요.' : '지금 쓸 수 있는 무료 모델이 없어요.', 503);
+        let last = '';
+        for (const m of models.slice(0, 3)) {
+          try {
+            return json({ text: await askOpenRouter(key, m, turns, origin), model: m });
+          } catch (e) {
+            last = e instanceof Error ? e.message : String(e);
+            if (/무료 사용량/.test(last)) break;
+          }
+        }
+        throw new Error(last || 'OpenRouter 가 답하지 못했어요');
+      }
+      // Cloudflare Workers AI: 글만 (사진은 기기에서 글자로 바꿔 보낸다)
+      if (needImage) return fail('이 모델은 사진을 못 읽어요. 사진은 기기에서 글자로 바꿔 보내요.');
+      if (this.translateAll.hit('all')) return fail('오늘 사이트 전체의 AI 한도를 다 썼어요. 내일 다시 해 주세요.', 429);
+      const out = await this.env.AI.run(TRANSLATE_MODEL as never, { messages: [{ role: 'system', content: SOLVE_SYSTEM }, ...turns.map((t) => ({ role: t.role, content: t.text }))], reasoning: { effort: 'medium' }, max_tokens: 6000 } as never);
+      const text = readOutput(out);
+      if (!text) throw new Error('Cloudflare AI 가 답을 주지 않았어요');
+      return json({ text, model: TRANSLATE_MODEL.replace('@cf/', '') });
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      console.error('solve failed', engine, msg);
+      return fail(/무료 사용량|neuron|quota/i.test(msg) ? `${msg.replace(/neuron.*$/i, '')} 다른 모델을 골라 주세요.`.trim() : `풀지 못했어요: ${msg.slice(0, 200)}`, 502);
+    }
   }
 
   private async translate(user: UserRow, body: Record<string, unknown>) {

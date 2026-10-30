@@ -29,7 +29,6 @@ export function monthItems(d: StudyData, month: string, school: { date: DateStr;
     for (const day of daysBetween(e.date > from ? e.date : from, end < to ? end : to)) add(day, { kind: 'exam', label: e.name, to: `/exams/${e.id}` });
   }
   for (const a of alive(d.assessments)) if (!a.done) add(a.due, { kind: 'task', label: `${d.subjects[a.subjectId]?.name ?? ''} ${a.title}`.trim(), to: '/exams/tasks' });
-  for (const p of alive(d.previews)) if (!p.done) add(p.date, { kind: 'preview', label: `${d.subjects[p.subjectId]?.name ?? ''} ${p.text}`.trim(), to: '/preview' });
   for (const t of alive(d.todos)) if (!t.done && t.due) add(t.due, { kind: 'todo', label: t.title });
   for (const v of alive(d.movies)) if (v.status === 'want' && v.release) add(v.release, { kind: 'movie', label: v.title, to: '/movies/want' });
   for (const r of alive(d.moneyRules)) if (!r.paused && r.type === 'out') for (const day of ruleDates(r, from, to)) if (r.freq !== 'daily') add(day, { kind: 'money', label: `${r.name} ${won(r.amount)}`, to: '/money/fixed' });

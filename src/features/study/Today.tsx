@@ -37,7 +37,7 @@ export function Today() {
     .filter((t) => (!t.done && (t.star || (t.due && t.due <= today))) || (t.done && t.doneAt && t.doneAt > Date.now() - 12 * 3600_000 && (t.star || (t.due && t.due <= today))))
     .sort((a, b) => Number(a.done) - Number(b.done) || (a.due ?? '9').localeCompare(b.due ?? '9'));
   const habits = alive(d.habits).filter((h) => !h.archived && habitOn(h, today));
-  const previews = d.settings.hiddenTabs?.includes('preview') ? [] : previewsForToday(alive(d.previews), today);
+  const previews: ReturnType<typeof previewsForToday> = [];
   // 일주일 안에 낼 수행평가
   const tasks = upcomingTasks(alive(d.assessments), today).filter((a) => a.due <= addDays(today, 7));
   const classes = classesOn(d.settings.schoolTimetable, today).filter((id) => d.subjects[id] && !d.subjects[id].deleted);

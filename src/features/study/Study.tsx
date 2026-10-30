@@ -16,7 +16,7 @@ import { Exams } from './Exams';
 import { go, Icon, Sheet, Toaster, useToday } from './ui';
 
 /** 폰 아래 메뉴에 늘 보이는 공부 메뉴 (나머지는 「더 보기」) */
-const PHONE_TABS: string[] = ['today', 'exams', 'words', 'review', 'time'];
+const PHONE_TABS: string[] = ['today', 'exams', 'review', 'solve', 'words', 'time'];
 
 // 오늘 화면 말고는 열 때 받는다 (처음 여는 속도)
 const Books = lazy(() => import('./Books').then((m) => ({ default: m.Books })));
@@ -40,7 +40,7 @@ const Search = lazy(() => import('../life/Search').then((m) => ({ default: m.Sea
 const LifeWeekPage = lazy(() => import('../life/LifeWeek').then((m) => ({ default: m.LifeWeekPage })));
 const CheckinPage = lazy(() => import('../life/Checkin').then((m) => ({ default: m.CheckinPage })));
 const Diary = lazy(() => import('../life/Diary').then((m) => ({ default: m.Diary })));
-const Preview = lazy(() => import('./Preview').then((m) => ({ default: m.Preview })));
+const Solve = lazy(() => import('./Solve').then((m) => ({ default: m.Solve })));
 const Translate = lazy(() => import('./Translate').then((m) => ({ default: m.Translate })));
 const Tutors = lazy(() => import('./Tutors').then((m) => ({ default: m.Tutors })));
 const Words = lazy(() => import('./Words').then((m) => ({ default: m.Words })));
@@ -60,7 +60,7 @@ const PRELOAD = [
   () => import('./Settings'),
   () => import('./Time'),
   () => import('./Translate'),
-  () => import('./Preview'),
+  () => import('./Solve'),
   () => import('./Tutors'),
   () => import('./Words'),
 ];
@@ -162,7 +162,7 @@ export function Study({ path, loggedIn, syncReady = true, onLogin }: { path: str
   else if (tab === 'time') content = <Time sub={id} />;
   else if (tab === 'life') content = <Life sub={id} />;
   else if (tab === 'settings') content = <Settings cat={path[1]} />;
-  else if (tab === 'preview') content = <Preview sub={id} />;
+  else if (tab === 'solve') content = <Solve />;
   else if (tab === 'translate') content = <Translate loggedIn={loggedIn} onLogin={onLogin} />;
   else if (tab === 'exams') content = <Exams id={id} sub={sub} />;
   else content = <Today />;
@@ -283,7 +283,7 @@ export function Study({ path, loggedIn, syncReady = true, onLogin }: { path: str
           <Suspense fallback={<p className="st-muted">여는 중…</p>}>{content}</Suspense>
         </div>
       </div>
-      {!running && area === 'study' && tab !== 'settings' && <AddButton today={today} tab={tab} />}
+      {!running && area === 'study' && tab !== 'settings' && tab !== 'solve' && <AddButton today={today} tab={tab} />}
       <Toaster />
       <TimerAlarm />
     </main>

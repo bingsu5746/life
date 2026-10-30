@@ -251,6 +251,8 @@ const ICON_PATHS: Record<string, string> = {
   pin: 'M12 21s-7-6.2-7-12a7 7 0 0 1 14 0c0 5.8-7 12-7 12zM12 11.5a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5z',
   music: 'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM12 12h.01',
   plus: 'M12 5v14M5 12h14',
+  solve: 'M9.5 18h5M10.5 21h3M12 3a6 6 0 0 0-3.5 10.9c.6.5 1 1.2 1 2.1h5c0-.9.4-1.6 1-2.1A6 6 0 0 0 12 3z',
+  up: 'M12 19V5M6 11l6-6 6 6',
   more: 'M6 12h.01M12 12h.01M18 12h.01',
   chevron: 'M9 6l6 6-6 6',
 };
@@ -332,17 +334,7 @@ export function NumInput({ value, onCommit, min, max, allowEmpty, ...rest }: { v
     if (next !== (value ?? null)) onCommit(next);
     else setText(shown);
   }
-  return (
-    <input
-      {...rest}
-      inputMode="decimal"
-      value={text}
-      onFocus={() => setEditing(true)}
-      onChange={(e) => setText(e.target.value.replace(/[^\d.]/g, ''))}
-      onBlur={commit}
-      onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()}
-    />
-  );
+  return <input {...rest} inputMode="decimal" value={text} onFocus={() => setEditing(true)} onChange={(e) => setText(e.target.value.replace(/[^\d.]/g, ''))} onBlur={commit} onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()} />;
 }
 
 /** 글 칸: NumInput 처럼 저장된 값을 따라가고, 바뀌었을 때만 저장 */

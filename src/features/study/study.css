@@ -6684,3 +6684,220 @@ body.focus-on {
 .focus-mini button:active {
   background: rgba(242, 242, 240, 0.12);
 }
+
+/* 문제 풀이 (AI 대화) */
+.sv {
+  display: flex;
+  flex-direction: column;
+  min-height: calc(100dvh - 180px);
+  max-width: 760px;
+  margin: 0 auto;
+  width: 100%;
+}
+.sv-head {
+  display: flex;
+  justify-content: flex-end;
+  gap: 14px;
+  padding: 4px 2px 8px;
+}
+.sv-msgs {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding-bottom: 16px;
+}
+.sv-empty {
+  display: grid;
+  justify-items: center;
+  gap: 10px;
+  margin: 18vh auto 0;
+  color: var(--muted);
+}
+.sv-empty .st-icon {
+  width: 34px;
+  height: 34px;
+}
+.sv-empty b {
+  font-size: 1.25rem;
+  color: var(--text);
+}
+.sv-user {
+  align-self: flex-end;
+  max-width: 85%;
+  display: grid;
+  gap: 6px;
+  justify-items: end;
+}
+.sv-user p {
+  margin: 0;
+  padding: 10px 14px;
+  border-radius: 18px;
+  background: var(--soft);
+  white-space: pre-wrap;
+}
+.sv-thumbs {
+  display: flex;
+  gap: 6px;
+}
+.sv-thumbs img {
+  width: 96px;
+  height: 96px;
+  object-fit: cover;
+  border-radius: 12px;
+}
+.sv-ai {
+  line-height: 1.7;
+}
+.sv-ai.bad p {
+  color: var(--bad);
+}
+.sv-busy {
+  color: var(--muted);
+}
+.sv-meta {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  margin-top: 6px;
+  color: var(--faint);
+}
+.sv-box {
+  position: sticky;
+  bottom: calc(env(safe-area-inset-bottom) + 72px);
+  display: grid;
+  gap: 8px;
+  padding: 10px 12px;
+  border: 1px solid var(--line-strong);
+  border-radius: 24px;
+  background: var(--surface);
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.06);
+}
+@media (min-width: 900px) {
+  .sv-box {
+    bottom: 16px;
+  }
+}
+.sv-box textarea {
+  border: 0;
+  outline: 0;
+  resize: none;
+  background: transparent;
+  font: inherit;
+  font-size: 1rem;
+  color: var(--text);
+  padding: 4px 4px 0;
+}
+.sv-tools {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.sv-round,
+.sv-send {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: 1px solid var(--line-strong);
+  background: none;
+  color: var(--text);
+  cursor: pointer;
+}
+.sv-send {
+  margin-left: auto;
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--on-accent);
+}
+.sv-send:disabled {
+  opacity: 0.3;
+}
+.sv-model {
+  padding: 7px 12px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--soft);
+  font: inherit;
+  font-size: 0.85rem;
+  color: var(--text);
+  cursor: pointer;
+}
+.sv-files {
+  display: flex;
+  gap: 8px;
+}
+.sv-file {
+  position: relative;
+}
+.sv-file img {
+  width: 64px;
+  height: 64px;
+  object-fit: cover;
+  border-radius: 10px;
+}
+.sv-file button {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  width: 20px;
+  height: 20px;
+  border: 0;
+  border-radius: 50%;
+  background: var(--text);
+  color: var(--bg);
+  font-size: 13px;
+  line-height: 1;
+  cursor: pointer;
+}
+.sv-pick {
+  display: grid;
+}
+.sv-pick button {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 4px;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  background: none;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.sv-pick span {
+  display: grid;
+  gap: 3px;
+}
+.sv-pick small {
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+.sv-check {
+  color: #2563eb;
+  font-size: 1.2rem;
+}
+.mt .mt-h {
+  font-weight: 700;
+  margin-top: 6px;
+}
+.mt .mt-li {
+  padding-left: 4px;
+}
+.mt .mt-gap {
+  height: 8px;
+}
+.mt code {
+  padding: 1px 5px;
+  border-radius: 5px;
+  background: var(--soft);
+  font-size: 0.9em;
+}
+.mt .katex-display {
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 4px 0;
+}
