@@ -194,9 +194,10 @@ export async function openRouterDaily(key: string): Promise<number | null> {
 
 // ===== OpenAI 모양 API (Mistral · Groq · SiliconFlow · NVIDIA) =====
 
-export const COMPAT: Record<'mistral' | 'groq' | 'siliconflow' | 'nvidia', { bases: string[]; keys: string[]; prefer?: RegExp }> = {
+export const COMPAT: Record<'mistral' | 'groq' | 'siliconflow' | 'nvidia', { bases: string[]; keys: string[]; prefer?: RegExp; first?: RegExp }> = {
   // 사진 · 표 · 수식 읽기: Pixtral · Mistral Medium 먼저
-  mistral: { bases: ['https://api.mistral.ai/v1'], keys: ['Mistral_api_key', 'MISTRAL_KEY'], prefer: /pixtral-large|mistral-medium|magistral-medium|mistral-large/i },
+  // 무료 한도(콘솔 「제한」 화면, 2026-10-30): mistral-large-2512 은 분당 25만 토큰, large-4 · medium · small 은 분당 2만 토큰이라 large-2512 를 맨 먼저
+  mistral: { bases: ['https://api.mistral.ai/v1'], keys: ['Mistral_api_key', 'MISTRAL_KEY'], first: /^mistral-large-2512$/i, prefer: /pixtral-large|mistral-medium|magistral-medium|mistral-large/i },
   // Groq (빠른 추론 서버). Cloudflare 에는 「Grok」 이름으로 넣었다
   groq: { bases: ['https://api.groq.com/openai/v1'], keys: ['Grok', 'Groq', 'GROQ_KEY'], prefer: /qwen3|gpt-oss-120b|llama-4|kimi/i },
   // 키는 발급한 곳(국제 .com · 중국 .cn)에서만 된다: 둘 다 해 본다
@@ -210,14 +211,21 @@ const SMART = /deepseek-(r1|v3)|qwen3|grok-4|magistral|mistral-large|kimi|glm-4\
 const SKIP = /embed|rerank|whisper|tts|audio|image-gen|flux|stable-diffusion|moderation|ocr|guard|reward|coder|codestral|-code\b|devstral|instruct-\d+k|safety/i;
 
 /** /models 응답에서 쓸 모델 고르기: 사진이면 사진을 읽는 모델(표시가 없으면 이름으로 짐작), 똑똑한 모델 먼저 */
-export function pickCompat(json: unknown, needImage: boolean, prefer?: RegExp): string[] {
+export function pickCompat(json: unknown, needImage: boolean, prefer?: RegExp, first?: RegExp): string[] {
   const data = (json as { data?: { id?: unknown; capabilities?: { vision?: unknown; completion_chat?: unknown } }[] })?.data ?? [];
   return (
     data
       .map((m) => ({ id: s(m.id), vision: m.capabilities?.vision === true || (m.capabilities?.vision === undefined && VISION.test(s(m.id))), chat: m.capabilities?.completion_chat !== false }))
       .filter((m) => m.id && m.chat && !SKIP.test(m.id) && (!needImage || m.vision))
       // 사진 모델은 「Thinking」 판이 자주 바빠서(503) 뒤로
-      .sort((a, b) => (needImage ? Number(/thinking/i.test(a.id)) - Number(/thinking/i.test(b.id)) : 0) || (prefer ? Number(prefer.test(b.id)) - Number(prefer.test(a.id)) : 0) || Number(SMART.test(b.id)) - Number(SMART.test(a.id)) || Number(/latest/.test(b.id)) - Number(/latest/.test(a.id)))
+      .sort(
+        (a, b) =>
+          (first ? Number(first.test(b.id)) - Number(first.test(a.id)) : 0) ||
+          (needImage ? Number(/thinking/i.test(a.id)) - Number(/thinking/i.test(b.id)) : 0) ||
+          (prefer ? Number(prefer.test(b.id)) - Number(prefer.test(a.id)) : 0) ||
+          Number(SMART.test(b.id)) - Number(SMART.test(a.id)) ||
+          Number(/latest/.test(b.id)) - Number(/latest/.test(a.id)),
+      )
       .map((m) => m.id)
   );
 }
@@ -283,4 +291,15 @@ export async function askCompat(base: string, key: string, model: string, turns:
     throw new Error(why === 'length' ? '생각하다가 글자 수 한도에 걸려 답을 못 썼어요' : `답이 비어 있어요${why ? ` (${why})` : ''}`);
   }
   return { text, remaining };
+}
+
+/** 같은 모델의 다른 이름(-latest · 판 번호)은 무료 한도를 같이 쓰는 것 같아서 한 묶음으로: mistral-medium-latest · mistral-medium-3-5 → mistral-medium
+ *  (Mistral 에서 medium 의 세 이름이 처음 묻자마자 모두 429 였다). 날짜판(-2512 같은 4자리)은 콘솔에 한도가 따로 있어서 따로 둔다 */
+export function modelFamily(id: string): string {
+  return id
+    .split('/')
+    .pop()!
+    .toLowerCase()
+    .replace(/-latest$/, '')
+    .replace(/(-\d{1,2})+$/, '');
 }

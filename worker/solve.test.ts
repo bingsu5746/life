@@ -101,3 +101,15 @@ describe('코드 전용 모델 · retry-after', () => {
     expect(retryAfter(new Headers())).toBeNull();
   });
 });
+
+describe('Mistral 모델 고르기', () => {
+  it('분당 토큰이 많은 large-2512 를 맨 먼저 · 같은 모델 묶음', async () => {
+    const { COMPAT, modelFamily } = await import('./solve');
+    const json = { data: [{ id: 'mistral-medium-latest', capabilities: { vision: true } }, { id: 'mistral-large-4', capabilities: { vision: true } }, { id: 'mistral-large-2512', capabilities: { vision: true } }] };
+    expect(pickCompat(json, true, COMPAT.mistral.prefer, COMPAT.mistral.first)[0]).toBe('mistral-large-2512');
+    expect(modelFamily('mistral-medium-latest')).toBe(modelFamily('mistral-medium-3-5'));
+    expect(modelFamily('mistral-large-4')).not.toBe(modelFamily('mistral-medium-latest'));
+    expect(modelFamily('mistral-large-4')).toBe(modelFamily('mistral-large-4-0'));
+    expect(modelFamily('mistral-large-2512')).not.toBe(modelFamily('mistral-large-4'));
+  });
+});
