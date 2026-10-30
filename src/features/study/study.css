@@ -6942,3 +6942,10 @@ body.focus-on {
   color: var(--muted);
   text-align: center;
 }
+.sv-retry {
+  margin: 0 0 6px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--soft);
+  font-size: 0.85rem;
+}

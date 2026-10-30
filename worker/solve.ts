@@ -155,7 +155,9 @@ export async function askOpenRouter(key: string, model: string, turns: SolveTurn
   });
   console.log('solve limit headers', 'openrouter', JSON.stringify(limitHeaders(res.headers)));
   const j = (await res.json().catch(() => null)) as { error?: { message?: string } } | null;
-  if (!res.ok) throw new Error(res.status === 429 ? 'OpenRouter 무료 사용량을 다 썼어요' : `OpenRouter ${res.status}: ${j?.error?.message ?? ''}`.trim());
+  const em = j?.error?.message ?? '';
+  if (res.status === 429) throw new Error(/day|daily|per-day|free-models-per-day|credit/i.test(em) ? `OpenRouter 무료 사용량을 다 썼어요 (${em.slice(0, 120)})` : `잠깐 막혔어요: 너무 빨리 보냈어요${em ? ` (${em.slice(0, 120)})` : ''}`);
+  if (!res.ok) throw new Error(`OpenRouter ${res.status}: ${em}`.trim());
   const t = readChat(j);
   if (!t) throw new Error('OpenRouter 모델이 답을 주지 않았어요');
   return t;
@@ -232,7 +234,9 @@ export async function askCompat(base: string, key: string, model: string, turns:
   console.log('solve limit headers', base, JSON.stringify(limitHeaders(res.headers)));
   if (!res.ok) {
     const m = typeof j?.error === 'string' ? j.error : (j?.error?.message ?? j?.message ?? '');
-    throw new Error(res.status === 429 ? '무료 사용량을 다 썼어요' : res.status === 402 ? '크레딧이 없어요' : `${res.status}: ${m}`.trim());
+    // 429 는 하루 한도일 수도, 잠깐(분·초) 막힌 것일 수도 있어서 서비스 말을 같이 남긴다
+    if (res.status === 429) throw new Error(/day|daily|quota|credit|insufficient|balance|month/i.test(m) ? `무료 사용량을 다 썼어요 (${m.slice(0, 120)})` : `잠깐 막혔어요: 너무 빨리 보냈어요${m ? ` (${m.slice(0, 120)})` : ''}`);
+    throw new Error(res.status === 402 ? '크레딧이 없어요' : `${res.status}: ${m}`.trim());
   }
   const text = readChat(j);
   if (!text) throw new Error('답이 비어 있어요');

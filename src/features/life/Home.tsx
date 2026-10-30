@@ -45,6 +45,16 @@ export function Home(_: { loggedIn: boolean; onLogin: () => void }) {
   const movies = alive(d.movies);
   const seen = movies.filter((m) => m.status === 'watched');
   const nextOpen = movies.filter((m) => m.status === 'want' && m.release && m.release >= today).sort((a, b) => a.release!.localeCompare(b.release!))[0];
+  // AI 풀이 (이 기기의 지난 대화)
+  const aiToday = (() => {
+    try {
+      const list = JSON.parse(localStorage.getItem('my-study.solve.chats') ?? '[]') as { at: number }[];
+      const start = new Date(`${today}T00:00:00+09:00`).getTime();
+      return list.filter((c) => c.at >= start).length;
+    } catch {
+      return 0;
+    }
+  })();
   // 일기
   const diaryToday = d.diary[today] && !d.diary[today].deleted;
   const diaryMonth = alive(d.diary).filter((e) => monthOf(e.id) === monthOf(today)).length;
@@ -100,6 +110,10 @@ export function Home(_: { loggedIn: boolean; onLogin: () => void }) {
       lines: [`본 영화 ${seen.length}편 · 올해 ${seen.filter((m) => m.watched?.startsWith(today.slice(0, 4))).length}편`, `보고 싶어요 ${movies.length - seen.length}편`],
       badge: nextOpen ? { big: dday(today, nextOpen.release!), small: nextOpen.title } : undefined,
       action: { label: '극장가', to: '/movies' },
+    },
+    ai: {
+      lines: [aiToday ? `오늘 질문 ${aiToday}개` : '오늘은 아직 안 물어봤어요', '사진이나 글로 문제를 물어보세요'],
+      action: { label: '질문하기', to: '/ai' },
     },
     diary: {
       lines: [diaryToday ? '오늘 일기를 썼어요' : '오늘 일기를 아직 안 썼어요', `이번 달 ${diaryMonth}편`],

@@ -1,10 +1,10 @@
 // 문제 풀이: AI 대화 화면. ＋ 로 사진 넣기 · 모델 고르기 · 보내기. 대화는 이 기기에만 저장(글만)
 import { useEffect, useRef, useState } from 'react';
-import { isLoggedIn, solveAsk, solveImgPut, solveImgUrl, solveUsage, type SolveEngine, type SolveTurn } from '../auth/api';
+import { ApiError, isLoggedIn, solveAsk, solveImgPut, solveImgUrl, solveUsage, type SolveEngine, type SolveTurn } from '../auth/api';
 import { MathText } from '../../lib/mathText';
 import { compressProblemImage } from '../../lib/imageCompress';
 import { Icon, Sheet, subjectsOf, SubjectDot, toast } from './ui';
-import { setSettings, useStudy } from './store';
+import { useStudy } from './store';
 import { guessNoteSubject } from './mistakes';
 
 const ENGINES: { key: SolveEngine; name: string; desc: string }[] = [
@@ -112,19 +112,11 @@ export function Solve() {
     if (k === 'gemini' && usage.gemini) return `Flash ${usage.gemini.flash} · Lite ${usage.gemini.lite} · Gemma ${usage.gemini.gemma.toLocaleString('ko-KR')}번`;
     if (typeof left === 'number') return `남은 ${left}번`;
     if (mine) return `남은 ${Math.max(0, mine - n)}번 / ${mine}`;
-    return `오늘 ${n}번 · 한도 넣기`;
-  };
-  /** 서비스 화면에서 본 하루 한도를 직접 넣기 */
-  const setLimit = (k: SolveEngine) => {
-    const v = window.prompt(`${ENGINES.find((e) => e.key === k)?.name} 하루 한도 (서비스 화면에서 본 숫자, 비우면 지움)`, String(d.settings.solveLimits?.[k] ?? ''));
-    if (v === null) return;
-    const n = Math.round(Number(v.replace(/[^\d]/g, '')));
-    const next = { ...(d.settings.solveLimits ?? {}) };
-    if (n > 0) next[k] = n;
-    else delete next[k];
-    setSettings({ solveLimits: next });
+    return `오늘 ${n}번 씀`;
   };
   const [topic, setTopic] = useState('');
+  /** 한도에 걸린 질문: 다른 모델을 고르면 이걸 다시 보낸다 */
+  const [retry, setRetry] = useState<Chat | null>(null);
   useEffect(() => endRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' }), [chat.msgs.length, busy]);
   useEffect(() => {
     const a = area.current;
@@ -167,17 +159,27 @@ export function Solve() {
     const guess = !chat.subjectId ? guessNoteSubject(d, Date.now(), undefined, q) : null;
     const next = { ...chat, subjectId: chat.subjectId ?? guess?.id, title: chat.title || topic.trim().slice(0, 60) || q.slice(0, 40) || '사진 문제', msgs };
     setChat(next);
+    await ask(engine, next);
+  }
+
+  /** 대화(마지막이 질문)를 그 모델로 보낸다. 한도에 걸리면 모델 고르는 창을 띄우고, 고르면 바로 다시 보낸다 */
+  async function ask(eng: SolveEngine, next: Chat) {
+    const msgs = next.msgs;
     setBusy('푸는 중');
     try {
       // 앞 대화는 글만 (사진은 이번 질문 것만 보내서 무겁지 않게)
       const turns: SolveTurn[] = msgs.filter((m) => !m.error).map((m, i, all) => ({ role: m.role, text: m.text, images: i === all.length - 1 ? m.images : undefined }));
-      const r = await solveAsk(engine, turns);
+      const r = await solveAsk(eng, turns);
       const done = { ...next, at: Date.now(), msgs: [...msgs, { role: 'assistant' as const, text: r.text, model: r.model }] };
       setChat(done);
       saveChat(done);
     } catch (e) {
       const done = { ...next, msgs: [...msgs, { role: 'assistant' as const, text: e instanceof Error ? e.message : '풀지 못했어요', error: true }] };
       setChat(done);
+      if (e instanceof ApiError && e.status === 429) {
+        setRetry(next);
+        setPicker(true);
+      }
     } finally {
       setBusy('');
     }
@@ -298,8 +300,15 @@ export function Solve() {
       </div>
 
       {picker && (
-        <Sheet title="모델 고르기" onClose={() => setPicker(false)}>
+        <Sheet
+          title={retry ? '다른 모델로 다시 보내기' : '모델 고르기'}
+          onClose={() => {
+            setPicker(false);
+            setRetry(null);
+          }}
+        >
           <div className="sv-pick">
+            {retry && <p className="sv-retry">이 모델은 지금 못 써요. 다른 모델을 고르면 같은 질문을 바로 다시 보내요.</p>}
             {shown.map((e) => (
               <button
                 key={e.key}
@@ -312,6 +321,12 @@ export function Solve() {
                     /* 무시 */
                   }
                   setPicker(false);
+                  if (retry) {
+                    const again = retry;
+                    setRetry(null);
+                    setChat(again);
+                    void ask(e.key, again);
+                  }
                 }}
               >
                 <span>
@@ -319,18 +334,7 @@ export function Solve() {
                   <small>{e.desc}</small>
                 </span>
                 <span className="sv-right">
-                  {countText(e.key) && (
-                    <small
-                      className={`sv-count ${usage?.out[e.key] ? 'bad' : ''}`}
-                      onClick={(ev) => {
-                        if (typeof usage?.left[e.key] === 'number') return;
-                        ev.stopPropagation();
-                        setLimit(e.key);
-                      }}
-                    >
-                      {countText(e.key)}
-                    </small>
-                  )}
+                  {countText(e.key) && <small className={usage?.out[e.key] ? 'bad' : ''}>{countText(e.key)}</small>}
                   {engine === e.key && <span className="sv-check">✓</span>}
                 </span>
               </button>

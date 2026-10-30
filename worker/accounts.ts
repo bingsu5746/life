@@ -435,7 +435,9 @@ export class Accounts extends DurableObject<Env> {
           return ok({ text: r.text, model: m }, r.remaining);
         } catch (e) {
           last = e instanceof Error ? e.message : String(e);
-          if (/사용량|크레딧/.test(last)) break;
+          if (/사용량|크레딧|잠깐 막혔/.test(last)) break;
+          // 다음 모델은 조금 쉬었다가 (초당 1번 같은 제한에 걸리지 않게)
+          await new Promise((r) => setTimeout(r, 1200));
         }
       }
       throw new Error(last || '답하지 못했어요');
@@ -509,7 +511,8 @@ export class Accounts extends DurableObject<Env> {
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       console.error('solve failed', engine, msg);
-      if (/사용량|크레딧|429|quota|exhaust|neuron/i.test(msg)) {
+      if (/잠깐 막혔/.test(msg)) return fail(`${msg} 잠시 뒤 다시 하거나 다른 모델을 골라 주세요.`, 429);
+      if (/사용량|크레딧|quota|exhaust|neuron/i.test(msg)) {
         this.bumpUse(user.id, engine, { out: true });
         return fail(`${/크레딧/.test(msg) ? '크레딧이 없어요.' : '오늘 무료 사용량을 다 썼어요.'} 다른 모델을 골라 주세요.`, 429);
       }

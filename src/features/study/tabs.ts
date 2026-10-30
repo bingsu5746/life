@@ -5,7 +5,6 @@ export const TABS = [
   { key: 'books', label: '문제집' },
   { key: 'tutor', label: '과외' },
   { key: 'review', label: '복습' },
-  { key: 'solve', label: '풀이' },
   { key: 'words', label: '단어' },
   { key: 'translate', label: '번역' },
   { key: 'time', label: '기록' },
@@ -20,6 +19,7 @@ export const AREAS = [
   { key: 'money', label: '돈' },
   { key: 'hobby', label: '취미' },
   { key: 'diary', label: '일기' },
+  { key: 'ai', label: 'AI' },
 ] as const;
 export type AreaKey = (typeof AREAS)[number]['key'];
 
@@ -56,6 +56,7 @@ export const AREA_ITEMS: Record<Exclude<AreaKey, 'home' | 'study'>, AreaItem[]> 
     { key: 'music', label: '음악', icon: 'music', to: '/music' },
     { key: 'travel', label: '여행', icon: 'pin', to: '/travel' },
   ],
+  ai: [{ key: '', label: '문제 풀이', icon: 'area-ai' }],
   diary: [
     { key: '', label: '일기', icon: 'area-diary' },
     { key: 'dream', label: '꿈', icon: 'moon' },
