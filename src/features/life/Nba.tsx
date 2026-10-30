@@ -4,10 +4,10 @@
 // - 경기 선수 기록에서 선수를 누르면 그 선수 시즌 평균
 // 응원팀(★)은 경기 화면에서 정하고, 그 팀 경기가 맨 위에 온다
 import { useEffect, useState } from 'react';
-import { ApiError, isLoggedIn, nbaAvg, nbaBox, nbaCareer, nbaGames, nbaPlayers, nbaRoster, nbaStandings, type NbaPlayerRow, type NbaAverage, type NbaCareerRow, type NbaRosterPlayer, type NbaGame, type NbaLine, type NbaStanding, type NbaTeam } from '../auth/api';
+import { ApiError, isLoggedIn, nba2k, type Nba2kPlayer, nbaAvg, nbaBox, nbaCareer, nbaGames, nbaPlayers, nbaRoster, nbaStandings, type NbaPlayerRow, type NbaAverage, type NbaCareerRow, type NbaRosterPlayer, type NbaGame, type NbaLine, type NbaStanding, type NbaTeam } from '../auth/api';
 import { addDays, longDate } from '../study/dates';
 import { go, Sheet, toast } from '../study/ui';
-import { NBA_TEAMS, nbaLogo } from './nbaLogo';
+import { NBA_TEAMS, nbaFace, nbaLogo } from './nbaLogo';
 
 const FAV_KEY = 'my-study.nba.fav';
 /** 미국 동부 기준 오늘 (한국보다 13~14시간 늦다: 한국 아침이면 미국은 전날 밤) */
@@ -93,20 +93,94 @@ export function NbaPage({ sub }: { sub?: string }) {
   );
 }
 
-/** 선수 얼굴 (NBA 공식 이미지, NBA 선수 번호가 있을 때만. 못 받으면 이름 첫 글자) */
-function Face({ id, name, size = 36 }: { id?: number; name: string; size?: number }) {
+/** 선수 얼굴 (NBA 공식 이미지, 우리 서버를 거쳐). 번호가 없거나 사진이 없으면 사람 모양 */
+function Face({ id, size = 36 }: { id?: number; name?: string; size?: number }) {
   const [bad, setBad] = useState(false);
-  const initials = name
-    .split(' ')
-    .map((w) => w[0] ?? '')
-    .join('')
-    .slice(0, 2);
   return (
     <span className="nba-face" style={{ width: size, height: size }}>
-      {id && !bad ? <img src={`https://cdn.nba.com/headshots/nba/latest/260x190/${id}.png`} alt="" loading="lazy" onError={() => setBad(true)} /> : initials}
+      {id && !bad ? (
+        <img src={nbaFace(id)} alt="" loading="lazy" onError={() => setBad(true)} />
+      ) : (
+        <svg viewBox="0 0 24 24" aria-hidden>
+          <circle cx="12" cy="9" r="4" />
+          <path d="M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6" />
+        </svg>
+      )}
     </span>
   );
 }
+
+// ===== NBA 2K 능력치 (한 번 받아 두고 이름으로 맞춘다) =====
+const normName = (x: string) =>
+  x
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/\b(jr|sr|ii|iii|iv)\b/g, '')
+    .replace(/[^a-z]/g, '');
+let twoKPromise: Promise<Map<string, Nba2kPlayer>> | null = null;
+function load2k() {
+  twoKPromise ??= nba2k()
+    .then((r) => new Map(r.players.map((p) => [normName(p.name), p])))
+    .catch((e) => {
+      twoKPromise = null;
+      throw e;
+    });
+  return twoKPromise;
+}
+function use2k(): Map<string, Nba2kPlayer> | null {
+  const [m, setM] = useState<Map<string, Nba2kPlayer> | null>(null);
+  useEffect(() => {
+    let live = true;
+    load2k()
+      .then((x) => live && setM(x))
+      .catch(() => {});
+    return () => {
+      live = false;
+    };
+  }, []);
+  return m;
+}
+/** 2K 능력치 이름 → 한국어 (모르는 이름은 그대로) */
+const ATTR_KO: Record<string, string> = {
+  closeShot: '근거리 슛',
+  midRangeShot: '미드레인지',
+  threePointShot: '3점 슛',
+  freeThrow: '자유투',
+  shotIQ: '슛 IQ',
+  offensiveConsistency: '공격 일관성',
+  layup: '레이업',
+  standingDunk: '스탠딩 덩크',
+  drivingDunk: '드라이빙 덩크',
+  postHook: '포스트 훅',
+  postFade: '포스트 페이드',
+  postControl: '포스트 컨트롤',
+  drawFoul: '파울 유도',
+  hands: '핸즈',
+  passAccuracy: '패스 정확도',
+  ballHandle: '볼 핸들링',
+  speedWithBall: '볼 가진 스피드',
+  passIQ: '패스 IQ',
+  passVision: '패스 시야',
+  interiorDefense: '내곽 수비',
+  perimeterDefense: '외곽 수비',
+  steal: '스틸',
+  block: '블록',
+  helpDefenseIQ: '도움 수비 IQ',
+  passPerception: '패스 예측',
+  defensiveConsistency: '수비 일관성',
+  offensiveRebound: '공격 리바운드',
+  defensiveRebound: '수비 리바운드',
+  speed: '스피드',
+  agility: '민첩성',
+  strength: '힘',
+  vertical: '점프력',
+  stamina: '체력',
+  hustle: '허슬',
+  overallDurability: '내구성',
+};
+const attrName = (k: string) => ATTR_KO[k] ?? k;
+const ORDER = Object.keys(ATTR_KO);
 
 function Games() {
   const [date, setDate] = useState(usToday);
@@ -435,6 +509,8 @@ function PlayerSheet({ who, season, onClose }: { who: PlayerRef; season: number;
       live = false;
     };
   }, [who.id, who.name, who.src, season]);
+  const twoK = use2k();
+  const k2 = twoK?.get(normName(who.name));
   // 커리어는 NBA 공식 번호가 있어야 한다 (공식 기록에서 온 선수 · 아니면 시즌 평균에서 찾은 번호)
   const nbaId = who.src === 'nba' ? who.id : avg?.id;
   useEffect(() => {
@@ -479,6 +555,23 @@ function PlayerSheet({ who, season, onClose }: { who: PlayerRef; season: number;
             </div>
           ))}
         </div>
+      )}
+      {k2 && (
+        <>
+          <h3 className="st-h nba-career-h">
+            NBA 2K 능력치 <span className="nba-ovr">{k2.ovr || '-'}</span>
+          </h3>
+          <div className="nba-attrs">
+            {Object.entries(k2.attrs)
+              .sort(([a], [b]) => (ORDER.indexOf(a) + 1 || 999) - (ORDER.indexOf(b) + 1 || 999))
+              .map(([k, v]) => (
+                <div key={k}>
+                  <small>{attrName(k)}</small>
+                  <b className={v >= 90 ? 'hi' : v >= 80 ? 'mid' : ''}>{v}</b>
+                </div>
+              ))}
+          </div>
+        </>
       )}
       <h3 className="st-h nba-career-h">커리어 (정규시즌 경기당 평균)</h3>
       {!nbaId && avg !== undefined && <p className="st-muted sm">NBA 공식 기록에서 이 선수를 찾지 못해서 커리어를 볼 수 없어요.</p>}
@@ -535,6 +628,7 @@ function PlayerSheet({ who, season, onClose }: { who: PlayerRef; season: number;
 
 /** 로스터: 팀 고르기 → 선수 목록 → 선수를 누르면 시즌 평균 · 커리어 */
 function Roster({ team }: { team?: string }) {
+  const twoK = use2k();
   const [data, setData] = useState<{ season: number; players: NbaRosterPlayer[] } | null>(null);
   const [err, setErr] = useState('');
   const [who, setWho] = useState<PlayerRef | null>(null);
@@ -589,6 +683,7 @@ function Roster({ team }: { team?: string }) {
                 <tr>
                   <th>#</th>
                   <th className="l">선수</th>
+                  <th>OVR</th>
                   <th className="l">포지션</th>
                   <th>키</th>
                   <th>몸무게</th>
@@ -608,6 +703,7 @@ function Roster({ team }: { team?: string }) {
                         </button>
                       </span>
                     </td>
+                    <td className="nba-ovrc">{twoK?.get(normName(p.name))?.ovr || '-'}</td>
                     <td className="l">{p.pos}</td>
                     <td>{p.height}</td>
                     <td>{p.weight ? `${p.weight}lb` : ''}</td>
@@ -644,11 +740,13 @@ const SORTS: { key: keyof NbaPlayerRow; label: string; pct?: boolean }[] = [
   { key: 'age', label: '나이' },
 ];
 function Players() {
+  const twoK = use2k();
+  const [minOvr, setMinOvr] = useState(0);
   const [data, setData] = useState<{ season: number; players: NbaPlayerRow[] } | null>(null);
   const [err, setErr] = useState('');
   const [q, setQ] = useState('');
   const [team, setTeam] = useState('');
-  const [sort, setSort] = useState<keyof NbaPlayerRow>('pts');
+  const [sort, setSort] = useState<string>('pts');
   const [asc, setAsc] = useState(false);
   const [minGp, setMinGp] = useState(0);
   const [who, setWho] = useState<PlayerRef | null>(null);
@@ -666,9 +764,20 @@ function Players() {
   if (!data) return <p className="st-muted">선수 목록을 받는 중…</p>;
   const maxGp = Math.max(0, ...data.players.map((p) => p.gp));
   const needle = q.trim().toLowerCase();
-  const num = (p: NbaPlayerRow, k: keyof NbaPlayerRow) => Number(p[k]) || 0;
-  const list = data.players.filter((p) => (!needle || p.name.toLowerCase().includes(needle)) && (!team || p.team === team) && p.gp >= minGp).sort((a, b) => (asc ? num(a, sort) - num(b, sort) : num(b, sort) - num(a, sort)) || a.name.localeCompare(b.name));
-  const sorter = SORTS.find((x) => x.key === sort);
+  const k2 = (p: NbaPlayerRow) => twoK?.get(normName(p.name));
+  // 정렬: 현실 기록(키) 또는 2K 능력치('2k:ovr' · '2k:<능력치>'). 2K 에서 못 찾은 선수는 맨 뒤
+  const num = (p: NbaPlayerRow, k: string) => {
+    if (k.startsWith('2k:')) {
+      const x = k2(p);
+      const a = k.slice(3);
+      return (a === 'ovr' ? x?.ovr : x?.attrs[a]) ?? -1;
+    }
+    return Number(p[k as keyof NbaPlayerRow]) || 0;
+  };
+  const list = data.players.filter((p) => (!needle || p.name.toLowerCase().includes(needle)) && (!team || p.team === team) && p.gp >= minGp && (!minOvr || (k2(p)?.ovr ?? 0) >= minOvr)).sort((a, b) => (asc ? num(a, sort) - num(b, sort) : num(b, sort) - num(a, sort)) || a.name.localeCompare(b.name));
+  const attrKeys = twoK ? [...new Set([...twoK.values()].flatMap((x) => Object.keys(x.attrs)))].sort((a, b) => (ORDER.indexOf(a) + 1 || 999) - (ORDER.indexOf(b) + 1 || 999)) : [];
+  const sort2k = sort.startsWith('2k:') && sort !== '2k:ovr' ? sort.slice(3) : '';
+  const shown2k = ['threePointShot', 'midRangeShot', 'passAccuracy'].filter((k) => attrKeys.includes(k) && k !== sort2k);
   return (
     <>
       <div className="nba-filters">
@@ -683,16 +792,37 @@ function Players() {
               </option>
             ))}
         </select>
-        <select className="st-input" value={String(sort)} onChange={(e) => setSort(e.target.value as keyof NbaPlayerRow)} aria-label="정렬">
-          {SORTS.map((x) => (
-            <option key={x.key} value={x.key}>
-              {x.label} 순
-            </option>
-          ))}
+        <select className="st-input" value={sort} onChange={(e) => setSort(e.target.value)} aria-label="정렬">
+          <optgroup label="현실 기록 (경기당 평균)">
+            {SORTS.map((x) => (
+              <option key={x.key} value={x.key}>
+                {x.label} 순
+              </option>
+            ))}
+          </optgroup>
+          {twoK && (
+            <optgroup label="NBA 2K 능력치">
+              <option value="2k:ovr">OVR 순</option>
+              {attrKeys.map((k) => (
+                <option key={k} value={`2k:${k}`}>
+                  {attrName(k)} 순
+                </option>
+              ))}
+            </optgroup>
+          )}
         </select>
         <button className="btn btn-sm" onClick={() => setAsc(!asc)} aria-label="정렬 방향">
           {asc ? '낮은 순 ↑' : '높은 순 ↓'}
         </button>
+        {twoK && (
+          <label className="nba-mingp">
+            <small>
+              2K OVR {minOvr || '모두'}
+              {minOvr ? ' 이상' : ''}
+            </small>
+            <input type="range" min={0} max={99} value={minOvr} onChange={(e) => setMinOvr(Number(e.target.value))} />
+          </label>
+        )}
         <label className="nba-mingp">
           <small>최소 {minGp}경기</small>
           <input type="range" min={0} max={maxGp} value={minGp} onChange={(e) => setMinGp(Number(e.target.value))} />
@@ -709,6 +839,11 @@ function Players() {
                 <th>#</th>
                 <th className="l">선수</th>
                 <th>경기</th>
+                {twoK && <th className={sort === '2k:ovr' ? 'on' : ''}>OVR</th>}
+                {sort2k && <th className="on">{attrName(sort2k)}</th>}
+                {shown2k.map((k) => (
+                  <th key={k}>{attrName(k)}</th>
+                ))}
                 {SORTS.slice(0, 11).map((x) => (
                   <th key={x.key} className={x.key === sort ? 'on' : ''}>
                     {x.label}
@@ -729,6 +864,11 @@ function Players() {
                     </button>
                   </td>
                   <td>{p.gp}</td>
+                  {twoK && <td className={`nba-ovrc ${sort === '2k:ovr' ? 'on' : ''}`}>{k2(p)?.ovr || '-'}</td>}
+                  {sort2k && <td className="on">{k2(p)?.attrs[sort2k] ?? '-'}</td>}
+                  {shown2k.map((k) => (
+                    <td key={k}>{k2(p)?.attrs[k] ?? '-'}</td>
+                  ))}
                   {SORTS.slice(0, 11).map((x) => (
                     <td key={x.key} className={x.key === sort ? 'on' : ''}>
                       {x.pct ? pctText(num(p, x.key)) : x.key === 'min' ? String(p.min) : num(p, x.key).toFixed(1)}
@@ -745,7 +885,7 @@ function Players() {
           </button>
         )}
       </section>
-      {sorter && <p className="st-muted sm">선수를 누르면 시즌 평균 · 커리어가 나와요.</p>}
+      <p className="st-muted sm">선수를 누르면 시즌 평균 · 2K 능력치 · 커리어가 나와요.{twoK ? ' 2K 능력치는 nba2kapi.com 것이고, 이름으로 맞추지 못한 선수는 - 로 보여요.' : ''}</p>
       {who && <PlayerSheet who={who} season={data.season} onClose={() => setWho(null)} />}
     </>
   );

@@ -32,4 +32,6 @@ export const NBA_TEAMS: Record<string, { id: number; city: string; name: string 
   WAS: { id: 1610612764, city: 'Washington', name: 'Wizards' },
 };
 
-export const nbaLogo = (abbr: string) => (NBA_TEAMS[abbr] ? `https://cdn.nba.com/logos/nba/${NBA_TEAMS[abbr].id}/global/L/logo.svg` : '');
+// 이미지는 우리 서버(/api/nba/img)를 거쳐 받는다 (NBA 서버가 다른 사이트에서 바로 부르는 걸 막을 수 있어서)
+export const nbaLogo = (abbr: string) => (NBA_TEAMS[abbr] ? `/api/nba/img/l/${NBA_TEAMS[abbr].id}` : '');
+export const nbaFace = (personId: number) => `/api/nba/img/h/${personId}`;

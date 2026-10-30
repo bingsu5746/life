@@ -7551,3 +7551,54 @@ body.focus-on {
   margin-top: 10px;
   width: 100%;
 }
+.nba-face svg {
+  width: 70%;
+  height: 70%;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.6;
+  stroke-linecap: round;
+}
+.nba-ovr {
+  display: inline-grid;
+  place-items: center;
+  min-width: 36px;
+  height: 26px;
+  margin-left: 6px;
+  padding: 0 8px;
+  border-radius: 8px;
+  background: var(--text);
+  color: var(--surface);
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+.nba-ovrc {
+  font-weight: 700;
+}
+.nba-attrs {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+  gap: 6px;
+}
+.nba-attrs div {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 6px;
+  padding: 7px 10px;
+  border-radius: 10px;
+  background: var(--soft);
+}
+.nba-attrs small {
+  color: var(--muted);
+  font-size: 0.72rem;
+}
+.nba-attrs b {
+  font-variant-numeric: tabular-nums;
+}
+.nba-attrs b.hi {
+  color: #16a34a;
+}
+.nba-attrs b.mid {
+  color: #2563eb;
+}

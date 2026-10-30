@@ -21,6 +21,7 @@ import { fetchProviders } from './ott';
 import { relayFetch, type Relay } from './relay';
 import { fetchSpecialDays } from './holidays';
 import { cleanFact } from './fact';
+import { fetch2k } from './nba2k';
 import { fetchAverage, fetchBox, fetchGames, fetchNbaAverages, fetchNbaBox, fetchNbaCareer, fetchNbaRoster, fetchNbaStandings, fetchStandings, nbaGameId, Paid, seasonOf, seasonPage, standingsFrom, type NbaGame } from './nba';
 import { monthOf, R2_FREE, R2_STOP, r2Block, rollMonth, type R2Use } from './r2guard';
 import { modelFamily, askCompat, askGemini, geminiDaily, pacificDay, askOpenRouter, COMPAT, compatModels, geminiModels, openRouterDaily, openRouterModels, pickCompat, SYSTEM as SOLVE_SYSTEM, type Engine, type SolveTurn } from './solve';
@@ -222,6 +223,7 @@ export class Accounts extends DurableObject<Env> {
     if (path === 'nba/box' && req.method === 'GET') return this.nbaBox(new URL(req.url).searchParams);
     if (path === 'nba/avg' && req.method === 'GET') return this.nbaAvg(new URL(req.url).searchParams);
     if (path === 'nba/players' && req.method === 'GET') return this.nbaPlayers();
+    if (path === 'nba/2k' && req.method === 'GET') return this.nba2k();
     if (path === 'nba/roster' && req.method === 'GET') return this.nbaRoster((new URL(req.url).searchParams.get('team') ?? '').toUpperCase());
     if (path === 'nba/career' && req.method === 'GET') return this.nbaCareer(Number(new URL(req.url).searchParams.get('player')));
     if (path === 'fact' && req.method === 'GET') return this.uselessFact(user, new URL(req.url).searchParams.get('random') === '1');
@@ -1269,6 +1271,20 @@ export class Accounts extends DurableObject<Env> {
       const msg = e instanceof Error ? e.message : String(e);
       console.error('nba.com players failed', msg);
       return fail(`선수 목록을 받지 못했어요. (NBA 공식 데이터: ${msg.slice(0, 80)})`, 502);
+    }
+  }
+
+  /** NBA 2K 능력치 전체 (지금 팀 선수, 12시간 기억. 키가 있으면 한 번에, 없으면 공개 목록으로) */
+  private async nba2k(): Promise<Response> {
+    const env = this.env as unknown as Record<string, string | undefined>;
+    const key = env.Nba2k || env.NBA2K || env.nba2k || env.Nba2kapi || env.NBA2KAPI || env.NBA2K_KEY || env.Nba2K;
+    try {
+      const r = await this.nbaCached('nba2k:curr', 12 * 3600_000, () => fetch2k(key));
+      return json({ players: r.v, at: r.at, key: !!key });
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      console.error('nba2k failed', msg);
+      return fail(`NBA 2K 능력치를 받지 못했어요. (${msg.slice(0, 80)})`, 502);
     }
   }
 

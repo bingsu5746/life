@@ -11,11 +11,28 @@ interface Env {
   KOBIS_KEY?: string;
 }
 
+/** NBA 선수 얼굴 · 팀 로고: NBA 이미지 서버에서 받아 Cloudflare 캐시에 7일 둔다.
+ *  (화면에서 바로 부르면 NBA 서버가 다른 사이트에서 온 요청을 막을 수 있어서 우리 주소를 거친다. 번호만 받아서 다른 주소는 못 부른다) */
+async function nbaImage(kind: string, id: string, ctx: ExecutionContext): Promise<Response> {
+  const src = kind === 'h' ? `https://cdn.nba.com/headshots/nba/latest/260x190/${id}.png` : `https://cdn.nba.com/logos/nba/${id}/global/L/logo.svg`;
+  const cache = caches.default;
+  const key = new Request(`https://life-img.cache/${kind}/${id}`);
+  const hit = await cache.match(key);
+  if (hit) return hit;
+  const up = await fetch(src, { headers: { referer: 'https://www.nba.com/', 'user-agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.0.0 Safari/537.36' } });
+  if (!up.ok) return new Response('no image', { status: 404, headers: { 'cache-control': 'public, max-age=86400' } });
+  const res = new Response(up.body, { headers: { 'content-type': kind === 'h' ? 'image/png' : 'image/svg+xml', 'cache-control': 'public, max-age=604800, immutable', 'x-content-type-options': 'nosniff' } });
+  ctx.waitUntil(cache.put(key, res.clone()));
+  return res;
+}
+
 export default {
-  async fetch(req: Request, env: Env): Promise<Response> {
+  async fetch(req: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     const url = new URL(req.url);
+    const img = req.method === 'GET' ? url.pathname.match(/^\/api\/nba\/img\/(h|l)\/(\d{3,12})$/) : null;
+    if (img) return nbaImage(img[1], img[2], ctx);
     if (
-      /^\/api\/(auth\/(signup|login|logout|logout-all)|me(\/(nickname|password))?|translate|solve(\/job\/[a-z0-9]{6,32}|\/usage|\/img(\/[a-f0-9]{8,64}\/[a-z0-9]+-[a-f0-9]{8}\.(webp|jpg))?)?|movies\/(kobis|catalog(\/sync)?|recommend|ott)|school|holidays|fact|nba\/(games|standings|box|avg|roster|career|players)|dict\/ko|lookup|music\/similar|notify(\/(digest|test))?|store\/(study|words)|study-photo\/[a-z0-9]{6,32})$/.test(
+      /^\/api\/(auth\/(signup|login|logout|logout-all)|me(\/(nickname|password))?|translate|solve(\/job\/[a-z0-9]{6,32}|\/usage|\/img(\/[a-f0-9]{8,64}\/[a-z0-9]+-[a-f0-9]{8}\.(webp|jpg))?)?|movies\/(kobis|catalog(\/sync)?|recommend|ott)|school|holidays|fact|nba\/(games|standings|box|avg|roster|career|players|2k)|dict\/ko|lookup|music\/similar|notify(\/(digest|test))?|store\/(study|words)|study-photo\/[a-z0-9]{6,32})$/.test(
         url.pathname,
       )
     ) {
