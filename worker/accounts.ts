@@ -20,7 +20,7 @@ import { findBooksAladin, findBooksKakao, findGames, findRecords, similarArtists
 import { fetchProviders } from './ott';
 import { relayFetch, type Relay } from './relay';
 import { fetchSpecialDays } from './holidays';
-import { fetchGames } from './nba';
+import { fetchAverage, fetchBox, fetchGames, fetchStandings, Paid, seasonOf, seasonPage, standingsFrom, type NbaGame } from './nba';
 import { monthOf, R2_FREE, R2_STOP, r2Block, rollMonth, type R2Use } from './r2guard';
 import { modelFamily, askCompat, askGemini, geminiDaily, pacificDay, askOpenRouter, COMPAT, compatModels, geminiModels, openRouterDaily, openRouterModels, pickCompat, SYSTEM as SOLVE_SYSTEM, type Engine, type SolveTurn } from './solve';
 import { filmFacets, searchFilms, type Film } from './catalog';
@@ -217,6 +217,9 @@ export class Accounts extends DurableObject<Env> {
     if (path === 'movies/ott' && req.method === 'POST') return this.ott(body);
     if (path === 'school' && req.method === 'POST') return this.school(body);
     if (path === 'nba/games' && req.method === 'GET') return this.nbaGames(new URL(req.url).searchParams.get('date'));
+    if (path === 'nba/standings' && req.method === 'GET') return this.nbaStandings();
+    if (path === 'nba/box' && req.method === 'GET') return this.nbaBox(Number(new URL(req.url).searchParams.get('game')), new URL(req.url).searchParams.get('final') === '1');
+    if (path === 'nba/avg' && req.method === 'GET') return this.nbaAvg(Number(new URL(req.url).searchParams.get('player')), Number(new URL(req.url).searchParams.get('season')));
     if (path === 'holidays' && req.method === 'GET') return this.holidays(new URL(req.url).searchParams.get('year'));
     if (path === 'dict/ko' && req.method === 'POST') return this.dictKo(body);
     if (path === 'lookup' && req.method === 'POST') return this.lookup(body);
@@ -1086,8 +1089,7 @@ export class Accounts extends DurableObject<Env> {
   /** NBA 하루 경기 (미국 날짜). 1분에 5번이라 기억해 둔다: 지난 날 하루 · 오늘·어제 1분(경기 중 점수) · 앞날 3시간 */
   private async nbaGames(date: string | null): Promise<Response> {
     if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) return fail('날짜를 확인해 주세요.');
-    const env = this.env as unknown as Record<string, string | undefined>;
-    const key = env.balldontlie || env.BALLDONTLIE_KEY;
+    const key = this.nbaKey();
     if (!key) return fail('NBA 를 보려면 balldontlie 키가 필요해요.', 503);
     const usToday = new Date(Date.now() - 5 * 3600_000).toISOString().slice(0, 10);
     const age = date < usToday && Date.parse(usToday) - Date.parse(date) > DAY ? DAY : date > usToday ? 3 * 3600_000 : 60_000;
@@ -1103,6 +1105,105 @@ export class Accounts extends DurableObject<Env> {
       console.error('nba failed', date, msg);
       if (c) return json({ games: JSON.parse(c.data), at: c.at, stale: true });
       return fail(`NBA 경기를 받지 못했어요. (${msg.slice(0, 120)})`, /잠깐/.test(msg) ? 429 : 502);
+    }
+  }
+
+  private nbaKey(): string | undefined {
+    const env = this.env as unknown as Record<string, string | undefined>;
+    return env.balldontlie || env.BALLDONTLIE_KEY;
+  }
+  /** 기억해 둔 값 (ms 안이면) 또는 새로 받아 기억 */
+  private async nbaCached<T>(ck: string, ms: number, get: () => Promise<T>): Promise<{ v: T; at: number; stale?: boolean }> {
+    const c = this.sql.exec<{ data: string; at: number }>('SELECT data, at FROM cache WHERE key = ?', ck).toArray()[0];
+    if (c && Date.now() - c.at < ms) return { v: JSON.parse(c.data) as T, at: c.at };
+    try {
+      const v = await get();
+      this.sql.exec('INSERT OR REPLACE INTO cache (key, data, at) VALUES (?, ?, ?)', ck, JSON.stringify(v), Date.now());
+      return { v, at: Date.now() };
+    } catch (e) {
+      // 받아 둔 게 있으면 오래됐어도 그걸로 (유료라서 안 되는 건 그대로 알린다)
+      if (c && !(e instanceof Paid)) return { v: JSON.parse(c.data) as T, at: c.at, stale: true };
+      throw e;
+    }
+  }
+  private nbaFail(e: unknown, what: string): Response {
+    const msg = e instanceof Error ? e.message : String(e);
+    console.error('nba failed', what, msg);
+    if (e instanceof Paid) return fail(msg, 402);
+    return fail(`${what}을 받지 못했어요. (${msg.slice(0, 120)})`, /잠깐/.test(msg) ? 429 : 502);
+  }
+
+  /** 순위: 순위 기능이 되면 그걸로(3시간 기억), 유료라면 이번 시즌 끝난 경기로 직접 센다 (6시간마다 뒤에서 모음) */
+  private nbaBuilding = false;
+  private async nbaStandings(): Promise<Response> {
+    const key = this.nbaKey();
+    if (!key) return fail('NBA 를 보려면 balldontlie 키가 필요해요.', 503);
+    const season = seasonOf(new Date(Date.now() - 5 * 3600_000).toISOString().slice(0, 10));
+    const paidMark = this.sql.exec<{ at: number }>("SELECT at FROM cache WHERE key = 'nba:standings:paid'").toArray()[0];
+    if (!paidMark || Date.now() - paidMark.at > 7 * DAY) {
+      try {
+        const r = await this.nbaCached(`nba:standings:${season}`, 3 * 3600_000, () => fetchStandings(key, season));
+        if (r.v.length) return json({ season, rows: r.v, at: r.at, from: 'api' });
+      } catch (e) {
+        if (!(e instanceof Paid)) return this.nbaFail(e, '순위');
+        this.sql.exec("INSERT OR REPLACE INTO cache (key, data, at) VALUES ('nba:standings:paid', '1', ?)", Date.now());
+      }
+    }
+    const ck = `nba:season:${season}`;
+    const c = this.sql.exec<{ data: string; at: number }>('SELECT data, at FROM cache WHERE key = ?', ck).toArray()[0];
+    const games = c ? (JSON.parse(c.data) as NbaGame[]) : [];
+    if ((!c || Date.now() - c.at > 6 * 3600_000) && !this.nbaBuilding) this.ctx.waitUntil(this.nbaBuildSeason(key, season));
+    return json({ season, rows: standingsFrom(games), at: c?.at ?? 0, from: 'games', building: this.nbaBuilding });
+  }
+  /** 이번 시즌 경기를 모두 받아 기억 (1분 5번 한도라 쪽마다 13초 쉰다) */
+  private async nbaBuildSeason(key: string, season: number) {
+    this.nbaBuilding = true;
+    // 서버가 중간에 쉬어도 이어서 받게, 받은 만큼과 다음 쪽을 적어 둔다 (1시간 안이면 이어서)
+    const pk = `nba:season:${season}:partial`;
+    try {
+      const p = this.sql.exec<{ data: string; at: number }>('SELECT data, at FROM cache WHERE key = ?', pk).toArray()[0];
+      const prev = p && Date.now() - p.at < 3600_000 ? (JSON.parse(p.data) as { games: NbaGame[]; cursor?: number }) : null;
+      const all: NbaGame[] = prev?.games ?? [];
+      let cursor: number | undefined = prev?.cursor;
+      for (let i = 0; i < 20; i++) {
+        const r = await seasonPage(key, season, cursor);
+        all.push(...r.games.filter((g) => /final/i.test(g.status)));
+        cursor = r.next;
+        if (!cursor) break;
+        this.sql.exec('INSERT OR REPLACE INTO cache (key, data, at) VALUES (?, ?, ?)', pk, JSON.stringify({ games: all, cursor }), Date.now());
+        await new Promise((res) => setTimeout(res, 13_000));
+      }
+      this.sql.exec('INSERT OR REPLACE INTO cache (key, data, at) VALUES (?, ?, ?)', `nba:season:${season}`, JSON.stringify(all), Date.now());
+      this.sql.exec('DELETE FROM cache WHERE key = ?', pk);
+      console.log('nba season built', season, all.length);
+    } catch (e) {
+      console.error('nba season build failed', e instanceof Error ? e.message : String(e));
+    } finally {
+      this.nbaBuilding = false;
+    }
+  }
+  /** 경기 선수 기록: 끝난 경기는 7일, 경기 중은 1분 기억 */
+  private async nbaBox(game: number, final: boolean): Promise<Response> {
+    if (!Number.isInteger(game) || game <= 0) return fail('경기를 확인해 주세요.');
+    const key = this.nbaKey();
+    if (!key) return fail('NBA 를 보려면 balldontlie 키가 필요해요.', 503);
+    try {
+      const r = await this.nbaCached(`nba:box:${game}`, final ? 7 * DAY : 60_000, () => fetchBox(key, game));
+      return json({ lines: r.v, at: r.at });
+    } catch (e) {
+      return this.nbaFail(e, '선수 기록');
+    }
+  }
+  /** 선수 시즌 평균: 12시간 기억 */
+  private async nbaAvg(player: number, season: number): Promise<Response> {
+    if (!Number.isInteger(player) || player <= 0 || !Number.isInteger(season) || season < 1990 || season > 2100) return fail('선수를 확인해 주세요.');
+    const key = this.nbaKey();
+    if (!key) return fail('NBA 를 보려면 balldontlie 키가 필요해요.', 503);
+    try {
+      const r = await this.nbaCached(`nba:avg:${season}:${player}`, 12 * 3600_000, () => fetchAverage(key, player, season));
+      return json({ avg: r.v, at: r.at });
+    } catch (e) {
+      return this.nbaFail(e, '시즌 평균');
     }
   }
 

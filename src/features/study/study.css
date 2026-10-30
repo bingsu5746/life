@@ -7195,10 +7195,15 @@ body.focus-on {
 .nba-card {
   display: grid;
   gap: 4px;
+  width: 100%;
   padding: 12px 14px;
   border: 1px solid var(--line);
   border-radius: 16px;
   background: var(--surface);
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
 }
 .nba-card.fav {
   border-color: var(--warn);
@@ -7251,7 +7256,7 @@ body.focus-on {
   display: grid;
   place-items: center;
   border-radius: 50%;
-  background: var(--soft);
+  overflow: hidden;
   font-size: 0.72rem;
   font-weight: 700;
   letter-spacing: 0.02em;
@@ -7284,4 +7289,139 @@ body.focus-on {
 .nba-team.win .nba-score {
   font-weight: 700;
   color: var(--text);
+}
+.nba-badge img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+.nba-trow {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.nba-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+  font-variant-numeric: tabular-nums;
+}
+.nba-table th,
+.nba-table td {
+  padding: 7px 6px;
+  text-align: right;
+  white-space: nowrap;
+  border-bottom: 1px solid var(--line);
+}
+.nba-table th {
+  color: var(--muted);
+  font-weight: 500;
+  font-size: 0.75rem;
+}
+.nba-table .l {
+  text-align: left;
+}
+.nba-table tr.fav td {
+  background: color-mix(in srgb, var(--warn) 12%, transparent);
+}
+.nba-table tr.cut td {
+  border-bottom: 2px solid var(--line-strong);
+}
+.nba-table tr.dnp td {
+  color: var(--muted);
+}
+.nba-table small {
+  color: var(--muted);
+}
+.nba-scroll {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+.nba-back {
+  justify-self: start;
+  align-self: flex-start;
+  width: auto;
+  margin-bottom: 8px;
+}
+.nba-head {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 8px;
+  padding: 16px;
+  margin-bottom: 12px;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: var(--surface);
+}
+.nba-hteam.home {
+  order: 3;
+}
+.nba-hteam {
+  display: grid;
+  justify-items: center;
+  gap: 4px;
+  text-align: center;
+}
+.nba-hteam small {
+  color: var(--muted);
+  font-size: 0.75rem;
+}
+.nba-hteam b {
+  font-weight: 500;
+}
+.nba-hteam.win b {
+  font-weight: 700;
+}
+.nba-hscore {
+  order: 2;
+  display: grid;
+  justify-items: center;
+  gap: 4px;
+}
+.nba-hscore b {
+  font-size: 1.8rem;
+  font-variant-numeric: tabular-nums;
+}
+.nba-hscore small {
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+.nba-hscore small.live {
+  color: var(--bad);
+  font-weight: 600;
+}
+.nba-fav {
+  padding: 3px 10px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: none;
+  color: var(--muted);
+  font: inherit;
+  font-size: 0.75rem;
+  cursor: pointer;
+}
+.nba-fav.on {
+  border-color: var(--warn);
+  color: var(--warn);
+}
+.nba-avg {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(90px, 1fr));
+  gap: 8px;
+}
+.nba-avg div {
+  display: grid;
+  gap: 2px;
+  padding: 10px;
+  border-radius: 12px;
+  background: var(--soft);
+}
+.nba-avg small {
+  color: var(--muted);
+  font-size: 0.72rem;
+}
+.nba-avg b {
+  font-size: 1.1rem;
+  font-variant-numeric: tabular-nums;
 }

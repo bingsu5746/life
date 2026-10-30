@@ -305,6 +305,7 @@ export interface NbaTeam {
   abbr: string;
   name: string;
   city: string;
+  conf?: string;
 }
 export interface NbaGame {
   id: number;
@@ -317,7 +318,52 @@ export interface NbaGame {
   period: number;
   time: string;
   start?: string;
+  season?: number;
 }
+export interface NbaStanding {
+  abbr: string;
+  name: string;
+  city: string;
+  conf: string;
+  w: number;
+  l: number;
+}
+export interface NbaLine {
+  playerId: number;
+  name: string;
+  pos: string;
+  team: string;
+  min: string;
+  pts: number;
+  reb: number;
+  ast: number;
+  stl: number;
+  blk: number;
+  fgm: number;
+  fga: number;
+  fg3m: number;
+  fg3a: number;
+  ftm: number;
+  fta: number;
+  tov: number;
+  pf: number;
+}
+export interface NbaAverage {
+  gp: number;
+  min: string;
+  pts: number;
+  reb: number;
+  ast: number;
+  stl: number;
+  blk: number;
+  fgPct: number;
+  fg3Pct: number;
+  ftPct: number;
+  tov: number;
+}
+export const nbaStandings = () => call<{ season: number; rows: NbaStanding[]; at: number; from: 'api' | 'games'; building?: boolean }>('nba/standings');
+export const nbaBox = (game: number, final: boolean) => call<{ lines: NbaLine[]; at: number }>(`nba/box?game=${game}${final ? '&final=1' : ''}`);
+export const nbaAvg = (player: number, season: number) => call<{ avg: NbaAverage | null; at: number }>(`nba/avg?player=${player}&season=${season}`);
 export const nbaGames = (date: string) => call<{ games: NbaGame[]; at: number; stale?: boolean }>(`nba/games?date=${date}`);
 
 /** 공휴일 · 기념일 (한국천문연구원 특일 정보, 서버가 7일 기억) */
