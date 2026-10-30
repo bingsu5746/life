@@ -311,7 +311,7 @@ export class Accounts extends DurableObject<Env> {
 
   /** 모델 고르는 창: 키가 있는 모델 · 오늘 쓴 횟수 · 남은 횟수(알 수 있을 때) */
   private async solveUsage(user: UserRow): Promise<Response> {
-    const engines: Engine[] = ['gemini', 'openrouter', 'mistral', 'grok', 'siliconflow', 'nvidia', 'cloudflare'];
+    const engines: Engine[] = ['gemini', 'openrouter', 'mistral', 'groq', 'siliconflow', 'nvidia', 'cloudflare'];
     const available = engines.filter((e) => this.keyOf(e));
     const orKey = this.keyOf('openrouter');
     if (orKey && (!this.orDaily || Date.now() - this.orDaily.at > 6 * 3600_000)) this.orDaily = { at: Date.now(), v: await openRouterDaily(orKey).catch(() => null) };
@@ -323,7 +323,7 @@ export class Accounts extends DurableObject<Env> {
 
   /** { engine, turns: [{ role, text, images: [{ mime, data(base64) }] }] } → { text, model } */
   private async solve(user: UserRow, b: Record<string, unknown>, origin: string): Promise<Response> {
-    const ENG: Engine[] = ['gemini', 'openrouter', 'mistral', 'grok', 'siliconflow', 'nvidia', 'cloudflare'];
+    const ENG: Engine[] = ['gemini', 'openrouter', 'mistral', 'groq', 'siliconflow', 'nvidia', 'cloudflare'];
     const engine = (ENG.includes(b.engine as Engine) ? b.engine : 'gemini') as Engine;
     const raw = Array.isArray(b.turns) ? b.turns.slice(-12) : [];
     let bytes = 0;
@@ -391,7 +391,7 @@ export class Accounts extends DurableObject<Env> {
         if (!text) throw new Error('Cloudflare AI 가 답을 주지 않았어요');
         return ok({ text, model: TRANSLATE_MODEL.replace('@cf/', '') });
       }
-      // Mistral · Grok · SiliconFlow · NVIDIA: 모델 목록에서 고르기
+      // Mistral · Groq · SiliconFlow · NVIDIA: 모델 목록에서 고르기
       const c = COMPAT[engine];
       let entry = this.compatList[engine];
       if (!entry || Date.now() - entry.at > 6 * 3600_000) {
@@ -407,7 +407,7 @@ export class Accounts extends DurableObject<Env> {
         if (!entry) throw new Error(err || '모델 목록을 받지 못했어요');
         this.compatList[engine] = entry;
       }
-      const models = pickCompat(entry.json, needImage);
+      const models = pickCompat(entry.json, needImage, c.prefer);
       if (!models.length) return fail(needImage ? '이 서비스에는 사진을 읽는 모델이 없어요. 다른 모델을 골라 주세요.' : '쓸 수 있는 모델이 없어요.', 503);
       return await tryModels(models, (m) => askCompat(entry.base, key, m, turns));
     } catch (e) {

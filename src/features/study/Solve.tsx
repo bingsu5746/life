@@ -3,15 +3,17 @@ import { useEffect, useRef, useState } from 'react';
 import { isLoggedIn, solveAsk, solveUsage, type SolveEngine, type SolveTurn } from '../auth/api';
 import { MathText } from '../../lib/mathText';
 import { shrink } from './photos';
-import { Icon, Sheet, toast } from './ui';
+import { Icon, Sheet, subjectsOf, SubjectDot, toast } from './ui';
+import { useStudy } from './store';
+import { guessNoteSubject } from './mistakes';
 
 const ENGINES: { key: SolveEngine; name: string; desc: string }[] = [
-  { key: 'gemini', name: 'Gemini Flash', desc: '무료 · 사진 읽기 · 가장 정확해요' },
+  { key: 'gemini', name: 'Gemini Flash', desc: '무료 · 전 과목 올라운더' },
+  { key: 'siliconflow', name: 'SiliconFlow', desc: '무료 · 수학/물리 고난도 계산 특화' },
+  { key: 'mistral', name: 'Mistral', desc: '무료 · 과학 표/그래프 · 복잡한 수식 사진 읽기 특화' },
+  { key: 'groq', name: 'Groq', desc: '무료 · 영어 독해 · 초고속 답변' },
+  { key: 'nvidia', name: 'NVIDIA NIM', desc: '무료 · 고3 4점 킬러 문항용 초대형 모델' },
   { key: 'openrouter', name: 'OpenRouter', desc: '무료 모델 자동 선택 · 사진 읽기' },
-  { key: 'mistral', name: 'Mistral', desc: '무료 등급 · 사진은 Pixtral 같은 사진 모델로' },
-  { key: 'grok', name: 'Grok', desc: 'xAI · 크레딧이 있을 때만' },
-  { key: 'siliconflow', name: 'SiliconFlow', desc: 'Qwen · DeepSeek 같은 공개 모델' },
-  { key: 'nvidia', name: 'NVIDIA', desc: '공개 모델 여러 개 · 분당 횟수 제한' },
   { key: 'cloudflare', name: 'Cloudflare AI', desc: '무료 · 사진은 Llama 3.2 Vision (어려운 문제는 약해요)' },
 ];
 
@@ -25,10 +27,13 @@ interface Chat {
   id: string;
   at: number;
   title: string;
+  /** 과목 (나중에 문제 저장소로 모을 때) */
+  subjectId?: string;
   msgs: Msg[];
 }
 
 const ENGINE_KEY = 'my-study.solve.engine';
+const SUBJECT_KEY = 'my-study.solve.subject';
 const CHATS_KEY = 'my-study.solve.chats';
 const load = <T,>(k: string, fb: T): T => {
   try {
@@ -57,7 +62,22 @@ const toB64 = async (b: Blob) => {
 
 export function Solve() {
   const [engine, setEngine] = useState<SolveEngine>(() => load<SolveEngine>(ENGINE_KEY, 'gemini'));
-  const [chat, setChat] = useState<Chat>(() => ({ id: Date.now().toString(36), at: Date.now(), title: '', msgs: [] }));
+  const d = useStudy();
+  const [chat, setChat] = useState<Chat>(() => ({ id: Date.now().toString(36), at: Date.now(), title: '', subjectId: load<string>(SUBJECT_KEY, '') || undefined, msgs: [] }));
+  const [subPick, setSubPick] = useState(false);
+  const subject = chat.subjectId && d.subjects[chat.subjectId] && !d.subjects[chat.subjectId].deleted ? d.subjects[chat.subjectId] : undefined;
+  const setSubject = (id: string | undefined) => {
+    setChat((c) => {
+      const next = { ...c, subjectId: id };
+      if (c.msgs.length) saveChat(next);
+      return next;
+    });
+    try {
+      localStorage.setItem(SUBJECT_KEY, JSON.stringify(id ?? ''));
+    } catch {
+      /* 무시 */
+    }
+  };
   const [text, setText] = useState('');
   const [files, setFiles] = useState<{ blob: Blob; url: string }[]>([]);
   const [busy, setBusy] = useState('');
@@ -115,7 +135,9 @@ export function Solve() {
     }
     const user: Msg = { role: 'user', text: q, images, thumbs: pics.map((p) => p.url) };
     const msgs = [...chat.msgs, user];
-    const next = { ...chat, title: chat.title || q.slice(0, 40) || '사진 문제', msgs };
+    // 과목을 안 골랐으면 글·지금 공부 중인 과목으로 짐작
+    const guess = !chat.subjectId ? guessNoteSubject(d, Date.now(), undefined, q) : null;
+    const next = { ...chat, subjectId: chat.subjectId ?? guess?.id, title: chat.title || q.slice(0, 40) || '사진 문제', msgs };
     setChat(next);
     setBusy('푸는 중');
     try {
@@ -140,7 +162,7 @@ export function Solve() {
           지난 대화
         </button>
         {chat.msgs.length > 0 && (
-          <button className="st-link" onClick={() => setChat({ id: Date.now().toString(36), at: Date.now(), title: '', msgs: [] })}>
+          <button className="st-link" onClick={() => setChat({ id: Date.now().toString(36), at: Date.now(), title: '', subjectId: chat.subjectId, msgs: [] })}>
             새 대화
           </button>
         )}
@@ -229,6 +251,16 @@ export function Solve() {
           <button className="sv-model" onClick={() => setPicker(true)}>
             {eng.name} ▾
           </button>
+          <button className="sv-model" onClick={() => setSubPick(true)}>
+            {subject ? (
+              <>
+                <SubjectDot id={subject.id} d={d} /> {subject.name}
+              </>
+            ) : (
+              '과목'
+            )}{' '}
+            ▾
+          </button>
           <button className="sv-send" aria-label="보내기" disabled={!!busy || (!text.trim() && !files.length)} onClick={() => void send()}>
             <Icon name="up" />
           </button>
@@ -265,6 +297,40 @@ export function Solve() {
           </div>
         </Sheet>
       )}
+      {subPick && (
+        <Sheet title="과목" onClose={() => setSubPick(false)}>
+          <div className="sv-pick">
+            {subjectsOf(d).map((x) => (
+              <button
+                key={x.id}
+                className={subject?.id === x.id ? 'on' : ''}
+                onClick={() => {
+                  setSubject(x.id);
+                  setSubPick(false);
+                }}
+              >
+                <span>
+                  <b>
+                    <SubjectDot id={x.id} d={d} /> {x.name}
+                  </b>
+                </span>
+                {subject?.id === x.id && <span className="sv-check">✓</span>}
+              </button>
+            ))}
+            <button
+              onClick={() => {
+                setSubject(undefined);
+                setSubPick(false);
+              }}
+            >
+              <span>
+                <b>과목 없음</b>
+                <small>보낼 때 문제 글로 짐작해요</small>
+              </span>
+            </button>
+          </div>
+        </Sheet>
+      )}
       {history && (
         <Sheet title="지난 대화" onClose={() => setHistory(false)}>
           <div className="sv-pick">
@@ -279,7 +345,10 @@ export function Solve() {
               >
                 <span>
                   <b>{c.title}</b>
-                  <small>{new Date(c.at).toLocaleString('ko-KR', { month: 'numeric', day: 'numeric', hour: 'numeric', minute: '2-digit' })}</small>
+                  <small>
+                    {c.subjectId && d.subjects[c.subjectId] ? `${d.subjects[c.subjectId].name} · ` : ''}
+                    {new Date(c.at).toLocaleString('ko-KR', { month: 'numeric', day: 'numeric', hour: 'numeric', minute: '2-digit' })}
+                  </small>
                 </span>
               </button>
             ))}

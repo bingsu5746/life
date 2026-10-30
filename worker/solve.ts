@@ -1,6 +1,6 @@
 // 문제 풀이 AI: Gemini(무료 등급) · OpenRouter 무료 모델 · Cloudflare Workers AI(글만).
 // 모델 이름은 자주 바뀌어서 고정하지 않고, 각 서비스의 모델 목록에서 고른다.
-export type Engine = 'gemini' | 'openrouter' | 'mistral' | 'grok' | 'siliconflow' | 'nvidia' | 'cloudflare';
+export type Engine = 'gemini' | 'openrouter' | 'mistral' | 'groq' | 'siliconflow' | 'nvidia' | 'cloudflare';
 export interface SolveImage {
   mime: string;
   data: string;
@@ -135,14 +135,17 @@ export async function openRouterDaily(key: string): Promise<number | null> {
   return j?.data?.is_free_tier === true ? 50 : j?.data?.is_free_tier === false ? 1000 : null;
 }
 
-// ===== OpenAI 모양 API (Mistral · Grok · SiliconFlow · NVIDIA) =====
+// ===== OpenAI 모양 API (Mistral · Groq · SiliconFlow · NVIDIA) =====
 
-export const COMPAT: Record<'mistral' | 'grok' | 'siliconflow' | 'nvidia', { bases: string[]; keys: string[] }> = {
-  mistral: { bases: ['https://api.mistral.ai/v1'], keys: ['Mistral_api_key', 'MISTRAL_KEY'] },
-  grok: { bases: ['https://api.x.ai/v1'], keys: ['Grok', 'XAI_KEY'] },
+export const COMPAT: Record<'mistral' | 'groq' | 'siliconflow' | 'nvidia', { bases: string[]; keys: string[]; prefer?: RegExp }> = {
+  // 사진 · 표 · 수식 읽기: Pixtral · Mistral Medium 먼저
+  mistral: { bases: ['https://api.mistral.ai/v1'], keys: ['Mistral_api_key', 'MISTRAL_KEY'], prefer: /pixtral-large|mistral-medium|magistral-medium|mistral-large/i },
+  // Groq (빠른 추론 서버). Cloudflare 에는 「Grok」 이름으로 넣었다
+  groq: { bases: ['https://api.groq.com/openai/v1'], keys: ['Grok', 'Groq', 'GROQ_KEY'], prefer: /qwen3|gpt-oss-120b|llama-4|kimi/i },
   // 키는 발급한 곳(국제 .com · 중국 .cn)에서만 된다: 둘 다 해 본다
-  siliconflow: { bases: ['https://api.siliconflow.com/v1', 'https://api.siliconflow.cn/v1'], keys: ['Siliconflow', 'SILICONFLOW_KEY'] },
-  nvidia: { bases: ['https://integrate.api.nvidia.com/v1'], keys: ['Nvidia', 'NVIDIA', 'Nvidia_api_key', 'NVIDIA_KEY'] },
+  siliconflow: { bases: ['https://api.siliconflow.com/v1', 'https://api.siliconflow.cn/v1'], keys: ['Siliconflow', 'SILICONFLOW_KEY'], prefer: /deepseek-r1|qwq|qwen3-235b|qwen3.*thinking|deepseek-v3/i },
+  // 가장 큰 모델 먼저 (수백 B · ultra)
+  nvidia: { bases: ['https://integrate.api.nvidia.com/v1'], keys: ['Nvidia', 'NVIDIA', 'Nvidia_api_key', 'NVIDIA_KEY'], prefer: /deepseek-r1|qwen3-235b|nemotron.*ultra|405b|253b|kimi-k2|deepseek-v3/i },
 };
 
 const VISION = /vl\b|-vl|vision|pixtral|mistral-(small|medium)|gemma-3|llama-4|grok-4|kimi-k2|qwen3\.5|omni/i;
@@ -150,12 +153,12 @@ const SMART = /deepseek-(r1|v3)|qwen3|grok-4|magistral|mistral-large|kimi|glm-4\
 const SKIP = /embed|rerank|whisper|tts|audio|image-gen|flux|stable-diffusion|moderation|ocr|guard|reward|coder|instruct-\d+k|safety/i;
 
 /** /models 응답에서 쓸 모델 고르기: 사진이면 사진을 읽는 모델(표시가 없으면 이름으로 짐작), 똑똑한 모델 먼저 */
-export function pickCompat(json: unknown, needImage: boolean): string[] {
+export function pickCompat(json: unknown, needImage: boolean, prefer?: RegExp): string[] {
   const data = (json as { data?: { id?: unknown; capabilities?: { vision?: unknown; completion_chat?: unknown } }[] })?.data ?? [];
   return data
     .map((m) => ({ id: s(m.id), vision: m.capabilities?.vision === true || (m.capabilities?.vision === undefined && VISION.test(s(m.id))), chat: m.capabilities?.completion_chat !== false }))
     .filter((m) => m.id && m.chat && !SKIP.test(m.id) && (!needImage || m.vision))
-    .sort((a, b) => Number(SMART.test(b.id)) - Number(SMART.test(a.id)) || Number(/latest/.test(b.id)) - Number(/latest/.test(a.id)))
+    .sort((a, b) => (prefer ? Number(prefer.test(b.id)) - Number(prefer.test(a.id)) : 0) || Number(SMART.test(b.id)) - Number(SMART.test(a.id)) || Number(/latest/.test(b.id)) - Number(/latest/.test(a.id)))
     .map((m) => m.id);
 }
 

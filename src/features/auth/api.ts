@@ -325,7 +325,7 @@ export async function musicSimilar(artists: string[], have: string[]) {
 }
 
 // ===== 문제 풀이 AI =====
-export type SolveEngine = 'gemini' | 'openrouter' | 'mistral' | 'grok' | 'siliconflow' | 'nvidia' | 'cloudflare';
+export type SolveEngine = 'gemini' | 'openrouter' | 'mistral' | 'groq' | 'siliconflow' | 'nvidia' | 'cloudflare';
 export interface SolveTurn {
   role: 'user' | 'assistant';
   text: string;
