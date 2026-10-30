@@ -7122,3 +7122,29 @@ body.focus-on {
   color: var(--muted);
   font-size: 0.75em;
 }
+.sv-urow {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.sv-resend {
+  flex: none;
+  width: 32px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  background: var(--surface);
+  color: var(--muted);
+  cursor: pointer;
+}
+.sv-resend svg {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}

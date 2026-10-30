@@ -177,6 +177,21 @@ export function Solve({ open }: { open?: string }) {
     await ask(engine, next);
   }
 
+  /** 답이 오류였거나 답이 없는 질문은 다시 보낼 수 있다 (푸는 중이 아닐 때) */
+  const canResend = (i: number) => !solving && !busy && (chat.msgs[i + 1]?.error === true || (i === chat.msgs.length - 1 && job?.status !== 'running'));
+  /** 그 질문까지만 남기고(오류 답은 지움) 다시 보낸다. 고른 모델이 방금 안 됐으면 모델 고르기 창 */
+  function resend(i: number) {
+    if (job?.status === 'running') return toast('다른 문제를 푸는 중이에요. 다 풀면 보내 주세요');
+    const next = { ...chat, msgs: chat.msgs.slice(0, i + 1) };
+    if (coolLeft(engine) > 0 || usage?.out[engine]) {
+      setRetry(next);
+      setPicker(true);
+      return;
+    }
+    setChat(next);
+    void ask(engine, next);
+  }
+
   /** 대화(마지막이 질문)를 그 모델로 서버에 맡긴다. 끝나면 위의 useEffect 가 받아 붙인다 */
   async function ask(eng: SolveEngine, next: Chat) {
     setBusy('');
@@ -202,7 +217,18 @@ export function Solve({ open }: { open?: string }) {
                   ))}
                 </div>
               )}
-              {m.text && <p>{m.text}</p>}
+              {(m.text || canResend(i)) && (
+                <div className="sv-urow">
+                  {canResend(i) && (
+                    <button className="sv-resend" aria-label="이 질문 다시 보내기" title="다시 보내기" onClick={() => resend(i)}>
+                      <svg viewBox="0 0 24 24" aria-hidden>
+                        <path d="M20 12a8 8 0 1 1-2.34-5.66M20 4v5h-5" />
+                      </svg>
+                    </button>
+                  )}
+                  {m.text && <p>{m.text}</p>}
+                </div>
+              )}
             </div>
           ) : (
             <div key={i} className={`sv-ai ${m.error ? 'bad' : ''}`}>
