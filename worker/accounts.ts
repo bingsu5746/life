@@ -627,7 +627,8 @@ export class Accounts extends DurableObject<Env> {
     /** 한 모델에 묻기: 너무 오래 걸리면(75초) 그 모델은 그만두고 다음으로 */
     const timed = <T>(p: Promise<T>, m: string) => Promise.race([p, new Promise<never>((_, no) => setTimeout(() => no(new Error('너무 오래 걸려서 다음 모델로')), THINKING.test(m) ? THINK_TIMEOUT : MODEL_TIMEOUT))]);
     /** 앞에서부터 몇 개 모델을 해 보고, 사용량이 다 됐다는 답이면 바로 멈춘다 */
-    const tryModels = async (models: string[], ask: (m: string) => Promise<{ text: string; remaining?: number | null }>) => {
+    /** shared: 잠깐 막힘(429)이 계정 전체에 걸리는 서비스 (Mistral: 모델을 바꿔도 6개가 다 막혔다) → 기다렸다 같은 모델로. 아니면 바로 다음 모델로 */
+    const tryModels = async (models: string[], ask: (m: string, big?: boolean) => Promise<{ text: string; remaining?: number | null }>, shared = false) => {
       let last = '';
       const tried: string[] = [];
       let waited = 0;
@@ -635,28 +636,38 @@ export class Accounts extends DurableObject<Env> {
       for (const [i, m] of list.entries()) {
         // 전체로 너무 오래 걸렸으면 새 모델은 그만
         if (i > 0 && Date.now() - t0 > SOLVE_BUDGET) break;
-        step(`${short(m)} 에게 묻는 중${list.length > 1 ? ` (${i + 1}/${list.length})` : ''}${THINKING.test(m) ? ' · 오래 생각하는 모델이라 1~2분 걸릴 수 있어요' : ''}`);
-        const t1 = Date.now();
-        try {
-          const r = await timed(ask(m), m);
-          console.log('solve model ok', engine, m, `${Date.now() - t1}ms`);
-          return ok({ text: r.text, model: m }, r.remaining);
-        } catch (e) {
-          last = e instanceof Error ? e.message : String(e);
-          tried.push(`${short(m)}: ${last.slice(0, 80)}`);
-          console.error('solve model failed', engine, m, `${Date.now() - t1}ms`, last);
-          // 계정 전체가 막힌 것(하루 사용량 · 크레딧)만 멈추고, 그 모델만 바쁘거나(503) 없거나(404) 잠깐 막힌 것은 다음 모델로
-          if (/사용량|크레딧/.test(last)) break;
-          if (i === list.length - 1) break;
-          // 잠깐 막힘(429) · 바쁨(503)은 계정 전체에 걸린 것이라 바로 다음 모델로 가도 또 막힌다.
-          // 서비스가 알려 준 시간(retry-after)만큼, 없으면 3·6초… 쉬었다가 (한 번에 8초, 모두 합쳐 20초까지)
-          const after = (e as { retryAfter?: number | null }).retryAfter;
-          const busy = /잠깐 막혔|^503|busy/i.test(last);
-          const ms = busy ? Math.min(8_000, after != null ? after * 1000 + 300 : 3000 * tried.length, 20_000 - waited) : 500;
-          waited += Math.max(0, ms);
-          if (ms > 1000) step(`잠깐 막혀서 ${Math.round(ms / 1000)}초 기다리는 중`);
-          if (ms > 0) await new Promise((r) => setTimeout(r, ms));
+        // 같은 모델을 다시 해 보는 경우: 잠깐 막힘(계정 전체라 다른 모델로 가도 또 막힘) · 생각하다 글자 수 한도에 걸림(더 길게)
+        let big = false;
+        for (let again = 0; again < 3; again++) {
+          step(`${short(m)} 에게 묻는 중${list.length > 1 ? ` (${i + 1}/${list.length})` : ''}${big ? ' · 더 길게 쓰게 해서 다시' : ''}${THINKING.test(m) || big ? ' · 오래 생각하는 모델이라 1~2분 걸릴 수 있어요' : ''}`);
+          const t1 = Date.now();
+          try {
+            const r = await timed(ask(m, big), m);
+            console.log('solve model ok', engine, m, `${Date.now() - t1}ms`);
+            return ok({ text: r.text, model: m }, r.remaining);
+          } catch (e) {
+            last = e instanceof Error ? e.message : String(e);
+            console.error('solve model failed', engine, m, `${Date.now() - t1}ms`, last);
+            if (/글자 수 한도/.test(last) && !big) {
+              big = true;
+              continue;
+            }
+            const after = (e as { retryAfter?: number | null }).retryAfter;
+            if (shared && /잠깐 막혔/.test(last) && waited < 30_000 && Date.now() - t0 < SOLVE_BUDGET) {
+              // 서비스가 알려 준 시간(retry-after)만큼, 없으면 5·10·15초 쉬었다가 같은 모델로 (모두 합쳐 30초까지)
+              const ms = Math.min(15_000, after != null ? after * 1000 + 300 : 5000 * (again + 1), 30_000 - waited);
+              waited += ms;
+              step(`잠깐 막혀서 ${Math.round(ms / 1000)}초 기다렸다 다시 묻는 중`);
+              await new Promise((r) => setTimeout(r, ms));
+              continue;
+            }
+            break;
+          }
         }
+        tried.push(`${short(m)}: ${last.slice(0, 80)}`);
+        // 계정 전체가 막힌 것(하루 사용량 · 크레딧) · 기다려도 계속 막힌 것은 멈추고, 그 모델만 바쁘거나(503) 없거나(404) 한 것은 잠깐 쉬고 다음 모델로
+        if (/사용량|크레딧/.test(last) || (shared && /잠깐 막혔/.test(last))) break;
+        if (i < list.length - 1) await new Promise((r) => setTimeout(r, /^503|busy|잠깐 막혔/i.test(last) ? 1500 : 500));
       }
       // 어떤 모델을 해 봤고 각각 왜 안 됐는지 화면에도 보이게
       throw new Error(tried.length > 1 ? `모델 ${tried.length}개 모두 안 됐어요 → ${tried.join(' / ')}` : last || '답하지 못했어요');
@@ -725,7 +736,7 @@ export class Accounts extends DurableObject<Env> {
       let models = pickCompat(entry.json, needImage, c.prefer);
       if (!models.length && dropStored()) models = pickCompat(entry.json, false, c.prefer);
       if (!models.length) return fail(needImage ? '이 서비스에는 사진을 읽는 모델이 없어요. 다른 모델을 골라 주세요.' : '쓸 수 있는 모델이 없어요.', 503);
-      return await tryModels(models, (m) => askCompat(entry.base, key, m, turns));
+      return await tryModels(models, (m, big) => askCompat(entry.base, key, m, turns, big ? 16_000 : 6000), engine === 'mistral');
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       console.error('solve failed', engine, msg);

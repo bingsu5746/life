@@ -265,8 +265,8 @@ function waitErr(msg: string, h: Headers): Error & { retryAfter?: number | null 
   return Object.assign(new Error(msg), { retryAfter: retryAfter(h) });
 }
 
-export async function askCompat(base: string, key: string, model: string, turns: SolveTurn[]): Promise<{ text: string; remaining: number | null }> {
-  const res = await fetch(`${base}/chat/completions`, { method: 'POST', headers: { 'content-type': 'application/json', authorization: `Bearer ${key}` }, body: JSON.stringify({ model, messages: chatMessages(turns), max_tokens: 6000 }) });
+export async function askCompat(base: string, key: string, model: string, turns: SolveTurn[], maxTokens = 6000): Promise<{ text: string; remaining: number | null }> {
+  const res = await fetch(`${base}/chat/completions`, { method: 'POST', headers: { 'content-type': 'application/json', authorization: `Bearer ${key}` }, body: JSON.stringify({ model, messages: chatMessages(turns), max_tokens: maxTokens }) });
   const j = (await res.json().catch(() => null)) as { error?: { message?: string } | string; message?: string } | null;
   const remaining = remainingFrom(res.headers);
   console.log('solve limit headers', base, JSON.stringify(limitHeaders(res.headers)));
