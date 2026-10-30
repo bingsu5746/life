@@ -1,7 +1,7 @@
 // 문제 풀이: AI 대화 화면. ＋ 로 사진 넣기 · 모델 고르기 · 보내기. 대화는 이 기기에만 저장(글만)
 import { useEffect, useRef, useState } from 'react';
 import { isLoggedIn, solveImgPut, solveImgUrl, solveUsage, type SolveEngine, type SolveTurn } from '../auth/api';
-import { getSolveJob, load, markJobSeen, migrateChats, saveChat, startSolve, useSolveJob, type Chat, type Msg } from './solveJob';
+import { coolLeft, getSolveJob, load, markJobSeen, migrateChats, saveChat, startSolve, useSolveJob, type Chat, type Msg } from './solveJob';
 import { MathText } from '../../lib/mathText';
 import { compressForStorage, compressProblemImage } from '../../lib/imageCompress';
 import { Icon, Sheet, subjectsOf, SubjectDot, toast, useNow } from './ui';
@@ -90,6 +90,14 @@ export function Solve({ open }: { open?: string }) {
   const retryLast = retry?.msgs[retry.msgs.length - 1];
   const hasImage = files.length > 0 || !!retryLast?.images?.length || !!retryLast?.imgKeys?.length;
   const noVision = (k: SolveEngine) => hasImage && usage?.vision?.[k] === false;
+  /** 못 고르는 까닭: 사진을 못 읽음 · 오늘 다 씀 · 방금 오류 (잠시 뒤 다시) */
+  const blockedWhy = (k: SolveEngine) => {
+    if (noVision(k)) return '사진을 못 읽어요';
+    if (usage?.out[k]) return '오늘은 다 썼어요';
+    const left = coolLeft(k);
+    if (left > 0) return `방금 안 됐어요 · ${Math.ceil(left / 60_000)}분 뒤에 다시 고를 수 있어요`;
+    return '';
+  };
   /** 오늘 쓴 횟수 · 남은 횟수 (한도를 알 때만) */
   const countText = (k: SolveEngine) => {
     if (!usage) return '';
@@ -130,6 +138,10 @@ export function Solve({ open }: { open?: string }) {
     if (!isLoggedIn()) return toast('풀이는 로그인한 뒤에 쓸 수 있어요');
     // 한 번에 한 문제씩 (다른 대화를 푸는 중에 보내면 앞의 풀이를 잃는다)
     if (job?.status === 'running') return toast('다른 문제를 푸는 중이에요. 다 풀면 보내 주세요');
+    if (coolLeft(engine) > 0) {
+      setPicker(true);
+      return toast(`${eng.name} 은 방금 안 됐어요. 다른 모델을 골라 주세요`);
+    }
     if (!chat.msgs.length && !topic.trim()) return toast('제목을 먼저 써 주세요');
     const pics = files;
     const q = text.trim();
@@ -307,8 +319,8 @@ export function Solve({ open }: { open?: string }) {
             {shown.map((e) => (
               <button
                 key={e.key}
-                className={`${engine === e.key ? 'on' : ''} ${noVision(e.key) ? 'off' : ''}`}
-                disabled={noVision(e.key)}
+                className={`${engine === e.key ? 'on' : ''} ${blockedWhy(e.key) ? 'off' : ''}`}
+                disabled={!!blockedWhy(e.key)}
                 onClick={() => {
                   setEngine(e.key);
                   try {
@@ -327,7 +339,7 @@ export function Solve({ open }: { open?: string }) {
               >
                 <span>
                   <b>{e.name}</b>
-                  <small>{noVision(e.key) ? '사진을 못 읽어요' : e.desc}</small>
+                  <small>{blockedWhy(e.key) || e.desc}</small>
                 </span>
                 <span className="sv-right">
                   {countText(e.key) && <small className={usage?.out[e.key] ? 'bad' : ''}>{countText(e.key)}</small>}

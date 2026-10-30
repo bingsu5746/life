@@ -28,6 +28,7 @@ export interface Chat {
 
 export const CHATS_KEY = 'my-study.solve.chats';
 const JOB_KEY = 'my-study.solve.job';
+const COOL_KEY = 'my-study.solve.cool';
 const DUR_KEY = 'my-study.solve.durations';
 
 export const load = <T>(k: string, fb: T): T => {
@@ -57,6 +58,11 @@ export function migrateChats(have: Record<string, unknown>) {
   if (!old.length) return;
   for (const c of old) if (!have[c.id] && c.title) saveChat(c);
   store(CHATS_KEY, null);
+}
+
+/** 방금 오류가 난 모델을 다시 고를 수 있을 때까지 남은 ms (0 이면 고를 수 있음) */
+export function coolLeft(engine: string, now = Date.now()): number {
+  return Math.max(0, (load<Record<string, number>>(COOL_KEY, {})[engine] ?? 0) - now);
 }
 
 /** 예상 시간: 그 모델로 지난번까지 푼 시간 기록(저장소의 지난 대화, 다른 기기 것도)의 최근 10개 평균.
@@ -159,6 +165,8 @@ export async function startSolve(engine: SolveEngine, chat: Chat) {
 function finish(text: string, code: number, model?: string) {
   if (!job || job.status !== 'running') return;
   const ok = code >= 200 && code < 300;
+  // 안 된 모델은 잠시 못 고르게 (잠깐 막힘 3분 · 그 밖의 오류 5분)
+  if (!ok) store(COOL_KEY, { ...load<Record<string, number>>(COOL_KEY, {}), [job.engine]: Date.now() + (code === 429 ? 3 : 5) * 60_000 });
   if (ok) recordDuration(job.engine, job.hasImage, Date.now() - job.startedAt);
   const ms = Date.now() - job.startedAt;
   const result: Chat = { ...job.chat, at: Date.now(), msgs: [...job.chat.msgs, { role: 'assistant', text, model, error: ok ? undefined : true, engine: job.engine, ms: ok ? ms : undefined, img: job.hasImage || undefined }] };
