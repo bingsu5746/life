@@ -404,8 +404,8 @@ export const nbaRoster = (team: string) => call<{ season: number; players: NbaRo
 export const nbaCareer = (player: number) => call<{ rows: NbaCareerRow[]; at: number }>(`nba/career?player=${player}`);
 export const nbaGames = (date: string) => call<{ games: NbaGame[]; at: number; stale?: boolean }>(`nba/games?date=${date}`);
 
-/** 오늘의 쓸모없는 지식 (영어, 하루 하나) */
-export const uselessFact = () => call<{ text: string; day: string }>('fact');
+/** 쓸모없는 지식 (영어 → 한국어, 오늘 것 · random 이면 아무거나) */
+export const uselessFact = (random = false) => call<{ en: string; ko: string; day?: string }>(random ? 'fact?random=1' : 'fact');
 
 /** 공휴일 · 기념일 (한국천문연구원 특일 정보, 서버가 7일 기억) */
 export interface SpecialDay {

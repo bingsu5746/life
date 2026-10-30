@@ -7471,19 +7471,38 @@ body.focus-on {
   margin-top: 16px;
 }
 .hm-fact {
-  display: grid;
-  gap: 2px;
-  margin: 16px 0 0;
-  padding: 10px 14px;
-  border-radius: 12px;
-  background: var(--soft);
-  color: var(--muted);
-  font-size: 0.82rem;
-  line-height: 1.5;
+  margin: 20px 0 0;
+  padding: 14px 16px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--surface);
 }
-.hm-fact small {
-  font-size: 0.7rem;
+.hm-fact-h {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--muted);
+  font: inherit;
+  font-size: 0.78rem;
   font-weight: 600;
+  cursor: pointer;
+}
+.hm-fact-h i {
+  font-style: normal;
+  font-size: 0.9rem;
+}
+.hm-fact p {
+  margin: 6px 0 0;
+  color: var(--text);
+  font-size: 0.95rem;
+  line-height: 1.65;
+  word-break: keep-all;
+}
+.hm-fact.busy p {
+  opacity: 0.5;
 }
 .nba-face {
   flex: none;

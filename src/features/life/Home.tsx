@@ -13,7 +13,7 @@ import { useEffect, useState } from 'react';
 import { DEFAULT_PLACE, getWeather, weatherText, type Weather } from './weather';
 import { minutesText } from '../study/timer';
 import { AREAS } from '../study/tabs';
-import { go, Icon, useToday } from '../study/ui';
+import { go, Icon, toast, useToday } from '../study/ui';
 import { dayStreak, hobbyWeek, monthOf, monthSummary, weekWorkouts, won, workoutStreak } from './calc';
 
 export function Home(_: { loggedIn: boolean; onLogin: () => void }) {
@@ -271,26 +271,27 @@ function WeatherChip() {
   );
 }
 
-/** 맨 아래 작게: 오늘의 쓸모없는 지식 (uselessfacts.jsph.pl, 영어). 로그인했을 때만, 이 기기에 하루 기억 */
+/** 맨 아래: 쓸모없는 지식 (uselessfacts.jsph.pl, 한국어로 번역). 처음엔 오늘 것(이 기기에 하루 기억), 「쓸모없는 지식」을 누르면 다른 것 */
 function FactCard() {
   const day = new Date().toISOString().slice(0, 10);
-  const [text, setText] = useState(() => {
+  const [fact, setFact] = useState<{ en: string; ko: string } | null>(() => {
     try {
-      const c = JSON.parse(localStorage.getItem('my-study.fact') ?? 'null') as { day: string; text: string } | null;
-      return c?.day === day ? c.text : '';
+      const c = JSON.parse(localStorage.getItem('my-study.fact2') ?? 'null') as { day: string; en: string; ko: string } | null;
+      return c?.day === day ? { en: c.en, ko: c.ko } : null;
     } catch {
-      return '';
+      return null;
     }
   });
+  const [busy, setBusy] = useState(false);
   useEffect(() => {
-    if (text || !isLoggedIn()) return;
+    if (fact || !isLoggedIn()) return;
     let on = true;
     uselessFact()
       .then((r) => {
         if (!on) return;
-        setText(r.text);
+        setFact({ en: r.en, ko: r.ko });
         try {
-          localStorage.setItem('my-study.fact', JSON.stringify({ day, text: r.text }));
+          localStorage.setItem('my-study.fact2', JSON.stringify({ day, en: r.en, ko: r.ko }));
         } catch {
           /* 무시 */
         }
@@ -299,12 +300,22 @@ function FactCard() {
     return () => {
       on = false;
     };
-  }, [text, day]);
-  if (!text) return null;
+  }, [fact, day]);
+  if (!fact) return null;
+  const next = () => {
+    if (busy) return;
+    setBusy(true);
+    uselessFact(true)
+      .then((r) => setFact({ en: r.en, ko: r.ko }))
+      .catch((e) => toast(e instanceof Error ? e.message : '다른 지식을 받지 못했어요'))
+      .finally(() => setBusy(false));
+  };
   return (
-    <p className="hm-fact" lang="en">
-      <small>오늘의 쓸모없는 지식</small>
-      {text}
-    </p>
+    <section className={`hm-fact ${busy ? 'busy' : ''}`}>
+      <button className="hm-fact-h" onClick={next} aria-label="다른 쓸모없는 지식 보기">
+        <span aria-hidden>💡</span> 쓸모없는 지식 <i aria-hidden>{busy ? '…' : '↻'}</i>
+      </button>
+      <p lang={fact.ko ? 'ko' : 'en'}>{fact.ko || fact.en}</p>
+    </section>
   );
 }

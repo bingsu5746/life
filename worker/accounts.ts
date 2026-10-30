@@ -20,6 +20,7 @@ import { findBooksAladin, findBooksKakao, findGames, findRecords, similarArtists
 import { fetchProviders } from './ott';
 import { relayFetch, type Relay } from './relay';
 import { fetchSpecialDays } from './holidays';
+import { cleanFact } from './fact';
 import { fetchAverage, fetchBox, fetchGames, fetchNbaAverages, fetchNbaBox, fetchNbaCareer, fetchNbaRoster, fetchNbaStandings, fetchStandings, nbaGameId, Paid, seasonOf, seasonPage, standingsFrom, type NbaGame } from './nba';
 import { monthOf, R2_FREE, R2_STOP, r2Block, rollMonth, type R2Use } from './r2guard';
 import { modelFamily, askCompat, askGemini, geminiDaily, pacificDay, askOpenRouter, COMPAT, compatModels, geminiModels, openRouterDaily, openRouterModels, pickCompat, SYSTEM as SOLVE_SYSTEM, type Engine, type SolveTurn } from './solve';
@@ -223,7 +224,7 @@ export class Accounts extends DurableObject<Env> {
     if (path === 'nba/players' && req.method === 'GET') return this.nbaPlayers();
     if (path === 'nba/roster' && req.method === 'GET') return this.nbaRoster((new URL(req.url).searchParams.get('team') ?? '').toUpperCase());
     if (path === 'nba/career' && req.method === 'GET') return this.nbaCareer(Number(new URL(req.url).searchParams.get('player')));
-    if (path === 'fact' && req.method === 'GET') return this.uselessFact();
+    if (path === 'fact' && req.method === 'GET') return this.uselessFact(user, new URL(req.url).searchParams.get('random') === '1');
     if (path === 'holidays' && req.method === 'GET') return this.holidays(new URL(req.url).searchParams.get('year'));
     if (path === 'dict/ko' && req.method === 'POST') return this.dictKo(body);
     if (path === 'lookup' && req.method === 'POST') return this.lookup(body);
@@ -1297,22 +1298,43 @@ export class Accounts extends DurableObject<Env> {
     }
   }
 
-  /** 오늘의 쓸모없는 지식 (uselessfacts.jsph.pl, 영어). 하루 한 번만 받는다. 글만 받으려고 Accept: text/plain (문서에 있는 형식) */
-  private async uselessFact(): Promise<Response> {
-    const day = new Date().toISOString().slice(0, 10);
+  /** 쓸모없는 지식 (uselessfacts.jsph.pl, 영어 → 한국어로 번역). 오늘 것은 하루 기억, random 이면 아무거나 하나 (번역 한도를 같이 쓴다)
+   *  글만 받으려고 Accept: text/plain (문서에 있는 형식). 출처 · 주소 같은 뒤에 붙은 글은 지운다 */
+  private async uselessFact(user: UserRow, random: boolean): Promise<Response> {
+    const get = async () => {
+      const res = await fetch(`https://uselessfacts.jsph.pl/api/v2/facts/${random ? 'random' : 'today'}?language=en`, { headers: { accept: 'text/plain' }, signal: AbortSignal.timeout(8000) });
+      if (!res.ok) throw new Error(`uselessfacts ${res.status}`);
+      const en = cleanFact(await res.text());
+      if (!en) throw new Error('uselessfacts 빈 답');
+      return { en, ko: await this.factKo(en) };
+    };
     try {
-      const r = await this.nbaCached(`fact:${day}`, DAY, async () => {
-        const res = await fetch('https://uselessfacts.jsph.pl/api/v2/facts/today?language=en', { headers: { accept: 'text/plain' }, signal: AbortSignal.timeout(8000) });
-        if (!res.ok) throw new Error(`uselessfacts ${res.status}`);
-        const text = (await res.text()).trim().slice(0, 600);
-        if (!text) throw new Error('uselessfacts 빈 답');
-        return text;
-      });
-      return json({ text: r.v, day });
+      if (random) {
+        const wait = this.translateByUser.hit(user.id);
+        if (wait) return fail(`너무 자주 눌렀어요. ${wait}초 뒤에 다시 해 주세요.`, 429);
+        return json(await get());
+      }
+      const day = new Date().toISOString().slice(0, 10);
+      const r = await this.nbaCached(`fact2:${day}`, DAY, get);
+      return json({ ...r.v, day });
     } catch (e) {
       console.error('fact failed', e instanceof Error ? e.message : String(e));
-      return fail('오늘의 지식을 받지 못했어요.', 502);
+      return fail('쓸모없는 지식을 받지 못했어요.', 502);
     }
+  }
+  /** 영어 지식 → 한국어 (번역과 같은 모델 · 한도). 안 되면 빈 글 (그때는 영어로 보여 준다) */
+  private async factKo(en: string): Promise<string> {
+    if (this.translateAll.hit('all')) return '';
+    const input = buildInput(en, 'ko', 'text');
+    for (const model of [TRANSLATE_MODEL, FAST_MODEL]) {
+      try {
+        const t = parseTranslation(readOutput(await this.env.AI.run(model as never, modelInput(model, input) as never)), 'text');
+        if (t?.text) return t.text.trim();
+      } catch (e) {
+        console.error('fact translate failed', model, e instanceof Error ? e.message : String(e));
+      }
+    }
+    return '';
   }
 
   /** 공휴일 · 기념일 (한 해씩, 7일 기억. 새로 정해진 대체공휴일도 일주일 안에 들어온다) */
