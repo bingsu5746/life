@@ -277,7 +277,12 @@ export function Solve() {
               const picked = [...(e.target.files ?? [])].slice(0, 4 - files.length);
               e.target.value = '';
               // 넣는 순간 줄인다 (가로 1400px · WebP, 안 되는 기기는 JPEG)
-              void Promise.all(picked.map((f) => compressProblemImage(f).catch(() => f))).then((blobs) => setFiles((cur) => [...cur, ...blobs.map((blob) => ({ blob, url: URL.createObjectURL(blob) }))].slice(0, 4)));
+              void Promise.all(picked.map((f) => compressProblemImage(f).catch(() => null))).then((blobs) => {
+                // 못 읽은 사진은 원본 그대로 보내지 않고 알려 준다 (형식이 맞지 않는 사진은 AI 가 거절함)
+                if (blobs.some((b) => !b)) toast('읽지 못한 사진이 있어요. 스크린샷이나 다른 사진으로 넣어 주세요');
+                const ok = blobs.filter((b): b is Blob => !!b);
+                setFiles((cur) => [...cur, ...ok.map((blob) => ({ blob, url: URL.createObjectURL(blob) }))].slice(0, 4));
+              });
             }}
           />
           <button className="sv-model" onClick={() => setPicker(true)}>
