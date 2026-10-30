@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { chatMessages, geminiBody, geminiChain, geminiDaily, pickGemini, pickOpenRouter, readChat, readGemini } from './solve';
+import { chatMessages, geminiBody, geminiChain, geminiDaily, pickGemini, pickCompat, pickOpenRouter, readChat, readGemini, retryAfter } from './solve';
 
 describe('solve', () => {
   it('Gemini Flash 모델 고르기', () => {
@@ -89,5 +89,15 @@ describe('사진 모델 순서', () => {
     const { pickCompat } = await import('./solve');
     const j = { data: [{ id: 'Qwen/Qwen3-VL-32B-Thinking' }, { id: 'Qwen/Qwen3-VL-32B-Instruct' }] };
     expect(pickCompat(j, true)).toEqual(['Qwen/Qwen3-VL-32B-Instruct', 'Qwen/Qwen3-VL-32B-Thinking']);
+  });
+});
+
+describe('코드 전용 모델 · retry-after', () => {
+  it('코드 전용 모델은 고르지 않는다', () => {
+    expect(pickCompat({ data: [{ id: 'moonshotai/Kimi-K2.7-Code' }, { id: 'Qwen/Qwen3-VL-32B' }] }, true)).toEqual(['Qwen/Qwen3-VL-32B']);
+  });
+  it('retry-after 를 초로 읽는다', () => {
+    expect(retryAfter(new Headers({ 'retry-after': '7' }))).toBe(7);
+    expect(retryAfter(new Headers())).toBeNull();
   });
 });

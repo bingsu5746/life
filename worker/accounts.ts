@@ -509,6 +509,7 @@ export class Accounts extends DurableObject<Env> {
     const tryModels = async (models: string[], ask: (m: string) => Promise<{ text: string; remaining?: number | null }>) => {
       let last = '';
       const tried: string[] = [];
+      let waited = 0;
       for (const m of models.slice(0, 6)) {
         try {
           const r = await ask(m);
@@ -519,8 +520,13 @@ export class Accounts extends DurableObject<Env> {
           console.error('solve model failed', engine, m, last);
           // 계정 전체가 막힌 것(하루 사용량 · 크레딧)만 멈추고, 그 모델만 바쁘거나(503) 없거나(404) 잠깐 막힌 것은 다음 모델로
           if (/사용량|크레딧/.test(last)) break;
-          // 다음 모델은 조금 쉬었다가 (초당 1번 같은 제한에 걸리지 않게)
-          await new Promise((r) => setTimeout(r, 1200));
+          // 잠깐 막힘(429) · 바쁨(503)은 계정 전체에 걸린 것이라 바로 다음 모델로 가도 또 막힌다.
+          // 서비스가 알려 준 시간(retry-after)만큼, 없으면 점점 길게 쉬었다가 (모두 합쳐 45초까지)
+          const after = (e as { retryAfter?: number | null }).retryAfter;
+          const busy = /잠깐 막혔|^503|busy/i.test(last);
+          const ms = busy ? Math.min(20_000, after != null ? after * 1000 + 300 : 4000 * (tried.length + 1), 45_000 - waited) : 1200;
+          waited += Math.max(0, ms);
+          if (ms > 0) await new Promise((r) => setTimeout(r, ms));
         }
       }
       // 어떤 모델을 해 봤고 각각 왜 안 됐는지 화면에도 보이게

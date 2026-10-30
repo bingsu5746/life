@@ -205,7 +205,7 @@ export const COMPAT: Record<'mistral' | 'groq' | 'siliconflow' | 'nvidia', { bas
 
 const VISION = /vl\b|-vl|vision|pixtral|mistral-(small|medium)|gemma-3|llama-4|grok-4|kimi-k2|qwen3\.5|omni/i;
 const SMART = /deepseek-(r1|v3)|qwen3|grok-4|magistral|mistral-large|kimi|glm-4\.|nemotron-.*(ultra|super)|gpt-oss|llama-4/i;
-const SKIP = /embed|rerank|whisper|tts|audio|image-gen|flux|stable-diffusion|moderation|ocr|guard|reward|coder|instruct-\d+k|safety/i;
+const SKIP = /embed|rerank|whisper|tts|audio|image-gen|flux|stable-diffusion|moderation|ocr|guard|reward|coder|codestral|-code\b|devstral|instruct-\d+k|safety/i;
 
 /** /models 응답에서 쓸 모델 고르기: 사진이면 사진을 읽는 모델(표시가 없으면 이름으로 짐작), 똑똑한 모델 먼저 */
 export function pickCompat(json: unknown, needImage: boolean, prefer?: RegExp): string[] {
@@ -249,6 +249,20 @@ export async function compatModels(base: string, key: string): Promise<unknown> 
   return res.json();
 }
 
+/** 다시 해도 되는 때(초): retry-after 머리글. 없으면 null */
+export function retryAfter(h: Headers): number | null {
+  const v = h.get('retry-after');
+  if (!v) return null;
+  const n = Number(v);
+  if (Number.isFinite(n)) return Math.max(0, n);
+  const t = Date.parse(v);
+  return Number.isFinite(t) ? Math.max(0, (t - Date.now()) / 1000) : null;
+}
+
+function waitErr(msg: string, h: Headers): Error & { retryAfter?: number | null } {
+  return Object.assign(new Error(msg), { retryAfter: retryAfter(h) });
+}
+
 export async function askCompat(base: string, key: string, model: string, turns: SolveTurn[]): Promise<{ text: string; remaining: number | null }> {
   const res = await fetch(`${base}/chat/completions`, { method: 'POST', headers: { 'content-type': 'application/json', authorization: `Bearer ${key}` }, body: JSON.stringify({ model, messages: chatMessages(turns), max_tokens: 6000 }) });
   const j = (await res.json().catch(() => null)) as { error?: { message?: string } | string; message?: string } | null;
@@ -257,10 +271,14 @@ export async function askCompat(base: string, key: string, model: string, turns:
   if (!res.ok) {
     const m = typeof j?.error === 'string' ? j.error : (j?.error?.message ?? j?.message ?? '');
     // 429 는 하루 한도일 수도, 잠깐(분·초) 막힌 것일 수도 있어서 서비스 말을 같이 남긴다
-    if (res.status === 429) throw new Error(/day|daily|quota|credit|insufficient|balance|month/i.test(m) ? `무료 사용량을 다 썼어요 (${m.slice(0, 120)})` : `잠깐 막혔어요: 너무 빨리 보냈어요${m ? ` (${m.slice(0, 120)})` : ''}`);
-    throw new Error(res.status === 402 ? '크레딧이 없어요' : `${res.status}: ${m}`.trim());
+    if (res.status === 429) throw waitErr(/day|daily|quota|credit|insufficient|balance|month/i.test(m) ? `무료 사용량을 다 썼어요 (${m.slice(0, 120)})` : `잠깐 막혔어요: 너무 빨리 보냈어요${m ? ` (${m.slice(0, 120)})` : ''}`, res.headers);
+    throw waitErr(res.status === 402 ? '크레딧이 없어요' : `${res.status}: ${m}`.trim(), res.headers);
   }
   const text = readChat(j);
-  if (!text) throw new Error('답이 비어 있어요');
+  if (!text) {
+    const why = s((j as { choices?: { finish_reason?: unknown }[] } | null)?.choices?.[0]?.finish_reason);
+    console.error('solve empty answer', model, why, JSON.stringify(j).slice(0, 600));
+    throw new Error(why === 'length' ? '생각하다가 글자 수 한도에 걸려 답을 못 썼어요' : `답이 비어 있어요${why ? ` (${why})` : ''}`);
+  }
   return { text, remaining };
 }
