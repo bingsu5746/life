@@ -41,9 +41,11 @@ const COOKIE = COOKIE_NAME;
 
 const DAY = 86_400_000;
 const enc = new TextEncoder();
-/** 한 모델을 기다리는 최대 시간 · 새 모델을 더 해 보지 않는 전체 시간 */
-const MODEL_TIMEOUT = 75_000;
-const SOLVE_BUDGET = 120_000;
+/** 한 모델을 기다리는 최대 시간 (오래 생각하는 추론 모델은 더 길게) · 새 모델을 더 해 보지 않는 전체 시간 */
+const MODEL_TIMEOUT = 60_000;
+const THINK_TIMEOUT = 150_000;
+const THINKING = /deepseek-r1|qwq|thinking|magistral|reasoner|gpt-oss|nemotron.*(ultra|super)/i;
+const SOLVE_BUDGET = 150_000;
 
 const hex = (buf: ArrayBuffer | Uint8Array) => [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, '0')).join('');
 const randomHex = (n: number) => hex(crypto.getRandomValues(new Uint8Array(n)));
@@ -623,7 +625,7 @@ export class Accounts extends DurableObject<Env> {
     const t0 = Date.now();
     const short = (m: string) => m.split('/').pop()!;
     /** 한 모델에 묻기: 너무 오래 걸리면(75초) 그 모델은 그만두고 다음으로 */
-    const timed = <T>(p: Promise<T>) => Promise.race([p, new Promise<never>((_, no) => setTimeout(() => no(new Error('너무 오래 걸려서 다음 모델로')), MODEL_TIMEOUT))]);
+    const timed = <T>(p: Promise<T>, m: string) => Promise.race([p, new Promise<never>((_, no) => setTimeout(() => no(new Error('너무 오래 걸려서 다음 모델로')), THINKING.test(m) ? THINK_TIMEOUT : MODEL_TIMEOUT))]);
     /** 앞에서부터 몇 개 모델을 해 보고, 사용량이 다 됐다는 답이면 바로 멈춘다 */
     const tryModels = async (models: string[], ask: (m: string) => Promise<{ text: string; remaining?: number | null }>) => {
       let last = '';
@@ -633,10 +635,10 @@ export class Accounts extends DurableObject<Env> {
       for (const [i, m] of list.entries()) {
         // 전체로 너무 오래 걸렸으면 새 모델은 그만
         if (i > 0 && Date.now() - t0 > SOLVE_BUDGET) break;
-        step(`${short(m)} 에게 묻는 중${list.length > 1 ? ` (${i + 1}/${list.length})` : ''}`);
+        step(`${short(m)} 에게 묻는 중${list.length > 1 ? ` (${i + 1}/${list.length})` : ''}${THINKING.test(m) ? ' · 오래 생각하는 모델이라 1~2분 걸릴 수 있어요' : ''}`);
         const t1 = Date.now();
         try {
-          const r = await timed(ask(m));
+          const r = await timed(ask(m), m);
           console.log('solve model ok', engine, m, `${Date.now() - t1}ms`);
           return ok({ text: r.text, model: m }, r.remaining);
         } catch (e) {
@@ -673,7 +675,7 @@ export class Accounts extends DurableObject<Env> {
           step(`${m} 에게 묻는 중`);
           const t1 = Date.now();
           try {
-            const text = await timed(askGemini(key, m, turns, this.gemFetch()));
+            const text = await timed(askGemini(key, m, turns, this.gemFetch()), m);
             console.log('solve model ok', 'gemini', m, `${Date.now() - t1}ms`);
             this.bumpGem(user.id, m);
             return ok({ text, model: m });
