@@ -1,4 +1,5 @@
 // 메인: 공부 · 운동 · 돈 · 취미 · 일기를 한눈에. 누르면 그 영역으로
+import { isLoggedIn, uselessFact } from '../auth/api';
 import { exportBackup } from '../study/backup';
 import { addDays, dday, longDate, weekStart, weekday } from '../study/dates';
 import { upcomingExams } from '../study/exams';
@@ -194,6 +195,7 @@ export function Home(_: { loggedIn: boolean; onLogin: () => void }) {
           );
         })}
       </div>
+      <FactCard />
       {(() => {
         const last = d.settings.lastBackup;
         const days = last ? Math.floor((Date.parse(today) - Date.parse(last)) / 86_400_000) : null;
@@ -266,5 +268,43 @@ function WeatherChip() {
         {t.text} · {w.max}° / {w.min}°{w.rain !== null && w.rain >= 30 ? ` · 비 ${w.rain}%` : ''}
       </small>
     </div>
+  );
+}
+
+/** 맨 아래 작게: 오늘의 쓸모없는 지식 (uselessfacts.jsph.pl, 영어). 로그인했을 때만, 이 기기에 하루 기억 */
+function FactCard() {
+  const day = new Date().toISOString().slice(0, 10);
+  const [text, setText] = useState(() => {
+    try {
+      const c = JSON.parse(localStorage.getItem('my-study.fact') ?? 'null') as { day: string; text: string } | null;
+      return c?.day === day ? c.text : '';
+    } catch {
+      return '';
+    }
+  });
+  useEffect(() => {
+    if (text || !isLoggedIn()) return;
+    let on = true;
+    uselessFact()
+      .then((r) => {
+        if (!on) return;
+        setText(r.text);
+        try {
+          localStorage.setItem('my-study.fact', JSON.stringify({ day, text: r.text }));
+        } catch {
+          /* 무시 */
+        }
+      })
+      .catch(() => {});
+    return () => {
+      on = false;
+    };
+  }, [text, day]);
+  if (!text) return null;
+  return (
+    <p className="hm-fact" lang="en">
+      <small>오늘의 쓸모없는 지식</small>
+      {text}
+    </p>
   );
 }

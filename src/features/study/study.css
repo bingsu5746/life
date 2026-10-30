@@ -7470,3 +7470,18 @@ body.focus-on {
 .nba-career-h {
   margin-top: 16px;
 }
+.hm-fact {
+  display: grid;
+  gap: 2px;
+  margin: 16px 0 0;
+  padding: 10px 14px;
+  border-radius: 12px;
+  background: var(--soft);
+  color: var(--muted);
+  font-size: 0.82rem;
+  line-height: 1.5;
+}
+.hm-fact small {
+  font-size: 0.7rem;
+  font-weight: 600;
+}

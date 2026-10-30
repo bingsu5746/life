@@ -396,6 +396,9 @@ export const nbaRoster = (team: string) => call<{ season: number; players: NbaRo
 export const nbaCareer = (player: number) => call<{ rows: NbaCareerRow[]; at: number }>(`nba/career?player=${player}`);
 export const nbaGames = (date: string) => call<{ games: NbaGame[]; at: number; stale?: boolean }>(`nba/games?date=${date}`);
 
+/** 오늘의 쓸모없는 지식 (영어, 하루 하나) */
+export const uselessFact = () => call<{ text: string; day: string }>('fact');
+
 /** 공휴일 · 기념일 (한국천문연구원 특일 정보, 서버가 7일 기억) */
 export interface SpecialDay {
   date: string;
@@ -429,7 +432,7 @@ export async function musicSimilar(artists: string[], have: string[]) {
 }
 
 // ===== 문제 풀이 AI =====
-export type SolveEngine = 'gemini' | 'openrouter' | 'mistral' | 'groq' | 'siliconflow' | 'nvidia' | 'cloudflare';
+export type SolveEngine = 'gemini' | 'openrouter' | 'mistral' | 'groq' | 'siliconflow' | 'nvidia' | 'huggingface' | 'cloudflare';
 export interface SolveTurn {
   role: 'user' | 'assistant';
   text: string;

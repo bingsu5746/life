@@ -1,6 +1,6 @@
 // 문제 풀이 AI: Gemini(무료 등급) · OpenRouter 무료 모델 · Cloudflare Workers AI(글만).
 // 모델 이름은 자주 바뀌어서 고정하지 않고, 각 서비스의 모델 목록에서 고른다.
-export type Engine = 'gemini' | 'openrouter' | 'mistral' | 'groq' | 'siliconflow' | 'nvidia' | 'cloudflare';
+export type Engine = 'gemini' | 'openrouter' | 'mistral' | 'groq' | 'siliconflow' | 'nvidia' | 'huggingface' | 'cloudflare';
 export interface SolveImage {
   mime: string;
   data: string;
@@ -194,7 +194,7 @@ export async function openRouterDaily(key: string): Promise<number | null> {
 
 // ===== OpenAI 모양 API (Mistral · Groq · SiliconFlow · NVIDIA) =====
 
-export const COMPAT: Record<'mistral' | 'groq' | 'siliconflow' | 'nvidia', { bases: string[]; keys: string[]; prefer?: RegExp; first?: RegExp }> = {
+export const COMPAT: Record<'mistral' | 'groq' | 'siliconflow' | 'nvidia' | 'huggingface', { bases: string[]; keys: string[]; prefer?: RegExp; first?: RegExp }> = {
   // 사진 · 표 · 수식 읽기: Pixtral · Mistral Medium 먼저
   // 무료 한도(콘솔 「제한」 화면, 2026-10-30): mistral-large-2512 은 분당 25만 토큰, large-4 · medium · small 은 분당 2만 토큰이라 large-2512 를 맨 먼저
   mistral: { bases: ['https://api.mistral.ai/v1'], keys: ['Mistral_api_key', 'MISTRAL_KEY'], first: /^mistral-large-2512$/i, prefer: /pixtral-large|mistral-medium|magistral-medium|mistral-large/i },
@@ -204,6 +204,8 @@ export const COMPAT: Record<'mistral' | 'groq' | 'siliconflow' | 'nvidia', { bas
   siliconflow: { bases: ['https://api.siliconflow.com/v1', 'https://api.siliconflow.cn/v1'], keys: ['Siliconflow', 'SILICONFLOW_KEY'], prefer: /deepseek-r1|qwq|qwen3-235b|qwen3.*thinking|deepseek-v3/i },
   // 가장 큰 모델 먼저 (수백 B · ultra)
   nvidia: { bases: ['https://integrate.api.nvidia.com/v1'], keys: ['Nvidia', 'NVIDIA', 'Nvidia_api_key', 'NVIDIA_KEY'], prefer: /deepseek-r1|qwen3-235b|nemotron.*ultra|405b|253b|kimi-k2|deepseek-v3/i },
+  // Hugging Face Inference Providers: OpenAI 와 같은 모양(router.huggingface.co/v1). 크레딧제라 다 쓰면 「크레딧이 없어요」(402)
+  huggingface: { bases: ['https://router.huggingface.co/v1'], keys: ['Huggingface', 'HuggingFace', 'Hugging_face', 'HF_TOKEN', 'HUGGINGFACE_KEY'], prefer: /gpt-oss-120b|deepseek-(r1|v3)|qwen3/i },
 };
 
 const VISION = /vl\b|-vl|vision|pixtral|mistral-(small|medium)|gemma-3|llama-4|grok-4|kimi-k2|qwen3\.5|omni/i;

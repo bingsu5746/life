@@ -222,6 +222,7 @@ export class Accounts extends DurableObject<Env> {
     if (path === 'nba/avg' && req.method === 'GET') return this.nbaAvg(new URL(req.url).searchParams);
     if (path === 'nba/roster' && req.method === 'GET') return this.nbaRoster((new URL(req.url).searchParams.get('team') ?? '').toUpperCase());
     if (path === 'nba/career' && req.method === 'GET') return this.nbaCareer(Number(new URL(req.url).searchParams.get('player')));
+    if (path === 'fact' && req.method === 'GET') return this.uselessFact();
     if (path === 'holidays' && req.method === 'GET') return this.holidays(new URL(req.url).searchParams.get('year'));
     if (path === 'dict/ko' && req.method === 'POST') return this.dictKo(body);
     if (path === 'lookup' && req.method === 'POST') return this.lookup(body);
@@ -541,7 +542,7 @@ export class Accounts extends DurableObject<Env> {
   private async solveUsage(user: UserRow): Promise<Response> {
     // 같은 사진 정리는 한 번만, 뒤에서
     if (this.r2() && !this.cacheGet(`r2dedup:${user.id}`)) this.ctx.waitUntil(this.r2Dedupe(user.id));
-    const engines: Engine[] = ['gemini', 'openrouter', 'mistral', 'groq', 'siliconflow', 'nvidia', 'cloudflare'];
+    const engines: Engine[] = ['gemini', 'openrouter', 'mistral', 'groq', 'siliconflow', 'nvidia', 'huggingface', 'cloudflare'];
     const available = engines.filter((e) => this.keyOf(e));
     const orKey = this.keyOf('openrouter');
     if (orKey && (!this.orDaily || Date.now() - this.orDaily.at > 6 * 3600_000)) this.orDaily = { at: Date.now(), v: await openRouterDaily(orKey).catch(() => null) };
@@ -565,7 +566,7 @@ export class Accounts extends DurableObject<Env> {
       if (!this.orList || Date.now() - this.orList.at > 6 * 3600_000) this.orList = { at: Date.now(), v: await openRouterModels().catch(() => []) };
       vision.openrouter = this.orList.v.some((m) => m.image);
     }
-    for (const e of ['mistral', 'groq', 'siliconflow', 'nvidia'] as const) {
+    for (const e of ['mistral', 'groq', 'siliconflow', 'nvidia', 'huggingface'] as const) {
       if (!available.includes(e)) continue;
       const entry = await this.compatEntry(e).catch(() => null);
       vision[e] = !!entry && pickCompat(entry.json, true, COMPAT[e].prefer).length > 0;
@@ -576,7 +577,7 @@ export class Accounts extends DurableObject<Env> {
 
   /** { engine, turns: [{ role, text, images: [{ mime, data(base64) }] }] } → { text, model } */
   private async solve(user: UserRow, b: Record<string, unknown>, origin: string, step: (s: string) => void = () => {}): Promise<Response> {
-    const ENG: Engine[] = ['gemini', 'openrouter', 'mistral', 'groq', 'siliconflow', 'nvidia', 'cloudflare'];
+    const ENG: Engine[] = ['gemini', 'openrouter', 'mistral', 'groq', 'siliconflow', 'nvidia', 'huggingface', 'cloudflare'];
     const engine = (ENG.includes(b.engine as Engine) ? b.engine : 'gemini') as Engine;
     const raw = Array.isArray(b.turns) ? b.turns.slice(-12) : [];
     let bytes = 0;
@@ -1279,6 +1280,24 @@ export class Accounts extends DurableObject<Env> {
       const msg = e instanceof Error ? e.message : String(e);
       console.error('nba.com career failed', player, msg);
       return fail(`커리어 기록을 받지 못했어요. (NBA 공식 데이터: ${msg.slice(0, 80)})`, 502);
+    }
+  }
+
+  /** 오늘의 쓸모없는 지식 (uselessfacts.jsph.pl, 영어). 하루 한 번만 받는다. 글만 받으려고 Accept: text/plain (문서에 있는 형식) */
+  private async uselessFact(): Promise<Response> {
+    const day = new Date().toISOString().slice(0, 10);
+    try {
+      const r = await this.nbaCached(`fact:${day}`, DAY, async () => {
+        const res = await fetch('https://uselessfacts.jsph.pl/api/v2/facts/today?language=en', { headers: { accept: 'text/plain' }, signal: AbortSignal.timeout(8000) });
+        if (!res.ok) throw new Error(`uselessfacts ${res.status}`);
+        const text = (await res.text()).trim().slice(0, 600);
+        if (!text) throw new Error('uselessfacts 빈 답');
+        return text;
+      });
+      return json({ text: r.v, day });
+    } catch (e) {
+      console.error('fact failed', e instanceof Error ? e.message : String(e));
+      return fail('오늘의 지식을 받지 못했어요.', 502);
     }
   }
 

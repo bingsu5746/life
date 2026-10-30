@@ -14,6 +14,7 @@ const ENGINES: { key: SolveEngine; name: string; desc: string }[] = [
   { key: 'mistral', name: 'Mistral', desc: '무료 · 과학 표/그래프 · 복잡한 수식 사진 읽기 특화' },
   { key: 'groq', name: 'Groq', desc: '무료 · 영어 독해 · 초고속 답변' },
   { key: 'nvidia', name: 'NVIDIA NIM', desc: '무료 · 고3 4점 킬러 문항용 초대형 모델' },
+  { key: 'huggingface', name: 'Hugging Face', desc: '크레딧제 · 여러 회사의 공개 모델 (크레딧 다 쓰면 멈춰요)' },
   { key: 'openrouter', name: 'OpenRouter', desc: '무료 모델 자동 선택 · 사진 읽기' },
   { key: 'siliconflow', name: 'SiliconFlow', desc: '무료 · 수학/물리 고난도 계산 특화' },
 ];
