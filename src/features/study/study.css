@@ -6659,3 +6659,28 @@ body.focus-on {
   border-color: var(--accent);
   color: var(--on-accent);
 }
+
+/* 집중 화면: 시간 아래 작은 멈춤 · 끝내기 */
+.focus-mini {
+  display: flex;
+  gap: 14px;
+}
+.focus-mini button {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border: 1px solid rgba(242, 242, 240, 0.22);
+  border-radius: 50%;
+  background: transparent;
+  cursor: pointer;
+}
+.focus-mini svg {
+  width: 18px;
+  height: 18px;
+  fill: rgba(242, 242, 240, 0.75);
+}
+.focus-mini button:active {
+  background: rgba(242, 242, 240, 0.12);
+}

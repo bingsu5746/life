@@ -87,7 +87,22 @@ export function FocusTimer({ timer, update, onStop, onExit }: { timer: TimerStat
         </svg>
         <div className="focus-time">
           <b className={paused ? 'paused' : ''}>{clock(v.shownMs)}</b>
-          <small>{v.finished ? (timer.phase === 'work' ? '공부 끝! 쉬어요' : '휴식 끝') : paused ? '멈춤' : timer.kind === 'pomo' && timer.phase === 'work' ? '남은 시간' : timer.kind === 'pomo' ? '쉬는 중' : '공부한 시간'}</small>
+          {v.finished ? (
+            <small>{timer.phase === 'work' ? '공부 끝! 쉬어요' : '휴식 끝'}</small>
+          ) : (
+            <div className="focus-mini" onPointerDown={(e) => e.stopPropagation()}>
+              <button aria-label={paused ? '이어서' : '멈춤'} onClick={() => (paused ? (primeAudio(), update(resume(timer, Date.now()))) : update(pause(timer, Date.now())))}>
+                <svg viewBox="0 0 24 24" aria-hidden>
+                  {paused ? <path d="M8 5.5v13l10.5-6.5z" /> : <path d="M7.5 5.5h3v13h-3zM13.5 5.5h3v13h-3z" />}
+                </svg>
+              </button>
+              <button aria-label="끝내고 기록" onClick={onStop}>
+                <svg viewBox="0 0 24 24" aria-hidden>
+                  <rect x="6.5" y="6.5" width="11" height="11" rx="2" />
+                </svg>
+              </button>
+            </div>
+          )}
         </div>
       </div>
       {timer.kind === 'pomo' && timer.phase !== 'work' && <BreakWords dark />}
@@ -121,8 +136,7 @@ export function FocusTimer({ timer, update, onStop, onExit }: { timer: TimerStat
               {timer.phase === 'work' ? '휴식 시작' : '다음 공부'}
             </button>
           )}
-          {!v.finished && <button onClick={() => (paused ? (primeAudio(), update(resume(timer, Date.now()))) : update(pause(timer, Date.now())))}>{paused ? '이어서' : '멈춤'}</button>}
-          <button onClick={onStop}>끝내고 기록</button>
+          {v.finished && <button onClick={onStop}>끝내고 기록</button>}
           <button onClick={onExit}>나가기</button>
         </div>
       </div>
