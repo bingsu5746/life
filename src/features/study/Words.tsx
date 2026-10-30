@@ -434,7 +434,7 @@ function WordSheet({ w, onClose }: { w: Word; onClose: () => void }) {
         <Field label="Day">
           <input className="st-input xs" inputMode="numeric" value={day} onChange={(e) => setDay(e.target.value.replace(/\D/g, ''))} />
         </Field>
-        {lang !== 'ko' && <EnDictBox word={w.term} />}
+        {lang !== 'ko' ? <EnDictBox word={w.term} /> : <KoDictBox word={w.term} />}
         <p className="st-hint">
           {w.box === 0 ? '새 단어' : w.learned ? '외움' : `${boxLabel(w.box, intervals)} · 다음 ${shortDate(w.due)}`} · 틀린 횟수 {w.wrong}
           {w.from && ` · 「${w.from}」에서`}
@@ -1024,6 +1024,42 @@ function EnDictBox({ word }: { word: string }) {
         ))}
       </ol>
       {e.synonyms.length > 0 && <small className="st-muted">비슷한 말: {e.synonyms.slice(0, 8).join(', ')}</small>}
+    </section>
+  );
+}
+
+/** 국어사전 자세히: 뜻 여러 개 · 쓰임 예문 (로그인했을 때) */
+function KoDictBox({ word }: { word: string }) {
+  const [senses, setSenses] = useState<Awaited<ReturnType<typeof dictKo>>['senses'] | null | undefined>(undefined);
+  useEffect(() => {
+    let on = true;
+    if (!isLoggedIn()) return setSenses(null);
+    dictKo(word, true)
+      .then((r) => on && setSenses(r.senses))
+      .catch(() => on && setSenses(null));
+    return () => {
+      on = false;
+    };
+  }, [word]);
+  if (senses === undefined) return <small className="st-muted">국어사전 찾는 중…</small>;
+  if (!senses?.length) return null;
+  return (
+    <section className="ed">
+      <ol className="ed-list">
+        {senses.slice(0, 6).map((x, i) => (
+          <li key={i}>
+            {x.pos && <small className="st-muted">「{x.pos}」 </small>}
+            {x.definition}
+            {x.examples &&
+              senses.findIndex((y) => JSON.stringify(y.examples) === JSON.stringify(x.examples)) === i &&
+              x.examples.slice(0, 3).map((e) => (
+                <div key={e} className="ed-ex">
+                  “{e}”
+                </div>
+              ))}
+          </li>
+        ))}
+      </ol>
     </section>
   );
 }

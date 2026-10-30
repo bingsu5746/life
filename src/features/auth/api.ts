@@ -305,8 +305,8 @@ export async function schoolInfo(body: { name: string; grade?: number; cls?: str
 }
 
 /** 국어 낱말 뜻 (표준국어대사전, 로그인한 사람만) */
-export async function dictKo(word: string) {
-  return call<{ senses: { word: string; pos?: string; definition: string }[] }>('dict/ko', 'POST', { word });
+export async function dictKo(word: string, detail = false) {
+  return call<{ senses: { word: string; pos?: string; definition: string; examples?: string[] }[] }>('dict/ko', 'POST', detail ? { word, detail: true } : { word });
 }
 
 // ===== 이름으로 찾기 (게임 · 책 · 음반) · 음악 추천 =====

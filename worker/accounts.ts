@@ -15,7 +15,7 @@ import { DurableObject } from 'cloudflare:workers';
 import { COOKIE_NAME, cutText, Limiter, passwordProblem, readCookie } from './security';
 import { fetchBoxOffice, fetchCatalogPage, fetchUpcoming } from './kobis';
 import { fetchEvents, fetchMeals, fetchTimetable, findSchool } from './neis';
-import { lookupKo } from './stdict';
+import { koExamples, lookupKo } from './stdict';
 import { findBooksAladin, findBooksKakao, findGames, findRecords, similarArtists } from './lookup';
 import { fetchProviders } from './ott';
 import { filmFacets, searchFilms, type Film } from './catalog';
@@ -702,11 +702,19 @@ export class Accounts extends DurableObject<Env> {
     if (!key) return fail('국어사전을 쓰려면 국립국어원 키(STDICT_KEY)가 필요해요.', 503);
     const q = typeof b.word === 'string' ? b.word.normalize('NFC').trim().slice(0, 30) : '';
     if (!q || !/[가-힣]/.test(q)) return fail('찾을 낱말을 한글로 골라 주세요.');
-    const ck = `stdict:${q}`;
+    // detail: 예문까지 (표제어마다 자세히 보기를 한 번 더 부른다)
+    const detail = b.detail === true;
+    const ck = `stdict${detail ? 'd' : ''}:${q}`;
     const c = this.sql.exec<{ data: string; at: number }>('SELECT data, at FROM cache WHERE key = ?', ck).toArray()[0];
     if (c && Date.now() - c.at < 30 * 86_400_000) return json({ senses: JSON.parse(c.data) });
     try {
       const senses = await lookupKo(key, q);
+      if (detail) {
+        const codes = [...new Set(senses.map((x) => x.code).filter((x): x is string => !!x))].slice(0, 3);
+        const ex = new Map<string, string[]>();
+        for (const code of codes) ex.set(code, await koExamples(key, code).catch(() => []));
+        for (const x of senses) if (x.code && ex.get(x.code)?.length) x.examples = ex.get(x.code);
+      }
       this.sql.exec('INSERT OR REPLACE INTO cache (key, data, at) VALUES (?, ?, ?)', ck, JSON.stringify(senses), Date.now());
       return json({ senses });
     } catch (e) {

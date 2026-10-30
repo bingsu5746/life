@@ -237,7 +237,7 @@ function WordPick({ from, today }: { from: string; today: string }) {
     const on = () => {
       const sel = window.getSelection();
       const t = sel?.toString().trim() ?? '';
-      const inText = !!sel?.anchorNode && !!(sel.anchorNode.parentElement?.closest('.ps-text'));
+      const inText = !!sel?.anchorNode && !!sel.anchorNode.parentElement?.closest('.ps-text');
       // 영어 낱말 1~4개만 (문장 전체를 고른 것은 무시)
       setTerm(inText && /^[A-Za-z][A-Za-z'’-]*(?:\s+[A-Za-z][A-Za-z'’-]*){0,3}$/.test(t) ? t.replace(/[’]/g, "'") : '');
     };
@@ -276,7 +276,7 @@ function WordPick({ from, today }: { from: string; today: string }) {
 /** 국어 지문: 낱말을 길게 눌러 고르면 표준국어대사전 뜻을 보여 주고, 「헷갈린 점」에 적어 둘 수 있다 */
 function KoPick({ p }: { p: Passage }) {
   const [term, setTerm] = useState('');
-  const [senses, setSenses] = useState<{ word: string; pos?: string; definition: string }[] | null>(null);
+  const [senses, setSenses] = useState<{ word: string; pos?: string; definition: string; examples?: string[] }[] | null>(null);
   const [busy, setBusy] = useState(false);
   useEffect(() => {
     const on = () => {
@@ -304,7 +304,7 @@ function KoPick({ p }: { p: Passage }) {
               if (!isLoggedIn()) return toast('국어사전은 로그인한 뒤에 쓸 수 있어요');
               setBusy(true);
               try {
-                setSenses((await dictKo(term)).senses);
+                setSenses((await dictKo(term, true)).senses);
               } catch (e) {
                 toast(e instanceof Error ? e.message : '뜻을 찾지 못했어요');
               } finally {
@@ -324,11 +324,18 @@ function KoPick({ p }: { p: Passage }) {
       {senses && senses.length > 0 && (
         <>
           <ol className="ps-senses">
-            {senses.slice(0, 4).map((s, i) => (
+            {senses.slice(0, 6).map((s, i) => (
               <li key={i}>
                 {s.word !== term && <b>{s.word} </b>}
                 {s.pos && <small className="st-muted">「{s.pos}」 </small>}
                 {s.definition}
+                {s.examples &&
+                  senses.findIndex((x) => JSON.stringify(x.examples) === JSON.stringify(s.examples)) === i &&
+                  s.examples.slice(0, 2).map((e) => (
+                    <div key={e} className="ed-ex">
+                      “{e}”
+                    </div>
+                  ))}
               </li>
             ))}
           </ol>

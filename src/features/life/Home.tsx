@@ -126,28 +126,21 @@ export function Home(_: { loggedIn: boolean; onLogin: () => void }) {
           <h2>{longDate(today)}</h2>
           <WeatherChip />
         </div>
-        <p className="st-sub">
-          <button className="st-link" onClick={() => go('/week')}>
-            이번 주 돌아보기
-          </button>{' '}
-          ·{' '}
-          <button className="st-link" onClick={() => go('/checkin')}>
-            하루 마감
-          </button>{' '}
-          ·{' '}
-          <button className="st-link" onClick={() => go('/calendar')}>
-            달력
-          </button>{' '}
-          ·{' '}
-          <button className="st-link" onClick={() => go('/plan')}>
-            한 주 계획
-          </button>{' '}
-          ·{' '}
-          <button className="st-link" onClick={() => go('/insights')}>
-            자세히 보기
-          </button>
-        </p>
       </header>
+      <nav className="hm-quick" aria-label="바로 가기">
+        {[
+          { to: '/calendar', icon: 'exams', label: '달력' },
+          { to: '/plan', icon: 'target', label: '주간 계획' },
+          { to: '/week', icon: 'review', label: '돌아보기' },
+          { to: '/checkin', icon: 'moon', label: '하루 마감', on: new Date().getHours() >= 20 },
+          { to: '/insights', icon: 'time', label: '통계' },
+        ].map((x) => (
+          <button key={x.to} className={x.on ? 'on' : ''} onClick={() => go(x.to)}>
+            <Icon name={x.icon} />
+            <span>{x.label}</span>
+          </button>
+        ))}
+      </nav>
       <ChangeBanner today={today} />
       <EveBanner today={today} />
       {weekday(today) === 0 && !d.settings.weekTargets?.[addDays(weekStart(today), 7)] && (

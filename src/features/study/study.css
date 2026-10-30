@@ -6630,3 +6630,32 @@ body.focus-on {
   color: var(--muted);
   font-style: italic;
 }
+
+/* 메인 바로 가기 */
+.hm-quick {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 8px;
+}
+.hm-quick button {
+  display: grid;
+  justify-items: center;
+  gap: 6px;
+  padding: 12px 4px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--surface);
+  font: inherit;
+  font-size: 0.78rem;
+  color: inherit;
+  cursor: pointer;
+}
+.hm-quick button .st-icon {
+  width: 22px;
+  height: 22px;
+}
+.hm-quick button.on {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--on-accent);
+}
