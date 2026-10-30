@@ -34,12 +34,45 @@ export function pickGemini(json: unknown, kind: 'flash' | 'pro' = 'flash'): stri
     .map((m) => m.name);
 }
 
-export function geminiBody(turns: SolveTurn[]) {
+/**
+ * 무료로 돌아가며 쓸 Gemini 모델 순서: Flash(새 판 먼저) → Flash Lite → Gemma 4.
+ * 무료 한도는 모델마다 따로라서(AI Studio 비율 제한 화면, 2026-10-30 기준) 하나가 다 되면 다음으로 넘어간다.
+ */
+export function geminiChain(json: unknown): string[] {
+  const models = (json as { models?: { name?: unknown; supportedGenerationMethods?: unknown }[] })?.models ?? [];
+  const ver = (n: string) => Number(n.match(/(?:gemini|gemma)-(\d+(?:\.\d+)?)/)?.[1] ?? 0);
+  const size = (n: string) => Number(n.match(/(\d+)b/)?.[1] ?? 0);
+  const ok = models
+    .map((m) => ({ name: s(m.name).replace(/^models\//, ''), gen: Array.isArray(m.supportedGenerationMethods) && m.supportedGenerationMethods.includes('generateContent') }))
+    .filter((m) => m.gen && !/image|tts|live|audio|embedding|native|transcribe|robotics|computer|preview|exp/.test(m.name));
+  const by = (re: RegExp, not?: RegExp) =>
+    ok
+      .filter((m) => re.test(m.name) && !(not && not.test(m.name)))
+      .sort((a, b) => ver(b.name) - ver(a.name) || size(b.name) - size(a.name) || a.name.length - b.name.length)
+      .map((m) => m.name);
+  return [...by(/^gemini-.*flash/, /lite/), ...by(/^gemini-.*flash-lite/), ...by(/^gemma-4/)];
+}
+
+/** 모델 하루 무료 한도 (AI Studio 비율 제한 화면 2026-10-30: Flash 20 · 3.1 이상 Flash Lite 500 · 2.5 Flash Lite 20 · Gemma 4 14,400) */
+export function geminiDaily(model: string): number | null {
+  if (/^gemma-4/.test(model)) return 14400;
+  const v = Number(model.match(/gemini-(\d+(?:\.\d+)?)/)?.[1] ?? 0);
+  if (/flash-lite/.test(model)) return v >= 3.1 ? 500 : 20;
+  if (/flash/.test(model)) return 20;
+  return null;
+}
+
+/** Gemini 하루 한도가 다시 차는 날짜: 태평양 시간 자정 기준 (Google 문서) */
+export const pacificDay = (now: number) => new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Los_Angeles' }).format(new Date(now));
+
+export function geminiBody(turns: SolveTurn[], model = '') {
+  // Gemma 는 시스템 지시를 따로 받지 않아서 첫 질문 앞에 붙인다
+  const gemma = model.startsWith('gemma');
   return {
-    systemInstruction: { parts: [{ text: SYSTEM }] },
-    contents: turns.map((t) => ({
+    ...(gemma ? {} : { systemInstruction: { parts: [{ text: SYSTEM }] } }),
+    contents: turns.map((t, i) => ({
       role: t.role === 'assistant' ? 'model' : 'user',
-      parts: [...(t.images ?? []).map((i) => ({ inlineData: { mimeType: i.mime, data: i.data } })), ...(t.text ? [{ text: t.text }] : [])],
+      parts: [...(t.images ?? []).map((im) => ({ inlineData: { mimeType: im.mime, data: im.data } })), ...(gemma && i === 0 ? [{ text: SYSTEM }] : []), ...(t.text ? [{ text: t.text }] : [])],
     })),
   };
 }
@@ -55,15 +88,14 @@ export function readGemini(json: unknown): string {
 
 const GEM = 'https://generativelanguage.googleapis.com/v1beta';
 
-export async function geminiModels(key: string): Promise<{ flash: string[]; pro: string[] }> {
+export async function geminiModels(key: string): Promise<string[]> {
   const res = await fetch(`${GEM}/models?pageSize=200`, { headers: { 'x-goog-api-key': key } });
   if (!res.ok) throw new Error(`Gemini 모델 목록 ${res.status}`);
-  const j = await res.json();
-  return { flash: pickGemini(j, 'flash'), pro: pickGemini(j, 'pro') };
+  return geminiChain(await res.json());
 }
 
 export async function askGemini(key: string, model: string, turns: SolveTurn[]): Promise<string> {
-  const res = await fetch(`${GEM}/models/${encodeURIComponent(model)}:generateContent`, { method: 'POST', headers: { 'content-type': 'application/json', 'x-goog-api-key': key }, body: JSON.stringify(geminiBody(turns)) });
+  const res = await fetch(`${GEM}/models/${encodeURIComponent(model)}:generateContent`, { method: 'POST', headers: { 'content-type': 'application/json', 'x-goog-api-key': key }, body: JSON.stringify(geminiBody(turns, model)) });
   console.log('solve limit headers', 'gemini', JSON.stringify(limitHeaders(res.headers)));
   const j = (await res.json().catch(() => null)) as { error?: { message?: string } } | null;
   if (!res.ok) throw new Error(res.status === 429 ? 'Gemini 무료 사용량을 다 썼어요' : `Gemini ${res.status}: ${j?.error?.message ?? ''}`.trim());

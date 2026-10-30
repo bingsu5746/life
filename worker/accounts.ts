@@ -19,7 +19,7 @@ import { koExamples, lookupKo } from './stdict';
 import { findBooksAladin, findBooksKakao, findGames, findRecords, similarArtists } from './lookup';
 import { fetchProviders } from './ott';
 import { monthOf, R2_FREE, R2_STOP, r2Block, rollMonth, type R2Use } from './r2guard';
-import { askCompat, askGemini, askOpenRouter, COMPAT, compatModels, geminiModels, openRouterDaily, openRouterModels, pickCompat, SYSTEM as SOLVE_SYSTEM, type Engine, type SolveTurn } from './solve';
+import { askCompat, askGemini, geminiDaily, pacificDay, askOpenRouter, COMPAT, compatModels, geminiModels, openRouterDaily, openRouterModels, pickCompat, SYSTEM as SOLVE_SYSTEM, type Engine, type SolveTurn } from './solve';
 import { filmFacets, searchFilms, type Film } from './catalog';
 import { buildRecommendInput, normTitle, readRecommendations, readRecommendRequest } from './recommend';
 import { allowedEndpoint, localDate, makeVapid, nextFire, sendPush, type PushSub, type Vapid } from './push';
@@ -277,7 +277,25 @@ export class Accounts extends DurableObject<Env> {
 
   // ===== 문제 풀이 AI =====
   private solveByUser = new Limiter(60, 60 * 60_000);
-  private gemList: { at: number; v: { flash: string[]; pro: string[] } } | null = null;
+  private gemList: { at: number; v: string[] } | null = null;
+
+  /** Gemini 모델마다 오늘(태평양 시간) 쓴 횟수 · 막힌 모델 */
+  private gemUse(userId: string): { n: Record<string, number>; out: Record<string, boolean> } {
+    const r = this.sql.exec<{ data: string }>('SELECT data FROM cache WHERE key = ?', `gemuse:${userId}:${pacificDay(Date.now())}`).toArray()[0];
+    const u = r ? JSON.parse(r.data) : {};
+    return { n: u.n ?? {}, out: u.out ?? {} };
+  }
+  private bumpGem(userId: string, model: string, out = false) {
+    const u = this.gemUse(userId);
+    if (out) u.out[model] = true;
+    else u.n[model] = (u.n[model] ?? 0) + 1;
+    this.sql.exec('INSERT OR REPLACE INTO cache (key, data, at) VALUES (?, ?, ?)', `gemuse:${userId}:${pacificDay(Date.now())}`, JSON.stringify(u), Date.now());
+  }
+  /** Gemini 모델 순서 중 아직 남은 것 (모델 · 남은 횟수) */
+  private gemLeft(userId: string): { model: string; left: number }[] {
+    const u = this.gemUse(userId);
+    return (this.gemList?.v ?? []).map((m) => ({ model: m, left: u.out[m] ? 0 : Math.max(0, (geminiDaily(m) ?? 20) - (u.n[m] ?? 0)) })).filter((x) => x.left > 0);
+  }
   private orList: { at: number; v: { id: string; image: boolean }[] } | null = null;
   private orDaily: { at: number; v: number | null } | null = null;
   /** OpenAI 모양 API: 맞는 주소와 모델 목록 (6시간) */
@@ -369,9 +387,20 @@ export class Accounts extends DurableObject<Env> {
     if (orKey && (!this.orDaily || Date.now() - this.orDaily.at > 6 * 3600_000)) this.orDaily = { at: Date.now(), v: await openRouterDaily(orKey).catch(() => null) };
     const u = this.solveUse(user.id);
     const left: Record<string, number> = { ...u.left };
+    let gemini: { flash: number; lite: number; gemma: number } | null = null;
+    const gk = this.keyOf('gemini');
+    if (gk) {
+      if (!this.gemList || Date.now() - this.gemList.at > DAY) this.gemList = { at: Date.now(), v: await geminiModels(gk).catch(() => []) };
+      if (this.gemList.v.length) {
+        const g = this.gemLeft(user.id);
+        left.gemini = g.reduce((a, x) => a + x.left, 0);
+        const sum = (re: RegExp, not?: RegExp) => g.filter((x) => re.test(x.model) && !(not && not.test(x.model))).reduce((a, x) => a + x.left, 0);
+        gemini = { flash: sum(/flash/, /lite/), lite: sum(/flash-lite/), gemma: sum(/^gemma/) };
+      }
+    }
     if (this.orDaily?.v) left.openrouter = Math.max(0, this.orDaily.v - (u.n.openrouter ?? 0));
     const r = this.r2Use();
-    return json({ available, used: u.n, out: u.out, left, r2: this.r2() ? { bytes: r.bytes, a: r.a, b: r.b + this.r2Ops, free: R2_FREE, stop: R2_STOP } : null });
+    return json({ available, used: u.n, out: u.out, left, gemini, r2: this.r2() ? { bytes: r.bytes, a: r.a, b: r.b + this.r2Ops, free: R2_FREE, stop: R2_STOP } : null });
   }
 
   /** { engine, turns: [{ role, text, images: [{ mime, data(base64) }] }] } → { text, model } */
@@ -414,7 +443,21 @@ export class Accounts extends DurableObject<Env> {
     try {
       if (engine === 'gemini') {
         if (!this.gemList || Date.now() - this.gemList.at > DAY) this.gemList = { at: Date.now(), v: await geminiModels(key) };
-        return await tryModels(this.gemList.v.flash.length ? this.gemList.v.flash : ['gemini-2.5-flash'], async (m) => ({ text: await askGemini(key, m, turns) }));
+        // 한도가 남은 모델부터. 한 모델이 다 됐다고(429) 하면 그 모델만 막고 다음 모델로
+        const chain = this.gemLeft(user.id).map((x) => x.model);
+        if (!chain.length) throw new Error('Gemini 무료 사용량을 다 썼어요');
+        let last = '';
+        for (const m of chain.slice(0, 4)) {
+          try {
+            const text = await askGemini(key, m, turns);
+            this.bumpGem(user.id, m);
+            return ok({ text, model: m });
+          } catch (e) {
+            last = e instanceof Error ? e.message : String(e);
+            if (/사용량/.test(last)) this.bumpGem(user.id, m, true);
+          }
+        }
+        throw new Error(last || 'Gemini 가 답하지 못했어요');
       }
       if (engine === 'openrouter') {
         if (!this.orList || Date.now() - this.orList.at > 6 * 3600_000) this.orList = { at: Date.now(), v: await openRouterModels() };

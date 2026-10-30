@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { chatMessages, geminiBody, pickGemini, pickOpenRouter, readChat, readGemini } from './solve';
+import { chatMessages, geminiBody, geminiChain, geminiDaily, pickGemini, pickOpenRouter, readChat, readGemini } from './solve';
 
 describe('solve', () => {
   it('Gemini Flash 모델 고르기', () => {
@@ -59,5 +59,25 @@ describe('OpenAI 모양 API', () => {
     expect(remainingFrom(new Headers({ 'x-ratelimit-remaining-requests-minute': '3', 'x-ratelimit-remaining-requests-day': '120' }))).toBe(120);
     expect(remainingFrom(new Headers({ 'x-ratelimit-remaining-requests-minute': '3' }))).toBeNull();
     expect(remainingFrom(new Headers({}))).toBeNull();
+  });
+});
+
+describe('Gemini 무료 모델 돌려 쓰기', () => {
+  const j = {
+    models: ['gemini-2.5-flash', 'gemini-3.8-flash', 'gemini-3.6-flash', 'gemini-3.5-flash-lite', 'gemini-2.5-flash-lite', 'gemma-4-31b-it', 'gemma-4-26b-it', 'gemini-3.1-pro', 'gemini-3.8-flash-tts', 'gemini-3.5-flash-preview-x'].map((n) => ({
+      name: `models/${n}`,
+      supportedGenerationMethods: ['generateContent'],
+    })),
+  };
+  it('Flash 새 판 → Flash Lite → Gemma 4 큰 것', () => {
+    expect(geminiChain(j)).toEqual(['gemini-3.8-flash', 'gemini-3.6-flash', 'gemini-2.5-flash', 'gemini-3.5-flash-lite', 'gemini-2.5-flash-lite', 'gemma-4-31b-it', 'gemma-4-26b-it']);
+  });
+  it('하루 한도', () => {
+    expect([geminiDaily('gemini-3.8-flash'), geminiDaily('gemini-3.5-flash-lite'), geminiDaily('gemini-2.5-flash-lite'), geminiDaily('gemma-4-31b-it')]).toEqual([20, 500, 20, 14400]);
+  });
+  it('Gemma 는 시스템 지시를 첫 질문에 붙인다', () => {
+    const b = geminiBody([{ role: 'user', text: '풀어 줘' }], 'gemma-4-31b-it') as { systemInstruction?: unknown; contents: { parts: { text?: string }[] }[] };
+    expect(b.systemInstruction).toBeUndefined();
+    expect(b.contents[0].parts[1]).toEqual({ text: '풀어 줘' });
   });
 });

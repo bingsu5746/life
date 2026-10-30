@@ -8,7 +8,7 @@ import { setSettings, useStudy } from './store';
 import { guessNoteSubject } from './mistakes';
 
 const ENGINES: { key: SolveEngine; name: string; desc: string }[] = [
-  { key: 'gemini', name: 'Gemini Flash', desc: '무료 · 전 과목 올라운더' },
+  { key: 'gemini', name: 'Gemini Flash', desc: '무료 · 전 과목 올라운더 · 다 쓰면 Lite → Gemma 로 · 한국 오후 4~5시에 다시 차요' },
   { key: 'siliconflow', name: 'SiliconFlow', desc: '무료 · 수학/물리 고난도 계산 특화' },
   { key: 'mistral', name: 'Mistral', desc: '무료 · 과학 표/그래프 · 복잡한 수식 사진 읽기 특화' },
   { key: 'groq', name: 'Groq', desc: '무료 · 영어 독해 · 초고속 답변' },
@@ -109,6 +109,7 @@ export function Solve() {
     const n = usage.used[k] ?? 0;
     const left = usage.left[k];
     const mine = d.settings.solveLimits?.[k];
+    if (k === 'gemini' && usage.gemini) return `Flash ${usage.gemini.flash} · Lite ${usage.gemini.lite} · Gemma ${usage.gemini.gemma.toLocaleString('ko-KR')}번`;
     if (typeof left === 'number') return `남은 ${left}번`;
     if (mine) return `남은 ${Math.max(0, mine - n)}번 / ${mine}`;
     return `오늘 ${n}번 · 한도 넣기`;
