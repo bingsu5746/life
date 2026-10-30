@@ -101,6 +101,11 @@ export function FocusTimer({ timer, update, onStop, onExit }: { timer: TimerStat
                   <rect x="6.5" y="6.5" width="11" height="11" rx="2" />
                 </svg>
               </button>
+              <button aria-label="집중 화면 닫기 (타이머는 계속)" onClick={onExit}>
+                <svg viewBox="0 0 24 24" aria-hidden className="line">
+                  <path d="M9 4H4v5M15 20h5v-5M4 4l6 6M20 20l-6-6" />
+                </svg>
+              </button>
             </div>
           )}
         </div>
@@ -137,7 +142,6 @@ export function FocusTimer({ timer, update, onStop, onExit }: { timer: TimerStat
             </button>
           )}
           {v.finished && <button onClick={onStop}>끝내고 기록</button>}
-          <button onClick={onExit}>나가기</button>
         </div>
       </div>
     </div>

@@ -1,12 +1,13 @@
 // 문제 풀이: AI 대화 화면. ＋ 로 사진 넣기 · 모델 고르기 · 보내기. 대화는 이 기기에만 저장(글만)
 import { useEffect, useRef, useState } from 'react';
-import { isLoggedIn, solveAsk, type SolveEngine, type SolveTurn } from '../auth/api';
+import { isLoggedIn, solveAsk, solveUsage, type SolveEngine, type SolveTurn } from '../auth/api';
 import { MathText } from '../../lib/mathText';
 import { shrink } from './photos';
 import { Icon, Sheet, toast } from './ui';
 
 const ENGINES: { key: SolveEngine; name: string; desc: string }[] = [
-  { key: 'gemini', name: 'Gemini', desc: '무료 · 사진 읽기 · 가장 정확해요' },
+  { key: 'gemini', name: 'Gemini Flash', desc: '무료 · 사진 읽기 · 빠르고 정확해요' },
+  { key: 'gemini-pro', name: 'Gemini Pro', desc: '가장 똑똑해요 · 결제를 켠 키에서만 · 하루 10번' },
   { key: 'openrouter', name: 'OpenRouter', desc: '무료 모델 자동 선택 · 하루 횟수 적음' },
   { key: 'cloudflare', name: 'Cloudflare AI', desc: '무료 · 글만 (사진은 기기에서 글자로 읽어 보내요)' },
 ];
@@ -62,7 +63,22 @@ export function Solve() {
   const fileRef = useRef<HTMLInputElement>(null);
   const endRef = useRef<HTMLDivElement>(null);
   const area = useRef<HTMLTextAreaElement>(null);
-  const eng = ENGINES.find((e) => e.key === engine)!;
+  const eng = ENGINES.find((e) => e.key === engine) ?? ENGINES[0];
+  const [usage, setUsage] = useState<Awaited<ReturnType<typeof solveUsage>> | null>(null);
+  useEffect(() => {
+    if (picker && isLoggedIn())
+      solveUsage()
+        .then(setUsage)
+        .catch(() => setUsage(null));
+  }, [picker]);
+  /** 오늘 쓴 횟수 · 남은 횟수 (한도를 알 때만) */
+  const countText = (k: SolveEngine) => {
+    if (!usage) return '';
+    if (usage.out[k]) return '오늘은 다 썼어요';
+    const n = usage.used[k] ?? 0;
+    const lim = usage.limits[k];
+    return lim ? `오늘 ${Math.max(0, lim - n)}번 더` : `오늘 ${n}번 씀`;
+  };
   useEffect(() => endRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' }), [chat.msgs.length, busy]);
   useEffect(() => {
     const a = area.current;
@@ -240,7 +256,10 @@ export function Solve() {
                   <b>{e.name}</b>
                   <small>{e.desc}</small>
                 </span>
-                {engine === e.key && <span className="sv-check">✓</span>}
+                <span className="sv-right">
+                  {countText(e.key) && <small className={usage?.out[e.key] ? 'bad' : ''}>{countText(e.key)}</small>}
+                  {engine === e.key && <span className="sv-check">✓</span>}
+                </span>
               </button>
             ))}
           </div>

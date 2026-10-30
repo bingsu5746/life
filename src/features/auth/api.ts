@@ -325,10 +325,11 @@ export async function musicSimilar(artists: string[], have: string[]) {
 }
 
 // ===== 문제 풀이 AI =====
-export type SolveEngine = 'gemini' | 'openrouter' | 'cloudflare';
+export type SolveEngine = 'gemini' | 'gemini-pro' | 'openrouter' | 'cloudflare';
 export interface SolveTurn {
   role: 'user' | 'assistant';
   text: string;
   images?: { mime: string; data: string }[];
 }
 export const solveAsk = (engine: SolveEngine, turns: SolveTurn[]) => call<{ text: string; model: string }>('solve', 'POST', { engine, turns });
+export const solveUsage = () => call<{ used: Record<string, number>; out: Record<string, boolean>; limits: Record<string, number | null> }>('solve/usage');

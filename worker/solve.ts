@@ -1,6 +1,6 @@
 // 문제 풀이 AI: Gemini(무료 등급) · OpenRouter 무료 모델 · Cloudflare Workers AI(글만).
 // 모델 이름은 자주 바뀌어서 고정하지 않고, 각 서비스의 모델 목록에서 고른다.
-export type Engine = 'gemini' | 'openrouter' | 'cloudflare';
+export type Engine = 'gemini' | 'gemini-pro' | 'openrouter' | 'cloudflare';
 export interface SolveImage {
   mime: string;
   data: string;
@@ -23,13 +23,13 @@ const s = (v: unknown) => (typeof v === 'string' ? v : '');
 
 // ===== Gemini =====
 
-/** 모델 목록에서 글 생성이 되는 Flash 모델 고르기 (lite·image·tts·live·audio 는 뺌, 숫자가 큰 판 먼저) */
-export function pickGemini(json: unknown): string[] {
+/** 모델 목록에서 글 생성이 되는 Flash(또는 Pro) 모델 고르기 (lite·image·tts·live·audio 는 뺌, 숫자가 큰 판 먼저) */
+export function pickGemini(json: unknown, kind: 'flash' | 'pro' = 'flash'): string[] {
   const models = (json as { models?: { name?: unknown; supportedGenerationMethods?: unknown }[] })?.models ?? [];
   const ver = (n: string) => Number(n.match(/gemini-(\d+(?:\.\d+)?)/)?.[1] ?? 0);
   return models
     .map((m) => ({ name: s(m.name).replace(/^models\//, ''), ok: Array.isArray(m.supportedGenerationMethods) && m.supportedGenerationMethods.includes('generateContent') }))
-    .filter((m) => m.ok && /^gemini-.*flash/.test(m.name) && !/lite|image|tts|live|audio|thinking-exp|embedding/.test(m.name))
+    .filter((m) => m.ok && (kind === 'pro' ? /^gemini-.*-pro/.test(m.name) : /^gemini-.*flash/.test(m.name)) && !/lite|image|tts|live|audio|thinking-exp|embedding/.test(m.name))
     .sort((a, b) => ver(b.name) - ver(a.name) || Number(/preview|exp/.test(a.name)) - Number(/preview|exp/.test(b.name)) || a.name.length - b.name.length)
     .map((m) => m.name);
 }
@@ -55,10 +55,11 @@ export function readGemini(json: unknown): string {
 
 const GEM = 'https://generativelanguage.googleapis.com/v1beta';
 
-export async function geminiModels(key: string): Promise<string[]> {
+export async function geminiModels(key: string): Promise<{ flash: string[]; pro: string[] }> {
   const res = await fetch(`${GEM}/models?pageSize=200`, { headers: { 'x-goog-api-key': key } });
   if (!res.ok) throw new Error(`Gemini 모델 목록 ${res.status}`);
-  return pickGemini(await res.json());
+  const j = await res.json();
+  return { flash: pickGemini(j, 'flash'), pro: pickGemini(j, 'pro') };
 }
 
 export async function askGemini(key: string, model: string, turns: SolveTurn[]): Promise<string> {
@@ -124,4 +125,12 @@ export async function askOpenRouter(key: string, model: string, turns: SolveTurn
   const t = readChat(j);
   if (!t) throw new Error('OpenRouter 모델이 답을 주지 않았어요');
   return t;
+}
+
+/** OpenRouter 키 정보: 충전한 적 없으면(is_free_tier) 무료 모델 하루 50번, 있으면 1000번 (OpenRouter 문서) */
+export async function openRouterDaily(key: string): Promise<number | null> {
+  const res = await fetch('https://openrouter.ai/api/v1/key', { headers: { authorization: `Bearer ${key}` } });
+  if (!res.ok) return null;
+  const j = (await res.json().catch(() => null)) as { data?: { is_free_tier?: unknown } } | null;
+  return j?.data?.is_free_tier === true ? 50 : j?.data?.is_free_tier === false ? 1000 : null;
 }

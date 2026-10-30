@@ -14,6 +14,7 @@ describe('solve', () => {
       ],
     };
     expect(pickGemini(j)).toEqual(['gemini-3.5-flash', 'gemini-2.5-flash']);
+    expect(pickGemini(j, 'pro')).toEqual(['gemini-3.5-pro']);
   });
   it('Gemini 요청 · 답', () => {
     const b = geminiBody([{ role: 'user', text: '풀어 줘', images: [{ mime: 'image/jpeg', data: 'AAA' }] }]);

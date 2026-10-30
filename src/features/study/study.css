@@ -5908,6 +5908,7 @@ body.focus-on {
   inset: 0;
   width: 100%;
   height: 100%;
+  pointer-events: none;
 }
 .focus-ring .track {
   fill: none;
@@ -5925,6 +5926,8 @@ body.focus-on {
   stroke: #7dd3a8;
 }
 .focus-time {
+  position: relative;
+  z-index: 1;
   display: grid;
   justify-items: center;
   gap: 6px;
@@ -6900,4 +6903,22 @@ body.focus-on {
   overflow-x: auto;
   overflow-y: hidden;
   padding: 4px 0;
+}
+.focus-mini svg.line {
+  fill: none;
+  stroke: rgba(242, 242, 240, 0.75);
+  stroke-width: 2;
+  stroke-linecap: round;
+}
+.sv-pick .sv-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: none;
+}
+.sv-pick .sv-right small {
+  white-space: nowrap;
+}
+.sv-pick small.bad {
+  color: var(--bad);
 }
