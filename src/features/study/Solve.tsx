@@ -1,7 +1,7 @@
 // 문제 풀이: AI 대화 화면. ＋ 로 사진 넣기 · 모델 고르기 · 보내기. 대화는 이 기기에만 저장(글만)
 import { useEffect, useRef, useState } from 'react';
 import { isLoggedIn, solveImgPut, solveImgUrl, solveUsage, type SolveEngine, type SolveTurn } from '../auth/api';
-import { load, markJobSeen, migrateChats, saveChat, startSolve, useSolveJob, type Chat, type Msg } from './solveJob';
+import { getSolveJob, load, markJobSeen, migrateChats, saveChat, startSolve, useSolveJob, type Chat, type Msg } from './solveJob';
 import { MathText } from '../../lib/mathText';
 import { compressForStorage, compressProblemImage } from '../../lib/imageCompress';
 import { Icon, Sheet, subjectsOf, SubjectDot, toast, useNow } from './ui';
@@ -53,18 +53,21 @@ export function Solve({ open }: { open?: string }) {
   };
   // 예전 대화를 저장소로 옮기기 · 저장소에서 고른 대화 열기
   useEffect(() => migrateChats(d.problems), []); // eslint-disable-line react-hooks/exhaustive-deps
+  // 옆 메뉴 「새 대화」(/ai) 를 누르면 새로
+  const lastOpen = useRef(open);
   useEffect(() => {
     const p = open ? d.problems[open] : undefined;
-    if (p && !p.deleted) setChat({ id: p.id, at: p.at, title: p.title, subjectId: p.subjectId, msgs: p.msgs });
+    const j = getSolveJob();
+    // 푸는 중이거나 아직 안 본 풀이가 있는 대화면 그쪽(질문·답이 더 새것)
+    if (j && open && j.chat.id === open && (j.status === 'running' || !j.seen)) setChat(j.result ?? j.chat);
+    else if (p && !p.deleted) setChat({ id: p.id, at: p.at, title: p.title, subjectId: p.subjectId, msgs: p.msgs });
+    else if (!open && lastOpen.current) setChat((c) => ({ id: Date.now().toString(36), at: Date.now(), title: '', subjectId: c.subjectId, msgs: [] }));
+    lastOpen.current = open;
   }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
-  const past = Object.values(d.problems)
-    .filter((p) => !p.deleted)
-    .sort((a, b) => b.at - a.at);
   const [text, setText] = useState('');
   const [files, setFiles] = useState<{ blob: Blob; url: string }[]>([]);
   const [busy, setBusy] = useState('');
   const [picker, setPicker] = useState(false);
-  const [history, setHistory] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
   const endRef = useRef<HTMLDivElement>(null);
   const area = useRef<HTMLTextAreaElement>(null);
@@ -168,16 +171,6 @@ export function Solve({ open }: { open?: string }) {
 
   return (
     <div className="sv">
-      <div className="sv-head">
-        <button className="st-link" onClick={() => setHistory(true)}>
-          지난 대화
-        </button>
-        {chat.msgs.length > 0 && (
-          <button className="st-link" onClick={() => setChat({ id: Date.now().toString(36), at: Date.now(), title: '', subjectId: chat.subjectId, msgs: [] })}>
-            새 대화
-          </button>
-        )}
-      </div>
       <div className="sv-msgs">
         {!chat.msgs.length && (
           <div className="sv-empty">
@@ -380,30 +373,6 @@ export function Solve({ open }: { open?: string }) {
                 <small>보낼 때 문제 글로 짐작해요</small>
               </span>
             </button>
-          </div>
-        </Sheet>
-      )}
-      {history && (
-        <Sheet title="지난 대화" onClose={() => setHistory(false)}>
-          <div className="sv-pick">
-            {!past.length && <p className="st-muted">아직 없어요.</p>}
-            {past.slice(0, 30).map((c) => (
-              <button
-                key={c.id}
-                onClick={() => {
-                  setChat({ id: c.id, at: c.at, title: c.title, subjectId: c.subjectId, msgs: c.msgs });
-                  setHistory(false);
-                }}
-              >
-                <span>
-                  <b>{c.title}</b>
-                  <small>
-                    {c.subjectId && d.subjects[c.subjectId] ? `${d.subjects[c.subjectId].name} · ` : ''}
-                    {new Date(c.at).toLocaleString('ko-KR', { month: 'numeric', day: 'numeric', hour: 'numeric', minute: '2-digit' })}
-                  </small>
-                </span>
-              </button>
-            ))}
           </div>
         </Sheet>
       )}

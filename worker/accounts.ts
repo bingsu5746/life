@@ -459,10 +459,12 @@ export class Accounts extends DurableObject<Env> {
         for (const o of r.objects) objs.push({ key: o.key, size: o.size, uploaded: o.uploaded.getTime() });
         cursor = r.truncated ? r.cursor : undefined;
       } while (cursor);
-      // 내용(SHA-256)이 같은 것끼리 묶기
+      // 내용(SHA-256)이 같은 것끼리 묶기. 똑같은 파일은 크기도 같으니, 크기가 겹치는 것만 받아 본다 (목록에는 크기가 같이 와서 읽기 횟수가 들지 않는다)
+      const bySize = new Map<number, number>();
+      for (const o of objs) bySize.set(o.size, (bySize.get(o.size) ?? 0) + 1);
       const groups = new Map<string, typeof objs>();
       let gets = 0;
-      for (const o of objs) {
+      for (const o of objs.filter((x) => (bySize.get(x.size) ?? 0) > 1)) {
         if (r2Block({ ...u, a: u.a + lists, b: u.b + gets }, 'get')) break;
         const obj = await bucket.get(o.key);
         gets++;

@@ -2993,6 +2993,7 @@ details[open] > :not(summary) {
   width: 100%;
   min-width: 0;
   touch-action: pan-y;
+  will-change: transform;
   user-select: none;
 }
 
@@ -4349,6 +4350,7 @@ body {
   border-radius: 22px;
   cursor: pointer;
   touch-action: pan-y;
+  will-change: transform;
   user-select: none;
   -webkit-user-select: none;
   transition: transform 0.26s cubic-bezier(0.2, 0.8, 0.2, 1);
@@ -7047,4 +7049,63 @@ body.focus-on {
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
+}
+
+/* 왼쪽으로 밀어 지우기 */
+.swd {
+  position: relative;
+  overflow: hidden;
+  border-radius: 12px;
+  transition:
+    height 0.2s,
+    opacity 0.2s;
+}
+.swd.gone {
+  opacity: 0;
+}
+.swd-bg {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  padding-right: 20px;
+  background: linear-gradient(90deg, transparent 0%, #e5484d 55%);
+  color: #fff;
+  pointer-events: none;
+}
+.swd-bg svg {
+  width: 26px;
+  height: 26px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  transition: transform 0.1s;
+}
+.swd-row {
+  position: relative;
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 8px;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  touch-action: pan-y;
+  will-change: transform;
+  user-select: none;
+  -webkit-user-select: none;
+  transition: transform 0.2s var(--ease, ease);
+}
+.st-nav .st-tab .st-icon.ai-dot {
+  width: 12px;
+  height: 12px;
+  margin: 6px;
+  border-radius: 50%;
+  flex: none;
 }

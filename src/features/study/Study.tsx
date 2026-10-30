@@ -21,7 +21,7 @@ const PHONE_TABS: string[] = ['today', 'exams', 'books', 'review', 'words', 'tim
 // 오늘 화면 말고는 열 때 받는다 (처음 여는 속도)
 const Books = lazy(() => import('./Books').then((m) => ({ default: m.Books })));
 const Life = lazy(() => import('./Life').then((m) => ({ default: m.Life })));
-import { useVaultCounts, VAULT_ITEMS, vaultItem } from './vault';
+import { askedSubjects, useVaultCounts, VAULT_ITEMS, vaultItem } from './vault';
 const Review = lazy(() => import('./Review').then((m) => ({ default: m.Review })));
 const Settings = lazy(() => import('./Settings').then((m) => ({ default: m.Settings })));
 const Time = lazy(() => import('./Time').then((m) => ({ default: m.Time })));
@@ -41,6 +41,7 @@ const Search = lazy(() => import('../life/Search').then((m) => ({ default: m.Sea
 const LifeWeekPage = lazy(() => import('../life/LifeWeek').then((m) => ({ default: m.LifeWeekPage })));
 const CheckinPage = lazy(() => import('../life/Checkin').then((m) => ({ default: m.CheckinPage })));
 const Diary = lazy(() => import('../life/Diary').then((m) => ({ default: m.Diary })));
+const SubjectProblems = lazy(() => import('./SavedProblems').then((m) => ({ default: m.SubjectProblems })));
 const Solve = lazy(() => import('./Solve').then((m) => ({ default: m.Solve })));
 const Translate = lazy(() => import('./Translate').then((m) => ({ default: m.Translate })));
 const Tutors = lazy(() => import('./Tutors').then((m) => ({ default: m.Tutors })));
@@ -156,6 +157,7 @@ export function Study({ path, loggedIn, syncReady = true, onLogin }: { path: str
   else if (p0 === 'travel') content = <Travel />;
   else if (area === 'hobby') content = <Hobby sub={path[1]} sub2={path[2]} />;
   else if (area === 'diary') content = <Diary sub={path[1]} />;
+  else if (area === 'ai' && path[1] === 's' && path[2]) content = <SubjectProblems subject={path[2]} />;
   else if (area === 'ai') content = <Solve open={path[1]} />;
   else if (tab === 'books') content = <Books id={id} sub={sub} />;
   else if (tab === 'tutor') content = <Tutors sub={id} />;
@@ -182,7 +184,8 @@ export function Study({ path, loggedIn, syncReady = true, onLogin }: { path: str
           ))}
         </nav>
       )}
-      {!running && area !== 'home' && area !== 'study' && (
+      {!running && area === 'ai' && <AiNav path={path} />}
+      {!running && area !== 'home' && area !== 'study' && area !== 'ai' && (
         <nav className="st-nav" aria-label={`${AREAS.find((a) => a.key === area)?.label} 메뉴`}>
           <button className="st-tab st-tab-home" onClick={() => go('/')}>
             <Icon name="area-home" />
@@ -357,6 +360,35 @@ function VaultNav({ sub }: { sub?: string }) {
           <span className="st-tab-label">{it.label}</span>
           <span className="st-tab-short">{it.short}</span>
           {counts[it.key] > 0 && <b className="st-count">{counts[it.key]}</b>}
+        </button>
+      ))}
+    </nav>
+  );
+}
+
+/** AI 화면 옆(폰은 아래) 메뉴: 새 대화 + 한 번이라도 물어본 과목들. 과목을 누르면 그 과목 질문 목록 */
+function AiNav({ path }: { path: string[] }) {
+  const d = useStudy();
+  const subjects = askedSubjects(d);
+  const openSubject = path[1] === 's' ? path[2] : path[1] ? (d.problems[path[1]]?.subjectId ?? 'none') : undefined;
+  return (
+    <nav className="st-nav" aria-label="AI 메뉴">
+      <button className="st-tab st-tab-home" onClick={() => go('/')}>
+        <Icon name="area-home" />
+        <span className="st-tab-label">메인으로</span>
+        <span className="st-tab-short">메인</span>
+      </button>
+      <button className={`st-tab ${!path[1] ? 'on' : ''}`} aria-current={!path[1] ? 'page' : undefined} onClick={() => go('/ai')}>
+        <Icon name="plus" />
+        <span className="st-tab-label">새 대화</span>
+        <span className="st-tab-short">새 대화</span>
+      </button>
+      {subjects.map((s) => (
+        <button key={s.id} className={`st-tab ${openSubject === s.id ? 'on' : ''}`} aria-current={openSubject === s.id ? 'page' : undefined} onClick={() => go(`/ai/s/${s.id}`)}>
+          <span className="st-icon ai-dot" style={{ background: d.subjects[s.id]?.color ?? 'var(--muted)' }} aria-hidden />
+          <span className="st-tab-label">{s.name}</span>
+          <span className="st-tab-short">{s.name}</span>
+          <b className="st-count muted">{s.n}</b>
         </button>
       ))}
     </nav>

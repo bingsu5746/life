@@ -8,13 +8,13 @@ export function AiPill({ onAi }: { onAi: boolean }) {
   if (!job || onAi) return null;
   if (job.status === 'running')
     return (
-      <button className="ai-pill run" onClick={() => (window.location.hash = '/ai')}>
+      <button className="ai-pill run" onClick={() => (window.location.hash = `/ai/${job.chat.id}`)}>
         <i /> AI 푸는 중 {Math.round((now - job.startedAt) / 1000)}초
       </button>
     );
   if (job.seen) return null;
   return (
-    <button className={`ai-pill ${job.status === 'done' ? 'ok' : 'bad'}`} onClick={() => (window.location.hash = '/ai')}>
+    <button className={`ai-pill ${job.status === 'done' ? 'ok' : 'bad'}`} onClick={() => (window.location.hash = `/ai/${job.chat.id}`)}>
       {job.status === 'done' ? 'AI 풀이 완료 ›' : 'AI 풀이 실패 ›'}
     </button>
   );
