@@ -35,7 +35,6 @@ export function Solve({ open }: { open?: string }) {
   const job = useSolveJob();
   // 푸는 중이거나 아직 안 본 풀이가 있으면 그 대화를 보여 준다
   const [chat, setChat] = useState<Chat>(() => (job && !job.seen ? (job.result ?? job.chat) : { id: Date.now().toString(36), at: Date.now(), title: '', subjectId: load<string>(SUBJECT_KEY, '') || undefined, msgs: [] }));
-  const now = useNow(1000);
   const solving = job?.status === 'running' && job.chat.id === chat.id ? job : null;
   const [subPick, setSubPick] = useState(false);
   const subject = chat.subjectId && d.subjects[chat.subjectId] && !d.subjects[chat.subjectId].deleted ? d.subjects[chat.subjectId] : undefined;
@@ -88,7 +87,8 @@ export function Solve({ open }: { open?: string }) {
   const [retry, setRetry] = useState<Chat | null>(null);
   const shown = usage ? ENGINES.filter((e) => usage.available.includes(e.key)) : ENGINES;
   // 사진이 있으면 사진을 못 읽는 서비스는 고를 수 없게
-  const hasImage = files.length > 0 || !!retry?.msgs[retry.msgs.length - 1]?.images?.length;
+  const retryLast = retry?.msgs[retry.msgs.length - 1];
+  const hasImage = files.length > 0 || !!retryLast?.images?.length || !!retryLast?.imgKeys?.length;
   const noVision = (k: SolveEngine) => hasImage && usage?.vision?.[k] === false;
   /** 오늘 쓴 횟수 · 남은 횟수 (한도를 알 때만) */
   const countText = (k: SolveEngine) => {
@@ -114,7 +114,7 @@ export function Solve({ open }: { open?: string }) {
   // 풀이가 끝나면 (다른 화면에 있다 왔어도) 이 대화에 붙인다. 못 풀었으면 다른 모델 고르기
   useEffect(() => {
     if (!job || job.status === 'running' || job.seen || !job.result) return;
-    if (job.chat.id === chat.id || !chat.msgs.length) {
+    if (job.chat.id === chat.id) {
       setChat(job.result);
       markJobSeen();
       if (job.status === 'error' && job.code && (job.code === 429 || job.code >= 500)) {
@@ -123,11 +123,13 @@ export function Solve({ open }: { open?: string }) {
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [job?.status, job?.id]);
+  }, [job?.status, job?.id, chat.id]);
 
   async function send() {
     if (busy || solving || (!text.trim() && !files.length)) return;
     if (!isLoggedIn()) return toast('풀이는 로그인한 뒤에 쓸 수 있어요');
+    // 한 번에 한 문제씩 (다른 대화를 푸는 중에 보내면 앞의 풀이를 잃는다)
+    if (job?.status === 'running') return toast('다른 문제를 푸는 중이에요. 다 풀면 보내 주세요');
     if (!chat.msgs.length && !topic.trim()) return toast('제목을 먼저 써 주세요');
     const pics = files;
     const q = text.trim();
@@ -207,7 +209,7 @@ export function Solve({ open }: { open?: string }) {
         {busy && <div className="sv-ai sv-busy">{busy}…</div>}
         {solving && (
           <div className="sv-ai sv-busy">
-            푸는 중… {Math.round((now - solving.startedAt) / 1000)}초 / 약 {Math.round(solving.estimate / 1000)}초<small className="st-muted"> · 다른 화면으로 가도 계속 풀어요</small>
+            푸는 중… <Elapsed from={solving.startedAt} />초 / 약 {Math.round(solving.estimate / 1000)}초<small className="st-muted"> · 다른 화면으로 가도 계속 풀어요</small>
           </div>
         )}
         <div ref={endRef} />
@@ -378,4 +380,10 @@ export function Solve({ open }: { open?: string }) {
       )}
     </div>
   );
+}
+
+/** 걸린 초: 이것만 1초마다 다시 그린다 (대화 전체를 다시 그리지 않게) */
+function Elapsed({ from }: { from: number }) {
+  const now = useNow(1000);
+  return <>{Math.round((now - from) / 1000)}</>;
 }

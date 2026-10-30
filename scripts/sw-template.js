@@ -34,7 +34,24 @@ self.addEventListener('fetch', (e) => {
     e.respondWith(fetch(req).catch(async () => (await caches.match('/', { ignoreSearch: true })) ?? Response.error()));
     return;
   }
-  e.respondWith((async () => (await caches.match(req)) ?? fetch(req))());
+  e.respondWith(
+    (async () => {
+      const hit = await caches.match(req);
+      if (hit) return hit;
+      const res = await fetch(req);
+      // 미리 받지 않은 사이트 파일(글꼴 조각 등)도 한 번 받으면 넣어 둔다 → 다음엔 바로 · 인터넷 없어도
+      if (res.ok && url.pathname.startsWith('/assets/') && !/^\/assets\/(pdf|tesseract)/.test(url.pathname)) {
+        const copy = res.clone();
+        e.waitUntil(
+          caches
+            .open(APP)
+            .then((c) => c.put(req, copy))
+            .catch(() => {}),
+        );
+      }
+      return res;
+    })(),
+  );
 });
 
 // 알림 (worker/push.ts 가 보낸 웹 푸시): 받은 제목·내용을 그대로 보여 준다

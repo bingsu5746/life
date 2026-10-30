@@ -9,6 +9,8 @@ export interface SolveTurn {
   role: 'user' | 'assistant';
   text: string;
   images?: SolveImage[];
+  /** 저장소(R2)에 둔 사진 열쇠 (서버가 꺼내 images 로 바꾼다) */
+  imgKeys?: string[];
 }
 
 export const SYSTEM = [
@@ -77,7 +79,7 @@ export function geminiBody(turns: SolveTurn[], model = '') {
     ...(gemma ? {} : { systemInstruction: { parts: [{ text: SYSTEM }] } }),
     contents: turns.map((t, i) => ({
       role: t.role === 'assistant' ? 'model' : 'user',
-      parts: [...(t.images ?? []).map((im) => ({ inlineData: { mimeType: im.mime, data: im.data } })), ...(gemma && i === 0 ? [{ text: SYSTEM }] : []), ...(t.text ? [{ text: t.text }] : [])],
+      parts: [...(t.images ?? []).map((im) => ({ inlineData: { mimeType: im.mime, data: im.data } })), ...(gemma && i === 0 ? [{ text: SYSTEM }] : []), ...(t.text ? [{ text: t.text }] : t.images?.length || (gemma && i === 0) ? [] : [{ text: '(사진 문제)' }])],
     })),
   };
 }
@@ -143,7 +145,7 @@ export function pickOpenRouter(json: unknown, needImage: boolean): string[] {
 export function chatMessages(turns: SolveTurn[]) {
   return [
     { role: 'system', content: SYSTEM },
-    ...turns.map((t) => (t.images?.length ? { role: t.role, content: [{ type: 'text', text: t.text || '이 문제를 풀어 줘.' }, ...t.images.map((i) => ({ type: 'image_url', image_url: { url: `data:${i.mime};base64,${i.data}` } }))] } : { role: t.role, content: t.text })),
+    ...turns.map((t) => (t.images?.length ? { role: t.role, content: [{ type: 'text', text: t.text || '이 문제를 풀어 줘.' }, ...t.images.map((i) => ({ type: 'image_url', image_url: { url: `data:${i.mime};base64,${i.data}` } }))] } : { role: t.role, content: t.text || '(사진 문제)' })),
   ];
 }
 

@@ -370,6 +370,8 @@ export class Accounts extends DurableObject<Env> {
     const key = `${user.id}:${id}`;
     if (this.running.has(key) || this.jobs.has(key)) return json({ jobId: id }, 202);
     this.running.add(key);
+    // 받아 가지 않은 지 하루 넘은 풀이 결과는 지운다
+    this.sql.exec("DELETE FROM cache WHERE key LIKE 'solvejob:%' AND at < ?", Date.now() - DAY);
     const work = this.solve(user, b, origin)
       .then(async (res) => ({ code: res.status, body: await res.text() }))
       .catch((e) => ({ code: 500, body: JSON.stringify({ error: `풀지 못했어요: ${e instanceof Error ? e.message : String(e)}` }) }))
@@ -566,15 +568,48 @@ export class Accounts extends DurableObject<Env> {
         .slice(0, 4)
         .filter((i): i is { mime: string; data: string } => !!i && typeof i === 'object' && /^image\/(jpeg|png|webp)$/.test(String((i as { mime?: unknown }).mime)) && typeof (i as { data?: unknown }).data === 'string' && /^[A-Za-z0-9+/=]+$/.test((i as { data: string }).data));
       bytes += images.reduce((a, i) => a + i.data.length, 0);
-      turns.push({ role: t.role === 'assistant' ? 'assistant' : 'user', text: typeof t.text === 'string' ? t.text.slice(0, 8000) : '', images: images.length ? images : undefined });
+      const imgKeys = (Array.isArray(t.imgKeys) ? t.imgKeys : []).filter((k): k is string => typeof k === 'string' && k.startsWith(`${user.id}/`) && /^[a-f0-9]{8,64}\/[a-z0-9]+-[a-f0-9]{8}\.(webp|jpg)$/.test(k)).slice(0, 4);
+      turns.push({ role: t.role === 'assistant' ? 'assistant' : 'user', text: typeof t.text === 'string' ? t.text.slice(0, 8000) : '', images: images.length ? images : undefined, imgKeys: !images.length && imgKeys.length ? imgKeys : undefined });
     }
+    // 이어서 묻기 · 다시 보내기: 사진을 다시 보내지 않았으면 저장소(R2)에 둔 사진을 꺼내 붙인다 (가장 최근 사진 질문 하나만)
+    const withKeys = [...turns].reverse().find((t) => t.imgKeys?.length);
+    let fromStore = false;
+    const bucket = this.r2();
+    if (withKeys && bucket && turns.reduce((a, t) => a + (t.images?.length ?? 0), 0) === 0) {
+      const imgs: { mime: string; data: string }[] = [];
+      for (const k0 of withKeys.imgKeys!) {
+        const u = this.r2Use();
+        if (r2Block({ ...u, b: u.b + this.r2Ops }, 'get')) break;
+        const k = this.cacheGet(`r2alias:${k0}`) ?? k0;
+        const obj = await bucket.get(k);
+        this.r2Ops++;
+        if (!obj) continue;
+        const buf = new Uint8Array(await obj.arrayBuffer());
+        let bin = '';
+        for (let i = 0; i < buf.length; i += 0x8000) bin += String.fromCharCode(...buf.subarray(i, i + 0x8000));
+        imgs.push({ mime: obj.httpMetadata?.contentType === 'image/webp' ? 'image/webp' : 'image/jpeg', data: btoa(bin) });
+        bytes += imgs[imgs.length - 1].data.length;
+      }
+      if (imgs.length) {
+        withKeys.images = imgs;
+        fromStore = true;
+      }
+    }
+    for (const t of turns) delete t.imgKeys;
     if (!turns.length || turns[turns.length - 1].role !== 'user') return fail('물어볼 문제를 넣어 주세요.');
     if (bytes > MAX_STORE) return fail('사진이 너무 커요. 사진 수를 줄여 주세요.', 413);
     const wait = this.solveByUser.hit(user.id);
     if (wait) return fail(`너무 자주 물었어요. ${wait}초 뒤에 다시 해 주세요.`, 429);
     const key = this.keyOf(engine);
     if (!key) return fail('이 모델의 키가 아직 없어요.', 503);
-    const needImage = turns.some((t) => t.images?.length);
+    let needImage = turns.some((t) => t.images?.length);
+    /** 저장소에서 꺼낸 사진(이어서 묻기)은 사진을 못 읽는 모델이면 빼고 글만 보낸다 */
+    const dropStored = () => {
+      if (!fromStore) return false;
+      for (const t of turns) delete t.images;
+      needImage = false;
+      return true;
+    };
     const ok = (r: { text: string; model: string }, left?: number | null) => (this.bumpUse(user.id, engine, { left }), json(r));
     /** 앞에서부터 몇 개 모델을 해 보고, 사용량이 다 됐다는 답이면 바로 멈춘다 */
     const tryModels = async (models: string[], ask: (m: string) => Promise<{ text: string; remaining?: number | null }>) => {
@@ -630,7 +665,8 @@ export class Accounts extends DurableObject<Env> {
       }
       if (engine === 'openrouter') {
         if (!this.orList || Date.now() - this.orList.at > 6 * 3600_000) this.orList = { at: Date.now(), v: await openRouterModels() };
-        const models = this.orList.v.filter((m) => !needImage || m.image).map((m) => m.id);
+        let models = this.orList.v.filter((m) => !needImage || m.image).map((m) => m.id);
+        if (!models.length && dropStored()) models = this.orList.v.map((m) => m.id);
         if (!models.length) return fail(needImage ? '지금 사진을 읽는 무료 모델이 없어요. 다른 모델을 골라 주세요.' : '지금 쓸 수 있는 무료 모델이 없어요.', 503);
         return await tryModels(models, async (m) => ({ text: await askOpenRouter(key, m, turns, origin) }));
       }
@@ -651,7 +687,7 @@ export class Accounts extends DurableObject<Env> {
           if (!text) throw new Error('Cloudflare AI 가 답을 주지 않았어요');
           return ok({ text, model: VISION_MODEL.replace('@cf/', '') });
         }
-        const out = await ai.run(TRANSLATE_MODEL, { messages: [{ role: 'system', content: SOLVE_SYSTEM }, ...turns.map((t) => ({ role: t.role, content: t.text }))], reasoning: { effort: 'medium' }, max_tokens: 6000 });
+        const out = await ai.run(TRANSLATE_MODEL, { messages: [{ role: 'system', content: SOLVE_SYSTEM }, ...turns.map((t) => ({ role: t.role, content: t.text || '(사진 문제)' }))], reasoning: { effort: 'medium' }, max_tokens: 6000 });
         const text = readOutput(out);
         if (!text) throw new Error('Cloudflare AI 가 답을 주지 않았어요');
         return ok({ text, model: TRANSLATE_MODEL.replace('@cf/', '') });
@@ -659,7 +695,8 @@ export class Accounts extends DurableObject<Env> {
       // Mistral · Groq · SiliconFlow · NVIDIA: 모델 목록에서 고르기
       const c = COMPAT[engine];
       const entry = await this.compatEntry(engine);
-      const models = pickCompat(entry.json, needImage, c.prefer);
+      let models = pickCompat(entry.json, needImage, c.prefer);
+      if (!models.length && dropStored()) models = pickCompat(entry.json, false, c.prefer);
       if (!models.length) return fail(needImage ? '이 서비스에는 사진을 읽는 모델이 없어요. 다른 모델을 골라 주세요.' : '쓸 수 있는 모델이 없어요.', 503);
       return await tryModels(models, (m) => askCompat(entry.base, key, m, turns));
     } catch (e) {

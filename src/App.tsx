@@ -89,7 +89,7 @@ export default function App() {
             {crumb.label}
           </button>
         )}
-        <AiPill onAi={path[0] === 'ai'} />
+        <AiPill ai={path[0] === 'ai' ? (path[1] ?? '') : undefined} />
         <div className="account">
           <button className="gear-btn search-btn" aria-label="검색" title="검색 ( / )" onClick={() => (window.location.hash = '/search')}>
             <svg viewBox="0 0 24 24" aria-hidden>

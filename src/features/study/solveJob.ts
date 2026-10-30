@@ -101,12 +101,30 @@ export const getSolveJob = () => job;
 export const markJobSeen = () => job && job.status !== 'running' && setJob({ ...job, seen: true });
 export const clearJob = () => setJob(null);
 
-const turnsOf = (msgs: Msg[]): SolveTurn[] => msgs.filter((m) => !m.error).map((m, i, all) => ({ role: m.role, text: m.text, images: i === all.length - 1 ? m.images : undefined }));
+/** 서버에 보낼 대화: 실패한 답은 빼고, 그래서 이어진 질문 둘은 하나로 합친다 (서비스마다 같은 쪽이 연달아 오면 거절하기도 해서).
+ *  사진은 마지막 질문 것만 직접 보내고, 그 전 사진 질문은 저장소 열쇠(imgKeys)만 보내면 서버가 꺼내 붙인다 */
+export function turnsOf(msgs: Msg[]): (SolveTurn & { imgKeys?: string[] })[] {
+  const out: (SolveTurn & { imgKeys?: string[] })[] = [];
+  const ok = msgs.filter((m) => !m.error);
+  ok.forEach((m, i) => {
+    const last = i === ok.length - 1;
+    const prev = out[out.length - 1];
+    const images = last ? m.images : undefined;
+    const imgKeys = images?.length ? undefined : m.imgKeys;
+    if (prev && prev.role === m.role) {
+      prev.text = [prev.text, m.text].filter(Boolean).join('\n\n');
+      if (images?.length) prev.images = images;
+      if (images?.length || imgKeys?.length) prev.imgKeys = imgKeys;
+    } else out.push({ role: m.role, text: m.text, images, imgKeys });
+  });
+  return out;
+}
 
 /** 풀이 맡기기 (대화의 마지막이 질문) */
 export async function startSolve(engine: SolveEngine, chat: Chat) {
   const id = Math.random().toString(36).slice(2, 12) + Date.now().toString(36);
-  const hasImage = !!chat.msgs[chat.msgs.length - 1]?.images?.length;
+  const lastMsg = chat.msgs[chat.msgs.length - 1];
+  const hasImage = !!lastMsg?.images?.length || !!lastMsg?.imgKeys?.length;
   setJob({ id, engine, chat, startedAt: Date.now(), estimate: estimateMs(engine, hasImage), hasImage, status: 'running' });
   try {
     await solveJobStart(engine, turnsOf(chat.msgs), id);

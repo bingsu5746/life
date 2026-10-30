@@ -330,6 +330,8 @@ export interface SolveTurn {
   role: 'user' | 'assistant';
   text: string;
   images?: { mime: string; data: string }[];
+  /** 저장소(R2)에 둔 사진 (서버가 꺼내 붙인다) */
+  imgKeys?: string[];
 }
 export const solveAsk = (engine: SolveEngine, turns: SolveTurn[]) => call<{ text: string; model: string }>('solve', 'POST', { engine, turns });
 export interface R2Info {

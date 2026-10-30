@@ -17,7 +17,8 @@ function serviceWorker(): Plugin {
       const root = join(import.meta.dirname, outDir);
       // 글자 인식·PDF 도구와 글꼴 조각은 쓸 때만 받는다 (크기가 커서 미리 받지 않음)
       const files = readdirSync(join(root, 'assets'))
-        .filter((f) => !/^(pdf|tesseract)/.test(f) && !f.endsWith('.woff2'))
+        // KaTeX 의 .ttf · .woff 는 브라우저가 .woff2 를 먼저 써서 받을 일이 없다
+        .filter((f) => !/^(pdf|tesseract)/.test(f) && !/\.(woff2?|ttf)$/.test(f))
         .map((f) => `/assets/${f}`);
       files.push('/', '/icon.svg', '/manifest.webmanifest');
       const h = createHash('sha256');

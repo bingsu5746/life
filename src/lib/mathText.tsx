@@ -1,4 +1,5 @@
 // AI 답 보여 주기: 간단한 마크다운(굵게 · 제목 · 목록 · 코드) + 수식(KaTeX: $…$, $$…$$, \(…\), \[…\])
+import { memo, useMemo } from 'react';
 import katex from 'katex';
 import 'katex/dist/katex.min.css';
 
@@ -47,6 +48,8 @@ export function toHtml(text: string): string {
   return parts.join('').replace(/\u0000(\d+)\u0000/g, (_, i) => holders[Number(i)]);
 }
 
-export function MathText({ text }: { text: string }) {
-  return <div className="mt" dangerouslySetInnerHTML={{ __html: toHtml(text) }} />;
-}
+/** 같은 글은 다시 그리지 않는다 (수식 그리기가 무거워서) */
+export const MathText = memo(function MathText({ text }: { text: string }) {
+  const html = useMemo(() => toHtml(text), [text]);
+  return <div className="mt" dangerouslySetInnerHTML={{ __html: html }} />;
+});
