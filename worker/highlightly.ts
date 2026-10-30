@@ -16,7 +16,11 @@ async function hl(key: string, path: string): Promise<unknown> {
 }
 
 /** 잠깐 확인용: 선수 기록 원본 앞부분 */
-export const hlRawStats = async (key: string, id: number) => JSON.stringify(await hl(key, `/players/${id}/statistics`)).slice(0, 3000);
+export const hlRawStats = async (key: string, id: number) => {
+  const j = (await hl(key, `/players/${id}/statistics`)) as { perSeason?: { stats?: { name: string }[] }[] }[];
+  const per = j?.[0]?.perSeason ?? [];
+  return JSON.stringify({ top: Object.keys(j?.[0] ?? {}), n: per.length, seasons: per.map((x) => ({ ...x, stats: x.stats?.length })), names: per[0]?.stats?.map((x) => x.name) });
+};
 
 const s = (v: unknown) => (typeof v === 'string' ? v : typeof v === 'number' ? String(v) : '');
 const n = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) ? v : typeof v === 'string' && v.trim() !== '' && Number.isFinite(Number(v)) ? Number(v) : 0);
