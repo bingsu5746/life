@@ -213,7 +213,8 @@ export function pickCompat(json: unknown, needImage: boolean, prefer?: RegExp): 
   return data
     .map((m) => ({ id: s(m.id), vision: m.capabilities?.vision === true || (m.capabilities?.vision === undefined && VISION.test(s(m.id))), chat: m.capabilities?.completion_chat !== false }))
     .filter((m) => m.id && m.chat && !SKIP.test(m.id) && (!needImage || m.vision))
-    .sort((a, b) => (prefer ? Number(prefer.test(b.id)) - Number(prefer.test(a.id)) : 0) || Number(SMART.test(b.id)) - Number(SMART.test(a.id)) || Number(/latest/.test(b.id)) - Number(/latest/.test(a.id)))
+    // 사진 모델은 「Thinking」 판이 자주 바빠서(503) 뒤로
+    .sort((a, b) => (needImage ? Number(/thinking/i.test(a.id)) - Number(/thinking/i.test(b.id)) : 0) || (prefer ? Number(prefer.test(b.id)) - Number(prefer.test(a.id)) : 0) || Number(SMART.test(b.id)) - Number(SMART.test(a.id)) || Number(/latest/.test(b.id)) - Number(/latest/.test(a.id)))
     .map((m) => m.id);
 }
 

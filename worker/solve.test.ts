@@ -83,3 +83,11 @@ describe('Gemini 무료 모델 돌려 쓰기', () => {
     expect(b.contents[0].parts[1]).toEqual({ text: '풀어 줘' });
   });
 });
+
+describe('사진 모델 순서', () => {
+  it('Thinking 판은 뒤로', async () => {
+    const { pickCompat } = await import('./solve');
+    const j = { data: [{ id: 'Qwen/Qwen3-VL-32B-Thinking' }, { id: 'Qwen/Qwen3-VL-32B-Instruct' }] };
+    expect(pickCompat(j, true)).toEqual(['Qwen/Qwen3-VL-32B-Instruct', 'Qwen/Qwen3-VL-32B-Thinking']);
+  });
+});
