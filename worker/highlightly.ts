@@ -15,6 +15,9 @@ async function hl(key: string, path: string): Promise<unknown> {
   return res.json();
 }
 
+/** 잠깐 확인용: 선수 기록 원본 앞부분 */
+export const hlRawStats = async (key: string, id: number) => JSON.stringify(await hl(key, `/players/${id}/statistics`)).slice(0, 3000);
+
 const s = (v: unknown) => (typeof v === 'string' ? v : typeof v === 'number' ? String(v) : '');
 const n = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) ? v : typeof v === 'string' && v.trim() !== '' && Number.isFinite(Number(v)) ? Number(v) : 0);
 const norm = (x: string) => x.toLowerCase().replace(/[^a-z0-9]/g, '');

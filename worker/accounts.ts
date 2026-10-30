@@ -22,7 +22,7 @@ import { relayFetch, type Relay } from './relay';
 import { fetchSpecialDays } from './holidays';
 import { cleanFact } from './fact';
 import { fetch2k } from './nba2k';
-import { fetchHlBox, fetchHlPlayerSeasons, fetchHlStandings, hlMatchId, sameTeam } from './highlightly';
+import { hlRawStats, fetchHlBox, fetchHlPlayerSeasons, fetchHlStandings, hlMatchId, sameTeam } from './highlightly';
 import { fetchGames, fetchNbaAverages, fetchBdlRoster, fetchNbaBox, fetchNbaCareer, fetchNbaRoster, fetchNbaStandings, fetchStandings, nbaGameId, Paid, seasonOf, seasonPage, standingsFrom, type NbaGame } from './nba';
 import { monthOf, R2_FREE, R2_STOP, r2Block, rollMonth, type R2Use } from './r2guard';
 import { modelFamily, askCompat, askGemini, geminiDaily, pacificDay, askOpenRouter, COMPAT, compatModels, geminiModels, openRouterDaily, openRouterModels, pickCompat, SYSTEM as SOLVE_SYSTEM, type Engine, type SolveTurn } from './solve';
@@ -1366,6 +1366,7 @@ export class Accounts extends DurableObject<Env> {
     if (!name) return fail('선수를 확인해 주세요.');
     const hk = this.hlKey();
     if (!hk) return fail('Highlightly 키가 없어요.', 503);
+    if (/^\d+$/.test(name)) return json({ raw: await hlRawStats(hk, Number(name)).catch((e) => String(e)) });
     try {
       const r = await this.nbaCached(`hl:player:${name.toLowerCase()}`, DAY, () => fetchHlPlayerSeasons(hk, name));
       return json({ player: r.v, at: r.at });
