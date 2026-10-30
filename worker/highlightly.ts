@@ -4,8 +4,10 @@
 // - GET /box-score/{matchId} → [홈팀, 원정팀] 각 { name, boxScores: [{ player{id,name,jersey}, statistics: [{ name, value }] }] }
 //   통계 이름은 문서 예: Total Minutes Played · Total Points Scored · Successful Field Goals (FGM) · Total Field Goals (FGA) …
 // - GET /players?name=… → { data: [{ id, fullName }] } · GET /players/{id}/statistics → [{ perSeason: [{ season, seasonBreakdown, stats: [{ name, value, category }] }] }]
+//   실제 응답(2026-10 확인): seasonBreakdown 은 모두 "Entire", season 은 시즌이 끝나는 해 (2026-27 시즌 = 2027).
+//   통계 이름 예: Avg. Points per Game · Avg. Rebounds per Game · Avg. Minutes per Game · Total Games Played · Field Goal Percentage(35.3 처럼 % 값)
 // 무료 플랜은 일부 결과가 숨겨질 수 있다고 문서에 있다 (plan.message)
-import type { NbaLine } from './nba';
+import type { NbaAverage, NbaLine } from './nba';
 
 const BASE = 'https://nba.highlightly.net';
 
@@ -14,13 +16,6 @@ async function hl(key: string, path: string): Promise<unknown> {
   if (!res.ok) throw new Error(`Highlightly ${res.status} ${(await res.text()).slice(0, 120)}`);
   return res.json();
 }
-
-/** 잠깐 확인용: 선수 기록 원본 앞부분 */
-export const hlRawStats = async (key: string, id: number) => {
-  const j = (await hl(key, `/players/${id}/statistics`)) as { perSeason?: { stats?: { name: string }[] }[] }[];
-  const per = j?.[0]?.perSeason ?? [];
-  return JSON.stringify({ top: Object.keys(j?.[0] ?? {}), n: per.length, seasons: per.map((x) => ({ ...x, stats: x.stats?.length })), names: per[0]?.stats?.map((x) => x.name) });
-};
 
 const s = (v: unknown) => (typeof v === 'string' ? v : typeof v === 'number' ? String(v) : '');
 const n = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) ? v : typeof v === 'string' && v.trim() !== '' && Number.isFinite(Number(v)) ? Number(v) : 0);
@@ -112,9 +107,32 @@ export async function fetchHlPlayerSeasons(key: string, name: string): Promise<{
         .join('/'),
       stats: (x.stats ?? []).map((st) => ({ name: s(st.name), value: n(st.value), category: s(st.category) })).filter((st) => st.name),
     }))
-    .filter((x) => x.season && !/entire/i.test(x.kind))
+    .filter((x) => x.season && x.stats.length)
     .sort((a, b) => b.season - a.season);
   return { id, seasons };
+}
+
+/** Highlightly 한 시즌 기록 → 우리 시즌 평균 칸 (season: 시즌이 시작하는 해) */
+export function hlAverage(seasons: HlSeason[], season: number): NbaAverage | null {
+  const x = seasons.find((y) => y.season === season + 1);
+  if (!x) return null;
+  const get = (name: string) => x.stats.find((st) => st.name === name)?.value ?? 0;
+  const gp = get('Total Games Played');
+  if (!gp) return null;
+  const min = get('Avg. Minutes per Game');
+  return {
+    gp,
+    min: min ? min.toFixed(1) : '',
+    pts: get('Avg. Points per Game'),
+    reb: get('Avg. Rebounds per Game'),
+    ast: get('Avg. Assists per Game'),
+    stl: get('Avg. Steals per Game'),
+    blk: get('Avg. Blocks per Game'),
+    tov: get('Avg. Turnovers per Game'),
+    fgPct: get('Field Goal Percentage'),
+    fg3Pct: get('3-Point Field Goal Percentage'),
+    ftPct: get('Free Throw Percentage'),
+  };
 }
 
 /** 순위 (동부 · 서부). 통계 이름에서 승 · 패를 찾는다 (못 찾으면 빈 목록 → 다른 길) */

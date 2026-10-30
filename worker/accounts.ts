@@ -22,7 +22,7 @@ import { relayFetch, type Relay } from './relay';
 import { fetchSpecialDays } from './holidays';
 import { cleanFact } from './fact';
 import { fetch2k } from './nba2k';
-import { hlRawStats, fetchHlBox, fetchHlPlayerSeasons, fetchHlStandings, hlMatchId, sameTeam } from './highlightly';
+import { hlAverage, fetchHlBox, fetchHlPlayerSeasons, fetchHlStandings, hlMatchId, sameTeam } from './highlightly';
 import { fetchGames, fetchNbaAverages, fetchBdlRoster, fetchNbaBox, fetchNbaCareer, fetchNbaRoster, fetchNbaStandings, fetchStandings, nbaGameId, Paid, seasonOf, seasonPage, standingsFrom, type NbaGame } from './nba';
 import { monthOf, R2_FREE, R2_STOP, r2Block, rollMonth, type R2Use } from './r2guard';
 import { modelFamily, askCompat, askGemini, geminiDaily, pacificDay, askOpenRouter, COMPAT, compatModels, geminiModels, openRouterDaily, openRouterModels, pickCompat, SYSTEM as SOLVE_SYSTEM, type Engine, type SolveTurn } from './solve';
@@ -1315,7 +1315,16 @@ export class Accounts extends DurableObject<Env> {
     } catch (e) {
       console.error('nba.com averages failed', e instanceof Error ? e.message : String(e));
     }
-    // balldontlie 시즌 평균은 유료(GOAT)라서 부르지 않는다. 화면이 Highlightly 시즌 기록을 대신 보여 준다
+    // balldontlie 시즌 평균은 유료(GOAT)라서 부르지 않는다. Highlightly 선수 시즌 기록으로 (이름으로 찾음)
+    const hk = this.hlKey();
+    if (hk && name) {
+      try {
+        const r = await this.nbaCached(`hl:player2:${name.toLowerCase()}`, DAY, () => fetchHlPlayerSeasons(hk, name));
+        return json({ avg: r.v ? hlAverage(r.v.seasons, season) : null, at: r.at, src: 'hl' });
+      } catch (e) {
+        console.error('highlightly avg failed', name, e instanceof Error ? e.message : String(e));
+      }
+    }
     return fail('NBA 공식 기록 서버가 지금 우리 서버에 답하지 않아서, 아래 Highlightly 기록으로 보여 줘요.', 502);
   }
 
@@ -1366,9 +1375,8 @@ export class Accounts extends DurableObject<Env> {
     if (!name) return fail('선수를 확인해 주세요.');
     const hk = this.hlKey();
     if (!hk) return fail('Highlightly 키가 없어요.', 503);
-    if (/^\d+$/.test(name)) return json({ raw: await hlRawStats(hk, Number(name)).catch((e) => String(e)) });
     try {
-      const r = await this.nbaCached(`hl:player:${name.toLowerCase()}`, DAY, () => fetchHlPlayerSeasons(hk, name));
+      const r = await this.nbaCached(`hl:player2:${name.toLowerCase()}`, DAY, () => fetchHlPlayerSeasons(hk, name));
       return json({ player: r.v, at: r.at });
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);

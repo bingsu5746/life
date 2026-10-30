@@ -974,7 +974,7 @@ function HlStats({ name }: { name: string }) {
       <div className="nba-days nba-seasons">
         {data.seasons.slice(0, 8).map((x, i) => (
           <button key={`${x.season}-${i}`} className={`nba-day ${i === open ? 'on' : ''}`} onClick={() => setOpen(i)}>
-            {x.season}
+            {x.season - 1}-{String(x.season).slice(2)}
             {x.team ? ` ${x.team}` : ''}
           </button>
         ))}
