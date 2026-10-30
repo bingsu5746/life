@@ -1317,51 +1317,65 @@ export class Accounts extends DurableObject<Env> {
 
   /** 쓸모없는 지식 (uselessfacts.jsph.pl, 영어 → 한국어로 번역). 오늘 것은 하루 기억, random 이면 아무거나 하나 (번역 한도를 같이 쓴다)
    *  글만 받으려고 Accept: text/plain (문서에 있는 형식). 출처 · 주소 같은 뒤에 붙은 글은 지운다 */
+  /** 쓸모없는 지식. 받아서 번역한 것은 서버에 모아 두고(같은 글은 한 번만), 사람마다 이미 본 것은 다시 보여 주지 않는다 */
   private async uselessFact(user: UserRow, random: boolean): Promise<Response> {
     try {
+      const seen = this.factSeen(user.id);
       if (random) {
-        // 모아 둔 게 넉넉하면 대부분은 모아 둔 것에서 (번역 · 바깥 요청 없이 바로). 가끔은 새로 받아 모은다
-        const max = this.factMax();
-        if (max >= 20 && Math.random() < 0.8) {
-          const hit = this.factPick(max);
-          if (hit) return json(hit);
+        // 아직 안 본 모아 둔 지식이 있으면 대부분은 거기서 바로 (번역 · 바깥 요청 없이). 가끔 · 다 봤으면 새로 받아 모은다
+        const unseen: number[] = [];
+        for (let id = 1, max = this.factMax(); id <= max; id++) if (!seen.has(id)) unseen.push(id);
+        if (unseen.length && (unseen.length >= 5 || Math.random() < 0.8)) {
+          const id = unseen[Math.floor(Math.random() * unseen.length)];
+          const row = this.sql.exec<{ en: string; ko: string }>('SELECT en, ko FROM facts WHERE rowid = ?', id).toArray()[0];
+          if (row) return json(this.factMark(user.id, seen, id, row));
         }
         const wait = this.translateByUser.hit(user.id);
-        if (wait) {
-          const hit = max ? this.factPick(max) : null;
-          return hit ? json(hit) : fail(`너무 자주 눌렀어요. ${wait}초 뒤에 다시 해 주세요.`, 429);
-        }
-        return json(await this.factFetch('random'));
+        if (wait) return fail(unseen.length ? `너무 자주 눌렀어요. ${wait}초 뒤에 다시 해 주세요.` : `모아 둔 지식은 다 봤어요. ${wait}초 뒤에 새로 받아 올게요.`, 429);
+        // 사이트의 랜덤도 겹칠 수 있어서, 이미 본 것이면 몇 번 더 받아 본다
+        let got = await this.factFetch('random');
+        for (let i = 0; i < 3 && got.id && seen.has(got.id); i++) got = await this.factFetch('random');
+        return json(this.factMark(user.id, seen, got.id, got));
       }
       const day = new Date().toISOString().slice(0, 10);
-      const fresh = !this.sql.exec<{ at: number }>('SELECT at FROM cache WHERE key = ?', `fact2:${day}`).toArray()[0];
-      const r = await this.nbaCached(`fact2:${day}`, DAY, () => this.factFetch('today'));
+      const fresh = !this.sql.exec<{ at: number }>('SELECT at FROM cache WHERE key = ?', `fact3:${day}`).toArray()[0];
+      const r = await this.nbaCached(`fact3:${day}`, DAY, () => this.factFetch('today'));
       // 하루에 한 번, 뒤에서 몇 개 더 받아 번역해 모은다 (사이트가 새로 넣는 지식도 이렇게 조금씩 들어온다)
       if (fresh) this.ctx.waitUntil(this.factGrow(8));
-      return json({ ...r.v, day });
+      return json({ ...this.factMark(user.id, seen, r.v.id, r.v), day });
     } catch (e) {
       console.error('fact failed', e instanceof Error ? e.message : String(e));
       return fail('쓸모없는 지식을 받지 못했어요.', 502);
     }
   }
-  /** 쓸모없는 지식 저장소: 받아서 번역한 것을 모아 둔다 (같은 글은 한 번만) */
+  /** 이 사람이 본 지식 번호들 */
+  private factSeen(userId: string): Set<number> {
+    const r = this.sql.exec<{ data: string }>('SELECT data FROM cache WHERE key = ?', `factseen:${userId}`).toArray()[0];
+    return new Set(r ? (JSON.parse(r.data) as number[]) : []);
+  }
+  private factMark(userId: string, seen: Set<number>, id: number | undefined, f: { en: string; ko: string }) {
+    if (id && !seen.has(id)) {
+      seen.add(id);
+      this.sql.exec('INSERT OR REPLACE INTO cache (key, data, at) VALUES (?, ?, ?)', `factseen:${userId}`, JSON.stringify([...seen]), Date.now());
+    }
+    return { en: f.en, ko: f.ko };
+  }
   private factMax(): number {
     return this.sql.exec<{ m: number | null }>('SELECT MAX(rowid) AS m FROM facts').toArray()[0]?.m ?? 0;
   }
-  private factPick(max: number): { en: string; ko: string } | null {
-    return this.sql.exec<{ en: string; ko: string }>('SELECT en, ko FROM facts WHERE rowid >= ? ORDER BY rowid LIMIT 1', 1 + Math.floor(Math.random() * max)).toArray()[0] ?? null;
-  }
-  /** 사이트에서 하나 받아 (이미 모아 둔 글이면 그 번역을 쓰고) 번역해서 모은다 */
-  private async factFetch(kind: 'random' | 'today'): Promise<{ en: string; ko: string }> {
+  /** 사이트에서 하나 받아 (이미 모아 둔 글이면 그 번역을 쓰고) 번역해서 모은다. id: 모아 둔 번호 (번역이 안 돼서 못 모았으면 없음) */
+  private async factFetch(kind: 'random' | 'today'): Promise<{ en: string; ko: string; id?: number }> {
     const res = await fetch(`https://uselessfacts.jsph.pl/api/v2/facts/${kind}?language=en`, { headers: { accept: 'text/plain' }, signal: AbortSignal.timeout(8000) });
     if (!res.ok) throw new Error(`uselessfacts ${res.status}`);
     const en = cleanFact(await res.text());
     if (!en) throw new Error('uselessfacts 빈 답');
-    const have = this.sql.exec<{ ko: string }>('SELECT ko FROM facts WHERE en = ?', en).toArray()[0];
-    if (have) return { en, ko: have.ko };
+    const have = this.sql.exec<{ ko: string; id: number }>('SELECT ko, rowid AS id FROM facts WHERE en = ?', en).toArray()[0];
+    if (have) return { en, ko: have.ko, id: have.id };
     const ko = await this.factKo(en);
-    if (ko) this.sql.exec('INSERT OR IGNORE INTO facts (en, ko, at) VALUES (?, ?, ?)', en, ko, Date.now());
-    return { en, ko };
+    if (!ko) return { en, ko };
+    this.sql.exec('INSERT OR IGNORE INTO facts (en, ko, at) VALUES (?, ?, ?)', en, ko, Date.now());
+    const id = this.sql.exec<{ id: number }>('SELECT rowid AS id FROM facts WHERE en = ?', en).toArray()[0]?.id;
+    return { en, ko, id };
   }
   private async factGrow(n: number) {
     for (let i = 0; i < n; i++) {
