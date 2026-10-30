@@ -7485,3 +7485,50 @@ body.focus-on {
   font-size: 0.7rem;
   font-weight: 600;
 }
+.nba-face {
+  flex: none;
+  display: inline-grid;
+  place-items: center;
+  border-radius: 50%;
+  overflow: hidden;
+  background: var(--soft);
+  color: var(--muted);
+  font-size: 0.7rem;
+  font-weight: 600;
+  vertical-align: middle;
+}
+.nba-face img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: top;
+}
+.nba-filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.nba-filters .st-input {
+  flex: 1 1 140px;
+  width: auto;
+}
+.nba-mingp {
+  display: grid;
+  gap: 2px;
+  flex: 1 1 160px;
+}
+.nba-mingp small {
+  color: var(--muted);
+  font-size: 0.72rem;
+}
+.nba-table th.on,
+.nba-table td.on {
+  color: var(--accent);
+  font-weight: 700;
+}
+.nba-more {
+  margin-top: 10px;
+  width: 100%;
+}

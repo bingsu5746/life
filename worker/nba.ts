@@ -314,6 +314,9 @@ export async function fetchNbaStandings(season: number): Promise<NbaStanding[]> 
 export interface NbaPlayerAvg extends NbaAverage {
   id: number;
   name: string;
+  team: string;
+  age: number;
+  fg3m: number;
 }
 /** 이번 시즌 모든 선수의 경기당 평균 (한 번에 받아 기억해 두고 찾는다) */
 export async function fetchNbaAverages(season: number): Promise<NbaPlayerAvg[]> {
@@ -349,6 +352,9 @@ export async function fetchNbaAverages(season: number): Promise<NbaPlayerAvg[]> 
   return resultRows(await getNba(statsUrl('leaguedashplayerstats', params), true)).map((r) => ({
     id: n(r.PLAYER_ID),
     name: s(r.PLAYER_NAME),
+    team: s(r.TEAM_ABBREVIATION),
+    age: n(r.AGE),
+    fg3m: n(r.FG3M),
     gp: n(r.GP),
     min: n(r.MIN).toFixed(1),
     pts: n(r.PTS),

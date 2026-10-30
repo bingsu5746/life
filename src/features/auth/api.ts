@@ -392,6 +392,14 @@ export interface NbaCareerRow {
   fg3Pct: number;
   ftPct: number;
 }
+export interface NbaPlayerRow extends NbaAverage {
+  id: number;
+  name: string;
+  team: string;
+  age: number;
+  fg3m: number;
+}
+export const nbaPlayers = () => call<{ season: number; players: NbaPlayerRow[]; at: number }>('nba/players');
 export const nbaRoster = (team: string) => call<{ season: number; players: NbaRosterPlayer[]; at: number }>(`nba/roster?team=${team}`);
 export const nbaCareer = (player: number) => call<{ rows: NbaCareerRow[]; at: number }>(`nba/career?player=${player}`);
 export const nbaGames = (date: string) => call<{ games: NbaGame[]; at: number; stale?: boolean }>(`nba/games?date=${date}`);

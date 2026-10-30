@@ -76,6 +76,16 @@ export const BASKETBALL_ITEMS: AreaItem[] = [
 ];
 export const basketballItem = (sub?: string) => (sub === 'drills' || sub === 'nba' ? sub : 'log');
 
+/** NBA 안에서의 메뉴 (농구로 돌아가기 + 경기 · 순위 · 로스터 · 선수) */
+export const NBA_ITEMS: AreaItem[] = [
+  { key: 'back', label: '농구', icon: 'ball', to: '/basketball' },
+  { key: 'games', label: '경기', icon: 'game', to: '/basketball/nba' },
+  { key: 'standings', label: '순위', icon: 'target', to: '/basketball/nba/standings' },
+  { key: 'roster', label: '로스터', icon: 'tutor', to: '/basketball/nba/roster' },
+  { key: 'players', label: '선수', icon: 'search', to: '/basketball/nba/players' },
+];
+export const nbaItem = (sub?: string) => (sub === 'standings' ? 'standings' : sub === 'roster' || sub?.startsWith('roster-') ? 'roster' : sub === 'players' ? 'players' : 'games');
+
 /** 영화 주소의 두 번째 칸 → 켜진 영화 메뉴 */
 export const movieItem = (sub?: string) => (sub === 'watched' || sub === 'want' || sub === 'quotes' || sub === 'awards' || sub === 'ceremony' ? 'watched' : sub === 'find' || sub === 'rec' ? sub : 'now');
 

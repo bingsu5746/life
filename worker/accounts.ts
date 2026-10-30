@@ -220,6 +220,7 @@ export class Accounts extends DurableObject<Env> {
     if (path === 'nba/standings' && req.method === 'GET') return this.nbaStandings();
     if (path === 'nba/box' && req.method === 'GET') return this.nbaBox(new URL(req.url).searchParams);
     if (path === 'nba/avg' && req.method === 'GET') return this.nbaAvg(new URL(req.url).searchParams);
+    if (path === 'nba/players' && req.method === 'GET') return this.nbaPlayers();
     if (path === 'nba/roster' && req.method === 'GET') return this.nbaRoster((new URL(req.url).searchParams.get('team') ?? '').toUpperCase());
     if (path === 'nba/career' && req.method === 'GET') return this.nbaCareer(Number(new URL(req.url).searchParams.get('player')));
     if (path === 'fact' && req.method === 'GET') return this.uselessFact();
@@ -1240,7 +1241,7 @@ export class Accounts extends DurableObject<Env> {
         .toLowerCase()
         .replace(/[^a-z]/g, '');
     try {
-      const all = await this.nbaCached(`nba:avgs:nbacom:${season}`, 6 * 3600_000, () => fetchNbaAverages(season));
+      const all = await this.nbaCached(`nba:avgs2:nbacom:${season}`, 6 * 3600_000, () => fetchNbaAverages(season));
       const hit = all.v.find((p) => (src === 'nba' ? p.id === player : norm(p.name) === norm(name)));
       if (hit) return json({ avg: hit, at: all.at });
       if (src === 'nba') return json({ avg: null, at: all.at });
@@ -1254,6 +1255,19 @@ export class Accounts extends DurableObject<Env> {
       return json({ avg: r.v, at: r.at });
     } catch (e) {
       return this.nbaFail(e, '시즌 평균');
+    }
+  }
+
+  /** 이번 시즌 모든 선수 경기당 평균 (선수 찾기 · 정렬용, 시즌 평균과 같은 표를 6시간 기억) */
+  private async nbaPlayers(): Promise<Response> {
+    const season = seasonOf(new Date(Date.now() - 5 * 3600_000).toISOString().slice(0, 10));
+    try {
+      const r = await this.nbaCached(`nba:avgs2:nbacom:${season}`, 6 * 3600_000, () => fetchNbaAverages(season));
+      return json({ season, players: r.v, at: r.at });
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      console.error('nba.com players failed', msg);
+      return fail(`선수 목록을 받지 못했어요. (NBA 공식 데이터: ${msg.slice(0, 80)})`, 502);
     }
   }
 
