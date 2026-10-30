@@ -70,7 +70,9 @@ describe('Gemini 무료 모델 돌려 쓰기', () => {
     })),
   };
   it('Flash 새 판 → Flash Lite → Gemma 4 큰 것', () => {
-    expect(geminiChain(j)).toEqual(['gemini-3.8-flash', 'gemini-3.6-flash', 'gemini-2.5-flash', 'gemini-3.5-flash-lite', 'gemini-2.5-flash-lite', 'gemma-4-31b-it', 'gemma-4-26b-it']);
+    expect(geminiChain(j)).toEqual(['gemini-3.8-flash', 'gemini-3.6-flash', 'gemini-3.5-flash-preview-x', 'gemini-2.5-flash', 'gemini-3.5-flash-lite', 'gemini-2.5-flash-lite', 'gemma-4-31b-it', 'gemma-4-26b-it']);
+    // 이름이 모두 -preview 여도 고른다
+    expect(geminiChain({ models: [{ name: 'models/gemini-3.8-flash-preview', supportedGenerationMethods: ['generateContent'] }] })).toEqual(['gemini-3.8-flash-preview']);
   });
   it('하루 한도', () => {
     expect([geminiDaily('gemini-3.8-flash'), geminiDaily('gemini-3.5-flash-lite'), geminiDaily('gemini-2.5-flash-lite'), geminiDaily('gemma-4-31b-it')]).toEqual([20, 500, 20, 14400]);

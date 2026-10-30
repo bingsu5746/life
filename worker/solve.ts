@@ -44,7 +44,7 @@ export function geminiChain(json: unknown): string[] {
   const size = (n: string) => Number(n.match(/(\d+)b/)?.[1] ?? 0);
   const ok = models
     .map((m) => ({ name: s(m.name).replace(/^models\//, ''), gen: Array.isArray(m.supportedGenerationMethods) && m.supportedGenerationMethods.includes('generateContent') }))
-    .filter((m) => m.gen && !/image|tts|live|audio|embedding|native|transcribe|robotics|computer|preview|exp/.test(m.name));
+    .filter((m) => m.gen && !/image|tts|live|audio|embedding|native|transcribe|robotics|computer|exp\b|-exp-/.test(m.name));
   const by = (re: RegExp, not?: RegExp) =>
     ok
       .filter((m) => re.test(m.name) && !(not && not.test(m.name)))
@@ -98,7 +98,10 @@ export async function askGemini(key: string, model: string, turns: SolveTurn[]):
   const res = await fetch(`${GEM}/models/${encodeURIComponent(model)}:generateContent`, { method: 'POST', headers: { 'content-type': 'application/json', 'x-goog-api-key': key }, body: JSON.stringify(geminiBody(turns, model)) });
   console.log('solve limit headers', 'gemini', JSON.stringify(limitHeaders(res.headers)));
   const j = (await res.json().catch(() => null)) as { error?: { message?: string } } | null;
-  if (!res.ok) throw new Error(res.status === 429 ? 'Gemini 무료 사용량을 다 썼어요' : `Gemini ${res.status}: ${j?.error?.message ?? ''}`.trim());
+  const em = j?.error?.message ?? '';
+  // 429 는 하루 한도(PerDay)일 수도, 분당 한도(PerMinute)일 수도 있다: Google 이 보낸 말로 가른다
+  if (res.status === 429) throw new Error(/per ?day|daily|PerDay/i.test(em) ? `Gemini 무료 사용량을 다 썼어요 (${model})` : `잠깐 막혔어요: 분당 횟수 (${model})`);
+  if (!res.ok) throw new Error(`Gemini ${res.status}: ${em}`.trim());
   const t = readGemini(j);
   if (!t) throw new Error('Gemini 가 답을 주지 않았어요');
   return t;

@@ -283,13 +283,14 @@ export class Accounts extends DurableObject<Env> {
   private gemUse(userId: string): { n: Record<string, number>; out: Record<string, boolean> } {
     const r = this.sql.exec<{ data: string }>('SELECT data FROM cache WHERE key = ?', `gemuse:${userId}:${pacificDay(Date.now())}`).toArray()[0];
     const u = r ? JSON.parse(r.data) : {};
-    return { n: u.n ?? {}, out: u.out ?? {} };
+    // 예전에 분당 한도까지 하루 한도로 적던 「out」 은 버린다
+    return { n: u.n ?? {}, out: u.blocked ?? {} };
   }
   private bumpGem(userId: string, model: string, out = false) {
     const u = this.gemUse(userId);
     if (out) u.out[model] = true;
     else u.n[model] = (u.n[model] ?? 0) + 1;
-    this.sql.exec('INSERT OR REPLACE INTO cache (key, data, at) VALUES (?, ?, ?)', `gemuse:${userId}:${pacificDay(Date.now())}`, JSON.stringify(u), Date.now());
+    this.sql.exec('INSERT OR REPLACE INTO cache (key, data, at) VALUES (?, ?, ?)', `gemuse:${userId}:${pacificDay(Date.now())}`, JSON.stringify({ n: u.n, blocked: u.out }), Date.now());
   }
   /** Gemini 모델 순서 중 아직 남은 것 (모델 · 남은 횟수) */
   private gemLeft(userId: string): { model: string; left: number }[] {
@@ -316,7 +317,8 @@ export class Accounts extends DurableObject<Env> {
     const day = new Date(Date.now() + 9 * 3600_000).toISOString().slice(0, 10);
     const r = this.sql.exec<{ data: string }>('SELECT data FROM cache WHERE key = ?', `solveuse:${userId}:${day}`).toArray()[0];
     const u = r ? JSON.parse(r.data) : {};
-    return { n: u.n ?? {}, out: u.out ?? {}, left: u.left ?? {} };
+    // 「blocked」: 예전에 잠깐 막힘까지 하루 한도로 잘못 적던 「out」 은 버린다
+    return { n: u.n ?? {}, out: u.blocked ?? {}, left: u.left ?? {} };
   }
   private bumpUse(userId: string, engine: string, how: { out?: boolean; left?: number | null } = {}) {
     const day = new Date(Date.now() + 9 * 3600_000).toISOString().slice(0, 10);
@@ -327,7 +329,7 @@ export class Accounts extends DurableObject<Env> {
       delete u.out[engine];
     }
     if (typeof how.left === 'number') u.left[engine] = how.left;
-    this.sql.exec('INSERT OR REPLACE INTO cache (key, data, at) VALUES (?, ?, ?)', `solveuse:${userId}:${day}`, JSON.stringify(u), Date.now());
+    this.sql.exec('INSERT OR REPLACE INTO cache (key, data, at) VALUES (?, ?, ?)', `solveuse:${userId}:${day}`, JSON.stringify({ n: u.n, blocked: u.out, left: u.left }), Date.now());
   }
 
   // ===== 문제 사진 저장 (R2, 무료 한도 넘기 전에 막음) =====
@@ -429,37 +431,47 @@ export class Accounts extends DurableObject<Env> {
     /** 앞에서부터 몇 개 모델을 해 보고, 사용량이 다 됐다는 답이면 바로 멈춘다 */
     const tryModels = async (models: string[], ask: (m: string) => Promise<{ text: string; remaining?: number | null }>) => {
       let last = '';
-      for (const m of models.slice(0, 3)) {
+      const tried: string[] = [];
+      for (const m of models.slice(0, 4)) {
         try {
           const r = await ask(m);
           return ok({ text: r.text, model: m }, r.remaining);
         } catch (e) {
           last = e instanceof Error ? e.message : String(e);
+          tried.push(`${m.split('/').pop()}: ${last.slice(0, 80)}`);
+          console.error('solve model failed', engine, m, last);
           if (/사용량|크레딧|잠깐 막혔/.test(last)) break;
           // 다음 모델은 조금 쉬었다가 (초당 1번 같은 제한에 걸리지 않게)
           await new Promise((r) => setTimeout(r, 1200));
         }
       }
-      throw new Error(last || '답하지 못했어요');
+      // 어떤 모델을 해 봤고 각각 왜 안 됐는지 화면에도 보이게
+      throw new Error(tried.length > 1 ? `${last} [해 본 모델 ${tried.length}개 → ${tried.join(' / ')}]` : last || '답하지 못했어요');
     };
     try {
       if (engine === 'gemini') {
         if (!this.gemList || Date.now() - this.gemList.at > DAY) this.gemList = { at: Date.now(), v: await geminiModels(key) };
         // 한도가 남은 모델부터. 한 모델이 다 됐다고(429) 하면 그 모델만 막고 다음 모델로
-        const chain = this.gemLeft(user.id).map((x) => x.model);
+        // 모델 목록에서 하나도 못 고르면 알려진 이름으로 해 본다
+        const chain = this.gemList.v.length ? this.gemLeft(user.id).map((x) => x.model) : ['gemini-2.5-flash', 'gemini-2.5-flash-lite'];
+        console.log('solve gemini chain', JSON.stringify(this.gemList.v));
         if (!chain.length) throw new Error('Gemini 무료 사용량을 다 썼어요');
         let last = '';
-        for (const m of chain.slice(0, 4)) {
+        const tried: string[] = [];
+        for (const m of chain.slice(0, 5)) {
           try {
             const text = await askGemini(key, m, turns);
             this.bumpGem(user.id, m);
             return ok({ text, model: m });
           } catch (e) {
             last = e instanceof Error ? e.message : String(e);
+            tried.push(`${m}: ${last.slice(0, 80)}`);
+            console.error('solve model failed', 'gemini', m, last);
+            // 하루 한도면 그 모델만 오늘 막고, 분당 한도면 이번만 건너뛴다
             if (/사용량/.test(last)) this.bumpGem(user.id, m, true);
           }
         }
-        throw new Error(last || 'Gemini 가 답하지 못했어요');
+        throw new Error(tried.length > 1 ? `${/사용량/.test(last) ? 'Gemini 무료 사용량을 다 썼어요' : '잠깐 막혔어요'} [해 본 모델 ${tried.length}개 → ${tried.join(' / ')}]` : last || 'Gemini 가 답하지 못했어요');
       }
       if (engine === 'openrouter') {
         if (!this.orList || Date.now() - this.orList.at > 6 * 3600_000) this.orList = { at: Date.now(), v: await openRouterModels() };
@@ -513,7 +525,8 @@ export class Accounts extends DurableObject<Env> {
       console.error('solve failed', engine, msg);
       if (/잠깐 막혔/.test(msg)) return fail(`${msg} 잠시 뒤 다시 하거나 다른 모델을 골라 주세요.`, 429);
       if (/사용량|크레딧|quota|exhaust|neuron/i.test(msg)) {
-        this.bumpUse(user.id, engine, { out: true });
+        // Gemini 는 모델마다 따로 막는다 (전체를 막지 않음)
+        if (engine !== 'gemini') this.bumpUse(user.id, engine, { out: true });
         return fail(`${/크레딧/.test(msg) ? '크레딧이 없어요.' : '오늘 무료 사용량을 다 썼어요.'} 다른 모델을 골라 주세요.`, 429);
       }
       return fail(`풀지 못했어요: ${msg.slice(0, 200)}`, 502);
