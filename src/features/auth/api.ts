@@ -361,9 +361,10 @@ export interface NbaAverage {
   ftPct: number;
   tov: number;
 }
-export const nbaStandings = () => call<{ season: number; rows: NbaStanding[]; at: number; from: 'api' | 'games'; building?: boolean }>('nba/standings');
-export const nbaBox = (game: number, final: boolean) => call<{ lines: NbaLine[]; at: number }>(`nba/box?game=${game}${final ? '&final=1' : ''}`);
-export const nbaAvg = (player: number, season: number) => call<{ avg: NbaAverage | null; at: number }>(`nba/avg?player=${player}&season=${season}`);
+export const nbaStandings = () => call<{ season: number; rows: NbaStanding[]; at: number; from: 'nba' | 'api' | 'games'; building?: boolean }>('nba/standings');
+/** 경기 선수 기록: NBA 공식 기록을 찾으려고 날짜 · 홈 · 원정 약자도 보낸다. src: 어디서 왔는지 (선수 번호가 달라서) */
+export const nbaBox = (g: { id: number; date: string; home: string; away: string; final: boolean }) => call<{ lines: NbaLine[]; at: number; src: 'nba' | 'bdl' }>(`nba/box?${new URLSearchParams({ game: String(g.id), date: g.date, home: g.home, away: g.away, ...(g.final ? { final: '1' } : {}) })}`);
+export const nbaAvg = (p: { id: number; name: string; season: number; src: 'nba' | 'bdl' }) => call<{ avg: NbaAverage | null; at: number }>(`nba/avg?${new URLSearchParams({ player: String(p.id), name: p.name, season: String(p.season), src: p.src })}`);
 export const nbaGames = (date: string) => call<{ games: NbaGame[]; at: number; stale?: boolean }>(`nba/games?date=${date}`);
 
 /** 공휴일 · 기념일 (한국천문연구원 특일 정보, 서버가 7일 기억) */

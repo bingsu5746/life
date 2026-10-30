@@ -32,3 +32,31 @@ describe('NBA 순위 · 선수 기록', () => {
     expect(parseAverage({ data: [] })).toBeNull();
   });
 });
+
+describe('NBA 공식 데이터 (nba_api 1.12.0 의 응답 모양)', () => {
+  it('boxscore → 선수 기록', async () => {
+    const { parseNbaBox } = await import('./nba');
+    const j = {
+      game: {
+        homeTeam: {
+          teamTricode: 'BOS',
+          players: [
+            {
+              personId: 1628369,
+              name: 'Jayson Tatum',
+              position: 'SF',
+              statistics: { minutes: 'PT36M05.00S', points: 30, reboundsTotal: 8, assists: 5, steals: 1, blocks: 0, fieldGoalsMade: 11, fieldGoalsAttempted: 22, threePointersMade: 4, threePointersAttempted: 9, freeThrowsMade: 4, freeThrowsAttempted: 5, turnovers: 2, foulsPersonal: 3 },
+            },
+          ],
+        },
+        awayTeam: { teamTricode: 'NYK', players: [] },
+      },
+    };
+    expect(parseNbaBox(j)[0]).toMatchObject({ playerId: 1628369, team: 'BOS', min: '36:05', pts: 30, reb: 8, fg3a: 9, pf: 3 });
+  });
+  it('시즌 글자', async () => {
+    const { seasonText } = await import('./nba');
+    expect(seasonText(2026)).toBe('2026-27');
+    expect(seasonText(2099)).toBe('2099-00');
+  });
+});

@@ -187,3 +187,177 @@ export const fetchAverage = async (key: string, playerId: number, season: number
 
 /** 날짜(미국) → 시즌 (10월에 시작하는 해) */
 export const seasonOf = (date: string) => (Number(date.slice(5, 7)) >= 9 ? Number(date.slice(0, 4)) : Number(date.slice(0, 4)) - 1);
+
+// ===== NBA 공식 데이터 (키 없음). 주소 · 머리글 · 응답 모양은 nba_api 1.12.0 (swar/nba_api) 을 보고 맞췄다 =====
+// - cdn.nba.com/static/json/liveData/… : 경기 선수 기록(boxscore) · 오늘 경기(todaysScoreboard)
+// - stats.nba.com/stats/… : 날짜별 경기(scoreboardv3) · 순위(leaguestandingsv3) · 선수 시즌 평균(leaguedashplayerstats)
+//   (nba_api 설명: stats.nba.com 은 클라우드 서버 주소에 답하지 않는 일이 많다 → 8초 안에 답이 없으면 다른 길로)
+export const NBA_TEAM_IDS: Record<string, number> = {
+  ATL: 1610612737,
+  BOS: 1610612738,
+  BKN: 1610612751,
+  CHA: 1610612766,
+  CHI: 1610612741,
+  CLE: 1610612739,
+  DAL: 1610612742,
+  DEN: 1610612743,
+  DET: 1610612765,
+  GSW: 1610612744,
+  HOU: 1610612745,
+  IND: 1610612754,
+  LAC: 1610612746,
+  LAL: 1610612747,
+  MEM: 1610612763,
+  MIA: 1610612748,
+  MIL: 1610612749,
+  MIN: 1610612750,
+  NOP: 1610612740,
+  NYK: 1610612752,
+  OKC: 1610612760,
+  ORL: 1610612753,
+  PHI: 1610612755,
+  PHX: 1610612756,
+  POR: 1610612757,
+  SAC: 1610612758,
+  SAS: 1610612759,
+  TOR: 1610612761,
+  UTA: 1610612762,
+  WAS: 1610612764,
+};
+const ABBR_OF = Object.fromEntries(Object.entries(NBA_TEAM_IDS).map(([a, id]) => [id, a])) as Record<number, string>;
+
+const CDN_HEADERS = { 'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:158.0) Gecko/20100101 Firefox/158.0', referer: 'https://www.nba.com/', accept: 'application/json, text/plain, */*' };
+const STATS_HEADERS = { ...CDN_HEADERS, 'user-agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.0.0 Safari/537.36', origin: 'https://www.nba.com', 'accept-language': 'en-US,en;q=0.9' };
+
+async function getNba(url: string, stats: boolean): Promise<unknown> {
+  const res = await fetch(url, { headers: stats ? STATS_HEADERS : CDN_HEADERS, signal: AbortSignal.timeout(8000) });
+  if (!res.ok) throw new Error(`nba.com ${res.status}`);
+  return res.json();
+}
+/** stats.nba.com: nba_api 처럼 값 이름 차례대로 */
+const statsUrl = (endpoint: string, params: Record<string, string>) =>
+  `https://stats.nba.com/stats/${endpoint}?${Object.entries(params)
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([k, v]) => `${k}=${encodeURIComponent(v)}`)
+    .join('&')}`;
+/** resultSets 의 첫 표 → 줄마다 { 이름: 값 } */
+function resultRows(json: unknown): Record<string, unknown>[] {
+  const j = json as { resultSets?: { headers?: string[]; rowSet?: unknown[][] }[] | { headers?: string[]; rowSet?: unknown[][] }; resultSet?: { headers?: string[]; rowSet?: unknown[][] } };
+  const rs = Array.isArray(j?.resultSets) ? j.resultSets[0] : (j?.resultSets ?? j?.resultSet);
+  const h = rs?.headers ?? [];
+  return (rs?.rowSet ?? []).map((r) => Object.fromEntries(h.map((k, i) => [k, r[i]])));
+}
+/** 시즌 글자: 2026 → 2026-27 */
+export const seasonText = (season: number) => `${season}-${String((season + 1) % 100).padStart(2, '0')}`;
+
+/** 날짜(미국) · 홈 · 원정 약자로 NBA 경기 번호 찾기: 날짜별 경기(stats) → 안 되면 오늘 경기(cdn) */
+export async function nbaGameId(date: string, home: string, away: string): Promise<string | null> {
+  const pick = (games: unknown[]) => {
+    const g = (games as { gameId?: string; homeTeam?: { teamTricode?: string }; awayTeam?: { teamTricode?: string } }[]).find((x) => x.homeTeam?.teamTricode === home && x.awayTeam?.teamTricode === away);
+    return g?.gameId ?? null;
+  };
+  try {
+    const j = (await getNba(statsUrl('scoreboardv3', { GameDate: date, LeagueID: '00' }), true)) as { scoreboard?: { games?: unknown[] } };
+    const id = pick(j?.scoreboard?.games ?? []);
+    if (id) return id;
+  } catch (e) {
+    console.error('nba.com scoreboardv3 failed', date, e instanceof Error ? e.message : String(e));
+  }
+  const t = (await getNba('https://cdn.nba.com/static/json/liveData/scoreboard/todaysScoreboard_00.json', false)) as { scoreboard?: { games?: unknown[] } };
+  return pick(t?.scoreboard?.games ?? []);
+}
+
+/** "PT25M01.00S" → "25:01" */
+const clock = (v: unknown) => {
+  const m = s(v).match(/PT(\d+)M(\d+)/);
+  return m ? `${Number(m[1])}:${m[2].padStart(2, '0')}` : s(v);
+};
+export function parseNbaBox(json: unknown): NbaLine[] {
+  const g = (json as { game?: Record<string, unknown> })?.game ?? {};
+  const out: NbaLine[] = [];
+  for (const side of ['awayTeam', 'homeTeam']) {
+    const t = (g[side] ?? {}) as { teamTricode?: string; players?: Record<string, unknown>[] };
+    for (const p of t.players ?? []) {
+      const st = (p.statistics ?? {}) as Record<string, unknown>;
+      out.push({
+        playerId: n(p.personId),
+        name: s(p.name) || `${s(p.firstName)} ${s(p.familyName)}`.trim(),
+        pos: s(p.position),
+        team: s(t.teamTricode),
+        min: clock(st.minutes),
+        pts: n(st.points),
+        reb: n(st.reboundsTotal),
+        ast: n(st.assists),
+        stl: n(st.steals),
+        blk: n(st.blocks),
+        fgm: n(st.fieldGoalsMade),
+        fga: n(st.fieldGoalsAttempted),
+        fg3m: n(st.threePointersMade),
+        fg3a: n(st.threePointersAttempted),
+        ftm: n(st.freeThrowsMade),
+        fta: n(st.freeThrowsAttempted),
+        tov: n(st.turnovers),
+        pf: n(st.foulsPersonal),
+      });
+    }
+  }
+  return out.filter((l) => l.name);
+}
+export const fetchNbaBox = async (gameId: string) => parseNbaBox(await getNba(`https://cdn.nba.com/static/json/liveData/boxscore/boxscore_${gameId}.json`, false));
+
+export async function fetchNbaStandings(season: number): Promise<NbaStanding[]> {
+  const rows = resultRows(await getNba(statsUrl('leaguestandingsv3', { LeagueID: '00', Season: seasonText(season), SeasonType: 'Regular Season', SeasonYear: '' }), true));
+  return rows.map((r) => ({ abbr: ABBR_OF[n(r.TeamID)] ?? '', name: s(r.TeamName), city: s(r.TeamCity), conf: s(r.Conference), w: n(r.WINS), l: n(r.LOSSES) })).filter((x) => x.abbr);
+}
+
+export interface NbaPlayerAvg extends NbaAverage {
+  id: number;
+  name: string;
+}
+/** 이번 시즌 모든 선수의 경기당 평균 (한 번에 받아 기억해 두고 찾는다) */
+export async function fetchNbaAverages(season: number): Promise<NbaPlayerAvg[]> {
+  const blank = [
+    'College',
+    'Conference',
+    'Country',
+    'DateFrom',
+    'DateTo',
+    'Division',
+    'DraftPick',
+    'DraftYear',
+    'GameScope',
+    'GameSegment',
+    'Height',
+    'ISTRound',
+    'Location',
+    'Outcome',
+    'PORound',
+    'PlayerExperience',
+    'PlayerPosition',
+    'SeasonSegment',
+    'ShotClockRange',
+    'StarterBench',
+    'TeamID',
+    'TwoWay',
+    'VsConference',
+    'VsDivision',
+    'Weight',
+  ];
+  const params: Record<string, string> = { LastNGames: '0', LeagueID: '00', MeasureType: 'Base', Month: '0', OpponentTeamID: '0', PaceAdjust: 'N', PerMode: 'PerGame', Period: '0', PlusMinus: 'N', Rank: 'N', Season: seasonText(season), SeasonType: 'Regular Season' };
+  for (const k of blank) params[k] = '';
+  return resultRows(await getNba(statsUrl('leaguedashplayerstats', params), true)).map((r) => ({
+    id: n(r.PLAYER_ID),
+    name: s(r.PLAYER_NAME),
+    gp: n(r.GP),
+    min: n(r.MIN).toFixed(1),
+    pts: n(r.PTS),
+    reb: n(r.REB),
+    ast: n(r.AST),
+    stl: n(r.STL),
+    blk: n(r.BLK),
+    fgPct: n(r.FG_PCT),
+    fg3Pct: n(r.FG3_PCT),
+    ftPct: n(r.FT_PCT),
+    tov: n(r.TOV),
+  }));
+}

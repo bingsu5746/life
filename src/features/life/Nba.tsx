@@ -241,7 +241,7 @@ function Standings() {
       )}
       <p className="st-muted sm">
         {data.season}-{String(data.season + 1).slice(2)} 시즌 · 6위까지 플레이오프, 7~10위 플레이인 (굵은 줄)
-        {data.from === 'games' ? ' · 끝난 경기 결과로 센 순위예요' : ''}
+        {data.from === 'games' ? ' · 끝난 경기 결과로 센 순위예요' : data.from === 'nba' ? ' · NBA 공식 순위' : ''}
         {data.building ? ' · 지금 경기 결과를 더 모으는 중' : ''}
       </p>
     </>
@@ -255,10 +255,15 @@ function GamePage({ id }: { id: number }) {
   const [err, setErr] = useState('');
   const [fav, setFav] = useState(readFav);
   const [player, setPlayer] = useState<NbaLine | null>(null);
+  const [src, setSrc] = useState<'nba' | 'bdl'>('bdl');
   useEffect(() => {
     let live = true;
-    nbaBox(id, !!g && isFinal(g))
-      .then((r) => live && setLines(r.lines))
+    nbaBox({ id, date: g?.date ?? '', home: g?.home.abbr ?? '', away: g?.away.abbr ?? '', final: !!g && isFinal(g) })
+      .then((r) => {
+        if (!live) return;
+        setLines(r.lines);
+        setSrc(r.src);
+      })
       .catch((e) => live && setErr(e instanceof ApiError || e instanceof Error ? e.message : '선수 기록을 받지 못했어요'));
     return () => {
       live = false;
@@ -376,26 +381,26 @@ function GamePage({ id }: { id: number }) {
           );
         })}
       {!!lines?.length && <p className="st-muted sm">선수 이름을 누르면 이번 시즌 평균이 나와요.</p>}
-      {player && <PlayerSheet line={player} season={season} onClose={() => setPlayer(null)} />}
+      {player && <PlayerSheet line={player} season={season} src={src} onClose={() => setPlayer(null)} />}
     </>
   );
 }
 
 const minutes = (m: string) => Number(m.split(':')[0]) || 0;
 
-function PlayerSheet({ line, season, onClose }: { line: NbaLine; season: number; onClose: () => void }) {
+function PlayerSheet({ line, season, src, onClose }: { line: NbaLine; season: number; src: 'nba' | 'bdl'; onClose: () => void }) {
   const [avg, setAvg] = useState<NbaAverage | null | undefined>(undefined);
   const [err, setErr] = useState('');
   useEffect(() => {
     if (!season) return setErr('시즌을 알 수 없어요.');
     let live = true;
-    nbaAvg(line.playerId, season)
+    nbaAvg({ id: line.playerId, name: line.name, season, src })
       .then((r) => live && setAvg(r.avg))
       .catch((e) => live && setErr(e instanceof Error ? e.message : '시즌 평균을 받지 못했어요'));
     return () => {
       live = false;
     };
-  }, [line.playerId, season]);
+  }, [line.playerId, season, src]);
   const p = (x: number) => (x ? `${(x <= 1 ? x * 100 : x).toFixed(1)}%` : '-');
   return (
     <Sheet title={line.name} onClose={onClose}>
