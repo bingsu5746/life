@@ -53,7 +53,10 @@ export function Today() {
     total++;
     if (ok) done++;
   };
-  for (const h of hws) for (const i of h.items) if ((i.item.kind !== 'pages' && !i.unit) || i.today.length || i.finished) count(i.finished || ((i.item.kind === 'pages' || !!i.unit) && i.today.every((p) => !i.remaining.includes(p))));
+  for (const h of hws)
+    for (const i of h.items)
+      if ((i.item.kind !== 'pages' && !i.unit && (i.day ? i.day <= today : !!(i.item.at && Date.now() - i.item.at < 18 * 3600_000))) || ((i.item.kind === 'pages' || i.unit) && (i.today.length || i.finished)))
+        count(i.finished || ((i.item.kind === 'pages' || !!i.unit) && i.today.every((p) => !i.remaining.includes(p))));
   for (const p of bookPlans) if (p.sched.today.length) count(p.sched.today.every((x) => p.target.done.has(x)));
   for (const t of todos) count(t.done);
   for (const p of previews) count(p.done);
@@ -219,7 +222,9 @@ function HomeworkRow({ h, today }: { h: HomeworkView; today: string }) {
           {late ? '밀린 숙제 · ' : ''}마감 {shortDate(h.due)}
         </span>
       </div>
-      {h.items.map(({ item, today: tp, remaining, finished, unit }) => {
+      {h.items.map(({ item, today: tp, remaining, finished, unit, day }) => {
+        // 통으로 하는 숙제: 그 날(또는 지난 날)이 됐을 때만, 끝낸 것은 끝낸 날만
+        if (item.kind !== 'pages' && !unit && (day ? day > today : !(item.at && Date.now() - item.at < 18 * 3600_000))) return null;
         if (item.kind === 'text' && unit) {
           const todayDone = tp.length === 0 || tp.every((p) => !remaining.includes(p));
           return (

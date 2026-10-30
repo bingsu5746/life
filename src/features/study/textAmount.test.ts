@@ -16,3 +16,12 @@ describe('textAmount', () => {
     expect(textAmount('2단원 요약')).toBeNull();
   });
 });
+
+describe('wholeDays', () => {
+  it('통 숙제를 마감 전날까지 하루에 하나씩 고르게', async () => {
+    const { wholeDays } = await import('./splitHomework');
+    expect(wholeDays(2, '2026-11-02', '2026-11-06', false, [])).toEqual(['2026-11-02', '2026-11-04']);
+    expect(wholeDays(3, '2026-11-02', '2026-11-03', false, [])).toEqual(['2026-11-02', '2026-11-02', '2026-11-02']);
+    expect(wholeDays(1, '2026-11-05', '2026-11-03', false, [])).toEqual(['2026-11-05']);
+  });
+});

@@ -140,6 +140,7 @@ function HwLine({ hw, iv }: { hw: Homework; iv: ReturnType<typeof homeworkViews>
   const { item } = iv;
   // 줄을 누르면 질문 메모 칸이 나타난다
   const [q, setQ] = useState<string | null>(null);
+  const todayStr = useToday();
   const title = item.kind === 'pages' ? `${item.bookName ?? d.books[item.bookId ?? '']?.name ?? ''} p.${item.range ? rangeText([item.range]) : ''}` : item.text;
   return (
     <div className="st-item">
@@ -154,6 +155,7 @@ function HwLine({ hw, iv }: { hw: Homework; iv: ReturnType<typeof homeworkViews>
         <div className={`st-item-title ${iv.finished ? 'done' : ''}`}>{title}</div>
         <div className="st-item-sub">
           {item.kind === 'pages' && !iv.finished && (iv.today.length ? `오늘 p.${rangeText(iv.today)} · ` : '') + `남은 ${iv.remaining.length}쪽`}
+          {iv.day && !iv.finished && `${iv.day === todayStr ? '오늘' : shortDate(iv.day)} 할 것`}
           {iv.unit && !iv.finished && (iv.today.length ? `오늘 ${rangeText(iv.today)}${iv.unit} · ` : '') + `남은 ${iv.remaining.length}${iv.unit === '번' ? '문제' : iv.unit}`}
           {item.question && ` · 질문: ${item.question}`}
         </div>

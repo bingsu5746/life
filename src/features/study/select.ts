@@ -1,5 +1,5 @@
 // 저장된 자료 → 화면에 보일 것 (계획 대상, 오늘 할 것, 숙제 분량 …)
-import { textAmount } from './splitHomework';
+import { textAmount, wholeDays } from './splitHomework';
 import { apportion } from './allocate';
 import { addDays, daysBetween } from './dates';
 import { habitOn } from './habits';
@@ -108,6 +108,8 @@ export interface HwItemView {
   finished: boolean;
   /** 글 숙제에서 찾은 분량 단위 (번 · 문제 · 강 …): 있으면 날마다 나눈다 */
   unit?: string;
+  /** 나눌 수 없는 숙제(분량 없음)를 통으로 할 날 */
+  day?: DateStr;
 }
 
 export interface HomeworkView {
@@ -156,6 +158,10 @@ export function homeworkViews(d: StudyData, today: DateStr): HomeworkView[] {
         const remaining = expand([item.range]).filter((p) => !done.has(p));
         return { item, remaining, today: homeworkToday(remaining, today, due, hw.includeDue, d.settings.offDates), finished: remaining.length === 0 };
       });
+      // 분량 없는 숙제(글 · 단어장)는 아직 안 한 것끼리 마감까지 하루에 하나씩 통으로
+      const whole = items.filter((i) => i.item.kind !== 'pages' && !i.unit && !i.finished);
+      const days = wholeDays(whole.length, today, due, hw.includeDue, d.settings.offDates);
+      whole.forEach((i, k) => (i.day = days[k]));
       return { hw, due, tutorName: tutor?.name ?? '과외', subjectId: tutor?.subjectId ?? '', items, finished: items.every((i) => i.finished) };
     })
     .sort((a, b) => a.due.localeCompare(b.due));

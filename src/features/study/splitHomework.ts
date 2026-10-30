@@ -60,3 +60,10 @@ export function textAmount(text: string): { from: number; to: number; unit: stri
   if (n && Number(n[1]) >= 2 && Number(n[1]) <= 2000) return { from: 1, to: Number(n[1]), unit: n[2] === '페이지' ? '쪽' : n[2] === '번' ? '번' : n[2] };
   return null;
 }
+
+/** 나눌 수 없는 숙제(분량 없음) n개를 오늘부터 마감까지 하나씩 통으로 고르게 놓는다: 그 숙제를 할 날 */
+export function wholeDays(n: number, today: DateStr, due: DateStr, includeDue: boolean, off: DateStr[]): DateStr[] {
+  const end = includeDue ? due : addDays(due, -1);
+  const dates = end >= today ? daysBetween(today, end).filter((d) => d === today || !off.includes(d)) : [today];
+  return Array.from({ length: n }, (_, i) => dates[Math.floor((i * dates.length) / n)]);
+}
