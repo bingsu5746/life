@@ -18,7 +18,7 @@ import { fetchEvents, fetchMeals, fetchTimetable, findSchool } from './neis';
 import { koExamples, lookupKo } from './stdict';
 import { findBooksAladin, findBooksKakao, findGames, findRecords, similarArtists } from './lookup';
 import { fetchProviders } from './ott';
-import { askGemini, askOpenRouter, geminiModels, openRouterDaily, openRouterModels, SYSTEM as SOLVE_SYSTEM, type Engine, type SolveTurn } from './solve';
+import { askCompat, askGemini, askOpenRouter, COMPAT, compatModels, geminiModels, openRouterDaily, openRouterModels, pickCompat, SYSTEM as SOLVE_SYSTEM, type Engine, type SolveTurn } from './solve';
 import { filmFacets, searchFilms, type Film } from './catalog';
 import { buildRecommendInput, normTitle, readRecommendations, readRecommendRequest } from './recommend';
 import { allowedEndpoint, localDate, makeVapid, nextFire, sendPush, type PushSub, type Vapid } from './push';
@@ -275,37 +275,56 @@ export class Accounts extends DurableObject<Env> {
   // ===== 문제 풀이 AI =====
   private solveByUser = new Limiter(60, 60 * 60_000);
   private gemList: { at: number; v: { flash: string[]; pro: string[] } } | null = null;
+  private orList: { at: number; v: { id: string; image: boolean }[] } | null = null;
   private orDaily: { at: number; v: number | null } | null = null;
-  /** Pro 는 결제를 켠 키에서만 돼서, 혹시 모를 요금을 막으려고 하루 횟수를 묶어 둔다 */
-  private static PRO_DAILY = 10;
+  /** OpenAI 모양 API: 맞는 주소와 모델 목록 (6시간) */
+  private compatList: Record<string, { at: number; base: string; json: unknown }> = {};
+  private cfAgreed = false;
 
-  /** 오늘(한국 날짜) 이 사람이 모델마다 쓴 횟수 · 다 써서 막힌 모델 */
-  private solveUse(userId: string): { n: Record<string, number>; out: Record<string, boolean> } {
+  private keyOf(engine: Engine): string | undefined {
+    const env = this.env as unknown as Record<string, string | undefined>;
+    if (engine === 'gemini') return env.Life_gemini_api_key || env.GEMINI_KEY;
+    if (engine === 'openrouter') return env.Openrouter || env.OPENROUTER_KEY;
+    if (engine === 'cloudflare') return 'on';
+    for (const k of COMPAT[engine].keys) if (env[k]) return env[k];
+    return undefined;
+  }
+
+  /** 오늘(한국 날짜) 이 사람이 모델마다 쓴 횟수 · 막힌 모델 · 서비스가 알려 준 남은 횟수 */
+  private solveUse(userId: string): { n: Record<string, number>; out: Record<string, boolean>; left: Record<string, number> } {
     const day = new Date(Date.now() + 9 * 3600_000).toISOString().slice(0, 10);
     const r = this.sql.exec<{ data: string }>('SELECT data FROM cache WHERE key = ?', `solveuse:${userId}:${day}`).toArray()[0];
-    return r ? JSON.parse(r.data) : { n: {}, out: {} };
+    const u = r ? JSON.parse(r.data) : {};
+    return { n: u.n ?? {}, out: u.out ?? {}, left: u.left ?? {} };
   }
-  private bumpUse(userId: string, engine: string, out = false) {
+  private bumpUse(userId: string, engine: string, how: { out?: boolean; left?: number | null } = {}) {
     const day = new Date(Date.now() + 9 * 3600_000).toISOString().slice(0, 10);
     const u = this.solveUse(userId);
-    if (out) u.out[engine] = true;
-    else u.n[engine] = (u.n[engine] ?? 0) + 1;
+    if (how.out) u.out[engine] = true;
+    else {
+      u.n[engine] = (u.n[engine] ?? 0) + 1;
+      delete u.out[engine];
+    }
+    if (typeof how.left === 'number') u.left[engine] = how.left;
     this.sql.exec('INSERT OR REPLACE INTO cache (key, data, at) VALUES (?, ?, ?)', `solveuse:${userId}:${day}`, JSON.stringify(u), Date.now());
   }
 
-  /** 모델 고르는 창: 오늘 쓴 횟수와 (알 수 있으면) 하루 한도 */
+  /** 모델 고르는 창: 키가 있는 모델 · 오늘 쓴 횟수 · 남은 횟수(알 수 있을 때) */
   private async solveUsage(user: UserRow): Promise<Response> {
-    const env = this.env as unknown as Record<string, string | undefined>;
-    const orKey = env.Openrouter || env.OPENROUTER_KEY;
+    const engines: Engine[] = ['gemini', 'openrouter', 'mistral', 'grok', 'siliconflow', 'nvidia', 'cloudflare'];
+    const available = engines.filter((e) => this.keyOf(e));
+    const orKey = this.keyOf('openrouter');
     if (orKey && (!this.orDaily || Date.now() - this.orDaily.at > 6 * 3600_000)) this.orDaily = { at: Date.now(), v: await openRouterDaily(orKey).catch(() => null) };
     const u = this.solveUse(user.id);
-    return json({ used: u.n, out: u.out, limits: { 'gemini-pro': Accounts.PRO_DAILY, openrouter: this.orDaily?.v ?? null } });
+    const left: Record<string, number> = { ...u.left };
+    if (this.orDaily?.v) left.openrouter = Math.max(0, this.orDaily.v - (u.n.openrouter ?? 0));
+    return json({ available, used: u.n, out: u.out, left });
   }
-  private orList: { at: number; v: { id: string; image: boolean }[] } | null = null;
 
   /** { engine, turns: [{ role, text, images: [{ mime, data(base64) }] }] } → { text, model } */
   private async solve(user: UserRow, b: Record<string, unknown>, origin: string): Promise<Response> {
-    const engine = (b.engine === 'openrouter' || b.engine === 'cloudflare' || b.engine === 'gemini-pro' ? b.engine : 'gemini') as Engine;
+    const ENG: Engine[] = ['gemini', 'openrouter', 'mistral', 'grok', 'siliconflow', 'nvidia', 'cloudflare'];
+    const engine = (ENG.includes(b.engine as Engine) ? b.engine : 'gemini') as Engine;
     const raw = Array.isArray(b.turns) ? b.turns.slice(-12) : [];
     let bytes = 0;
     const turns: SolveTurn[] = [];
@@ -321,59 +340,84 @@ export class Accounts extends DurableObject<Env> {
     if (bytes > MAX_STORE) return fail('사진이 너무 커요. 사진 수를 줄여 주세요.', 413);
     const wait = this.solveByUser.hit(user.id);
     if (wait) return fail(`너무 자주 물었어요. ${wait}초 뒤에 다시 해 주세요.`, 429);
-    const env = this.env as unknown as Record<string, string | undefined>;
+    const key = this.keyOf(engine);
+    if (!key) return fail('이 모델의 키가 아직 없어요.', 503);
     const needImage = turns.some((t) => t.images?.length);
-    if (engine === 'gemini-pro' && (this.solveUse(user.id).n['gemini-pro'] ?? 0) >= Accounts.PRO_DAILY) return fail(`Gemini Pro 는 하루 ${Accounts.PRO_DAILY}번까지만 쓰게 해 뒀어요.`, 429);
-    const ok = (r: { text: string; model: string }) => (this.bumpUse(user.id, engine), json(r));
-    try {
-      if (engine === 'gemini' || engine === 'gemini-pro') {
-        const key = env.Life_gemini_api_key || env.GEMINI_KEY;
-        if (!key) return fail('Gemini 키가 아직 없어요.', 503);
-        if (!this.gemList || Date.now() - this.gemList.at > DAY) this.gemList = { at: Date.now(), v: await geminiModels(key) };
-        const list = engine === 'gemini-pro' ? this.gemList.v.pro : this.gemList.v.flash;
-        if (!list.length && engine === 'gemini-pro') return fail('이 키로는 Gemini Pro 모델이 보이지 않아요.', 503);
-        const models = list.length ? list : ['gemini-2.5-flash'];
-        let last = '';
-        for (const m of models.slice(0, 3)) {
-          try {
-            return ok({ text: await askGemini(key, m, turns), model: m });
-          } catch (e) {
-            last = e instanceof Error ? e.message : String(e);
-            if (/무료 사용량/.test(last)) break;
-          }
+    const ok = (r: { text: string; model: string }, left?: number | null) => (this.bumpUse(user.id, engine, { left }), json(r));
+    /** 앞에서부터 몇 개 모델을 해 보고, 사용량이 다 됐다는 답이면 바로 멈춘다 */
+    const tryModels = async (models: string[], ask: (m: string) => Promise<{ text: string; remaining?: number | null }>) => {
+      let last = '';
+      for (const m of models.slice(0, 3)) {
+        try {
+          const r = await ask(m);
+          return ok({ text: r.text, model: m }, r.remaining);
+        } catch (e) {
+          last = e instanceof Error ? e.message : String(e);
+          if (/사용량|크레딧/.test(last)) break;
         }
-        throw new Error(last || 'Gemini 가 답하지 못했어요');
+      }
+      throw new Error(last || '답하지 못했어요');
+    };
+    try {
+      if (engine === 'gemini') {
+        if (!this.gemList || Date.now() - this.gemList.at > DAY) this.gemList = { at: Date.now(), v: await geminiModels(key) };
+        return await tryModels(this.gemList.v.flash.length ? this.gemList.v.flash : ['gemini-2.5-flash'], async (m) => ({ text: await askGemini(key, m, turns) }));
       }
       if (engine === 'openrouter') {
-        const key = env.Openrouter || env.OPENROUTER_KEY;
-        if (!key) return fail('OpenRouter 키가 아직 없어요.', 503);
         if (!this.orList || Date.now() - this.orList.at > 6 * 3600_000) this.orList = { at: Date.now(), v: await openRouterModels() };
         const models = this.orList.v.filter((m) => !needImage || m.image).map((m) => m.id);
-        if (!models.length) return fail(needImage ? '지금 사진을 읽는 무료 모델이 없어요. 글로 넣거나 다른 모델을 골라 주세요.' : '지금 쓸 수 있는 무료 모델이 없어요.', 503);
-        let last = '';
-        for (const m of models.slice(0, 3)) {
+        if (!models.length) return fail(needImage ? '지금 사진을 읽는 무료 모델이 없어요. 다른 모델을 골라 주세요.' : '지금 쓸 수 있는 무료 모델이 없어요.', 503);
+        return await tryModels(models, async (m) => ({ text: await askOpenRouter(key, m, turns, origin) }));
+      }
+      if (engine === 'cloudflare') {
+        if (this.translateAll.hit('all')) return fail('오늘 사이트 전체의 AI 한도를 다 썼어요. 한국 시간 오전 9시 뒤에 다시 해 주세요.', 429);
+        const ai = this.env.AI as unknown as { run: (m: string, i: unknown) => Promise<unknown> };
+        if (needImage) {
+          // 사진: Meta Llama 3.2 11B Vision. 처음 쓸 때 사용 조건 동의(prompt: "agree")가 필요하다 (Cloudflare 문서)
+          const VISION_MODEL = '@cf/meta/llama-3.2-11b-vision-instruct';
+          if (!this.cfAgreed) {
+            await ai.run(VISION_MODEL, { prompt: 'agree' }).catch(() => undefined);
+            this.cfAgreed = true;
+          }
+          const last = turns[turns.length - 1];
+          const img = last.images?.[0] ?? turns.flatMap((t) => t.images ?? [])[0];
+          const out = await ai.run(VISION_MODEL, { messages: [{ role: 'system', content: SOLVE_SYSTEM }, ...turns.map((t) => ({ role: t.role, content: t.text || '이 문제를 풀어 줘.' }))], image: `data:${img.mime};base64,${img.data}`, max_tokens: 2048 });
+          const text = readOutput(out);
+          if (!text) throw new Error('Cloudflare AI 가 답을 주지 않았어요');
+          return ok({ text, model: VISION_MODEL.replace('@cf/', '') });
+        }
+        const out = await ai.run(TRANSLATE_MODEL, { messages: [{ role: 'system', content: SOLVE_SYSTEM }, ...turns.map((t) => ({ role: t.role, content: t.text }))], reasoning: { effort: 'medium' }, max_tokens: 6000 });
+        const text = readOutput(out);
+        if (!text) throw new Error('Cloudflare AI 가 답을 주지 않았어요');
+        return ok({ text, model: TRANSLATE_MODEL.replace('@cf/', '') });
+      }
+      // Mistral · Grok · SiliconFlow · NVIDIA: 모델 목록에서 고르기
+      const c = COMPAT[engine];
+      let entry = this.compatList[engine];
+      if (!entry || Date.now() - entry.at > 6 * 3600_000) {
+        let err = '';
+        for (const base of c.bases) {
           try {
-            return ok({ text: await askOpenRouter(key, m, turns, origin), model: m });
+            entry = { at: Date.now(), base, json: await compatModels(base, key) };
+            break;
           } catch (e) {
-            last = e instanceof Error ? e.message : String(e);
-            if (/무료 사용량/.test(last)) break;
+            err = e instanceof Error ? e.message : String(e);
           }
         }
-        throw new Error(last || 'OpenRouter 가 답하지 못했어요');
+        if (!entry) throw new Error(err || '모델 목록을 받지 못했어요');
+        this.compatList[engine] = entry;
       }
-      // Cloudflare Workers AI: 글만 (사진은 기기에서 글자로 바꿔 보낸다)
-      if (needImage) return fail('이 모델은 사진을 못 읽어요. 사진은 기기에서 글자로 바꿔 보내요.');
-      if (this.translateAll.hit('all')) return fail('오늘 사이트 전체의 AI 한도를 다 썼어요. 내일 다시 해 주세요.', 429);
-      const out = await this.env.AI.run(TRANSLATE_MODEL as never, { messages: [{ role: 'system', content: SOLVE_SYSTEM }, ...turns.map((t) => ({ role: t.role, content: t.text }))], reasoning: { effort: 'medium' }, max_tokens: 6000 } as never);
-      const text = readOutput(out);
-      if (!text) throw new Error('Cloudflare AI 가 답을 주지 않았어요');
-      return ok({ text, model: TRANSLATE_MODEL.replace('@cf/', '') });
+      const models = pickCompat(entry.json, needImage);
+      if (!models.length) return fail(needImage ? '이 서비스에는 사진을 읽는 모델이 없어요. 다른 모델을 골라 주세요.' : '쓸 수 있는 모델이 없어요.', 503);
+      return await tryModels(models, (m) => askCompat(entry.base, key, m, turns));
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       console.error('solve failed', engine, msg);
-      if (/무료 사용량|429|quota|exhaust/i.test(msg)) this.bumpUse(user.id, engine, true);
-      if (engine === 'gemini-pro' && /403|429|billing|quota|free/i.test(msg)) return fail('Gemini Pro 는 결제를 켠 키에서만 쓸 수 있어요 (무료 키는 Flash 만).', 402);
-      return fail(/무료 사용량|neuron|quota/i.test(msg) ? `${msg.replace(/neuron.*$/i, '')} 다른 모델을 골라 주세요.`.trim() : `풀지 못했어요: ${msg.slice(0, 200)}`, 502);
+      if (/사용량|크레딧|429|quota|exhaust|neuron/i.test(msg)) {
+        this.bumpUse(user.id, engine, { out: true });
+        return fail(`${/크레딧/.test(msg) ? '크레딧이 없어요.' : '오늘 무료 사용량을 다 썼어요.'} 다른 모델을 골라 주세요.`, 429);
+      }
+      return fail(`풀지 못했어요: ${msg.slice(0, 200)}`, 502);
     }
   }
 

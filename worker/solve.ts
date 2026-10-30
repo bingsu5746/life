@@ -1,6 +1,6 @@
 // 문제 풀이 AI: Gemini(무료 등급) · OpenRouter 무료 모델 · Cloudflare Workers AI(글만).
 // 모델 이름은 자주 바뀌어서 고정하지 않고, 각 서비스의 모델 목록에서 고른다.
-export type Engine = 'gemini' | 'gemini-pro' | 'openrouter' | 'cloudflare';
+export type Engine = 'gemini' | 'openrouter' | 'mistral' | 'grok' | 'siliconflow' | 'nvidia' | 'cloudflare';
 export interface SolveImage {
   mime: string;
   data: string;
@@ -133,4 +133,61 @@ export async function openRouterDaily(key: string): Promise<number | null> {
   if (!res.ok) return null;
   const j = (await res.json().catch(() => null)) as { data?: { is_free_tier?: unknown } } | null;
   return j?.data?.is_free_tier === true ? 50 : j?.data?.is_free_tier === false ? 1000 : null;
+}
+
+// ===== OpenAI 모양 API (Mistral · Grok · SiliconFlow · NVIDIA) =====
+
+export const COMPAT: Record<'mistral' | 'grok' | 'siliconflow' | 'nvidia', { bases: string[]; keys: string[] }> = {
+  mistral: { bases: ['https://api.mistral.ai/v1'], keys: ['Mistral_api_key', 'MISTRAL_KEY'] },
+  grok: { bases: ['https://api.x.ai/v1'], keys: ['Grok', 'XAI_KEY'] },
+  // 키는 발급한 곳(국제 .com · 중국 .cn)에서만 된다: 둘 다 해 본다
+  siliconflow: { bases: ['https://api.siliconflow.com/v1', 'https://api.siliconflow.cn/v1'], keys: ['Siliconflow', 'SILICONFLOW_KEY'] },
+  nvidia: { bases: ['https://integrate.api.nvidia.com/v1'], keys: ['Nvidia', 'NVIDIA', 'Nvidia_api_key', 'NVIDIA_KEY'] },
+};
+
+const VISION = /vl\b|-vl|vision|pixtral|mistral-(small|medium)|gemma-3|llama-4|grok-4|kimi-k2|qwen3\.5|omni/i;
+const SMART = /deepseek-(r1|v3)|qwen3|grok-4|magistral|mistral-large|kimi|glm-4\.|nemotron-.*(ultra|super)|gpt-oss|llama-4/i;
+const SKIP = /embed|rerank|whisper|tts|audio|image-gen|flux|stable-diffusion|moderation|ocr|guard|reward|coder|instruct-\d+k|safety/i;
+
+/** /models 응답에서 쓸 모델 고르기: 사진이면 사진을 읽는 모델(표시가 없으면 이름으로 짐작), 똑똑한 모델 먼저 */
+export function pickCompat(json: unknown, needImage: boolean): string[] {
+  const data = (json as { data?: { id?: unknown; capabilities?: { vision?: unknown; completion_chat?: unknown } }[] })?.data ?? [];
+  return data
+    .map((m) => ({ id: s(m.id), vision: m.capabilities?.vision === true || (m.capabilities?.vision === undefined && VISION.test(s(m.id))), chat: m.capabilities?.completion_chat !== false }))
+    .filter((m) => m.id && m.chat && !SKIP.test(m.id) && (!needImage || m.vision))
+    .sort((a, b) => Number(SMART.test(b.id)) - Number(SMART.test(a.id)) || Number(/latest/.test(b.id)) - Number(/latest/.test(a.id)))
+    .map((m) => m.id);
+}
+
+/** 응답 머리글에서 남은 요청 수 (서비스마다 이름이 달라서 「remaining」 + 「request」 가 들어간 것) */
+export function remainingFrom(h: Headers): number | null {
+  let best: number | null = null;
+  h.forEach((v, k) => {
+    const key = k.toLowerCase();
+    // 분·초 단위 한도는 하루 남은 수가 아니라서 뺀다
+    if (key.includes('remaining') && key.includes('request') && !/minute|second|-sec|-min/.test(key)) {
+      const n = Number(v);
+      if (Number.isFinite(n) && (best === null || key.includes('day'))) best = n;
+    }
+  });
+  return best;
+}
+
+export async function compatModels(base: string, key: string): Promise<unknown> {
+  const res = await fetch(`${base}/models`, { headers: { authorization: `Bearer ${key}` } });
+  if (!res.ok) throw new Error(`모델 목록 ${res.status}`);
+  return res.json();
+}
+
+export async function askCompat(base: string, key: string, model: string, turns: SolveTurn[]): Promise<{ text: string; remaining: number | null }> {
+  const res = await fetch(`${base}/chat/completions`, { method: 'POST', headers: { 'content-type': 'application/json', authorization: `Bearer ${key}` }, body: JSON.stringify({ model, messages: chatMessages(turns), max_tokens: 6000 }) });
+  const j = (await res.json().catch(() => null)) as { error?: { message?: string } | string; message?: string } | null;
+  const remaining = remainingFrom(res.headers);
+  if (!res.ok) {
+    const m = typeof j?.error === 'string' ? j.error : (j?.error?.message ?? j?.message ?? '');
+    throw new Error(res.status === 429 ? '무료 사용량을 다 썼어요' : res.status === 402 ? '크레딧이 없어요' : `${res.status}: ${m}`.trim());
+  }
+  const text = readChat(j);
+  if (!text) throw new Error('답이 비어 있어요');
+  return { text, remaining };
 }

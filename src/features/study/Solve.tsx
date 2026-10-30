@@ -6,10 +6,13 @@ import { shrink } from './photos';
 import { Icon, Sheet, toast } from './ui';
 
 const ENGINES: { key: SolveEngine; name: string; desc: string }[] = [
-  { key: 'gemini', name: 'Gemini Flash', desc: '무료 · 사진 읽기 · 빠르고 정확해요' },
-  { key: 'gemini-pro', name: 'Gemini Pro', desc: '가장 똑똑해요 · 결제를 켠 키에서만 · 하루 10번' },
-  { key: 'openrouter', name: 'OpenRouter', desc: '무료 모델 자동 선택 · 하루 횟수 적음' },
-  { key: 'cloudflare', name: 'Cloudflare AI', desc: '무료 · 글만 (사진은 기기에서 글자로 읽어 보내요)' },
+  { key: 'gemini', name: 'Gemini Flash', desc: '무료 · 사진 읽기 · 가장 정확해요' },
+  { key: 'openrouter', name: 'OpenRouter', desc: '무료 모델 자동 선택 · 사진 읽기' },
+  { key: 'mistral', name: 'Mistral', desc: '무료 등급 · 사진은 Pixtral 같은 사진 모델로' },
+  { key: 'grok', name: 'Grok', desc: 'xAI · 크레딧이 있을 때만' },
+  { key: 'siliconflow', name: 'SiliconFlow', desc: 'Qwen · DeepSeek 같은 공개 모델' },
+  { key: 'nvidia', name: 'NVIDIA', desc: '공개 모델 여러 개 · 분당 횟수 제한' },
+  { key: 'cloudflare', name: 'Cloudflare AI', desc: '무료 · 사진은 Llama 3.2 Vision (어려운 문제는 약해요)' },
 ];
 
 interface Msg extends SolveTurn {
@@ -66,18 +69,24 @@ export function Solve() {
   const eng = ENGINES.find((e) => e.key === engine) ?? ENGINES[0];
   const [usage, setUsage] = useState<Awaited<ReturnType<typeof solveUsage>> | null>(null);
   useEffect(() => {
-    if (picker && isLoggedIn())
+    if (isLoggedIn())
       solveUsage()
-        .then(setUsage)
+        .then((u) => {
+          setUsage(u);
+          // 고른 모델의 키가 없어졌으면 쓸 수 있는 첫 모델로
+          if (u.available.length && !u.available.includes(engine)) setEngine(u.available[0]);
+        })
         .catch(() => setUsage(null));
-  }, [picker]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [picker, busy === '']);
+  const shown = usage ? ENGINES.filter((e) => usage.available.includes(e.key)) : ENGINES;
   /** 오늘 쓴 횟수 · 남은 횟수 (한도를 알 때만) */
   const countText = (k: SolveEngine) => {
     if (!usage) return '';
     if (usage.out[k]) return '오늘은 다 썼어요';
     const n = usage.used[k] ?? 0;
-    const lim = usage.limits[k];
-    return lim ? `오늘 ${Math.max(0, lim - n)}번 더` : `오늘 ${n}번 씀`;
+    const left = usage.left[k];
+    return typeof left === 'number' ? `남은 ${left}번` : `오늘 ${n}번 씀`;
   };
   useEffect(() => endRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' }), [chat.msgs.length, busy]);
   useEffect(() => {
@@ -91,21 +100,12 @@ export function Solve() {
     if (busy || (!text.trim() && !files.length)) return;
     if (!isLoggedIn()) return toast('풀이는 로그인한 뒤에 쓸 수 있어요');
     const pics = files;
-    let q = text.trim();
+    const q = text.trim();
     setText('');
     setFiles([]);
     let images: SolveTurn['images'];
     try {
-      if (pics.length && engine === 'cloudflare') {
-        // 글만 읽는 모델: 사진 글자를 기기에서 읽어 함께 보낸다
-        const { readImageText } = await import('../../lib/ocr');
-        let read = '';
-        for (const [i, p] of pics.entries()) {
-          setBusy(`사진 글자 읽는 중 ${i + 1}/${pics.length}`);
-          read += (await readImageText(p.blob)).trim() + '\n';
-        }
-        q = `${q}\n\n[사진에서 읽은 문제]\n${read.trim()}`.trim();
-      } else if (pics.length) {
+      if (pics.length) {
         setBusy('사진 준비 중');
         images = await Promise.all(pics.map(async (p) => ({ mime: 'image/jpeg', data: await toB64(await shrink(p.blob)) })));
       }
@@ -238,7 +238,7 @@ export function Solve() {
       {picker && (
         <Sheet title="모델 고르기" onClose={() => setPicker(false)}>
           <div className="sv-pick">
-            {ENGINES.map((e) => (
+            {shown.map((e) => (
               <button
                 key={e.key}
                 className={engine === e.key ? 'on' : ''}

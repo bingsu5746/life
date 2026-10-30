@@ -44,3 +44,20 @@ describe('solve', () => {
     expect(readChat({ choices: [{ message: { content: ' 정답 ' } }] })).toBe('정답');
   });
 });
+
+describe('OpenAI 모양 API', () => {
+  it('모델 고르기: 사진이면 사진 모델, 똑똑한 모델 먼저, 임베딩 등은 뺀다', async () => {
+    const { pickCompat } = await import('./solve');
+    const j = { data: [{ id: 'mistral-embed' }, { id: 'open-mistral-7b' }, { id: 'mistral-large-latest' }, { id: 'pixtral-12b', capabilities: { vision: true, completion_chat: true } }, { id: 'Qwen/Qwen2.5-VL-72B-Instruct' }] };
+    expect(pickCompat(j, false).slice(0, 1)).toEqual(['mistral-large-latest']);
+    expect(pickCompat(j, false)).not.toContain('mistral-embed');
+    expect(pickCompat(j, true).sort()).toEqual(['Qwen/Qwen2.5-VL-72B-Instruct', 'pixtral-12b']);
+  });
+  it('남은 요청 수 머리글', async () => {
+    const { remainingFrom } = await import('./solve');
+    expect(remainingFrom(new Headers({ 'x-ratelimit-remaining-requests': '17' }))).toBe(17);
+    expect(remainingFrom(new Headers({ 'x-ratelimit-remaining-requests-minute': '3', 'x-ratelimit-remaining-requests-day': '120' }))).toBe(120);
+    expect(remainingFrom(new Headers({ 'x-ratelimit-remaining-requests-minute': '3' }))).toBeNull();
+    expect(remainingFrom(new Headers({}))).toBeNull();
+  });
+});
