@@ -43,3 +43,20 @@ export function resplit(remaining: number[], today: DateStr, due: DateStr, inclu
   if (!nums.length) return [];
   return splitHomework(nums.length, 0, today, due, includeDue, off).map((p) => ({ date: p.date, from: nums[p.from], to: nums[p.to] }));
 }
+
+/**
+ * 글로 적은 숙제에서 분량 찾기: 「블랙라벨 1~40번」 → 1~40번, 「쎈 30문제」 → 1~30문제, 「인강 3~7강」 → 3~7강.
+ * 분량이 없으면 null (그러면 나누지 않고 「다 했어요」 한 번으로)
+ */
+export function textAmount(text: string): { from: number; to: number; unit: string } | null {
+  const t = text ?? '';
+  const r = t.match(/(\d{1,4})\s*[~∼\-–]\s*(\d{1,4})\s*(번|문제|문항|쪽|p|페이지|강|개|장)?/i);
+  if (r) {
+    const from = Number(r[1]);
+    const to = Number(r[2]);
+    if (to > from && to - from < 2000) return { from, to, unit: r[3] === 'p' || r[3] === '페이지' ? '쪽' : (r[3] ?? '번') };
+  }
+  const n = t.match(/(\d{1,4})\s*(문제|문항|개|번|쪽|페이지|강|장)/);
+  if (n && Number(n[1]) >= 2 && Number(n[1]) <= 2000) return { from: 1, to: Number(n[1]), unit: n[2] === '페이지' ? '쪽' : n[2] === '번' ? '번' : n[2] };
+  return null;
+}

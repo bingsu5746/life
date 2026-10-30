@@ -53,7 +53,7 @@ export function Today() {
     total++;
     if (ok) done++;
   };
-  for (const h of hws) for (const i of h.items) if (i.item.kind !== 'pages' || i.today.length || i.finished) count(i.finished || (i.item.kind === 'pages' && i.today.every((p) => !i.remaining.includes(p))));
+  for (const h of hws) for (const i of h.items) if ((i.item.kind !== 'pages' && !i.unit) || i.today.length || i.finished) count(i.finished || ((i.item.kind === 'pages' || !!i.unit) && i.today.every((p) => !i.remaining.includes(p))));
   for (const p of bookPlans) if (p.sched.today.length) count(p.sched.today.every((x) => p.target.done.has(x)));
   for (const t of todos) count(t.done);
   for (const p of previews) count(p.done);
@@ -219,7 +219,24 @@ function HomeworkRow({ h, today }: { h: HomeworkView; today: string }) {
           {late ? '밀린 숙제 · ' : ''}마감 {shortDate(h.due)}
         </span>
       </div>
-      {h.items.map(({ item, today: tp, remaining, finished }) => {
+      {h.items.map(({ item, today: tp, remaining, finished, unit }) => {
+        if (item.kind === 'text' && unit) {
+          const todayDone = tp.length === 0 || tp.every((p) => !remaining.includes(p));
+          return (
+            <div key={item.id} className="st-item">
+              <Check on={finished || todayDone} label="오늘 분량 했어요" onClick={() => markHwPages(h.hw, item, tp.length ? tp : remaining, !(finished || todayDone))} />
+              <div className="st-item-main">
+                <div className="st-item-title">
+                  {item.text} {tp.length ? `· 오늘 ${rangeText(tp)}${unit}` : finished ? '· 끝' : ''}
+                </div>
+                <div className="st-item-sub">
+                  {finished ? '다 했어요' : `남은 ${remaining.length}${unit === '번' ? '문제' : unit}`}
+                  {item.question && ` · 질문: ${item.question}`}
+                </div>
+              </div>
+            </div>
+          );
+        }
         if (item.kind === 'pages') {
           const todayDone = tp.length === 0 || tp.every((p) => !remaining.includes(p));
           return (

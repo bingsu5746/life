@@ -39,7 +39,10 @@ export function Tutors({ sub }: { sub?: string }) {
         const next = nextClass(t, today, true);
         const mine = views.filter((v) => v.hw.tutorId === t.id);
         const open = mine.filter((v) => !v.finished || v.due >= today);
-        const past = mine.filter((v) => v.finished && v.due < today).slice(-5).reverse();
+        const past = mine
+          .filter((v) => v.finished && v.due < today)
+          .slice(-5)
+          .reverse();
         const forNext = open.filter((v) => v.due === next);
         const questions = open.flatMap((v) => v.items.filter((i) => i.item.question).map((i) => i.item.question!));
         return (
@@ -142,6 +145,8 @@ function HwLine({ hw, iv }: { hw: Homework; iv: ReturnType<typeof homeworkViews>
     <div className="st-item">
       {item.kind === 'pages' ? (
         <Check on={iv.finished} label="다 했어요" onClick={() => markHwPages(hw, item, iv.finished ? expand(item.range ? [item.range] : []) : iv.remaining, !iv.finished)} />
+      ) : iv.unit ? (
+        <Check on={iv.finished} label="다 했어요" onClick={() => (iv.finished ? patchHwItem(hw.id, item.id, { doneRanges: [], done: false }) : patchHwItem(hw.id, item.id, { done: true }))} />
       ) : (
         <Check on={!!item.done} label="다 했어요" onClick={() => patchHwItem(hw.id, item.id, { done: !item.done })} />
       )}
@@ -149,6 +154,7 @@ function HwLine({ hw, iv }: { hw: Homework; iv: ReturnType<typeof homeworkViews>
         <div className={`st-item-title ${iv.finished ? 'done' : ''}`}>{title}</div>
         <div className="st-item-sub">
           {item.kind === 'pages' && !iv.finished && (iv.today.length ? `오늘 p.${rangeText(iv.today)} · ` : '') + `남은 ${iv.remaining.length}쪽`}
+          {iv.unit && !iv.finished && (iv.today.length ? `오늘 ${rangeText(iv.today)}${iv.unit} · ` : '') + `남은 ${iv.remaining.length}${iv.unit === '번' ? '문제' : iv.unit}`}
           {item.question && ` · 질문: ${item.question}`}
         </div>
         {q !== null && (
@@ -160,16 +166,7 @@ function HwLine({ hw, iv }: { hw: Homework; iv: ReturnType<typeof homeworkViews>
               setQ(null);
             }}
           >
-            <input
-              autoFocus
-              className="st-input sm"
-              value={q}
-              onChange={(e) => setQ(e.target.value)}
-              onBlur={() => setQ(null)}
-              onClick={(e) => e.stopPropagation()}
-              placeholder="다음 수업에서 물어볼 것 (예: p.37 5번) · Enter"
-              aria-label="질문 메모"
-            />
+            <input autoFocus className="st-input sm" value={q} onChange={(e) => setQ(e.target.value)} onBlur={() => setQ(null)} onClick={(e) => e.stopPropagation()} placeholder="다음 수업에서 물어볼 것 (예: p.37 5번) · Enter" aria-label="질문 메모" />
           </form>
         )}
       </div>
@@ -321,7 +318,7 @@ function HomeworkSheet({ tutor, hw, today, onClose }: { tutor: Tutor; hw?: Homew
                 <input className="st-input xs" placeholder="37-40" value={x.pages} onChange={(e) => set(i, { pages: e.target.value })} aria-label="쪽" />
               </div>
             )}
-            {x.kind === 'text' && <input className="st-input" placeholder="예: 오답 정리, 단어 50개 외우기" value={x.text} onChange={(e) => set(i, { text: e.target.value })} />}
+            {x.kind === 'text' && <input className="st-input" placeholder="예: 블랙라벨 1~40번, 오답 정리" value={x.text} onChange={(e) => set(i, { text: e.target.value })} />}
             {x.kind === 'words' && (
               <div className="st-inline wrap">
                 <select className="st-input sm" value={x.wordListId} onChange={(e) => set(i, { wordListId: e.target.value })} aria-label="단어 목록">

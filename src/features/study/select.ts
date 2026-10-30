@@ -1,4 +1,5 @@
 // 저장된 자료 → 화면에 보일 것 (계획 대상, 오늘 할 것, 숙제 분량 …)
+import { textAmount } from './splitHomework';
 import { apportion } from './allocate';
 import { addDays, daysBetween } from './dates';
 import { habitOn } from './habits';
@@ -30,8 +31,7 @@ export const liveHomework = (d: StudyData): Homework[] => alive(d.homework).filt
 /** 과외 숙제로 잡힌 문제집 페이지 (문제집 계획에서 뺀다) */
 export function reservedPages(d: StudyData, bookId: Id): Set<number> {
   const out = new Set<number>();
-  for (const hw of liveHomework(d))
-    for (const it of hw.items) if (it.kind === 'pages' && it.bookId === bookId && it.range) for (const p of expand([it.range])) out.add(p);
+  for (const hw of liveHomework(d)) for (const it of hw.items) if (it.kind === 'pages' && it.bookId === bookId && it.range) for (const p of expand([it.range])) out.add(p);
   return out;
 }
 
@@ -106,6 +106,8 @@ export interface HwItemView {
   remaining: number[];
   today: number[];
   finished: boolean;
+  /** 글 숙제에서 찾은 분량 단위 (번 · 문제 · 강 …): 있으면 날마다 나눈다 */
+  unit?: string;
 }
 
 export interface HomeworkView {
@@ -126,7 +128,13 @@ function hwItemPagesDone(d: StudyData, it: HwItem): Set<number> {
 export function homeworkToday(remaining: number[], today: DateStr, due: DateStr, includeDue: boolean, offDates: DateStr[]): number[] {
   const end = includeDue ? due : addDays(due, -1);
   const dates = end >= today ? daysBetween(today, end).filter((x) => x === today || !offDates.includes(x)) : [today];
-  return remaining.slice(0, apportion(remaining.length, dates.map(() => 1))[0]);
+  return remaining.slice(
+    0,
+    apportion(
+      remaining.length,
+      dates.map(() => 1),
+    )[0],
+  );
 }
 
 export function homeworkViews(d: StudyData, today: DateStr): HomeworkView[] {
@@ -135,6 +143,14 @@ export function homeworkViews(d: StudyData, today: DateStr): HomeworkView[] {
       const tutor = d.tutors[hw.tutorId];
       const due = homeworkDue(hw, tutor && !tutor.deleted ? tutor : undefined);
       const items = hw.items.map((item): HwItemView => {
+        if (item.kind === 'text') {
+          // 글 숙제도 분량(1~40번 · 30문제 …)이 있으면 마감까지 나눈다. 한 번호는 doneRanges 에
+          const amt = item.done ? null : textAmount(item.text ?? '');
+          if (!amt) return { item, remaining: [], today: [], finished: !!item.done };
+          const done = new Set(expand(item.doneRanges ?? []));
+          const remaining = expand([[amt.from, amt.to]]).filter((p) => !done.has(p));
+          return { item, remaining, today: homeworkToday(remaining, today, due, hw.includeDue, d.settings.offDates), finished: remaining.length === 0, unit: amt.unit };
+        }
         if (item.kind !== 'pages' || !item.range) return { item, remaining: [], today: [], finished: !!item.done };
         const done = hwItemPagesDone(d, item);
         const remaining = expand([item.range]).filter((p) => !done.has(p));
