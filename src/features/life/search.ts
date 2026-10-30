@@ -105,7 +105,7 @@ export function searchAll(d: StudyData, words: Record<string, Word>, query: stri
     '운동',
     alive(d.workouts)
       .sort((a, b) => b.date.localeCompare(a.date))
-      .map((w) => ({ title: `${w.date} ${w.kind}`, text: [w.detail, w.memo].filter(Boolean).join(' · '), to: w.kind === '농구' ? '/fitness/basketball' : '/fitness', fields: [w.kind, w.detail, w.memo] })),
+      .map((w) => ({ title: `${w.date} ${w.kind}`, text: [w.detail, w.memo].filter(Boolean).join(' · '), to: '/basketball', fields: [w.kind, w.detail, w.memo] })),
   );
   add(
     '취미',

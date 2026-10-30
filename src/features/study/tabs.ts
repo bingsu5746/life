@@ -15,7 +15,6 @@ export const TABS = [
 export const AREAS = [
   { key: 'home', label: '메인' },
   { key: 'study', label: '공부' },
-  { key: 'fitness', label: '운동' },
   { key: 'money', label: '돈' },
   { key: 'hobby', label: '취미' },
   { key: 'diary', label: '일기' },
@@ -33,16 +32,10 @@ export interface AreaItem {
 }
 
 /** 취미 영역에 함께 들어 있는 주소 맨 앞 칸 */
-export const HOBBY_PARTS = ['movies', 'games', 'music', 'travel'] as const;
+export const HOBBY_PARTS = ['movies', 'games', 'music', 'travel', 'basketball'] as const;
 
 /** 공부를 뺀 영역마다 왼쪽(폰은 아래) 메뉴: 영역을 누르면 메인 대신 이 칸들이 나온다 */
 export const AREA_ITEMS: Record<Exclude<AreaKey, 'home' | 'study'>, AreaItem[]> = {
-  fitness: [
-    { key: '', label: '운동', icon: 'area-fitness' },
-    { key: 'body', label: '몸', icon: 'tutor' },
-    { key: 'basketball', label: '농구', icon: 'ball' },
-    { key: 'drills', label: '농구 연습', icon: 'target' },
-  ],
   money: [
     { key: '', label: '이번 달', icon: 'area-money' },
     { key: 'fixed', label: '고정', icon: 'review' },
@@ -51,6 +44,7 @@ export const AREA_ITEMS: Record<Exclude<AreaKey, 'home' | 'study'>, AreaItem[]> 
   hobby: [
     { key: '', label: '취미', icon: 'area-hobby' },
     { key: 'reading', label: '독서', icon: 'books' },
+    { key: 'basketball', label: '농구', icon: 'ball', to: '/basketball' },
     { key: 'movies', label: '영화', icon: 'area-movies', to: '/movies' },
     { key: 'games', label: '게임', icon: 'game', to: '/games' },
     { key: 'music', label: '음악', icon: 'music', to: '/music' },
@@ -73,6 +67,15 @@ export const MOVIE_ITEMS: AreaItem[] = [
   { key: 'rec', label: '추천', icon: 'area-hobby', to: '/movies/rec' },
 ];
 
+/** 농구 안에서의 메뉴 (취미로 돌아가기 + 농구 연습 · 농구 기록 · NBA) */
+export const BASKETBALL_ITEMS: AreaItem[] = [
+  { key: 'hobby', label: '취미', icon: 'area-hobby', to: '/hobby' },
+  { key: 'drills', label: '농구 연습', icon: 'target', to: '/basketball/drills' },
+  { key: 'log', label: '농구 기록', icon: 'ball', to: '/basketball' },
+  { key: 'nba', label: 'NBA', icon: 'game', to: '/basketball/nba' },
+];
+export const basketballItem = (sub?: string) => (sub === 'drills' || sub === 'nba' ? sub : 'log');
+
 /** 영화 주소의 두 번째 칸 → 켜진 영화 메뉴 */
 export const movieItem = (sub?: string) => (sub === 'watched' || sub === 'want' || sub === 'quotes' || sub === 'awards' || sub === 'ceremony' ? 'watched' : sub === 'find' || sub === 'rec' ? sub : 'now');
 
@@ -81,7 +84,6 @@ export function activeItem(area: keyof typeof AREA_ITEMS, sub?: string, p0?: str
   if (area === 'hobby' && (HOBBY_PARTS as readonly string[]).includes(p0 ?? '')) return p0!;
   if (area === 'diary') return sub === 'dream' || sub === 'form' ? sub : '';
   if (area === 'money') return sub === 'fixed' || sub === 'saving' ? sub : '';
-  if (area === 'fitness') return sub === 'body' || sub === 'basketball' || sub === 'drills' ? sub : '';
   if (area === 'hobby') return sub === 'wish' || sub === 'reading' ? sub : '';
   return '';
 }

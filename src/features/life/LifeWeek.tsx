@@ -65,7 +65,7 @@ export function LifeWeekPage({ day, monthly }: { day?: string; monthly?: boolean
           <b>{hm(w.study.now)}</b>
           <Delta now={w.study.now} prev={w.study.prev} fmt={hm} word={prevWord} />
         </button>
-        <button className="lw-card" onClick={() => go('/fitness')}>
+        <button className="lw-card" onClick={() => go('/basketball')}>
           <small>운동</small>
           <b>
             {w.workout.days}일{w.workout.minutes ? ` · ${hm(w.workout.minutes)}` : ''}

@@ -37,7 +37,7 @@ export function Basketball({ sub }: { sub?: string }) {
   const chrono = [...games].reverse().slice(-20);
   const close = () => {
     setEdit(null);
-    if (sub) go('/fitness/basketball');
+    if (sub) go('/basketball');
   };
   return (
     <div className="st-page">
@@ -243,15 +243,7 @@ function BbSheet({ item, today, onClose }: { item?: Workout; today: string; onCl
             </datalist>
             {rows.map((r, i) => (
               <div key={i} className="bb-item">
-                <input
-                  className="st-input"
-                  list="bb-drills"
-                  value={r.name}
-                  onChange={(e) => setRow(i, { name: e.target.value, kind: r.kind ?? guessKind(e.target.value) })}
-                  onBlur={() => !r.kind && setRow(i, { kind: guessKind(r.name) })}
-                  placeholder="연습한 것 (예: 자유투)"
-                  aria-label="연습한 것"
-                />
+                <input className="st-input" list="bb-drills" value={r.name} onChange={(e) => setRow(i, { name: e.target.value, kind: r.kind ?? guessKind(e.target.value) })} onBlur={() => !r.kind && setRow(i, { kind: guessKind(r.name) })} placeholder="연습한 것 (예: 자유투)" aria-label="연습한 것" />
                 <div className="bb-item-nums">
                   <input className="st-input xs" inputMode="numeric" value={r.made} onChange={(e) => setRow(i, { made: e.target.value.replace(/\D/g, '').slice(0, 4) })} placeholder="성공" aria-label={`${r.name || '연습'} 성공 수`} />
                   /

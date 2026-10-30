@@ -191,7 +191,7 @@ export function DrillsPage() {
         </section>
       ) : (
         <Empty title="연습을 끝내면 여기에 쌓여요">
-          <button className="st-link" onClick={() => go('/fitness/basketball')}>
+          <button className="st-link" onClick={() => go('/basketball')}>
             농구 기록 보기
           </button>
         </Empty>
