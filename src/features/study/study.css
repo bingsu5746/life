@@ -7109,3 +7109,9 @@ body.focus-on {
   border-radius: 50%;
   flex: none;
 }
+.sv-step {
+  display: block;
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 0.85em;
+}

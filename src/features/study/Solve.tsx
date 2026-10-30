@@ -210,6 +210,7 @@ export function Solve({ open }: { open?: string }) {
         {solving && (
           <div className="sv-ai sv-busy">
             푸는 중… <Elapsed from={solving.startedAt} />초 / 약 {Math.round(solving.estimate / 1000)}초<small className="st-muted"> · 다른 화면으로 가도 계속 풀어요</small>
+            {solving.step && <small className="sv-step">{solving.step}</small>}
           </div>
         )}
         <div ref={endRef} />

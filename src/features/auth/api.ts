@@ -347,4 +347,4 @@ export const solveImgPut = (mime: string, data: string) => call<{ key: string }>
 export const solveImgUrl = (key: string) => `/api/solve/img/${key}`;
 /** 풀이를 서버에 맡기기 (바로 돌아옴) · 끝났는지 묻기 */
 export const solveJobStart = (engine: SolveEngine, turns: SolveTurn[], jobId: string) => call<{ jobId: string }>('solve', 'POST', { engine, turns, jobId });
-export const solveJobGet = (jobId: string) => call<{ running?: boolean; missing?: boolean; done?: boolean; code?: number; result?: unknown }>(`solve/job/${jobId}`);
+export const solveJobGet = (jobId: string) => call<{ running?: boolean; step?: string; missing?: boolean; done?: boolean; code?: number; result?: unknown }>(`solve/job/${jobId}`);

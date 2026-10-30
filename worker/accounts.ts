@@ -41,6 +41,10 @@ const COOKIE = COOKIE_NAME;
 
 const DAY = 86_400_000;
 const enc = new TextEncoder();
+/** 한 모델을 기다리는 최대 시간 · 새 모델을 더 해 보지 않는 전체 시간 */
+const MODEL_TIMEOUT = 75_000;
+const SOLVE_BUDGET = 120_000;
+
 const hex = (buf: ArrayBuffer | Uint8Array) => [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, '0')).join('');
 const randomHex = (n: number) => hex(crypto.getRandomValues(new Uint8Array(n)));
 const sha256 = async (s: string) => hex(await crypto.subtle.digest('SHA-256', enc.encode(s)));
@@ -363,6 +367,9 @@ export class Accounts extends DurableObject<Env> {
   private jobs = new Map<string, { code: number; body: string }>();
   private running = new Set<string>();
 
+  /** 푸는 중인 풀이가 지금 무엇을 하는지 (어느 모델에 묻는 중 · 기다리는 중) */
+  private steps = new Map<string, string>();
+
   /** 풀이 시작: 바로 번호만 돌려주고, 끝나면 저장해 둔다 (기기는 몇 초마다 물어봄) */
   private solveStart(user: UserRow, b: Record<string, unknown>, origin: string): Response {
     const id = String(b.jobId);
@@ -372,11 +379,12 @@ export class Accounts extends DurableObject<Env> {
     this.running.add(key);
     // 받아 가지 않은 지 하루 넘은 풀이 결과는 지운다
     this.sql.exec("DELETE FROM cache WHERE key LIKE 'solvejob:%' AND at < ?", Date.now() - DAY);
-    const work = this.solve(user, b, origin)
+    const work = this.solve(user, b, origin, (step) => this.steps.set(key, step))
       .then(async (res) => ({ code: res.status, body: await res.text() }))
       .catch((e) => ({ code: 500, body: JSON.stringify({ error: `풀지 못했어요: ${e instanceof Error ? e.message : String(e)}` }) }))
       .then((r) => {
         this.running.delete(key);
+        this.steps.delete(key);
         this.jobs.set(key, r);
         // 서버가 잠깐 내려가도 남게 저장 (가져가면 지움)
         this.sql.exec('INSERT OR REPLACE INTO cache (key, data, at) VALUES (?, ?, ?)', `solvejob:${key}`, JSON.stringify(r), Date.now());
@@ -388,7 +396,7 @@ export class Accounts extends DurableObject<Env> {
   /** 풀이 상태: 아직이면 running, 끝났으면 답(한 번 주고 지운다) */
   private solveJob(user: UserRow, id: string): Response {
     const key = `${user.id}:${id}`;
-    if (this.running.has(key)) return json({ running: true });
+    if (this.running.has(key)) return json({ running: true, step: this.steps.get(key) });
     let r = this.jobs.get(key);
     if (!r) {
       const row = this.sql.exec<{ data: string }>('SELECT data FROM cache WHERE key = ?', `solvejob:${key}`).toArray()[0];
@@ -556,7 +564,7 @@ export class Accounts extends DurableObject<Env> {
   }
 
   /** { engine, turns: [{ role, text, images: [{ mime, data(base64) }] }] } → { text, model } */
-  private async solve(user: UserRow, b: Record<string, unknown>, origin: string): Promise<Response> {
+  private async solve(user: UserRow, b: Record<string, unknown>, origin: string, step: (s: string) => void = () => {}): Promise<Response> {
     const ENG: Engine[] = ['gemini', 'openrouter', 'mistral', 'groq', 'siliconflow', 'nvidia', 'cloudflare'];
     const engine = (ENG.includes(b.engine as Engine) ? b.engine : 'gemini') as Engine;
     const raw = Array.isArray(b.turns) ? b.turns.slice(-12) : [];
@@ -612,26 +620,39 @@ export class Accounts extends DurableObject<Env> {
     };
     const ok = (r: { text: string; model: string }, left?: number | null) => (this.bumpUse(user.id, engine, { left }), json(r));
     /** 앞에서부터 몇 개 모델을 해 보고, 사용량이 다 됐다는 답이면 바로 멈춘다 */
+    const t0 = Date.now();
+    const short = (m: string) => m.split('/').pop()!;
+    /** 한 모델에 묻기: 너무 오래 걸리면(75초) 그 모델은 그만두고 다음으로 */
+    const timed = <T>(p: Promise<T>) => Promise.race([p, new Promise<never>((_, no) => setTimeout(() => no(new Error('너무 오래 걸려서 다음 모델로')), MODEL_TIMEOUT))]);
+    /** 앞에서부터 몇 개 모델을 해 보고, 사용량이 다 됐다는 답이면 바로 멈춘다 */
     const tryModels = async (models: string[], ask: (m: string) => Promise<{ text: string; remaining?: number | null }>) => {
       let last = '';
       const tried: string[] = [];
       let waited = 0;
-      for (const m of models.slice(0, 6)) {
+      const list = models.slice(0, 6);
+      for (const [i, m] of list.entries()) {
+        // 전체로 너무 오래 걸렸으면 새 모델은 그만
+        if (i > 0 && Date.now() - t0 > SOLVE_BUDGET) break;
+        step(`${short(m)} 에게 묻는 중${list.length > 1 ? ` (${i + 1}/${list.length})` : ''}`);
+        const t1 = Date.now();
         try {
-          const r = await ask(m);
+          const r = await timed(ask(m));
+          console.log('solve model ok', engine, m, `${Date.now() - t1}ms`);
           return ok({ text: r.text, model: m }, r.remaining);
         } catch (e) {
           last = e instanceof Error ? e.message : String(e);
-          tried.push(`${m.split('/').pop()}: ${last.slice(0, 80)}`);
-          console.error('solve model failed', engine, m, last);
+          tried.push(`${short(m)}: ${last.slice(0, 80)}`);
+          console.error('solve model failed', engine, m, `${Date.now() - t1}ms`, last);
           // 계정 전체가 막힌 것(하루 사용량 · 크레딧)만 멈추고, 그 모델만 바쁘거나(503) 없거나(404) 잠깐 막힌 것은 다음 모델로
           if (/사용량|크레딧/.test(last)) break;
+          if (i === list.length - 1) break;
           // 잠깐 막힘(429) · 바쁨(503)은 계정 전체에 걸린 것이라 바로 다음 모델로 가도 또 막힌다.
-          // 서비스가 알려 준 시간(retry-after)만큼, 없으면 점점 길게 쉬었다가 (모두 합쳐 45초까지)
+          // 서비스가 알려 준 시간(retry-after)만큼, 없으면 3·6초… 쉬었다가 (한 번에 8초, 모두 합쳐 20초까지)
           const after = (e as { retryAfter?: number | null }).retryAfter;
           const busy = /잠깐 막혔|^503|busy/i.test(last);
-          const ms = busy ? Math.min(20_000, after != null ? after * 1000 + 300 : 4000 * (tried.length + 1), 45_000 - waited) : 1200;
+          const ms = busy ? Math.min(8_000, after != null ? after * 1000 + 300 : 3000 * tried.length, 20_000 - waited) : 500;
           waited += Math.max(0, ms);
+          if (ms > 1000) step(`잠깐 막혀서 ${Math.round(ms / 1000)}초 기다리는 중`);
           if (ms > 0) await new Promise((r) => setTimeout(r, ms));
         }
       }
@@ -647,15 +668,19 @@ export class Accounts extends DurableObject<Env> {
         if (!chain.length) throw new Error('Gemini 무료 사용량을 다 썼어요');
         let last = '';
         const tried: string[] = [];
-        for (const m of chain.slice(0, 8)) {
+        for (const [i, m] of chain.slice(0, 8).entries()) {
+          if (i > 0 && Date.now() - t0 > SOLVE_BUDGET) break;
+          step(`${m} 에게 묻는 중`);
+          const t1 = Date.now();
           try {
-            const text = await askGemini(key, m, turns, this.gemFetch());
+            const text = await timed(askGemini(key, m, turns, this.gemFetch()));
+            console.log('solve model ok', 'gemini', m, `${Date.now() - t1}ms`);
             this.bumpGem(user.id, m);
             return ok({ text, model: m });
           } catch (e) {
             last = e instanceof Error ? e.message : String(e);
             tried.push(`${m}: ${last.slice(0, 80)}`);
-            console.error('solve model failed', 'gemini', m, last);
+            console.error('solve model failed', 'gemini', m, `${Date.now() - t1}ms`, last);
             // 하루 한도면 그 모델만 오늘 막고, 분당 한도면 이번만 건너뛴다
             // 하루 한도 · 없는 모델(404)은 오늘 그 모델을 건너뛴다
             if (/사용량|Gemini 404/.test(last)) this.bumpGem(user.id, m, true);

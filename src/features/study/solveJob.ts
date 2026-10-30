@@ -81,6 +81,8 @@ export interface Job {
   code?: number;
   /** 사람이 확인했는지 (맨 위 표시를 지우려고) */
   seen?: boolean;
+  /** 서버가 지금 하는 일 (어느 모델에 묻는 중 · 기다리는 중) */
+  step?: string;
 }
 
 let job: Job | null = load<Job | null>(JOB_KEY, null);
@@ -159,6 +161,7 @@ async function poll() {
             finish(res.text ?? res.error ?? '풀지 못했어요', r.code ?? 500, res.model);
             break;
           }
+          if (r.running && r.step && r.step !== job.step) setJob({ ...job, step: r.step });
           if (r.missing && Date.now() - job.startedAt > 15_000) {
             finish('서버가 다시 시작돼서 풀이를 잃었어요. 다시 보내 주세요.', 500);
             break;
