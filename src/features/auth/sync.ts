@@ -63,10 +63,7 @@ interface Side<T> {
   merge: (local: T, remote: T | null) => T;
   replace: (v: T) => void;
 }
-const SIDES: { study: Side<StudyData>; words: Side<ReturnType<typeof getWords>> } = {
-  study: { local: getStudy, read: (r) => normalize(r as StudyData), merge: mergeStudy, replace: replaceStudy },
-  words: { local: getWords, read: sanitizeWords, merge: mergeWords, replace: replaceWords },
-};
+const SIDES: { study: Side<StudyData>; words: Side<ReturnType<typeof getWords>> } = { study: { local: getStudy, read: (r) => normalize(r as StudyData), merge: mergeStudy, replace: replaceStudy }, words: { local: getWords, read: sanitizeWords, merge: mergeWords, replace: replaceWords } };
 
 /**
  * 한 묶음 맞추기. 서버에서 바뀐 게 없으면 내용을 받지 않고, 이 기기에서 고친 것만 올린다.
@@ -175,15 +172,21 @@ if (typeof window !== 'undefined') {
   });
 }
 
-// 다른 기기에서 바꾼 것을 받아 오기: 이 창으로 돌아올 때마다 (30초에 한 번까지, 실패한 뒤면 바로)
+// 다른 기기에서 바꾼 것을 받아 오기. 컴퓨터는 창을 옮겨도 visibilitychange 가 안 나는 때가 많아서
+// 창으로 돌아올 때(보임 · focus · pageshow) + 켜 둔 동안 3분마다. 바뀐 게 없으면 서버는 「그대로」만 답한다 (내용 안 보냄)
 let lastPull = 0;
-if (typeof document !== 'undefined')
-  document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState !== 'visible' || !isLoggedIn()) return;
-    if (status !== 'error' && Date.now() - lastPull < 30_000) return;
-    lastPull = Date.now();
-    void run(['study', 'words']);
-  });
+function pull(minGap: number) {
+  if (document.visibilityState !== 'visible' || !isLoggedIn()) return;
+  if (status !== 'error' && Date.now() - lastPull < minGap) return;
+  lastPull = Date.now();
+  void run(['study', 'words']);
+}
+if (typeof document !== 'undefined') {
+  document.addEventListener('visibilitychange', () => pull(10_000));
+  window.addEventListener('focus', () => pull(10_000));
+  window.addEventListener('pageshow', () => pull(10_000));
+  window.setInterval(() => pull(170_000), 180_000);
+}
 
 /** 로그아웃: 이 기기 자료를 지울지 고른다 */
 export async function forgetDevice(wipe: boolean) {
