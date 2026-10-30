@@ -128,7 +128,7 @@ export function Solve() {
   async function send() {
     if (busy || (!text.trim() && !files.length)) return;
     if (!isLoggedIn()) return toast('풀이는 로그인한 뒤에 쓸 수 있어요');
-    if (!chat.msgs.length && !topic.trim()) return toast('문제 이름을 먼저 써 주세요 (예: 쎈 수학Ⅰ p.45 12번)');
+    if (!chat.msgs.length && !topic.trim()) return toast('제목을 먼저 써 주세요');
     const pics = files;
     const q = text.trim();
     setText('');
@@ -235,7 +235,7 @@ export function Solve() {
       </div>
 
       <div className="sv-box">
-        {!chat.msgs.length && <input className="sv-topic" value={topic} onChange={(e) => setTopic(e.target.value)} placeholder="문제 이름 (예: 쎈 수학Ⅰ p.45 12번 · 이차함수 최댓값)" aria-label="문제 이름" />}
+        {!chat.msgs.length && <input className="sv-topic" value={topic} onChange={(e) => setTopic(e.target.value)} placeholder="제목" aria-label="제목" />}
         {files.length > 0 && (
           <div className="sv-files">
             {files.map((f, i) => (
