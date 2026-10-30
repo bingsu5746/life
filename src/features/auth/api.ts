@@ -300,6 +300,26 @@ export interface SchoolPeriod {
   period: number;
   subject: string;
 }
+/** NBA 하루 경기 (미국 날짜, balldontlie) */
+export interface NbaTeam {
+  abbr: string;
+  name: string;
+  city: string;
+}
+export interface NbaGame {
+  id: number;
+  date: string;
+  home: NbaTeam;
+  away: NbaTeam;
+  homeScore: number;
+  awayScore: number;
+  status: string;
+  period: number;
+  time: string;
+  start?: string;
+}
+export const nbaGames = (date: string) => call<{ games: NbaGame[]; at: number; stale?: boolean }>(`nba/games?date=${date}`);
+
 /** 공휴일 · 기념일 (한국천문연구원 특일 정보, 서버가 7일 기억) */
 export interface SpecialDay {
   date: string;

@@ -7156,3 +7156,132 @@ body.focus-on {
 .cal-tag.anniv {
   background: #db2777;
 }
+
+/* NBA */
+.nba-days {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.nba-day {
+  flex: 1;
+  padding: 8px 0;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface);
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+.nba-day.on {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--on-accent);
+  font-weight: 600;
+}
+.nba-date {
+  margin: 8px 0 14px;
+}
+.nba-livechip {
+  color: var(--bad);
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+.nba-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 12px;
+}
+.nba-card {
+  display: grid;
+  gap: 4px;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--surface);
+}
+.nba-card.fav {
+  border-color: var(--warn);
+  box-shadow: 0 0 0 1px var(--warn) inset;
+}
+.nba-card.live {
+  border-color: var(--bad);
+}
+.nba-status {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.8rem;
+  color: var(--muted);
+  margin-bottom: 4px;
+}
+.nba-status.live {
+  color: var(--bad);
+  font-weight: 600;
+}
+.nba-status.live i {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--bad);
+  animation: nba-blink 1.2s infinite;
+}
+@keyframes nba-blink {
+  50% {
+    opacity: 0.2;
+  }
+}
+.nba-team {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 6px 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.nba-badge {
+  flex: none;
+  width: 40px;
+  height: 40px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--soft);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+.nba-name {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  line-height: 1.2;
+}
+.nba-name small {
+  color: var(--muted);
+  font-size: 0.75rem;
+}
+.nba-name b {
+  font-weight: 500;
+}
+.nba-name i {
+  color: var(--warn);
+  font-style: normal;
+  font-size: 0.75rem;
+}
+.nba-score {
+  font-size: 1.5rem;
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+}
+.nba-team.win .nba-name b,
+.nba-team.win .nba-score {
+  font-weight: 700;
+  color: var(--text);
+}

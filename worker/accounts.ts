@@ -20,6 +20,7 @@ import { findBooksAladin, findBooksKakao, findGames, findRecords, similarArtists
 import { fetchProviders } from './ott';
 import { relayFetch, type Relay } from './relay';
 import { fetchSpecialDays } from './holidays';
+import { fetchGames } from './nba';
 import { monthOf, R2_FREE, R2_STOP, r2Block, rollMonth, type R2Use } from './r2guard';
 import { modelFamily, askCompat, askGemini, geminiDaily, pacificDay, askOpenRouter, COMPAT, compatModels, geminiModels, openRouterDaily, openRouterModels, pickCompat, SYSTEM as SOLVE_SYSTEM, type Engine, type SolveTurn } from './solve';
 import { filmFacets, searchFilms, type Film } from './catalog';
@@ -215,6 +216,7 @@ export class Accounts extends DurableObject<Env> {
     if (path === 'movies/recommend' && req.method === 'POST') return this.recommend(user, body);
     if (path === 'movies/ott' && req.method === 'POST') return this.ott(body);
     if (path === 'school' && req.method === 'POST') return this.school(body);
+    if (path === 'nba/games' && req.method === 'GET') return this.nbaGames(new URL(req.url).searchParams.get('date'));
     if (path === 'holidays' && req.method === 'GET') return this.holidays(new URL(req.url).searchParams.get('year'));
     if (path === 'dict/ko' && req.method === 'POST') return this.dictKo(body);
     if (path === 'lookup' && req.method === 'POST') return this.lookup(body);
@@ -1081,6 +1083,29 @@ export class Accounts extends DurableObject<Env> {
   }
 
   /** 학교: 급식 · 학사일정 · 시간표 (나이스). 학교 코드는 30일, 나머지는 6시간 저장 */
+  /** NBA 하루 경기 (미국 날짜). 1분에 5번이라 기억해 둔다: 지난 날 하루 · 오늘·어제 1분(경기 중 점수) · 앞날 3시간 */
+  private async nbaGames(date: string | null): Promise<Response> {
+    if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) return fail('날짜를 확인해 주세요.');
+    const env = this.env as unknown as Record<string, string | undefined>;
+    const key = env.balldontlie || env.BALLDONTLIE_KEY;
+    if (!key) return fail('NBA 를 보려면 balldontlie 키가 필요해요.', 503);
+    const usToday = new Date(Date.now() - 5 * 3600_000).toISOString().slice(0, 10);
+    const age = date < usToday && Date.parse(usToday) - Date.parse(date) > DAY ? DAY : date > usToday ? 3 * 3600_000 : 60_000;
+    const ck = `nba:${date}`;
+    const c = this.sql.exec<{ data: string; at: number }>('SELECT data, at FROM cache WHERE key = ?', ck).toArray()[0];
+    if (c && Date.now() - c.at < age) return json({ games: JSON.parse(c.data), at: c.at });
+    try {
+      const games = await fetchGames(key, date);
+      this.sql.exec('INSERT OR REPLACE INTO cache (key, data, at) VALUES (?, ?, ?)', ck, JSON.stringify(games), Date.now());
+      return json({ games, at: Date.now() });
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      console.error('nba failed', date, msg);
+      if (c) return json({ games: JSON.parse(c.data), at: c.at, stale: true });
+      return fail(`NBA 경기를 받지 못했어요. (${msg.slice(0, 120)})`, /잠깐/.test(msg) ? 429 : 502);
+    }
+  }
+
   /** 공휴일 · 기념일 (한 해씩, 7일 기억. 새로 정해진 대체공휴일도 일주일 안에 들어온다) */
   private async holidays(y: string | null): Promise<Response> {
     const year = Number(y);
