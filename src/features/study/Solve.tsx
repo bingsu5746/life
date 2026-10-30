@@ -101,7 +101,12 @@ export function Solve() {
         .catch(() => setUsage(null));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [picker, busy === '']);
+  /** 한도에 걸린 질문: 다른 모델을 고르면 이걸 다시 보낸다 */
+  const [retry, setRetry] = useState<Chat | null>(null);
   const shown = usage ? ENGINES.filter((e) => usage.available.includes(e.key)) : ENGINES;
+  // 사진이 있으면 사진을 못 읽는 서비스는 고를 수 없게
+  const hasImage = files.length > 0 || !!retry?.msgs[retry.msgs.length - 1]?.images?.length;
+  const noVision = (k: SolveEngine) => hasImage && usage?.vision?.[k] === false;
   /** 오늘 쓴 횟수 · 남은 횟수 (한도를 알 때만) */
   const countText = (k: SolveEngine) => {
     if (!usage) return '';
@@ -115,8 +120,6 @@ export function Solve() {
     return `오늘 ${n}번 씀`;
   };
   const [topic, setTopic] = useState('');
-  /** 한도에 걸린 질문: 다른 모델을 고르면 이걸 다시 보낸다 */
-  const [retry, setRetry] = useState<Chat | null>(null);
   useEffect(() => endRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' }), [chat.msgs.length, busy]);
   useEffect(() => {
     const a = area.current;
@@ -176,7 +179,7 @@ export function Solve() {
     } catch (e) {
       const done = { ...next, msgs: [...msgs, { role: 'assistant' as const, text: e instanceof Error ? e.message : '풀지 못했어요', error: true }] };
       setChat(done);
-      if (e instanceof ApiError && e.status === 429) {
+      if (e instanceof ApiError && (e.status === 429 || e.status >= 500)) {
         setRetry(next);
         setPicker(true);
       }
@@ -281,6 +284,13 @@ export function Solve() {
                 // 못 읽은 사진은 원본 그대로 보내지 않고 알려 준다 (형식이 맞지 않는 사진은 AI 가 거절함)
                 if (blobs.some((b) => !b)) toast('읽지 못한 사진이 있어요. 스크린샷이나 다른 사진으로 넣어 주세요');
                 const ok = blobs.filter((b): b is Blob => !!b);
+                if (ok.length && usage?.vision?.[engine] === false) {
+                  const v = (usage.available ?? []).find((k) => usage.vision?.[k] !== false && !usage.out[k]);
+                  if (v) {
+                    setEngine(v);
+                    toast(`${ENGINES.find((x) => x.key === engine)?.name} 은 사진을 못 읽어서 ${ENGINES.find((x) => x.key === v)?.name} 로 바꿨어요`);
+                  }
+                }
                 setFiles((cur) => [...cur, ...ok.map((blob) => ({ blob, url: URL.createObjectURL(blob) }))].slice(0, 4));
               });
             }}
@@ -313,11 +323,12 @@ export function Solve() {
           }}
         >
           <div className="sv-pick">
-            {retry && <p className="sv-retry">이 모델은 지금 못 써요. 다른 모델을 고르면 같은 질문을 바로 다시 보내요.</p>}
+            {retry && <p className="sv-retry">이 모델로는 못 풀었어요. 다른 모델을 고르면 같은 질문을 바로 다시 보내요.</p>}
             {shown.map((e) => (
               <button
                 key={e.key}
-                className={engine === e.key ? 'on' : ''}
+                className={`${engine === e.key ? 'on' : ''} ${noVision(e.key) ? 'off' : ''}`}
+                disabled={noVision(e.key)}
                 onClick={() => {
                   setEngine(e.key);
                   try {
@@ -336,7 +347,7 @@ export function Solve() {
               >
                 <span>
                   <b>{e.name}</b>
-                  <small>{e.desc}</small>
+                  <small>{noVision(e.key) ? '사진을 못 읽어요' : e.desc}</small>
                 </span>
                 <span className="sv-right">
                   {countText(e.key) && <small className={usage?.out[e.key] ? 'bad' : ''}>{countText(e.key)}</small>}

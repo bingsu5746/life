@@ -6949,3 +6949,7 @@ body.focus-on {
   background: var(--soft);
   font-size: 0.85rem;
 }
+.sv-pick button.off {
+  opacity: 0.35;
+  cursor: not-allowed;
+}

@@ -303,6 +303,25 @@ export class Accounts extends DurableObject<Env> {
   private compatList: Record<string, { at: number; base: string; json: unknown }> = {};
   private cfAgreed = false;
 
+  /** OpenAI 모양 API 의 맞는 주소와 모델 목록 (6시간 기억) */
+  private async compatEntry(engine: keyof typeof COMPAT): Promise<{ at: number; base: string; json: unknown }> {
+    const key = this.keyOf(engine);
+    if (!key) throw new Error('키가 없어요');
+    const old = this.compatList[engine];
+    if (old && Date.now() - old.at < 6 * 3600_000) return old;
+    let err = '';
+    for (const base of COMPAT[engine].bases) {
+      try {
+        const entry = { at: Date.now(), base, json: await compatModels(base, key) };
+        this.compatList[engine] = entry;
+        return entry;
+      } catch (e) {
+        err = e instanceof Error ? e.message : String(e);
+      }
+    }
+    throw new Error(err || '모델 목록을 받지 못했어요');
+  }
+
   private keyOf(engine: Engine): string | undefined {
     const env = this.env as unknown as Record<string, string | undefined>;
     if (engine === 'gemini') return env.Life_gemini_api_key || env.GEMINI_KEY;
@@ -401,8 +420,19 @@ export class Accounts extends DurableObject<Env> {
       }
     }
     if (this.orDaily?.v) left.openrouter = Math.max(0, this.orDaily.v - (u.n.openrouter ?? 0));
+    // 사진을 읽을 수 있는 서비스 (모델 목록 기준, 6시간 기억)
+    const vision: Record<string, boolean> = { gemini: true, cloudflare: true };
+    if (available.includes('openrouter')) {
+      if (!this.orList || Date.now() - this.orList.at > 6 * 3600_000) this.orList = { at: Date.now(), v: await openRouterModels().catch(() => []) };
+      vision.openrouter = this.orList.v.some((m) => m.image);
+    }
+    for (const e of ['mistral', 'groq', 'siliconflow', 'nvidia'] as const) {
+      if (!available.includes(e)) continue;
+      const entry = await this.compatEntry(e).catch(() => null);
+      vision[e] = !!entry && pickCompat(entry.json, true, COMPAT[e].prefer).length > 0;
+    }
     const r = this.r2Use();
-    return json({ available, used: u.n, out: u.out, left, gemini, r2: this.r2() ? { bytes: r.bytes, a: r.a, b: r.b + this.r2Ops, free: R2_FREE, stop: R2_STOP } : null });
+    return json({ available, vision, used: u.n, out: u.out, left, gemini, r2: this.r2() ? { bytes: r.bytes, a: r.a, b: r.b + this.r2Ops, free: R2_FREE, stop: R2_STOP } : null });
   }
 
   /** { engine, turns: [{ role, text, images: [{ mime, data(base64) }] }] } → { text, model } */
@@ -432,7 +462,7 @@ export class Accounts extends DurableObject<Env> {
     const tryModels = async (models: string[], ask: (m: string) => Promise<{ text: string; remaining?: number | null }>) => {
       let last = '';
       const tried: string[] = [];
-      for (const m of models.slice(0, 4)) {
+      for (const m of models.slice(0, 6)) {
         try {
           const r = await ask(m);
           return ok({ text: r.text, model: m }, r.remaining);
@@ -440,25 +470,25 @@ export class Accounts extends DurableObject<Env> {
           last = e instanceof Error ? e.message : String(e);
           tried.push(`${m.split('/').pop()}: ${last.slice(0, 80)}`);
           console.error('solve model failed', engine, m, last);
-          if (/사용량|크레딧|잠깐 막혔/.test(last)) break;
+          // 계정 전체가 막힌 것(하루 사용량 · 크레딧)만 멈추고, 그 모델만 바쁘거나(503) 없거나(404) 잠깐 막힌 것은 다음 모델로
+          if (/사용량|크레딧/.test(last)) break;
           // 다음 모델은 조금 쉬었다가 (초당 1번 같은 제한에 걸리지 않게)
           await new Promise((r) => setTimeout(r, 1200));
         }
       }
       // 어떤 모델을 해 봤고 각각 왜 안 됐는지 화면에도 보이게
-      throw new Error(tried.length > 1 ? `${last} [해 본 모델 ${tried.length}개 → ${tried.join(' / ')}]` : last || '답하지 못했어요');
+      throw new Error(tried.length > 1 ? `모델 ${tried.length}개 모두 안 됐어요 → ${tried.join(' / ')}` : last || '답하지 못했어요');
     };
     try {
       if (engine === 'gemini') {
         if (!this.gemList || Date.now() - this.gemList.at > DAY) this.gemList = { at: Date.now(), v: await geminiModels(key) };
         // 한도가 남은 모델부터. 한 모델이 다 됐다고(429) 하면 그 모델만 막고 다음 모델로
         // 모델 목록에서 하나도 못 고르면 알려진 이름으로 해 본다
-        const chain = this.gemList.v.length ? this.gemLeft(user.id).map((x) => x.model) : ['gemini-2.5-flash', 'gemini-2.5-flash-lite'];
-        console.log('solve gemini chain', JSON.stringify(this.gemList.v));
+        const chain = this.gemLeft(user.id).map((x) => x.model);
         if (!chain.length) throw new Error('Gemini 무료 사용량을 다 썼어요');
         let last = '';
         const tried: string[] = [];
-        for (const m of chain.slice(0, 5)) {
+        for (const m of chain.slice(0, 8)) {
           try {
             const text = await askGemini(key, m, turns);
             this.bumpGem(user.id, m);
@@ -468,10 +498,11 @@ export class Accounts extends DurableObject<Env> {
             tried.push(`${m}: ${last.slice(0, 80)}`);
             console.error('solve model failed', 'gemini', m, last);
             // 하루 한도면 그 모델만 오늘 막고, 분당 한도면 이번만 건너뛴다
-            if (/사용량/.test(last)) this.bumpGem(user.id, m, true);
+            // 하루 한도 · 없는 모델(404)은 오늘 그 모델을 건너뛴다
+            if (/사용량|Gemini 404/.test(last)) this.bumpGem(user.id, m, true);
           }
         }
-        throw new Error(tried.length > 1 ? `${/사용량/.test(last) ? 'Gemini 무료 사용량을 다 썼어요' : '잠깐 막혔어요'} [해 본 모델 ${tried.length}개 → ${tried.join(' / ')}]` : last || 'Gemini 가 답하지 못했어요');
+        throw new Error(tried.length > 1 ? `Gemini 모델 ${tried.length}개 모두 안 됐어요 → ${tried.join(' / ')}` : last || 'Gemini 가 답하지 못했어요');
       }
       if (engine === 'openrouter') {
         if (!this.orList || Date.now() - this.orList.at > 6 * 3600_000) this.orList = { at: Date.now(), v: await openRouterModels() };
@@ -503,20 +534,7 @@ export class Accounts extends DurableObject<Env> {
       }
       // Mistral · Groq · SiliconFlow · NVIDIA: 모델 목록에서 고르기
       const c = COMPAT[engine];
-      let entry = this.compatList[engine];
-      if (!entry || Date.now() - entry.at > 6 * 3600_000) {
-        let err = '';
-        for (const base of c.bases) {
-          try {
-            entry = { at: Date.now(), base, json: await compatModels(base, key) };
-            break;
-          } catch (e) {
-            err = e instanceof Error ? e.message : String(e);
-          }
-        }
-        if (!entry) throw new Error(err || '모델 목록을 받지 못했어요');
-        this.compatList[engine] = entry;
-      }
+      const entry = await this.compatEntry(engine);
       const models = pickCompat(entry.json, needImage, c.prefer);
       if (!models.length) return fail(needImage ? '이 서비스에는 사진을 읽는 모델이 없어요. 다른 모델을 골라 주세요.' : '쓸 수 있는 모델이 없어요.', 503);
       return await tryModels(models, (m) => askCompat(entry.base, key, m, turns));

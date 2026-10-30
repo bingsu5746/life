@@ -43,15 +43,20 @@ export function geminiChain(json: unknown): string[] {
   const ver = (n: string) => Number(n.match(/(?:gemini|gemma)-(\d+(?:\.\d+)?)/)?.[1] ?? 0);
   const size = (n: string) => Number(n.match(/(\d+)b/)?.[1] ?? 0);
   const ok = models
-    .map((m) => ({ name: s(m.name).replace(/^models\//, ''), gen: Array.isArray(m.supportedGenerationMethods) && m.supportedGenerationMethods.includes('generateContent') }))
+    // generateContent 표시가 없으면(목록 모양이 바뀐 경우) 일단 넣는다
+    .map((m) => ({ name: s(m.name).replace(/^models\//, ''), gen: !Array.isArray(m.supportedGenerationMethods) || m.supportedGenerationMethods.includes('generateContent') }))
     .filter((m) => m.gen && !/image|tts|live|audio|embedding|native|transcribe|robotics|computer|exp\b|-exp-/.test(m.name));
+  // 같은 판이면 정식판(preview 아님) 먼저
   const by = (re: RegExp, not?: RegExp) =>
     ok
       .filter((m) => re.test(m.name) && !(not && not.test(m.name)))
-      .sort((a, b) => ver(b.name) - ver(a.name) || size(b.name) - size(a.name) || a.name.length - b.name.length)
+      .sort((a, b) => ver(b.name) - ver(a.name) || Number(/preview/.test(a.name)) - Number(/preview/.test(b.name)) || size(b.name) - size(a.name) || a.name.length - b.name.length)
       .map((m) => m.name);
   return [...by(/^gemini-.*flash/, /lite/), ...by(/^gemini-.*flash-lite/), ...by(/^gemma-4/)];
 }
+
+/** 목록을 못 받거나 비었을 때 해 볼 이름 (AI Studio 비율 제한 화면에 보인 무료 모델, 2026-10-30) */
+export const GEMINI_KNOWN = ['gemini-3.8-flash', 'gemini-3.6-flash', 'gemini-3-flash', 'gemini-3.8-flash-preview', 'gemini-3.6-flash-preview', 'gemini-3.5-flash-lite', 'gemini-3.1-flash-lite', 'gemma-4-31b-it', 'gemma-4-26b-it'];
 
 /** 모델 하루 무료 한도 (AI Studio 비율 제한 화면 2026-10-30: Flash 20 · 3.1 이상 Flash Lite 500 · 2.5 Flash Lite 20 · Gemma 4 14,400) */
 export function geminiDaily(model: string): number | null {
@@ -88,10 +93,21 @@ export function readGemini(json: unknown): string {
 
 const GEM = 'https://generativelanguage.googleapis.com/v1beta';
 
+/** 모델 목록 (여러 쪽이면 끝까지). 못 고르면 알려진 이름으로 */
 export async function geminiModels(key: string): Promise<string[]> {
-  const res = await fetch(`${GEM}/models?pageSize=200`, { headers: { 'x-goog-api-key': key } });
-  if (!res.ok) throw new Error(`Gemini 모델 목록 ${res.status}`);
-  return geminiChain(await res.json());
+  const all: unknown[] = [];
+  let page = '';
+  for (let i = 0; i < 5; i++) {
+    const res = await fetch(`${GEM}/models?pageSize=1000${page ? `&pageToken=${encodeURIComponent(page)}` : ''}`, { headers: { 'x-goog-api-key': key } });
+    if (!res.ok) break;
+    const j = (await res.json()) as { models?: unknown[]; nextPageToken?: string };
+    all.push(...(j.models ?? []));
+    if (!j.nextPageToken) break;
+    page = j.nextPageToken;
+  }
+  const chain = geminiChain({ models: all });
+  console.log('solve gemini models', all.length, JSON.stringify(chain));
+  return chain.length ? chain : GEMINI_KNOWN;
 }
 
 export async function askGemini(key: string, model: string, turns: SolveTurn[]): Promise<string> {
