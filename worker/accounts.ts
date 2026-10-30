@@ -874,6 +874,10 @@ export class Accounts extends DurableObject<Env> {
       this.sql.exec('INSERT OR REPLACE INTO cache (key, data, at) VALUES (?, ?, ?)', ck, JSON.stringify(v), Date.now());
       return v;
     };
+    // 나이스가 실패하면 30분 동안은 다시 묻지 않는다 (화면을 열 때마다 같은 오류가 반복되지 않게)
+    const failKey = `neis:fail:${name}`;
+    const lastFail = this.sql.exec<{ data: string; at: number }>('SELECT data, at FROM cache WHERE key = ?', failKey).toArray()[0];
+    if (lastFail && Date.now() - lastFail.at < 30 * 60_000) return fail(`나이스가 응답하지 않아 잠시 쉬어요. (${JSON.parse(lastFail.data)})`, 503);
     try {
       const codes = await cached(`neis:school:${name}`, 30 * 86_400_000, () => findSchool(key, name));
       if (!codes) return fail(`「${name}」을 나이스에서 찾지 못했어요. 학교 이름을 정확히 써 주세요.`, 404);
@@ -886,6 +890,7 @@ export class Accounts extends DurableObject<Env> {
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       console.error('neis failed', msg);
+      this.sql.exec('INSERT OR REPLACE INTO cache (key, data, at) VALUES (?, ?, ?)', failKey, JSON.stringify(msg.slice(0, 200)), Date.now());
       return fail(msg.startsWith('나이스') ? msg : '나이스에서 정보를 받지 못했어요. 잠시 뒤 다시 해 주세요.', 502);
     }
   }

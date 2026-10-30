@@ -67,9 +67,7 @@ export function parseMeals(rows: Row[]): Meal[] {
 }
 
 export function parseEvents(rows: Row[]): SchoolEvent[] {
-  return rows
-    .map((r) => ({ date: ymd(r.AA_YMD), name: s(r.EVENT_NM), off: /휴업|공휴/.test(s(r.SBTR_DD_SC_NM)) }))
-    .filter((e) => e.date && e.name && e.name !== '토요휴업일');
+  return rows.map((r) => ({ date: ymd(r.AA_YMD), name: s(r.EVENT_NM), off: /휴업|공휴/.test(s(r.SBTR_DD_SC_NM)) })).filter((e) => e.date && e.name && e.name !== '토요휴업일');
 }
 
 export function parseTimetable(rows: Row[]): Period[] {
@@ -81,8 +79,12 @@ export function parseTimetable(rows: Row[]): Period[] {
 
 async function call(key: string, service: string, params: Record<string, string>): Promise<Row[]> {
   const q = new URLSearchParams({ KEY: key, Type: 'json', pIndex: '1', pSize: '1000', ...params });
-  const res = await fetch(`${BASE}/${service}?${q}`, { headers: { accept: 'application/json' } });
-  if (!res.ok) throw new Error(`나이스 응답 ${res.status}`);
+  // 일부 공공 서버는 브라우저 정보(User-Agent)가 없는 요청을 막아서 붙인다
+  const res = await fetch(`${BASE}/${service}?${q}`, { headers: { accept: 'application/json', 'user-agent': 'Mozilla/5.0 (compatible; LifeStudyApp/1.0)' } });
+  if (!res.ok) {
+    const body = (await res.text().catch(() => '')).replace(/\s+/g, ' ').slice(0, 160);
+    throw new Error(`나이스(${service}) 응답 ${res.status}${body ? `: ${body}` : ''}`);
+  }
   return rowsOf(await res.json(), service);
 }
 

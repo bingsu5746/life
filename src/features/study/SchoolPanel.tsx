@@ -18,14 +18,31 @@ function cachedSchool(body: { name: string; grade?: number; cls?: string; from: 
   } catch {
     /* 저장소를 못 쓰면 그냥 받는다 */
   }
-  return schoolInfo(body).then((v) => {
-    try {
-      sessionStorage.setItem(k, JSON.stringify({ at: Date.now(), v }));
-    } catch {
-      /* 무시 */
-    }
-    return v;
-  });
+  // 실패도 30분 동안 기억해서 화면을 열 때마다 다시 묻지 않는다
+  const fk = `${k}.fail`;
+  try {
+    const f = Number(sessionStorage.getItem(fk));
+    if (f && Date.now() - f < 30 * 60_000) return Promise.reject(new Error('나이스 쉬는 중'));
+  } catch {
+    /* 무시 */
+  }
+  return schoolInfo(body)
+    .catch((e) => {
+      try {
+        sessionStorage.setItem(fk, String(Date.now()));
+      } catch {
+        /* 무시 */
+      }
+      throw e;
+    })
+    .then((v) => {
+      try {
+        sessionStorage.setItem(k, JSON.stringify({ at: Date.now(), v }));
+      } catch {
+        /* 무시 */
+      }
+      return v;
+    });
 }
 
 /** 학교 정보 받기 (로그인 · 학교를 정했을 때만) */
