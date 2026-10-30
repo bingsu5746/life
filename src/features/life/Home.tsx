@@ -1,33 +1,20 @@
 // 메인: 공부 · 운동 · 돈 · 취미 · 일기를 한눈에. 누르면 그 영역으로
-import { isLoggedIn, uselessFact } from "../auth/api";
-import { exportBackup } from "../study/backup";
-import { addDays, dday, longDate, weekStart, weekday } from "../study/dates";
-import { upcomingExams } from "../study/exams";
-import { SchoolHome } from "../study/SchoolPanel";
-import { EveBanner } from "../study/Eve";
-import { MorningCard } from "./Morning";
-import { alive } from "../study/model";
-import { todaySummary } from "../study/select";
-import { put, useStudy, useWords } from "../study/store";
-import { useCallback, useEffect, useState } from "react";
-import {
-  DEFAULT_PLACE,
-  getWeather,
-  weatherText,
-  type Weather,
-} from "./weather";
-import { minutesText } from "../study/timer";
-import { AREAS } from "../study/tabs";
-import { go, Icon, toast, useToday } from "../study/ui";
-import {
-  dayStreak,
-  hobbyWeek,
-  monthOf,
-  monthSummary,
-  weekWorkouts,
-  won,
-  workoutStreak,
-} from "./calc";
+import { isLoggedIn, uselessFact } from '../auth/api';
+import { exportBackup } from '../study/backup';
+import { addDays, dday, longDate, weekStart, weekday } from '../study/dates';
+import { upcomingExams } from '../study/exams';
+import { SchoolHome } from '../study/SchoolPanel';
+import { EveBanner } from '../study/Eve';
+import { MorningCard } from './Morning';
+import { alive } from '../study/model';
+import { todaySummary } from '../study/select';
+import { put, useStudy, useWords } from '../study/store';
+import { useCallback, useEffect, useState } from 'react';
+import { DEFAULT_PLACE, getWeather, weatherText, type Weather } from './weather';
+import { minutesText } from '../study/timer';
+import { AREAS } from '../study/tabs';
+import { go, Icon, toast, useToday } from '../study/ui';
+import { dayStreak, hobbyWeek, monthOf, monthSummary, weekWorkouts, won, workoutStreak } from './calc';
 
 export function Home(_: { loggedIn: boolean; onLogin: () => void }) {
   const d = useStudy();
@@ -54,19 +41,15 @@ export function Home(_: { loggedIn: boolean; onLogin: () => void }) {
   // 취미
   const hw = hobbyWeek(alive(d.hobbyLogs), ws);
   const hobbyMin = [...hw.values()].reduce((a, b) => a + b, 0);
-  const doing = alive(d.wishes).filter((w) => w.status === "doing");
+  const doing = alive(d.wishes).filter((w) => w.status === 'doing');
   // 영화
   const movies = alive(d.movies);
-  const seen = movies.filter((m) => m.status === "watched");
-  const nextOpen = movies
-    .filter((m) => m.status === "want" && m.release && m.release >= today)
-    .sort((a, b) => a.release!.localeCompare(b.release!))[0];
+  const seen = movies.filter((m) => m.status === 'watched');
+  const nextOpen = movies.filter((m) => m.status === 'want' && m.release && m.release >= today).sort((a, b) => a.release!.localeCompare(b.release!))[0];
   // AI 풀이 (이 기기의 지난 대화)
   const aiToday = (() => {
     try {
-      const list = JSON.parse(
-        localStorage.getItem("my-study.solve.chats") ?? "[]",
-      ) as { at: number }[];
+      const list = JSON.parse(localStorage.getItem('my-study.solve.chats') ?? '[]') as { at: number }[];
       const start = new Date(`${today}T00:00:00+09:00`).getTime();
       return list.filter((c) => c.at >= start).length;
     } catch {
@@ -75,31 +58,12 @@ export function Home(_: { loggedIn: boolean; onLogin: () => void }) {
   })();
   // 일기
   const diaryToday = d.diary[today] && !d.diary[today].deleted;
-  const diaryMonth = alive(d.diary).filter(
-    (e) => monthOf(e.id) === monthOf(today),
-  ).length;
+  const diaryMonth = alive(d.diary).filter((e) => monthOf(e.id) === monthOf(today)).length;
 
-  const cards: Record<
-    string,
-    {
-      lines: string[];
-      action?: { label: string; to: string };
-      badge?: { big: string; small: string };
-      streak?: number;
-    }
-  > = {
+  const cards: Record<string, { lines: string[]; action?: { label: string; to: string }; badge?: { big: string; small: string }; streak?: number }> = {
     study: {
-      lines: [
-        sum.total
-          ? sum.left
-            ? `오늘 할 것 ${sum.left}개 남음`
-            : "오늘 할 것 다 했어요"
-          : "오늘 정해 둔 공부가 없어요",
-        `오늘 공부 ${minutesText(studied)}`,
-      ],
-      badge: exam
-        ? { big: dday(today, exam.date), small: exam.name }
-        : undefined,
+      lines: [sum.total ? (sum.left ? `오늘 할 것 ${sum.left}개 남음` : '오늘 할 것 다 했어요') : '오늘 정해 둔 공부가 없어요', `오늘 공부 ${minutesText(studied)}`],
+      badge: exam ? { big: dday(today, exam.date), small: exam.name } : undefined,
       streak: dayStreak(
         alive(d.sessions)
           .filter((s) => s.minutes > 0)
@@ -108,83 +72,43 @@ export function Home(_: { loggedIn: boolean; onLogin: () => void }) {
       ),
     },
     fitness: {
-      lines: [
-        `이번 주 ${wkDays}${goal ? `/${goal}` : ""}일 운동`,
-        didToday
-          ? "오늘 운동했어요"
-          : workoutStreak(alive(d.workouts), today)
-            ? `${workoutStreak(alive(d.workouts), today)}일 연속`
-            : "오늘은 아직 안 했어요",
-      ],
-      action: didToday ? undefined : { label: "운동 넣기", to: "/fitness/new" },
+      lines: [`이번 주 ${wkDays}${goal ? `/${goal}` : ''}일 운동`, didToday ? '오늘 운동했어요' : workoutStreak(alive(d.workouts), today) ? `${workoutStreak(alive(d.workouts), today)}일 연속` : '오늘은 아직 안 했어요'],
+      action: didToday ? undefined : { label: '운동 넣기', to: '/fitness/new' },
       streak: workoutStreak(alive(d.workouts), today),
     },
-    money: {
-      lines: [
-        `이번 달 쓴 돈 ${won(ms.out)}`,
-        budget
-          ? budget - ms.out >= 0
-            ? `예산 ${won(budget - ms.out)} 남음`
-            : `예산 ${won(ms.out - budget)} 넘음`
-          : "",
-      ].filter(Boolean),
-      action: { label: "쓴 것 적기", to: "/money/new" },
-    },
+    money: { lines: [`이번 달 쓴 돈 ${won(ms.out)}`, budget ? (budget - ms.out >= 0 ? `예산 ${won(budget - ms.out)} 남음` : `예산 ${won(ms.out - budget)} 넘음`) : ''].filter(Boolean), action: { label: '쓴 것 적기', to: '/money/new' } },
     hobby: {
       lines: [
         `이번 주 취미 ${minutesText(hobbyMin)}`,
         [
-          seen.length ? `본 영화 ${seen.length}편` : "",
-          alive(d.records).filter((r) => r.status === "have").length
-            ? `LP·음반 ${alive(d.records).filter((r) => r.status === "have").length}장`
-            : "",
-          alive(d.games).filter((g) => g.status === "playing").length
-            ? `하는 게임 ${alive(d.games).filter((g) => g.status === "playing").length}개`
-            : "",
+          seen.length ? `본 영화 ${seen.length}편` : '',
+          alive(d.records).filter((r) => r.status === 'have').length ? `LP·음반 ${alive(d.records).filter((r) => r.status === 'have').length}장` : '',
+          alive(d.games).filter((g) => g.status === 'playing').length ? `하는 게임 ${alive(d.games).filter((g) => g.status === 'playing').length}개` : '',
         ]
           .filter(Boolean)
-          .join(" · "),
+          .join(' · '),
         doing.length
           ? `하는 중: ${doing
               .slice(0, 2)
               .map((w) => w.title)
-              .join(", ")}`
-          : "",
+              .join(', ')}`
+          : '',
       ].filter(Boolean),
-      badge: nextOpen
-        ? { big: dday(today, nextOpen.release!), small: nextOpen.title }
-        : undefined,
+      badge: nextOpen ? { big: dday(today, nextOpen.release!), small: nextOpen.title } : undefined,
     },
     movies: {
-      lines: [
-        `본 영화 ${seen.length}편 · 올해 ${seen.filter((m) => m.watched?.startsWith(today.slice(0, 4))).length}편`,
-        `보고 싶어요 ${movies.length - seen.length}편`,
-      ],
-      badge: nextOpen
-        ? { big: dday(today, nextOpen.release!), small: nextOpen.title }
-        : undefined,
-      action: { label: "극장가", to: "/movies" },
+      lines: [`본 영화 ${seen.length}편 · 올해 ${seen.filter((m) => m.watched?.startsWith(today.slice(0, 4))).length}편`, `보고 싶어요 ${movies.length - seen.length}편`],
+      badge: nextOpen ? { big: dday(today, nextOpen.release!), small: nextOpen.title } : undefined,
+      action: { label: '극장가', to: '/movies' },
     },
-    ai: {
-      lines: [
-        aiToday ? `오늘 질문 ${aiToday}개` : "오늘은 아직 안 물어봤어요",
-        "사진이나 글로 문제를 물어보세요",
-      ],
-      action: { label: "질문하기", to: "/ai" },
-    },
+    ai: { lines: [aiToday ? `오늘 질문 ${aiToday}개` : '오늘은 아직 안 물어봤어요', '사진이나 글로 문제를 물어보세요'], action: { label: '질문하기', to: '/ai' } },
     diary: {
-      lines: [
-        diaryToday ? "오늘 일기를 썼어요" : "오늘 일기를 아직 안 썼어요",
-        `이번 달 ${diaryMonth}편`,
-      ],
+      lines: [diaryToday ? '오늘 일기를 썼어요' : '오늘 일기를 아직 안 썼어요', `이번 달 ${diaryMonth}편`],
       streak: dayStreak(
         alive(d.diary).map((e) => e.id),
         today,
       ),
-      action: {
-        label: diaryToday ? "오늘 일기 보기" : "오늘 일기 쓰기",
-        to: `/diary/${today}`,
-      },
+      action: { label: diaryToday ? '오늘 일기 보기' : '오늘 일기 쓰기', to: `/diary/${today}` },
     },
   };
 
@@ -198,22 +122,13 @@ export function Home(_: { loggedIn: boolean; onLogin: () => void }) {
       </header>
       <nav className="hm-quick" aria-label="바로 가기">
         {[
-          { to: "/calendar", icon: "exams", label: "달력" },
-          { to: "/plan", icon: "target", label: "주간 계획" },
-          { to: "/week", icon: "review", label: "돌아보기" },
-          {
-            to: "/checkin",
-            icon: "moon",
-            label: "하루 마감",
-            on: new Date().getHours() >= 20,
-          },
-          { to: "/insights", icon: "time", label: "통계" },
+          { to: '/calendar', icon: 'exams', label: '달력' },
+          { to: '/plan', icon: 'target', label: '주간 계획' },
+          { to: '/week', icon: 'review', label: '돌아보기' },
+          { to: '/checkin', icon: 'moon', label: '하루 마감', on: new Date().getHours() >= 20 },
+          { to: '/insights', icon: 'time', label: '통계' },
         ].map((x) => (
-          <button
-            key={x.to}
-            className={x.on ? "on" : ""}
-            onClick={() => go(x.to)}
-          >
+          <button key={x.to} className={x.on ? 'on' : ''} onClick={() => go(x.to)}>
             <Icon name={x.icon} />
             <span>{x.label}</span>
           </button>
@@ -221,16 +136,15 @@ export function Home(_: { loggedIn: boolean; onLogin: () => void }) {
       </nav>
       <ChangeBanner today={today} />
       <EveBanner today={today} />
-      {weekday(today) === 0 &&
-        !d.settings.weekTargets?.[addDays(weekStart(today), 7)] && (
-          <button className="hm-plan" onClick={() => go("/plan")}>
-            다음 주 계획 세우기 ›
-          </button>
-        )}
+      {weekday(today) === 0 && !d.settings.weekTargets?.[addDays(weekStart(today), 7)] && (
+        <button className="hm-plan" onClick={() => go('/plan')}>
+          다음 주 계획 세우기 ›
+        </button>
+      )}
       <MorningCard today={today} />
       <SchoolHome today={today} />
       <div className="hm-grid">
-        {AREAS.filter((a) => a.key !== "home" && show(a.key)).map((a) => {
+        {AREAS.filter((a) => a.key !== 'home' && show(a.key)).map((a) => {
           const c = cards[a.key];
           return (
             <section key={a.key} className="hm-card">
@@ -250,16 +164,13 @@ export function Home(_: { loggedIn: boolean; onLogin: () => void }) {
                   </span>
                 )}
                 {c.lines.map((l, i) => (
-                  <span key={i} className={i === 0 ? "hm-big" : "hm-line"}>
+                  <span key={i} className={i === 0 ? 'hm-big' : 'hm-line'}>
                     {l}
                   </span>
                 ))}
               </button>
               {c.action && (
-                <button
-                  className="btn btn-sm hm-act"
-                  onClick={() => go(c.action!.to)}
-                >
+                <button className="btn btn-sm hm-act" onClick={() => go(c.action!.to)}>
                   {c.action.label}
                 </button>
               )}
@@ -270,15 +181,11 @@ export function Home(_: { loggedIn: boolean; onLogin: () => void }) {
       <FactCard />
       {(() => {
         const last = d.settings.lastBackup;
-        const days = last
-          ? Math.floor((Date.parse(today) - Date.parse(last)) / 86_400_000)
-          : null;
+        const days = last ? Math.floor((Date.parse(today) - Date.parse(last)) / 86_400_000) : null;
         if (days !== null && days < 30) return null;
         return (
           <p className="st-hint">
-            {days === null
-              ? "아직 백업 파일을 내려받은 적이 없어요."
-              : `백업한 지 ${days}일 지났어요.`}{" "}
+            {days === null ? '아직 백업 파일을 내려받은 적이 없어요.' : `백업한 지 ${days}일 지났어요.`}{' '}
             <button className="st-link" onClick={() => exportBackup()}>
               지금 내려받기
             </button>
@@ -300,23 +207,15 @@ function ChangeBanner({ today }: { today: string }) {
       <small>이번 주에 바꿀 한 가지</small>
       <b>{note.change}</b>
       {note.kept !== undefined ? (
-        <small className="st-muted">
-          {note.kept ? "지켰어요 ✓" : "다음 주에 다시 해 봐요"}
-        </small>
+        <small className="st-muted">{note.kept ? '지켰어요 ✓' : '다음 주에 다시 해 봐요'}</small>
       ) : (
         weekend && (
           <div className="st-inline">
             <span className="st-muted">지켰나요?</span>
-            <button
-              className="btn btn-sm btn-primary"
-              onClick={() => put("weekNotes", { ...note, kept: true })}
-            >
+            <button className="btn btn-sm btn-primary" onClick={() => put('weekNotes', { ...note, kept: true })}>
               지켰어요
             </button>
-            <button
-              className="btn btn-sm"
-              onClick={() => put("weekNotes", { ...note, kept: false })}
-            >
+            <button className="btn btn-sm" onClick={() => put('weekNotes', { ...note, kept: false })}>
               못 지켰어요
             </button>
           </div>
@@ -349,22 +248,19 @@ function WeatherChip() {
       </span>
       <b>{w.temp}°</b>
       <small>
-        {t.text} · {w.max}° / {w.min}°
-        {w.rain !== null && w.rain >= 30 ? ` · 비 ${w.rain}%` : ""}
+        {t.text} · {w.max}° / {w.min}°{w.rain !== null && w.rain >= 30 ? ` · 비 ${w.rain}%` : ''}
       </small>
     </div>
   );
 }
 
-/** 맨 아래: 쓸모없는 지식 (uselessfacts.jsph.pl, 한국어로 번역). 처음엔 오늘 것(이 기기에 하루 기억), 「쓸모없는 지식」을 누르면 다른 것 */
+/** 맨 아래: 쓸모없는 지식 (uselessfacts.jsph.pl, 한국어로 번역). 「쓸모없는 지식」을 누르면 다른 것 */
 let loadingFact = false;
 function FactCard() {
   // 메인 화면에 올 때마다 · 앱에 다시 들어올 때마다 다음 지식으로 바꾼다 (받는 동안은 지난 것을 보여 줌)
   const [fact, setFact] = useState<{ en: string; ko: string } | null>(() => {
     try {
-      const c = JSON.parse(
-        localStorage.getItem("my-study.fact2") ?? "null",
-      ) as { en: string; ko: string } | null;
+      const c = JSON.parse(localStorage.getItem('my-study.fact2') ?? 'null') as { en: string; ko: string } | null;
       return c?.en ? { en: c.en, ko: c.ko } : null;
     } catch {
       return null;
@@ -379,19 +275,12 @@ function FactCard() {
       .then((r) => {
         setFact({ en: r.en, ko: r.ko });
         try {
-          localStorage.setItem(
-            "my-study.fact2",
-            JSON.stringify({ en: r.en, ko: r.ko }),
-          );
+          localStorage.setItem('my-study.fact2', JSON.stringify({ en: r.en, ko: r.ko }));
         } catch {
           /* 무시 */
         }
       })
-      .catch(
-        (e) =>
-          !quiet &&
-          toast(e instanceof Error ? e.message : "다른 지식을 받지 못했어요"),
-      )
+      .catch((e) => !quiet && toast(e instanceof Error ? e.message : '다른 지식을 받지 못했어요'))
       .finally(() => {
         loadingFact = false;
         setBusy(false);
@@ -399,23 +288,18 @@ function FactCard() {
   }, []);
   useEffect(() => {
     load(true);
-    const back = () => document.visibilityState === "visible" && load(true);
-    document.addEventListener("visibilitychange", back);
-    return () => document.removeEventListener("visibilitychange", back);
+    const back = () => document.visibilityState === 'visible' && load(true);
+    document.addEventListener('visibilitychange', back);
+    return () => document.removeEventListener('visibilitychange', back);
   }, [load]);
   if (!fact) return null;
   const next = () => !busy && load(false);
   return (
-    <section className={`hm-fact ${busy ? "busy" : ""}`}>
-      <button
-        className="hm-fact-h"
-        onClick={next}
-        aria-label="다른 쓸모없는 지식 보기"
-      >
-        <span aria-hidden>💡</span> 쓸모없는 지식{" "}
-        <i aria-hidden>{busy ? "…" : "↻"}</i>
+    <section className={`hm-fact ${busy ? 'busy' : ''}`}>
+      <button className="hm-fact-h" onClick={next} aria-label="다른 쓸모없는 지식 보기">
+        <span aria-hidden>💡</span> 쓸모없는 지식 <i aria-hidden>{busy ? '…' : '↻'}</i>
       </button>
-      <p lang={fact.ko ? "ko" : "en"}>{fact.ko || fact.en}</p>
+      <p lang={fact.ko ? 'ko' : 'en'}>{fact.ko || fact.en}</p>
     </section>
   );
 }
