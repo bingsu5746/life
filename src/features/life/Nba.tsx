@@ -261,7 +261,7 @@ function Games() {
         {anyLive && <span className="nba-livechip"> · ● 경기 중</span>}
       </p>
       {err && <p className="st-muted">{err}</p>}
-      {!err && games === null && <p className="st-muted">경기를 받는 중…</p>}
+      {!err && games === null && <Loading what="경기" />}
       {!err && games?.length === 0 && <p className="st-muted">이날은 경기가 없어요.</p>}
       <div className="nba-list">
         {sorted.map((g) => {
@@ -285,6 +285,31 @@ function Games() {
   );
 }
 
+/** 「받는 중」: 오래 걸리면 몇 초째인지와 다시 받기(새로고침)를 보여 준다. 앱 버전도 같이 (옛 버전이 남아 있는지 알 수 있게) */
+function Loading({ what }: { what: string }) {
+  const [sec, setSec] = useState(0);
+  useEffect(() => {
+    const t = window.setInterval(() => setSec((x) => x + 1), 1000);
+    return () => window.clearInterval(t);
+  }, []);
+  const ver = document.querySelector<HTMLScriptElement>('script[type="module"][src*="/assets/index-"]')?.src.match(/index-([\w-]+)\.js/)?.[1] ?? '개발';
+  return (
+    <p className="st-muted">
+      {what} 받는 중… {sec >= 5 && `${sec}초`}
+      {sec >= 15 && (
+        <>
+          {' '}
+          · 오래 걸려요{' '}
+          <button className="st-link" onClick={() => location.reload()}>
+            다시 받기
+          </button>{' '}
+          <small>(앱 {ver})</small>
+        </>
+      )}
+    </p>
+  );
+}
+
 /** 동부 · 서부 순위 */
 function Standings() {
   const [data, setData] = useState<Awaited<ReturnType<typeof nbaStandings>> | null>(null);
@@ -300,7 +325,7 @@ function Standings() {
     };
   }, []);
   if (err) return <p className="st-muted">{err}</p>;
-  if (!data) return <p className="st-muted">순위를 받는 중…</p>;
+  if (!data) return <Loading what="순위" />;
   if (!data.rows.length) return <p className="st-muted">{data.building ? '이번 시즌 경기 결과를 모으는 중이에요. 몇 분 뒤 다시 열어 주세요.' : '아직 순위가 없어요.'}</p>;
   const confs = [
     { key: 'East', label: '동부' },
@@ -433,7 +458,7 @@ function GamePage({ id }: { id: number }) {
         </section>
       )}
       {err && <p className="st-muted">{err}</p>}
-      {!err && lines === null && <p className="st-muted">선수 기록을 받는 중…</p>}
+      {!err && lines === null && <Loading what="선수 기록" />}
       {!err && lines?.length === 0 && <p className="st-muted">아직 선수 기록이 없어요. 경기가 시작되면 나와요.</p>}
       {!!lines?.length &&
         teams.map((t) => {
@@ -698,7 +723,7 @@ function Roster({ team }: { team?: string }) {
         </span>
       </div>
       {err && <p className="st-muted">{err}</p>}
-      {!err && !data && <p className="st-muted">로스터를 받는 중…</p>}
+      {!err && !data && <Loading what="로스터" />}
       {data && (
         <section className="st-card">
           <div className="nba-scroll">
@@ -789,7 +814,7 @@ function Players() {
     };
   }, []);
   if (err) return <p className="st-muted">{err}</p>;
-  if (!data) return <p className="st-muted">선수 목록을 받는 중…</p>;
+  if (!data) return <Loading what="선수 목록" />;
   const only2k = data.src === '2k';
   const realSorts = only2k ? [] : SORTS;
   const maxGp = Math.max(0, ...data.players.map((p) => p.gp));
