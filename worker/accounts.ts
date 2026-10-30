@@ -18,6 +18,7 @@ import { fetchEvents, fetchMeals, fetchTimetable, findSchool } from './neis';
 import { koExamples, lookupKo } from './stdict';
 import { findBooksAladin, findBooksKakao, findGames, findRecords, similarArtists } from './lookup';
 import { fetchProviders } from './ott';
+import { monthOf, R2_FREE, R2_STOP, r2Block, rollMonth, type R2Use } from './r2guard';
 import { askCompat, askGemini, askOpenRouter, COMPAT, compatModels, geminiModels, openRouterDaily, openRouterModels, pickCompat, SYSTEM as SOLVE_SYSTEM, type Engine, type SolveTurn } from './solve';
 import { filmFacets, searchFilms, type Film } from './catalog';
 import { buildRecommendInput, normTitle, readRecommendations, readRecommendRequest } from './recommend';
@@ -149,7 +150,7 @@ export class Accounts extends DurableObject<Env> {
 
     let body: Record<string, unknown> = {};
     if (req.method === 'POST' || req.method === 'PUT' || req.method === 'DELETE') {
-      const big = path.startsWith('store/') || path.startsWith('study-photo/') || path === 'solve';
+      const big = path.startsWith('store/') || path.startsWith('study-photo/') || path === 'solve' || path === 'solve/img';
       const text = await req.text();
       if (text.length > (big ? MAX_STORE + 1000 : path === 'translate' || path === 'notify/digest' ? 4 * MAX_SMALL_BODY : MAX_SMALL_BODY)) return fail('보낸 내용이 너무 커요.', 413);
       try {
@@ -199,6 +200,8 @@ export class Accounts extends DurableObject<Env> {
     if (path === 'translate' && req.method === 'POST') return this.translate(user, body);
     if (path === 'solve' && req.method === 'POST') return this.solve(user, body, new URL(req.url).origin);
     if (path === 'solve/usage' && req.method === 'GET') return this.solveUsage(user);
+    if (path === 'solve/img' && req.method === 'POST') return this.solveImgPut(user, body);
+    if (path.startsWith('solve/img/') && req.method === 'GET') return this.solveImgGet(user, path.slice('solve/img/'.length));
     if (path === 'movies/catalog' && req.method === 'GET') return this.catalogSearch(new URL(req.url).searchParams);
     if (path === 'movies/recommend' && req.method === 'POST') return this.recommend(user, body);
     if (path === 'movies/ott' && req.method === 'POST') return this.ott(body);
@@ -309,6 +312,55 @@ export class Accounts extends DurableObject<Env> {
     this.sql.exec('INSERT OR REPLACE INTO cache (key, data, at) VALUES (?, ?, ?)', `solveuse:${userId}:${day}`, JSON.stringify(u), Date.now());
   }
 
+  // ===== 문제 사진 저장 (R2, 무료 한도 넘기 전에 막음) =====
+  private r2Ops = 0;
+  private r2(): R2Bucket | undefined {
+    return (this.env as unknown as { PROBLEMS?: R2Bucket }).PROBLEMS;
+  }
+  private r2Use(): R2Use {
+    const r = this.sql.exec<{ data: string }>("SELECT data FROM cache WHERE key = 'r2use'").toArray()[0];
+    return rollMonth(r ? JSON.parse(r.data) : { bytes: 0, month: monthOf(Date.now()), a: 0, b: 0 }, Date.now());
+  }
+  private saveR2Use(u: R2Use) {
+    this.sql.exec("INSERT OR REPLACE INTO cache (key, data, at) VALUES ('r2use', ?, ?)", JSON.stringify(u), Date.now());
+  }
+
+  /** 사진 올리기: { mime, data(base64) } → { key } */
+  private async solveImgPut(user: UserRow, b: Record<string, unknown>): Promise<Response> {
+    const bucket = this.r2();
+    if (!bucket) return fail('사진 저장소(R2)가 아직 연결되지 않았어요.', 503);
+    const mime = b.mime === 'image/webp' ? 'image/webp' : b.mime === 'image/jpeg' ? 'image/jpeg' : '';
+    const data = typeof b.data === 'string' ? b.data : '';
+    if (!mime || !data || !/^[A-Za-z0-9+/=]+$/.test(data)) return fail('사진이 잘못됐어요.');
+    const bin = Uint8Array.from(atob(data), (c) => c.charCodeAt(0));
+    if (bin.length > 800_000) return fail('사진이 너무 커요.', 413);
+    const u = this.r2Use();
+    const block = r2Block(u, 'put', bin.length);
+    if (block) return fail(block, 507);
+    const key = `${user.id}/${Date.now().toString(36)}-${randomHex(4)}.${mime === 'image/webp' ? 'webp' : 'jpg'}`;
+    await bucket.put(key, bin, { httpMetadata: { contentType: mime } });
+    this.saveR2Use({ ...u, bytes: u.bytes + bin.length, a: u.a + 1 });
+    return json({ key });
+  }
+
+  /** 사진 보기 (자기 것만). 읽기 횟수는 20번마다 저장 */
+  private async solveImgGet(user: UserRow, key: string): Promise<Response> {
+    const bucket = this.r2();
+    if (!bucket) return fail('사진 저장소가 없어요.', 503);
+    if (!key.startsWith(`${user.id}/`)) return fail('볼 수 없는 사진이에요.', 403);
+    const u = this.r2Use();
+    const block = r2Block({ ...u, b: u.b + this.r2Ops }, 'get');
+    if (block) return fail(block, 507);
+    const obj = await bucket.get(key);
+    this.r2Ops++;
+    if (this.r2Ops >= 20) {
+      this.saveR2Use({ ...u, b: u.b + this.r2Ops });
+      this.r2Ops = 0;
+    }
+    if (!obj) return fail('사진이 없어요.', 404);
+    return new Response(obj.body, { headers: { 'content-type': obj.httpMetadata?.contentType ?? 'image/jpeg', 'cache-control': 'private, max-age=31536000, immutable', 'x-content-type-options': 'nosniff' } });
+  }
+
   /** 모델 고르는 창: 키가 있는 모델 · 오늘 쓴 횟수 · 남은 횟수(알 수 있을 때) */
   private async solveUsage(user: UserRow): Promise<Response> {
     const engines: Engine[] = ['gemini', 'openrouter', 'mistral', 'groq', 'siliconflow', 'nvidia', 'cloudflare'];
@@ -318,7 +370,8 @@ export class Accounts extends DurableObject<Env> {
     const u = this.solveUse(user.id);
     const left: Record<string, number> = { ...u.left };
     if (this.orDaily?.v) left.openrouter = Math.max(0, this.orDaily.v - (u.n.openrouter ?? 0));
-    return json({ available, used: u.n, out: u.out, left });
+    const r = this.r2Use();
+    return json({ available, used: u.n, out: u.out, left, r2: this.r2() ? { bytes: r.bytes, a: r.a, b: r.b + this.r2Ops, free: R2_FREE, stop: R2_STOP } : null });
   }
 
   /** { engine, turns: [{ role, text, images: [{ mime, data(base64) }] }] } → { text, model } */

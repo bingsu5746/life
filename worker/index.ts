@@ -13,7 +13,11 @@ interface Env {
 export default {
   async fetch(req: Request, env: Env): Promise<Response> {
     const url = new URL(req.url);
-    if (/^\/api\/(auth\/(signup|login|logout|logout-all)|me(\/(nickname|password))?|translate|solve(\/usage)?|movies\/(kobis|catalog(\/sync)?|recommend|ott)|school|dict\/ko|lookup|music\/similar|notify(\/(digest|test))?|store\/(study|words)|study-photo\/[a-z0-9]{6,32})$/.test(url.pathname)) {
+    if (
+      /^\/api\/(auth\/(signup|login|logout|logout-all)|me(\/(nickname|password))?|translate|solve(\/usage|\/img(\/[a-f0-9]{8,64}\/[a-z0-9]+-[a-f0-9]{8}\.(webp|jpg))?)?|movies\/(kobis|catalog(\/sync)?|recommend|ott)|school|dict\/ko|lookup|music\/similar|notify(\/(digest|test))?|store\/(study|words)|study-photo\/[a-z0-9]{6,32})$/.test(
+        url.pathname,
+      )
+    ) {
       try {
         // 밖에서 붙여 온 키 머리글은 지우고, 영화 정보 요청에만 비밀값의 키를 붙인다
         const headers = new Headers(req.headers);

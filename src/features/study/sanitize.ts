@@ -592,6 +592,13 @@ export function sanitizeSettings(s: unknown): StudySettings & { updatedAt: numbe
         )
       : undefined,
     morningOff: x.morningOff === true ? true : undefined,
+    solveLimits: isObj(x.solveLimits)
+      ? Object.fromEntries(
+          Object.entries(x.solveLimits)
+            .filter(([k, v]) => /^[a-z]{2,20}$/.test(k) && typeof v === 'number' && v > 0 && v < 1e7)
+            .map(([k, v]) => [k, Math.round(v as number)]),
+        )
+      : undefined,
     weeklyLimit: score(x.weeklyLimit, 1, 1e9),
     weatherPlace:
       isObj(x.weatherPlace) && typeof x.weatherPlace.lat === 'number' && Math.abs(x.weatherPlace.lat) <= 90 && typeof x.weatherPlace.lon === 'number' && Math.abs(x.weatherPlace.lon) <= 180

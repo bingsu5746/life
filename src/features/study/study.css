@@ -6922,3 +6922,23 @@ body.focus-on {
 .sv-pick small.bad {
   color: var(--bad);
 }
+.sv-topic {
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  outline: 0;
+  background: transparent;
+  font: inherit;
+  font-weight: 600;
+  padding: 4px 4px 8px;
+  color: var(--text);
+}
+.sv-count {
+  cursor: pointer;
+  text-decoration: underline dotted;
+}
+.sv-r2 {
+  padding-top: 12px;
+  font-size: 0.72rem;
+  color: var(--muted);
+  text-align: center;
+}

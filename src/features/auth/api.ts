@@ -332,4 +332,14 @@ export interface SolveTurn {
   images?: { mime: string; data: string }[];
 }
 export const solveAsk = (engine: SolveEngine, turns: SolveTurn[]) => call<{ text: string; model: string }>('solve', 'POST', { engine, turns });
-export const solveUsage = () => call<{ available: SolveEngine[]; used: Record<string, number>; out: Record<string, boolean>; left: Record<string, number> }>('solve/usage');
+export interface R2Info {
+  bytes: number;
+  a: number;
+  b: number;
+  free: { bytes: number; a: number; b: number };
+  stop: { bytes: number; a: number; b: number };
+}
+export const solveUsage = () => call<{ available: SolveEngine[]; used: Record<string, number>; out: Record<string, boolean>; left: Record<string, number>; r2: R2Info | null }>('solve/usage');
+/** 문제 사진을 R2 에 올리기 → 열쇠 */
+export const solveImgPut = (mime: string, data: string) => call<{ key: string }>('solve/img', 'POST', { mime, data });
+export const solveImgUrl = (key: string) => `/api/solve/img/${key}`;

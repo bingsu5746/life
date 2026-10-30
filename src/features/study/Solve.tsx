@@ -1,10 +1,10 @@
 // 문제 풀이: AI 대화 화면. ＋ 로 사진 넣기 · 모델 고르기 · 보내기. 대화는 이 기기에만 저장(글만)
 import { useEffect, useRef, useState } from 'react';
-import { isLoggedIn, solveAsk, solveUsage, type SolveEngine, type SolveTurn } from '../auth/api';
+import { isLoggedIn, solveAsk, solveImgPut, solveImgUrl, solveUsage, type SolveEngine, type SolveTurn } from '../auth/api';
 import { MathText } from '../../lib/mathText';
-import { shrink } from './photos';
+import { compressProblemImage } from '../../lib/imageCompress';
 import { Icon, Sheet, subjectsOf, SubjectDot, toast } from './ui';
-import { useStudy } from './store';
+import { setSettings, useStudy } from './store';
 import { guessNoteSubject } from './mistakes';
 
 const ENGINES: { key: SolveEngine; name: string; desc: string }[] = [
@@ -20,6 +20,8 @@ const ENGINES: { key: SolveEngine; name: string; desc: string }[] = [
 interface Msg extends SolveTurn {
   /** 사진 미리보기 (이 화면에서만) */
   thumbs?: string[];
+  /** R2 에 올린 사진 (지난 대화에서도 보이게) */
+  imgKeys?: string[];
   model?: string;
   error?: boolean;
 }
@@ -46,7 +48,7 @@ const load = <T,>(k: string, fb: T): T => {
 function saveChat(c: Chat) {
   try {
     const list = load<Chat[]>(CHATS_KEY, []).filter((x) => x.id !== c.id);
-    const slim: Chat = { ...c, msgs: c.msgs.map((m) => ({ role: m.role, text: m.text, model: m.model, error: m.error, images: undefined, thumbs: undefined })) };
+    const slim: Chat = { ...c, msgs: c.msgs.map((m) => ({ role: m.role, text: m.text, model: m.model, error: m.error, imgKeys: m.imgKeys, images: undefined, thumbs: undefined })) };
     localStorage.setItem(CHATS_KEY, JSON.stringify([slim, ...list].slice(0, 20)));
   } catch {
     /* 가득 차면 저장하지 않는다 */
@@ -106,8 +108,22 @@ export function Solve() {
     if (usage.out[k]) return '오늘은 다 썼어요';
     const n = usage.used[k] ?? 0;
     const left = usage.left[k];
-    return typeof left === 'number' ? `남은 ${left}번` : `오늘 ${n}번 씀`;
+    const mine = d.settings.solveLimits?.[k];
+    if (typeof left === 'number') return `남은 ${left}번`;
+    if (mine) return `남은 ${Math.max(0, mine - n)}번 / ${mine}`;
+    return `오늘 ${n}번 · 한도 넣기`;
   };
+  /** 서비스 화면에서 본 하루 한도를 직접 넣기 */
+  const setLimit = (k: SolveEngine) => {
+    const v = window.prompt(`${ENGINES.find((e) => e.key === k)?.name} 하루 한도 (서비스 화면에서 본 숫자, 비우면 지움)`, String(d.settings.solveLimits?.[k] ?? ''));
+    if (v === null) return;
+    const n = Math.round(Number(v.replace(/[^\d]/g, '')));
+    const next = { ...(d.settings.solveLimits ?? {}) };
+    if (n > 0) next[k] = n;
+    else delete next[k];
+    setSettings({ solveLimits: next });
+  };
+  const [topic, setTopic] = useState('');
   useEffect(() => endRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' }), [chat.msgs.length, busy]);
   useEffect(() => {
     const a = area.current;
@@ -119,6 +135,7 @@ export function Solve() {
   async function send() {
     if (busy || (!text.trim() && !files.length)) return;
     if (!isLoggedIn()) return toast('풀이는 로그인한 뒤에 쓸 수 있어요');
+    if (!chat.msgs.length && !topic.trim()) return toast('문제 이름을 먼저 써 주세요 (예: 쎈 수학Ⅰ p.45 12번)');
     const pics = files;
     const q = text.trim();
     setText('');
@@ -127,17 +144,27 @@ export function Solve() {
     try {
       if (pics.length) {
         setBusy('사진 준비 중');
-        images = await Promise.all(pics.map(async (p) => ({ mime: 'image/jpeg', data: await toB64(await shrink(p.blob)) })));
+        images = await Promise.all(pics.map(async (p) => ({ mime: p.blob.type === 'image/webp' ? 'image/webp' : 'image/jpeg', data: await toB64(p.blob) })));
       }
     } catch {
       setBusy('');
       return toast('사진을 준비하지 못했어요');
     }
-    const user: Msg = { role: 'user', text: q, images, thumbs: pics.map((p) => p.url) };
+    // 사진은 R2 에도 올려 둔다 (연결돼 있고 무료 한도 안일 때만)
+    let imgKeys: string[] | undefined;
+    if (images?.length && usage?.r2) {
+      setBusy('사진 저장 중');
+      try {
+        imgKeys = (await Promise.all(images.map((i) => solveImgPut(i.mime, i.data)))).map((r) => r.key);
+      } catch (e) {
+        toast(e instanceof Error ? e.message : '사진을 저장하지 못했어요');
+      }
+    }
+    const user: Msg = { role: 'user', text: q, images, thumbs: pics.map((p) => p.url), imgKeys };
     const msgs = [...chat.msgs, user];
     // 과목을 안 골랐으면 글·지금 공부 중인 과목으로 짐작
     const guess = !chat.subjectId ? guessNoteSubject(d, Date.now(), undefined, q) : null;
-    const next = { ...chat, subjectId: chat.subjectId ?? guess?.id, title: chat.title || q.slice(0, 40) || '사진 문제', msgs };
+    const next = { ...chat, subjectId: chat.subjectId ?? guess?.id, title: chat.title || topic.trim().slice(0, 60) || q.slice(0, 40) || '사진 문제', msgs };
     setChat(next);
     setBusy('푸는 중');
     try {
@@ -177,9 +204,9 @@ export function Solve() {
         {chat.msgs.map((m, i) =>
           m.role === 'user' ? (
             <div key={i} className="sv-user">
-              {m.thumbs && m.thumbs.length > 0 && (
+              {(m.thumbs?.length ? m.thumbs : (m.imgKeys?.map(solveImgUrl) ?? [])).length > 0 && (
                 <div className="sv-thumbs">
-                  {m.thumbs.map((u) => (
+                  {(m.thumbs?.length ? m.thumbs : m.imgKeys!.map(solveImgUrl)).map((u) => (
                     <img key={u} src={u} alt="문제 사진" />
                   ))}
                 </div>
@@ -205,6 +232,7 @@ export function Solve() {
       </div>
 
       <div className="sv-box">
+        {!chat.msgs.length && <input className="sv-topic" value={topic} onChange={(e) => setTopic(e.target.value)} placeholder="문제 이름 (예: 쎈 수학Ⅰ p.45 12번 · 이차함수 최댓값)" aria-label="문제 이름" />}
         {files.length > 0 && (
           <div className="sv-files">
             {files.map((f, i) => (
@@ -243,9 +271,10 @@ export function Solve() {
             multiple
             hidden
             onChange={(e) => {
-              const add = [...(e.target.files ?? [])].slice(0, 4 - files.length).map((blob) => ({ blob, url: URL.createObjectURL(blob) }));
-              setFiles([...files, ...add]);
+              const picked = [...(e.target.files ?? [])].slice(0, 4 - files.length);
               e.target.value = '';
+              // 넣는 순간 줄인다 (가로 1400px · WebP, 안 되는 기기는 JPEG)
+              void Promise.all(picked.map((f) => compressProblemImage(f).catch(() => f))).then((blobs) => setFiles((cur) => [...cur, ...blobs.map((blob) => ({ blob, url: URL.createObjectURL(blob) }))].slice(0, 4)));
             }}
           />
           <button className="sv-model" onClick={() => setPicker(true)}>
@@ -261,7 +290,7 @@ export function Solve() {
             )}{' '}
             ▾
           </button>
-          <button className="sv-send" aria-label="보내기" disabled={!!busy || (!text.trim() && !files.length)} onClick={() => void send()}>
+          <button className="sv-send" aria-label="보내기" disabled={!!busy || (!text.trim() && !files.length) || (!chat.msgs.length && !topic.trim())} onClick={() => void send()}>
             <Icon name="up" />
           </button>
         </div>
@@ -289,11 +318,30 @@ export function Solve() {
                   <small>{e.desc}</small>
                 </span>
                 <span className="sv-right">
-                  {countText(e.key) && <small className={usage?.out[e.key] ? 'bad' : ''}>{countText(e.key)}</small>}
+                  {countText(e.key) && (
+                    <small
+                      className={`sv-count ${usage?.out[e.key] ? 'bad' : ''}`}
+                      onClick={(ev) => {
+                        if (typeof usage?.left[e.key] === 'number') return;
+                        ev.stopPropagation();
+                        setLimit(e.key);
+                      }}
+                    >
+                      {countText(e.key)}
+                    </small>
+                  )}
                   {engine === e.key && <span className="sv-check">✓</span>}
                 </span>
               </button>
             ))}
+            {usage?.r2 && (
+              <div className="sv-r2">
+                사진 저장소 {(usage.r2.bytes / 1024 ** 2).toFixed(1)}MB / {(usage.r2.free.bytes / 1024 ** 3).toFixed(0)}GB · 이번 달 올리기 {usage.r2.a.toLocaleString('ko-KR')} / {usage.r2.free.a.toLocaleString('ko-KR')} · 보기 {usage.r2.b.toLocaleString('ko-KR')} /{' '}
+                {usage.r2.free.b.toLocaleString('ko-KR')}
+                <br />
+                무료 한도의 90%가 되면 저절로 막아요.
+              </div>
+            )}
           </div>
         </Sheet>
       )}

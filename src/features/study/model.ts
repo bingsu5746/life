@@ -38,6 +38,8 @@ export interface StudySettings {
   hiddenTabs?: string[];
   /** 주마다 요일별 공부 시간 목표(분): 그 주 월요일 → [월 … 일] */
   weekTargets?: Record<DateStr, number[]>;
+  /** 풀이 AI 하루 한도 (서비스 화면에서 본 숫자를 직접 넣음) */
+  solveLimits?: Record<string, number>;
   /** 메인 아침 루틴 숨기기 */
   morningOff?: boolean;
   /** 학교 시간표: 요일(1=월 … 5=금, 6=토)마다 그날 수업 과목 (교시 순) */
