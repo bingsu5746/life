@@ -629,7 +629,7 @@ function PlayerSheet({ who, season, onClose }: { who: PlayerRef; season: number;
 /** 로스터: 팀 고르기 → 선수 목록 → 선수를 누르면 시즌 평균 · 커리어 */
 function Roster({ team }: { team?: string }) {
   const twoK = use2k();
-  const [data, setData] = useState<{ season: number; players: NbaRosterPlayer[] } | null>(null);
+  const [data, setData] = useState<{ season: number; players: NbaRosterPlayer[]; src?: 'nba' | 'bdl' } | null>(null);
   const [err, setErr] = useState('');
   const [who, setWho] = useState<PlayerRef | null>(null);
   const fav = readFav();
@@ -697,8 +697,8 @@ function Roster({ team }: { team?: string }) {
                     <td>{p.num}</td>
                     <td className="l">
                       <span className="nba-trow">
-                        <Face id={p.id} name={p.name} size={30} />
-                        <button className="st-link" onClick={() => setWho({ id: p.id, name: p.name, team, pos: p.pos, src: 'nba' })}>
+                        <Face id={p.id || undefined} name={p.name} size={30} />
+                        <button className="st-link" onClick={() => setWho({ id: p.id, name: p.name, team, pos: p.pos, src: p.id ? 'nba' : 'bdl' })}>
                           {p.name}
                         </button>
                       </span>

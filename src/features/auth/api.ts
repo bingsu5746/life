@@ -57,7 +57,8 @@ export class ApiError extends Error {
   }
 }
 
-async function call<T>(path: string, method = 'GET', body?: unknown): Promise<T> {
+/** ms: 이 시간 안에 답이 없으면 그만 (화면이 「받는 중」에 멈추지 않게) */
+async function call<T>(path: string, method = 'GET', body?: unknown, ms?: number): Promise<T> {
   let res: Response;
   try {
     res = await fetch(`/api/${path}`, {
@@ -65,8 +66,10 @@ async function call<T>(path: string, method = 'GET', body?: unknown): Promise<T>
       credentials: 'same-origin',
       headers: body === undefined ? {} : { 'content-type': 'application/json' },
       body: body === undefined ? undefined : JSON.stringify(body),
+      signal: ms ? AbortSignal.timeout(ms) : undefined,
     });
-  } catch {
+  } catch (e) {
+    if (e instanceof DOMException && (e.name === 'TimeoutError' || e.name === 'AbortError')) throw new ApiError('서버가 오래 답하지 않아요. 잠시 뒤 다시 해 주세요.', 0);
     throw new ApiError('서버에 연결할 수 없어요. 인터넷 연결을 확인해 주세요.', 0);
   }
   let data: { error?: string } & T;
@@ -363,10 +366,11 @@ export interface NbaAverage {
   ftPct: number;
   tov: number;
 }
-export const nbaStandings = () => call<{ season: number; rows: NbaStanding[]; at: number; from: 'nba' | 'api' | 'games'; building?: boolean }>('nba/standings');
+export const nbaStandings = () => call<{ season: number; rows: NbaStanding[]; at: number; from: 'nba' | 'api' | 'games'; building?: boolean }>('nba/standings', 'GET', undefined, 40_000);
 /** 경기 선수 기록: NBA 공식 기록을 찾으려고 날짜 · 홈 · 원정 약자도 보낸다. src: 어디서 왔는지 (선수 번호가 달라서) */
-export const nbaBox = (g: { id: number; date: string; home: string; away: string; final: boolean }) => call<{ lines: NbaLine[]; at: number; src: 'nba' | 'bdl' }>(`nba/box?${new URLSearchParams({ game: String(g.id), date: g.date, home: g.home, away: g.away, ...(g.final ? { final: '1' } : {}) })}`);
-export const nbaAvg = (p: { id: number; name: string; season: number; src: 'nba' | 'bdl' }) => call<{ avg: NbaAverage | null; at: number }>(`nba/avg?${new URLSearchParams({ player: String(p.id), name: p.name, season: String(p.season), src: p.src })}`);
+export const nbaBox = (g: { id: number; date: string; home: string; away: string; final: boolean }) =>
+  call<{ lines: NbaLine[]; at: number; src: 'nba' | 'bdl' }>(`nba/box?${new URLSearchParams({ game: String(g.id), date: g.date, home: g.home, away: g.away, ...(g.final ? { final: '1' } : {}) })}`, 'GET', undefined, 40_000);
+export const nbaAvg = (p: { id: number; name: string; season: number; src: 'nba' | 'bdl' }) => call<{ avg: NbaAverage | null; at: number }>(`nba/avg?${new URLSearchParams({ player: String(p.id), name: p.name, season: String(p.season), src: p.src })}`, 'GET', undefined, 40_000);
 export interface NbaRosterPlayer {
   id: number;
   name: string;
@@ -407,11 +411,11 @@ export interface Nba2kPlayer {
   pos: string[];
   attrs: Record<string, number>;
 }
-export const nba2k = () => call<{ players: Nba2kPlayer[]; at: number; key: boolean }>('nba/2k');
-export const nbaPlayers = () => call<{ season: number; players: NbaPlayerRow[]; at: number }>('nba/players');
-export const nbaRoster = (team: string) => call<{ season: number; players: NbaRosterPlayer[]; at: number }>(`nba/roster?team=${team}`);
-export const nbaCareer = (player: number) => call<{ rows: NbaCareerRow[]; at: number }>(`nba/career?player=${player}`);
-export const nbaGames = (date: string) => call<{ games: NbaGame[]; at: number; stale?: boolean }>(`nba/games?date=${date}`);
+export const nba2k = () => call<{ players: Nba2kPlayer[]; at: number; key: boolean }>('nba/2k', 'GET', undefined, 40_000);
+export const nbaPlayers = () => call<{ season: number; players: NbaPlayerRow[]; at: number }>('nba/players', 'GET', undefined, 40_000);
+export const nbaRoster = (team: string) => call<{ season: number; players: NbaRosterPlayer[]; at: number; src?: 'nba' | 'bdl' }>(`nba/roster?team=${team}`, 'GET', undefined, 40_000);
+export const nbaCareer = (player: number) => call<{ rows: NbaCareerRow[]; at: number }>(`nba/career?player=${player}`, 'GET', undefined, 40_000);
+export const nbaGames = (date: string) => call<{ games: NbaGame[]; at: number; stale?: boolean }>(`nba/games?date=${date}`, 'GET', undefined, 40_000);
 
 /** 쓸모없는 지식 (영어 → 한국어, 오늘 것 · random 이면 아무거나) */
 export const uselessFact = (random = false) => call<{ en: string; ko: string; day?: string }>(random ? 'fact?random=1' : 'fact');

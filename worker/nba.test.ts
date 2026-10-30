@@ -89,3 +89,11 @@ describe('NBA 로스터 · 커리어 (resultSets 이름으로)', () => {
     }
   });
 });
+
+describe('정해진 시간 안에 안 끝나면 실패', () => {
+  it('within', async () => {
+    const { within } = await import('./nba');
+    await expect(within(new Promise(() => {}), 20, '테스트')).rejects.toThrow(/응답 없음/);
+    await expect(within(Promise.resolve(1), 20, '테스트')).resolves.toBe(1);
+  });
+});

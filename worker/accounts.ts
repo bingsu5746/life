@@ -22,7 +22,7 @@ import { relayFetch, type Relay } from './relay';
 import { fetchSpecialDays } from './holidays';
 import { cleanFact } from './fact';
 import { fetch2k } from './nba2k';
-import { fetchAverage, fetchBox, fetchGames, fetchNbaAverages, fetchNbaBox, fetchNbaCareer, fetchNbaRoster, fetchNbaStandings, fetchStandings, nbaGameId, Paid, seasonOf, seasonPage, standingsFrom, type NbaGame } from './nba';
+import { fetchAverage, fetchBox, fetchGames, fetchNbaAverages, fetchBdlRoster, fetchNbaBox, fetchNbaCareer, fetchNbaRoster, fetchNbaStandings, fetchStandings, nbaGameId, Paid, seasonOf, seasonPage, standingsFrom, type NbaGame } from './nba';
 import { monthOf, R2_FREE, R2_STOP, r2Block, rollMonth, type R2Use } from './r2guard';
 import { modelFamily, askCompat, askGemini, geminiDaily, pacificDay, askOpenRouter, COMPAT, compatModels, geminiModels, openRouterDaily, openRouterModels, pickCompat, SYSTEM as SOLVE_SYSTEM, type Engine, type SolveTurn } from './solve';
 import { filmFacets, searchFilms, type Film } from './catalog';
@@ -1237,7 +1237,7 @@ export class Accounts extends DurableObject<Env> {
     const season = Number(q.get('season'));
     const name = (q.get('name') ?? '').trim().slice(0, 80);
     const src = q.get('src') === 'nba' ? 'nba' : 'bdl';
-    if (!Number.isInteger(player) || player <= 0 || !Number.isInteger(season) || season < 1990 || season > 2100) return fail('선수를 확인해 주세요.');
+    if (!Number.isInteger(player) || player < 0 || (!player && !name) || !Number.isInteger(season) || season < 1990 || season > 2100) return fail('선수를 확인해 주세요.');
     const norm = (x: string) =>
       x
         .normalize('NFD')
@@ -1253,7 +1253,7 @@ export class Accounts extends DurableObject<Env> {
       console.error('nba.com averages failed', e instanceof Error ? e.message : String(e));
     }
     const key = this.nbaKey();
-    if (!key || src === 'nba') return fail('시즌 평균을 받지 못했어요. 잠시 뒤 다시 해 주세요.', 502);
+    if (!key || src === 'nba' || !player) return fail('시즌 평균을 받지 못했어요. NBA 공식 데이터가 우리 서버에 답하지 않는 것 같아요.', 502);
     try {
       const r = await this.nbaCached(`nba:avg:${season}:${player}`, 12 * 3600_000, () => fetchAverage(key, player, season));
       return json({ avg: r.v, at: r.at });
@@ -1293,13 +1293,23 @@ export class Accounts extends DurableObject<Env> {
   private async nbaRoster(team: string): Promise<Response> {
     if (!/^[A-Z]{3}$/.test(team)) return fail('팀을 확인해 주세요.');
     const season = seasonOf(new Date(Date.now() - 5 * 3600_000).toISOString().slice(0, 10));
+    let why = '';
     try {
       const r = await this.nbaCached(`nba:roster:${season}:${team}`, 12 * 3600_000, () => fetchNbaRoster(team, season));
-      return json({ season, players: r.v, at: r.at });
+      return json({ season, players: r.v, at: r.at, src: 'nba' });
+    } catch (e) {
+      why = e instanceof Error ? e.message : String(e);
+      console.error('nba.com roster failed', team, why);
+    }
+    // NBA 공식이 안 되면 balldontlie 선수 목록으로 (얼굴 · 커리어는 NBA 번호가 없어서 이름으로 찾는다)
+    const key = this.nbaKey();
+    try {
+      if (!key) throw new Error('balldontlie 키 없음');
+      const r = await this.nbaCached(`nba:roster:bdl:${team}`, 12 * 3600_000, () => fetchBdlRoster(key, team));
+      return json({ season, players: r.v, at: r.at, src: 'bdl' });
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
-      console.error('nba.com roster failed', team, msg);
-      return fail(`로스터를 받지 못했어요. (NBA 공식 데이터: ${msg.slice(0, 80)})`, 502);
+      return fail(`로스터를 받지 못했어요. (NBA 공식: ${why.slice(0, 60)} / balldontlie: ${msg.slice(0, 60)})`, 502);
     }
   }
   /** 선수 커리어 (NBA 공식, 12시간 기억) */

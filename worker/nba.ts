@@ -158,7 +158,7 @@ export async function bdl(key: string, path: string, query: string): Promise<unk
       ];
   let last = '';
   for (const t of tries) {
-    const res = await fetch(`https://api.balldontlie.io${t.prefix}${path}?${query}`, { headers: { authorization: t.bearer ? `Bearer ${key}` : key } });
+    const res = await within(fetch(`https://api.balldontlie.io${t.prefix}${path}?${query}`, { headers: { authorization: t.bearer ? `Bearer ${key}` : key }, signal: AbortSignal.timeout(10000) }), 11000, 'balldontlie');
     if (res.ok) {
       combo = t;
       return res.json();
@@ -229,10 +229,28 @@ const ABBR_OF = Object.fromEntries(Object.entries(NBA_TEAM_IDS).map(([a, id]) =>
 const CDN_HEADERS = { 'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:158.0) Gecko/20100101 Firefox/158.0', referer: 'https://www.nba.com/', accept: 'application/json, text/plain, */*' };
 const STATS_HEADERS = { ...CDN_HEADERS, 'user-agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.0.0 Safari/537.36', origin: 'https://www.nba.com', 'accept-language': 'en-US,en;q=0.9' };
 
+/** 정해진 시간 안에 안 끝나면 실패로 (바깥 서버가 답 없이 붙잡고 있어도 화면이 「받는 중」에 멈추지 않게) */
+export function within<T>(p: Promise<T>, ms: number, what: string): Promise<T> {
+  return Promise.race([p, new Promise<never>((_, no) => setTimeout(() => no(new Error(`${what} 응답 없음 (${Math.round(ms / 1000)}초)`)), ms))]);
+}
+/** stats.nba.com 이 답하지 않으면 30분 동안은 묻지 않고 바로 다른 길로 (nba_api 설명: 클라우드 서버 주소에는 답하지 않는 일이 많다) */
+let statsDownUntil = 0;
 async function getNba(url: string, stats: boolean): Promise<unknown> {
-  const res = await fetch(url, { headers: stats ? STATS_HEADERS : CDN_HEADERS, signal: AbortSignal.timeout(8000) });
-  if (!res.ok) throw new Error(`nba.com ${res.status}`);
-  return res.json();
+  if (stats && Date.now() < statsDownUntil) throw new Error('stats.nba.com 이 우리 서버에 답하지 않아요 (잠시 쉬는 중)');
+  try {
+    return await within(
+      (async () => {
+        const res = await fetch(url, { headers: stats ? STATS_HEADERS : CDN_HEADERS, signal: AbortSignal.timeout(8000) });
+        if (!res.ok) throw new Error(`nba.com ${res.status}`);
+        return res.json();
+      })(),
+      9000,
+      stats ? 'stats.nba.com' : 'cdn.nba.com',
+    );
+  } catch (e) {
+    if (stats) statsDownUntil = Date.now() + 30 * 60_000;
+    throw e;
+  }
 }
 /** stats.nba.com: nba_api 처럼 값 이름 차례대로 */
 const statsUrl = (endpoint: string, params: Record<string, string>) =>
@@ -427,4 +445,16 @@ export async function fetchNbaCareer(playerId: number): Promise<NbaCareerRow[]> 
     fg3Pct: n(r.FG3_PCT),
     ftPct: n(r.FT_PCT),
   }));
+}
+
+/** 로스터 (stats.nba.com 이 안 될 때): balldontlie 팀 번호를 찾아 그 팀 선수 (무료 기능: 팀 · 선수) */
+let bdlTeams: Record<string, number> | null = null;
+export async function fetchBdlRoster(key: string, abbr: string): Promise<NbaRosterPlayer[]> {
+  if (!bdlTeams) {
+    const t = rows(await bdl(key, '/teams', 'per_page=100'));
+    bdlTeams = Object.fromEntries(t.map((x) => [s(x.abbreviation), n(x.id)]));
+  }
+  const id = bdlTeams[abbr];
+  if (!id) throw new Error('팀을 찾지 못했어요');
+  return rows(await bdl(key, '/players', `team_ids[]=${id}&per_page=100`)).map((p) => ({ id: 0, name: `${s(p.first_name)} ${s(p.last_name)}`.trim(), num: s(p.jersey_number), pos: s(p.position), height: s(p.height), weight: s(p.weight), age: 0, exp: '', school: s(p.college) }));
 }
