@@ -4,7 +4,29 @@
 // - 경기 선수 기록에서 선수를 누르면 그 선수 시즌 평균
 // 응원팀(★)은 경기 화면에서 정하고, 그 팀 경기가 맨 위에 온다
 import { useEffect, useState } from 'react';
-import { ApiError, isLoggedIn, nba2k, type Nba2kPlayer, nbaAvg, nbaBox, nbaCareer, nbaGames, nbaPlayers, nbaRoster, nbaStandings, type NbaPlayerRow, type NbaAverage, type NbaCareerRow, type NbaRosterPlayer, type NbaGame, type NbaLine, type NbaStanding, type NbaTeam } from '../auth/api';
+import {
+  ApiError,
+  hlPlayer,
+  type HlSeason,
+  isLoggedIn,
+  nba2k,
+  type Nba2kPlayer,
+  nbaAvg,
+  nbaBox,
+  nbaCareer,
+  nbaGames,
+  nbaPlayers,
+  nbaRoster,
+  nbaStandings,
+  type NbaPlayerRow,
+  type NbaAverage,
+  type NbaCareerRow,
+  type NbaRosterPlayer,
+  type NbaGame,
+  type NbaLine,
+  type NbaStanding,
+  type NbaTeam,
+} from '../auth/api';
 import { addDays, longDate } from '../study/dates';
 import { go, Sheet, toast } from '../study/ui';
 import { NBA_TEAMS, nbaFace, nbaLogo } from './nbaLogo';
@@ -336,7 +358,7 @@ function Standings() {
       )}
       <p className="st-muted sm">
         {data.season}-{String(data.season + 1).slice(2)} 시즌 · 6위까지 플레이오프, 7~10위 플레이인 (굵은 줄)
-        {data.from === 'games' ? ' · 끝난 경기 결과로 센 순위예요' : data.from === 'nba' ? ' · NBA 공식 순위' : ''}
+        {data.from === 'games' ? ' · 끝난 경기 결과로 센 순위예요' : data.from === 'nba' ? ' · NBA 공식 순위' : data.from === 'hl' ? ' · Highlightly 순위' : ''}
         {data.building ? ' · 지금 경기 결과를 더 모으는 중' : ''}
       </p>
     </>
@@ -350,10 +372,10 @@ function GamePage({ id }: { id: number }) {
   const [err, setErr] = useState('');
   const [fav, setFav] = useState(readFav);
   const [player, setPlayer] = useState<NbaLine | null>(null);
-  const [src, setSrc] = useState<'nba' | 'bdl'>('bdl');
+  const [src, setSrc] = useState<'nba' | 'bdl' | 'hl'>('bdl');
   useEffect(() => {
     let live = true;
-    nbaBox({ id, date: g?.date ?? '', home: g?.home.abbr ?? '', away: g?.away.abbr ?? '', final: !!g && isFinal(g) })
+    nbaBox({ id, date: g?.date ?? '', home: g?.home.abbr ?? '', away: g?.away.abbr ?? '', homeName: g?.home.name ?? '', awayName: g?.away.name ?? '', final: !!g && isFinal(g) })
       .then((r) => {
         if (!live) return;
         setLines(r.lines);
@@ -477,7 +499,7 @@ function GamePage({ id }: { id: number }) {
           );
         })}
       {!!lines?.length && <p className="st-muted sm">선수 이름을 누르면 이번 시즌 평균이 나와요.</p>}
-      {player && <PlayerSheet who={{ id: player.playerId, name: player.name, team: player.team, pos: player.pos, src }} season={season} onClose={() => setPlayer(null)} />}
+      {player && <PlayerSheet who={{ id: player.playerId, name: player.name, team: player.team, pos: player.pos, src: src === 'nba' ? 'nba' : 'bdl' }} season={season} onClose={() => setPlayer(null)} />}
     </>
   );
 }
@@ -573,6 +595,7 @@ function PlayerSheet({ who, season, onClose }: { who: PlayerRef; season: number;
           </div>
         </>
       )}
+      {(err || cErr || (!nbaId && avg !== undefined)) && <HlStats name={who.name} />}
       <h3 className="st-h nba-career-h">커리어 (정규시즌 경기당 평균)</h3>
       {!nbaId && avg !== undefined && <p className="st-muted sm">NBA 공식 기록에서 이 선수를 찾지 못해서 커리어를 볼 수 없어요.</p>}
       {cErr && <p className="st-muted sm">{cErr}</p>}
@@ -887,6 +910,55 @@ function Players() {
       </section>
       <p className="st-muted sm">선수를 누르면 시즌 평균 · 2K 능력치 · 커리어가 나와요.{twoK ? ' 2K 능력치는 nba2kapi.com 것이고, 이름으로 맞추지 못한 선수는 - 로 보여요.' : ''}</p>
       {who && <PlayerSheet who={who} season={data.season} onClose={() => setWho(null)} />}
+    </>
+  );
+}
+
+/** NBA 공식 기록이 안 될 때: Highlightly 의 선수 시즌별 기록 (통계 이름은 Highlightly 가 주는 영어 그대로) */
+function HlStats({ name }: { name: string }) {
+  const [data, setData] = useState<{ id: number; seasons: HlSeason[] } | null | undefined>(undefined);
+  const [err, setErr] = useState('');
+  const [open, setOpen] = useState(0);
+  useEffect(() => {
+    let live = true;
+    hlPlayer(name)
+      .then((r) => live && setData(r.player))
+      .catch((e) => live && setErr(e instanceof Error ? e.message : '기록을 받지 못했어요'));
+    return () => {
+      live = false;
+    };
+  }, [name]);
+  if (err) return <p className="st-muted sm">{err}</p>;
+  if (data === undefined) return <p className="st-muted sm">Highlightly 에서 기록을 받는 중…</p>;
+  if (!data?.seasons.length) return <p className="st-muted sm">Highlightly 에도 이 선수 기록이 없어요.</p>;
+  const cur = data.seasons[open] ?? data.seasons[0];
+  const cats = [...new Set(cur.stats.map((x) => x.category || '기타'))];
+  return (
+    <>
+      <h3 className="st-h nba-career-h">시즌 기록 (Highlightly)</h3>
+      <div className="nba-days nba-seasons">
+        {data.seasons.slice(0, 8).map((x, i) => (
+          <button key={`${x.season}-${i}`} className={`nba-day ${i === open ? 'on' : ''}`} onClick={() => setOpen(i)}>
+            {x.season}
+            {x.team ? ` ${x.team}` : ''}
+          </button>
+        ))}
+      </div>
+      {cats.map((c) => (
+        <div key={c}>
+          <p className="st-muted sm">{c}</p>
+          <div className="nba-attrs">
+            {cur.stats
+              .filter((x) => (x.category || '기타') === c)
+              .map((x) => (
+                <div key={x.name}>
+                  <small>{x.name}</small>
+                  <b>{Number.isInteger(x.value) ? x.value : x.value.toFixed(1)}</b>
+                </div>
+              ))}
+          </div>
+        </div>
+      ))}
     </>
   );
 }

@@ -7602,3 +7602,11 @@ body.focus-on {
 .nba-attrs b.mid {
   color: #2563eb;
 }
+.nba-seasons {
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+}
+.nba-seasons .nba-day {
+  flex: 0 0 auto;
+  padding: 6px 12px;
+}

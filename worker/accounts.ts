@@ -22,6 +22,7 @@ import { relayFetch, type Relay } from './relay';
 import { fetchSpecialDays } from './holidays';
 import { cleanFact } from './fact';
 import { fetch2k } from './nba2k';
+import { fetchHlBox, fetchHlPlayerSeasons, fetchHlStandings, hlMatchId, sameTeam } from './highlightly';
 import { fetchAverage, fetchBox, fetchGames, fetchNbaAverages, fetchBdlRoster, fetchNbaBox, fetchNbaCareer, fetchNbaRoster, fetchNbaStandings, fetchStandings, nbaGameId, Paid, seasonOf, seasonPage, standingsFrom, type NbaGame } from './nba';
 import { monthOf, R2_FREE, R2_STOP, r2Block, rollMonth, type R2Use } from './r2guard';
 import { modelFamily, askCompat, askGemini, geminiDaily, pacificDay, askOpenRouter, COMPAT, compatModels, geminiModels, openRouterDaily, openRouterModels, pickCompat, SYSTEM as SOLVE_SYSTEM, type Engine, type SolveTurn } from './solve';
@@ -45,6 +46,41 @@ const COOKIE = COOKIE_NAME;
 
 const DAY = 86_400_000;
 const enc = new TextEncoder();
+/** NBA 팀 약자 → 팀 이름 (Highlightly 순위의 팀을 약자로 맞출 때) */
+const NBA_TEAM_NAMES: Record<string, string> = {
+  ATL: 'Hawks',
+  BKN: 'Nets',
+  BOS: 'Celtics',
+  CHA: 'Hornets',
+  CHI: 'Bulls',
+  CLE: 'Cavaliers',
+  DAL: 'Mavericks',
+  DEN: 'Nuggets',
+  DET: 'Pistons',
+  GSW: 'Warriors',
+  HOU: 'Rockets',
+  IND: 'Pacers',
+  LAC: 'Clippers',
+  LAL: 'Lakers',
+  MEM: 'Grizzlies',
+  MIA: 'Heat',
+  MIL: 'Bucks',
+  MIN: 'Timberwolves',
+  NOP: 'Pelicans',
+  NYK: 'Knicks',
+  OKC: 'Thunder',
+  ORL: 'Magic',
+  PHI: '76ers',
+  PHX: 'Suns',
+  POR: 'Trail Blazers',
+  SAC: 'Kings',
+  SAS: 'Spurs',
+  TOR: 'Raptors',
+  UTA: 'Jazz',
+  WAS: 'Wizards',
+};
+const norm2 = (x: string) => x.toLowerCase().replace(/[^a-z0-9]/g, '');
+
 /** 한 모델을 기다리는 최대 시간 (오래 생각하는 추론 모델은 더 길게) · 새 모델을 더 해 보지 않는 전체 시간 */
 const MODEL_TIMEOUT = 60_000;
 const THINK_TIMEOUT = 150_000;
@@ -224,6 +260,7 @@ export class Accounts extends DurableObject<Env> {
     if (path === 'nba/box' && req.method === 'GET') return this.nbaBox(new URL(req.url).searchParams);
     if (path === 'nba/avg' && req.method === 'GET') return this.nbaAvg(new URL(req.url).searchParams);
     if (path === 'nba/players' && req.method === 'GET') return this.nbaPlayers();
+    if (path === 'nba/hlplayer' && req.method === 'GET') return this.hlPlayer((new URL(req.url).searchParams.get('name') ?? '').trim().slice(0, 60));
     if (path === 'nba/2k' && req.method === 'GET') return this.nba2k();
     if (path === 'nba/roster' && req.method === 'GET') return this.nbaRoster((new URL(req.url).searchParams.get('team') ?? '').toUpperCase());
     if (path === 'nba/career' && req.method === 'GET') return this.nbaCareer(Number(new URL(req.url).searchParams.get('player')));
@@ -1116,6 +1153,10 @@ export class Accounts extends DurableObject<Env> {
     }
   }
 
+  private hlKey(): string | undefined {
+    const env = this.env as unknown as Record<string, string | undefined>;
+    return env.Highlightly || env.HIGHLIGHTLY_KEY;
+  }
   private nbaKey(): string | undefined {
     const env = this.env as unknown as Record<string, string | undefined>;
     return env.balldontlie || env.BALLDONTLIE_KEY;
@@ -1154,7 +1195,18 @@ export class Accounts extends DurableObject<Env> {
     } catch (e) {
       console.error('nba.com standings failed', e instanceof Error ? e.message : String(e));
     }
-    // 2) balldontlie 순위 (유료일 수 있음) → 3) 끝난 경기로 직접 세기
+    // 2) Highlightly 순위
+    const hk = this.hlKey();
+    if (hk) {
+      try {
+        const abbrOf = (name: string, ab: string) => Object.entries(NBA_TEAM_NAMES).find(([a, nm]) => a === ab.toUpperCase() || norm2(nm) === norm2(name))?.[0] ?? '';
+        const r = await this.nbaCached(`hl:standings:${season}`, 3 * 3600_000, () => fetchHlStandings(hk, abbrOf));
+        if (r.v.length >= 20) return json({ season, rows: r.v, at: r.at, from: 'hl' });
+      } catch (e) {
+        console.error('highlightly standings failed', e instanceof Error ? e.message : String(e));
+      }
+    }
+    // 3) balldontlie 순위 (유료일 수 있음) → 4) 끝난 경기로 직접 세기
     const paidMark = this.sql.exec<{ at: number }>("SELECT at FROM cache WHERE key = 'nba:standings:paid'").toArray()[0];
     if (!paidMark || Date.now() - paidMark.at > 7 * DAY) {
       try {
@@ -1222,12 +1274,34 @@ export class Accounts extends DurableObject<Env> {
         console.error('nba.com box failed', game, why);
       }
     }
+    // 2) Highlightly (키 「Highlightly」): 날짜 · 두 팀으로 경기를 찾아 박스스코어
+    const hk = this.hlKey();
+    const homeName = (q.get('homeName') ?? '').slice(0, 40);
+    const awayName = (q.get('awayName') ?? '').slice(0, 40);
+    if (hk && /^\d{4}-\d{2}-\d{2}$/.test(date)) {
+      try {
+        const mid = await this.nbaCached(`hl:mid:${game}`, 365 * DAY, async () => {
+          const id = await hlMatchId(hk, date, { abbr: home, name: homeName }, { abbr: away, name: awayName });
+          if (!id) throw new Error('Highlightly 에서 경기를 찾지 못했어요');
+          return id;
+        });
+        const abbrOf = (teamName: string) => (sameTeam({ name: teamName, displayName: teamName }, '', homeName) ? home : sameTeam({ name: teamName, displayName: teamName }, '', awayName) ? away : '');
+        const r = await this.nbaCached(`hl:box:${mid.v}`, ms, () => fetchHlBox(hk, mid.v, abbrOf));
+        if (r.v.length) return json({ lines: r.v, at: r.at, src: 'hl' });
+      } catch (e) {
+        const m = e instanceof Error ? e.message : String(e);
+        why = why ? `${why} / ${m}` : m;
+        console.error('highlightly box failed', game, m);
+      }
+    }
+    // 3) balldontlie (유료일 수 있음)
     const key = this.nbaKey();
-    if (!key) return fail(why ? `선수 기록을 받지 못했어요. (${why})` : 'NBA 를 보려면 balldontlie 키가 필요해요.', 503);
+    if (!key) return fail(why ? `선수 기록을 받지 못했어요. (${why.slice(0, 160)})` : 'NBA 를 보려면 balldontlie 키가 필요해요.', 503);
     try {
       const r = await this.nbaCached(`nba:box:${game}`, ms, () => fetchBox(key, game));
       return json({ lines: r.v, at: r.at, src: 'bdl' });
     } catch (e) {
+      if (why) console.error('box all failed', why);
       return this.nbaFail(e, '선수 기록');
     }
   }
@@ -1286,6 +1360,21 @@ export class Accounts extends DurableObject<Env> {
       const msg = e instanceof Error ? e.message : String(e);
       console.error('nba2k failed', msg);
       return fail(`NBA 2K 능력치를 받지 못했어요. (${msg.slice(0, 80)})`, 502);
+    }
+  }
+
+  /** Highlightly 선수 시즌별 기록 (정규시즌, 하루 기억) */
+  private async hlPlayer(name: string): Promise<Response> {
+    if (!name) return fail('선수를 확인해 주세요.');
+    const hk = this.hlKey();
+    if (!hk) return fail('Highlightly 키가 없어요.', 503);
+    try {
+      const r = await this.nbaCached(`hl:player:${name.toLowerCase()}`, DAY, () => fetchHlPlayerSeasons(hk, name));
+      return json({ player: r.v, at: r.at });
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      console.error('highlightly player failed', name, msg);
+      return fail(`선수 기록을 받지 못했어요. (Highlightly: ${msg.slice(0, 80)})`, 502);
     }
   }
 

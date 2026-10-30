@@ -366,10 +366,10 @@ export interface NbaAverage {
   ftPct: number;
   tov: number;
 }
-export const nbaStandings = () => call<{ season: number; rows: NbaStanding[]; at: number; from: 'nba' | 'api' | 'games'; building?: boolean }>('nba/standings', 'GET', undefined, 40_000);
+export const nbaStandings = () => call<{ season: number; rows: NbaStanding[]; at: number; from: 'nba' | 'hl' | 'api' | 'games'; building?: boolean }>('nba/standings', 'GET', undefined, 40_000);
 /** 경기 선수 기록: NBA 공식 기록을 찾으려고 날짜 · 홈 · 원정 약자도 보낸다. src: 어디서 왔는지 (선수 번호가 달라서) */
-export const nbaBox = (g: { id: number; date: string; home: string; away: string; final: boolean }) =>
-  call<{ lines: NbaLine[]; at: number; src: 'nba' | 'bdl' }>(`nba/box?${new URLSearchParams({ game: String(g.id), date: g.date, home: g.home, away: g.away, ...(g.final ? { final: '1' } : {}) })}`, 'GET', undefined, 40_000);
+export const nbaBox = (g: { id: number; date: string; home: string; away: string; homeName: string; awayName: string; final: boolean }) =>
+  call<{ lines: NbaLine[]; at: number; src: 'nba' | 'bdl' | 'hl' }>(`nba/box?${new URLSearchParams({ game: String(g.id), date: g.date, home: g.home, away: g.away, homeName: g.homeName, awayName: g.awayName, ...(g.final ? { final: '1' } : {}) })}`, 'GET', undefined, 40_000);
 export const nbaAvg = (p: { id: number; name: string; season: number; src: 'nba' | 'bdl' }) => call<{ avg: NbaAverage | null; at: number }>(`nba/avg?${new URLSearchParams({ player: String(p.id), name: p.name, season: String(p.season), src: p.src })}`, 'GET', undefined, 40_000);
 export interface NbaRosterPlayer {
   id: number;
@@ -412,6 +412,13 @@ export interface Nba2kPlayer {
   attrs: Record<string, number>;
 }
 export const nba2k = () => call<{ players: Nba2kPlayer[]; at: number; key: boolean }>('nba/2k', 'GET', undefined, 40_000);
+export interface HlSeason {
+  season: number;
+  kind: string;
+  team: string;
+  stats: { name: string; value: number; category: string }[];
+}
+export const hlPlayer = (name: string) => call<{ player: { id: number; seasons: HlSeason[] } | null; at: number }>(`nba/hlplayer?name=${encodeURIComponent(name)}`, 'GET', undefined, 40_000);
 export const nbaPlayers = () => call<{ season: number; players: NbaPlayerRow[]; at: number }>('nba/players', 'GET', undefined, 40_000);
 export const nbaRoster = (team: string) => call<{ season: number; players: NbaRosterPlayer[]; at: number; src?: 'nba' | 'bdl' }>(`nba/roster?team=${team}`, 'GET', undefined, 40_000);
 export const nbaCareer = (player: number) => call<{ rows: NbaCareerRow[]; at: number }>(`nba/career?player=${player}`, 'GET', undefined, 40_000);
