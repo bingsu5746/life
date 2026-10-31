@@ -1173,6 +1173,18 @@ export class Accounts extends DurableObject<Env> {
     }
   }
 
+  /** stats.nba.com 은 Cloudflare 에 답하지 않을 때가 많다: 한 번 안 되면 1시간 동안은 묻지 않고 바로 다른 길로 (서버가 다시 시작해도 기억) */
+  private async stats<T>(get: () => Promise<T>): Promise<T> {
+    const until = Number(this.cacheGet('nba:statsdown') ?? 0);
+    if (Date.now() < until) throw new Error('stats.nba.com 이 우리 서버에 답하지 않아요 (잠시 쉬는 중)');
+    try {
+      return await get();
+    } catch (e) {
+      this.cacheSet('nba:statsdown', String(Date.now() + 3600_000));
+      throw e;
+    }
+  }
+
   private hlKey(): string | undefined {
     const env = this.env as unknown as Record<string, string | undefined>;
     return env.Highlightly || env.HIGHLIGHTLY_KEY;
@@ -1210,7 +1222,7 @@ export class Accounts extends DurableObject<Env> {
     const season = seasonOf(new Date(Date.now() - 5 * 3600_000).toISOString().slice(0, 10));
     // 1) NBA 공식 순위 (키 없음)
     try {
-      const r = await this.nbaCached(`nba:standings:nbacom:${season}`, 3 * 3600_000, () => fetchNbaStandings(season));
+      const r = await this.nbaCached(`nba:standings:nbacom:${season}`, 3 * 3600_000, () => this.stats(() => fetchNbaStandings(season)));
       if (r.v.length) return json({ season, rows: r.v, at: r.at, from: 'nba' });
     } catch (e) {
       console.error('nba.com standings failed', e instanceof Error ? e.message : String(e));
@@ -1333,7 +1345,7 @@ export class Accounts extends DurableObject<Env> {
         .toLowerCase()
         .replace(/[^a-z]/g, '');
     try {
-      const all = await this.nbaCached(`nba:avgs2:nbacom:${season}`, 6 * 3600_000, () => fetchNbaAverages(season));
+      const all = await this.nbaCached(`nba:avgs2:nbacom:${season}`, 6 * 3600_000, () => this.stats(() => fetchNbaAverages(season)));
       const hit = all.v.find((p) => (src === 'nba' ? p.id === player : norm(p.name) === norm(name)));
       if (hit) return json({ avg: hit, at: all.at });
       if (src === 'nba') return json({ avg: null, at: all.at });
@@ -1394,7 +1406,7 @@ export class Accounts extends DurableObject<Env> {
         await new Promise((r) => setTimeout(r, 1500 * (i + 1)));
         res = await within((i === 0 ? this.gemFetch() : fetch)(url, init), 15_000, 'Discogs');
       }
-      if (res.status === 429) throw new Error('Discogs 가 잠깐 막았어요 (1분 횟수). 1분 뒤 다시 해 주세요');
+      if (res.status === 429) throw new Error(`Discogs 가 잠깐 막았어요 (1분 횟수). 1분 뒤 다시 해 주세요 [남은 ${res.headers.get('x-discogs-ratelimit-remaining') ?? '?'} · ${(await res.text()).slice(0, 80)}]`);
       if (!res.ok) throw new Error(`Discogs ${res.status}`);
       const j = (await res.json()) as { results?: { id?: number; title?: string; year?: string; cover_image?: string; thumb?: string; genre?: string[]; style?: string[]; community?: { have?: number; want?: number } }[] };
       const list = (j.results ?? [])
@@ -1493,7 +1505,7 @@ export class Accounts extends DurableObject<Env> {
   private async nbaPlayers(): Promise<Response> {
     const season = seasonOf(new Date(Date.now() - 5 * 3600_000).toISOString().slice(0, 10));
     try {
-      const r = await this.nbaCached(`nba:avgs2:nbacom:${season}`, 6 * 3600_000, () => fetchNbaAverages(season));
+      const r = await this.nbaCached(`nba:avgs2:nbacom:${season}`, 6 * 3600_000, () => this.stats(() => fetchNbaAverages(season)));
       return json({ season, players: r.v, at: r.at });
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
@@ -1552,7 +1564,7 @@ export class Accounts extends DurableObject<Env> {
     const season = seasonOf(new Date(Date.now() - 5 * 3600_000).toISOString().slice(0, 10));
     let why = '';
     try {
-      const r = await this.nbaCached(`nba:roster:${season}:${team}`, 12 * 3600_000, () => fetchNbaRoster(team, season));
+      const r = await this.nbaCached(`nba:roster:${season}:${team}`, 12 * 3600_000, () => this.stats(() => fetchNbaRoster(team, season)));
       return json({ season, players: r.v, at: r.at, src: 'nba' });
     } catch (e) {
       why = e instanceof Error ? e.message : String(e);
@@ -1585,7 +1597,7 @@ export class Accounts extends DurableObject<Env> {
   private async nbaCareer(player: number): Promise<Response> {
     if (!Number.isInteger(player) || player <= 0) return fail('선수를 확인해 주세요.');
     try {
-      const r = await this.nbaCached(`nba:career:${player}`, 12 * 3600_000, () => fetchNbaCareer(player));
+      const r = await this.nbaCached(`nba:career:${player}`, 12 * 3600_000, () => this.stats(() => fetchNbaCareer(player)));
       return json({ rows: r.v, at: r.at });
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
