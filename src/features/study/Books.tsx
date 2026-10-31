@@ -231,7 +231,10 @@ function BookEditor({ book, onDone }: { book?: Book; onDone: (id?: string, plan?
               setName(h.title);
               if (text.trim()) return;
               if (h.tocText?.trim()) {
-                setText(h.tocText.trim());
+                // 쪽이 붙은 줄이 있으면 쪽 없는 큰 제목(「Ⅰ. 다항식」)은 빼고 넣는다
+                const lines = h.tocText.split('\n').map((l) => l.trim()).filter(Boolean);
+                const paged = lines.filter((l) => /\d+\s*(?:쪽|p)?$/i.test(l));
+                setText((paged.length >= 2 ? paged : lines).join('\n'));
                 toast('목차를 불러왔어요. 쪽이 없는 줄은 고쳐 주세요');
                 return;
               }
