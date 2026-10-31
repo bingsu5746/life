@@ -25,6 +25,7 @@ import { fetch2k } from './nba2k';
 import { hcBody, parseHc } from './homecourt';
 import { diaryBody, noteBody, parseDiary, parseNote } from './aiRead';
 import { cheapShark } from './cheapshark';
+import { krPrices, steamAchievements, steamMe, storeNames, storeSearch, wishlist, type KrPrice } from './steam';
 import { hlAverage, fetchHlBox, fetchHlPlayerSeasons, fetchHlStandings, hlMatchId, sameTeam } from './highlightly';
 import { within, fetchGames, fetchNbaAverages, fetchBdlRoster, fetchNbaBox, fetchNbaCareer, fetchNbaRoster, fetchNbaStandings, fetchStandings, nbaGameId, Paid, seasonOf, seasonPage, standingsFrom, type NbaGame } from './nba';
 import { monthOf, R2_FREE, R2_STOP, r2Block, rollMonth, type R2Use } from './r2guard';
@@ -254,6 +255,26 @@ export class Accounts extends DurableObject<Env> {
     if (path === 'movies/ott' && req.method === 'POST') return this.ott(body);
     if (path === 'school' && req.method === 'POST') return this.school(body);
     if (path === 'keys' && req.method === 'GET') return this.keysInfo();
+    if (path === 'games/csmap' && req.method === 'GET')
+      return this.csMap(
+        (new URL(req.url).searchParams.get('ids') ?? '')
+          .split(',')
+          .map(Number)
+          .filter((x) => Number.isInteger(x) && x > 0),
+      );
+    if (path === 'steam/names' && req.method === 'GET') {
+      const ids = (new URL(req.url).searchParams.get('ids') ?? '')
+        .split(',')
+        .map(Number)
+        .filter((x) => Number.isInteger(x) && x > 0)
+        .slice(0, 100);
+      return storeNames(ids).then(
+        (names) => json({ names }),
+        (e) => fail(`이름을 받지 못했어요. (${(e instanceof Error ? e.message : String(e)).slice(0, 80)})`, 502),
+      );
+    }
+    if (path === 'steam/me' && req.method === 'GET') return this.steamMeRoute(new URL(req.url).searchParams.get('steamid') ?? '');
+    if (path === 'steam/ach' && req.method === 'GET') return this.steamAchRoute(new URL(req.url).searchParams.get('steamid') ?? '', Number(new URL(req.url).searchParams.get('appid')));
     if (path === 'games/search' && req.method === 'GET') return this.gameSearch((new URL(req.url).searchParams.get('q') ?? '').trim().slice(0, 80));
     if (path === 'games/prices' && req.method === 'GET')
       return this.gamePrices(
@@ -261,7 +282,7 @@ export class Accounts extends DurableObject<Env> {
           .split(',')
           .map(Number)
           .filter((x) => Number.isInteger(x) && x > 0)
-          .slice(0, 50),
+          .slice(0, 100),
       );
     if (path === 'games/watch' && req.method === 'PUT') return this.gameWatch(req, user, body);
     if (path === 'nba/fav' && (req.method === 'GET' || req.method === 'PUT')) return this.nbaFav(req, user, body);
@@ -1449,20 +1470,20 @@ export class Accounts extends DurableObject<Env> {
     }
   }
 
-  /** Steam 게임 찾기 (CheapShark, 키 없음). Steam 에 있는 게임만 */
+  private steamKey() {
+    return this.secret('steam', 'steamkey', 'steamapikey', 'steamwebapikey', 'steamapi');
+  }
+  /** Steam 게임 찾기 (한국 상점 값, 원) */
   private async gameSearch(q: string): Promise<Response> {
-    if (q.length < 2) return fail('게임 이름을 넣어 주세요.');
+    if (q.length < 1) return fail('게임 이름을 넣어 주세요.');
     try {
-      const r = await this.nbaCached(`cs:search:${q.toLowerCase()}`, DAY, async () => {
-        const list = (await cheapShark(`games?${new URLSearchParams({ title: q, limit: '30' })}`)) as { gameID?: string; steamAppID?: string | null; external?: string; cheapest?: string; thumb?: string }[];
-        return list.filter((g) => g.gameID && g.steamAppID).map((g) => ({ id: Number(g.gameID), steamAppID: Number(g.steamAppID), title: g.external ?? '', cheapest: Number(g.cheapest) || 0, thumb: g.thumb ?? '' }));
-      });
+      const r = await this.nbaCached(`st:search:${q.toLowerCase()}`, 6 * 3600_000, () => storeSearch(q));
       return json({ list: r.v });
     } catch (e) {
       return fail(`게임을 찾지 못했어요. (${(e instanceof Error ? e.message : String(e)).slice(0, 80)})`, 502);
     }
   }
-  /** 여러 게임의 지금 Steam 값 · 정가 · 역대 최저 (달러, 3시간 기억) */
+  /** 여러 게임의 지금 한국 Steam 값 (3시간 기억) + 이 앱이 본 가장 싼 값 */
   private async gamePrices(ids: number[]): Promise<Response> {
     if (!ids.length) return json({ prices: {} });
     try {
@@ -1471,61 +1492,102 @@ export class Accounts extends DurableObject<Env> {
       return fail(`값을 받지 못했어요. (${(e instanceof Error ? e.message : String(e)).slice(0, 80)})`, 502);
     }
   }
-  private async steamPrices(ids: number[]): Promise<Record<number, { price: number; retail: number; lowest: number; thumb: string; title: string }>> {
-    const out: Record<number, { price: number; retail: number; lowest: number; thumb: string; title: string }> = {};
+  private async steamPrices(ids: number[]): Promise<Record<number, KrPrice & { low: number; lowAt: number }>> {
+    const out: Record<number, KrPrice & { low: number; lowAt: number }> = {};
     const need: number[] = [];
+    const lowOf = (id: number) => (JSON.parse(this.cacheGet(`st:low:${id}`) ?? 'null') as { low: number; at: number } | null) ?? null;
     for (const id of ids) {
-      const c = this.cacheGet(`cs:price:${id}`);
-      const v = c ? (JSON.parse(c) as { at: number; v: (typeof out)[number] }) : null;
-      if (v && Date.now() - v.at < 3 * 3600_000) out[id] = v.v;
+      const c = this.cacheGet(`st:price:${id}`);
+      const v = c ? (JSON.parse(c) as { at: number; v: KrPrice }) : null;
+      const low = lowOf(id);
+      if (v && Date.now() - v.at < 3 * 3600_000) out[id] = { ...v.v, low: low?.low ?? v.v.final, lowAt: low?.at ?? v.at };
       else need.push(id);
     }
-    for (let i = 0; i < need.length; i += 25) {
-      const j = (await cheapShark(`games?ids=${need.slice(i, i + 25).join(',')}`)) as Record<string, { info?: { title?: string; thumb?: string }; cheapestPriceEver?: { price?: string }; deals?: { storeID?: string; price?: string; retailPrice?: string }[] }>;
-      for (const [k, g] of Object.entries(j)) {
-        const steam = (g.deals ?? []).find((d) => d.storeID === '1');
-        if (!steam) continue;
-        const v = { price: Number(steam.price) || 0, retail: Number(steam.retailPrice) || 0, lowest: Number(g.cheapestPriceEver?.price) || 0, thumb: g.info?.thumb ?? '', title: g.info?.title ?? '' };
-        out[Number(k)] = v;
-        this.cacheSet(`cs:price:${k}`, JSON.stringify({ at: Date.now(), v }));
+    if (need.length) {
+      const got = await krPrices(need);
+      for (const [k, v] of Object.entries(got)) {
+        const id = Number(k);
+        this.cacheSet(`st:price:${id}`, JSON.stringify({ at: Date.now(), v }));
+        // 여기서 본 가장 싼 값을 적어 둔다 (Steam 이 역대 최저를 알려 주지 않아서)
+        const low = lowOf(id);
+        const keep = low && low.low <= v.final ? low : { low: v.final, at: Date.now() };
+        if (!low || keep !== low) this.cacheSet(`st:low:${id}`, JSON.stringify(keep));
+        out[id] = { ...v, low: keep.low, lowAt: keep.at };
       }
     }
     return out;
   }
-  /** 값 알림: 이 값(달러) 아래로 내려가면 알림. { list: [{ id, title, target }] } (빈 목록이면 끔) */
+  /** 예전 CheapShark 번호 → Steam 번호 (예전에 넣은 게임 옮기기) */
+  private async csMap(ids: number[]): Promise<Response> {
+    try {
+      const j = (await cheapShark(`games?ids=${ids.slice(0, 25).join(',')}`)) as Record<string, { info?: { steamAppID?: string | null } }>;
+      return json({ map: Object.fromEntries(Object.entries(j).map(([k, v]) => [k, Number(v.info?.steamAppID) || 0])) });
+    } catch (e) {
+      return fail(`옮기지 못했어요. (${(e instanceof Error ? e.message : String(e)).slice(0, 80)})`, 502);
+    }
+  }
+  /** 내 Steam: 프로필 · 가진 게임 · 찜 목록 (10분 기억). 가진 게임은 키(steam)가 있어야 */
+  private async steamMeRoute(steamid: string): Promise<Response> {
+    if (!/^\d{17}$/.test(steamid)) return fail('Steam ID(17자리 숫자)를 확인해 주세요.');
+    const key = this.steamKey();
+    try {
+      const wish = await this.nbaCached(`st:wish:${steamid}`, 10 * 60_000, () => wishlist(steamid)).catch(() => ({ v: [] as { appid: number; added: number }[] }));
+      if (!key) return json({ me: null, wish: wish.v, needKey: true });
+      const me = await this.nbaCached(`st:me:${steamid}`, 10 * 60_000, () => steamMe(key, steamid));
+      return json({ me: me.v, wish: wish.v });
+    } catch (e) {
+      return fail(`Steam 정보를 받지 못했어요. 프로필이 「공개」인지 확인해 주세요. (${(e instanceof Error ? e.message : String(e)).slice(0, 80)})`, 502);
+    }
+  }
+  private async steamAchRoute(steamid: string, appid: number): Promise<Response> {
+    const key = this.steamKey();
+    if (!key) return fail('Steam 키가 아직 없어요.', 503);
+    if (!/^\d{17}$/.test(steamid) || !Number.isInteger(appid) || appid <= 0) return fail('게임을 확인해 주세요.');
+    try {
+      const r = await this.nbaCached(`st:ach:${steamid}:${appid}`, 30 * 60_000, () => steamAchievements(key, steamid, appid));
+      return json(r.v);
+    } catch (e) {
+      return fail(`업적을 받지 못했어요. (${(e instanceof Error ? e.message : String(e)).slice(0, 80)})`, 502);
+    }
+  }
+  /** 값 알림: 이 값(원) 아래로 내려가면 알림. { list: [{ id(Steam 번호), title, target }] } (빈 목록이면 끔) */
   private gameWatch(req: Request, user: UserRow, b: Record<string, unknown>): Response {
     const list = (Array.isArray(b.list) ? b.list : [])
       .map((x) => x as { id?: unknown; title?: unknown; target?: unknown })
-      .filter((x) => Number.isInteger(x.id) && typeof x.target === 'number' && x.target > 0 && x.target < 1000)
-      .slice(0, 30)
+      .filter((x) => Number.isInteger(x.id) && typeof x.target === 'number' && x.target > 0 && x.target < 10_000_000)
+      .slice(0, 50)
       .map((x) => ({ id: x.id as number, title: String(x.title ?? '').slice(0, 80), target: x.target as number }));
     const ck = `gamewatch:${user.id}`;
     if (!list.length) this.sql.exec('DELETE FROM cache WHERE key = ?', ck);
     else {
       const old = this.cacheGet(ck);
       const sent = old ? ((JSON.parse(old) as { sent?: Record<string, number> }).sent ?? {}) : {};
-      this.cacheSet(ck, JSON.stringify({ list, origin: new URL(req.url).origin, sent }));
+      this.cacheSet(ck, JSON.stringify({ list, origin: new URL(req.url).origin, sent, krw: true }));
     }
     void this.scheduleAlarm();
     return json({ ok: true, n: list.length });
   }
-  /** 6시간마다: 값 알림을 건 게임이 목표 값 아래면 알림 (같은 값이면 다시 안 보냄) */
+  /** 6시간마다: 값 알림을 건 게임의 한국 Steam 값이 목표 아래면 알림 (같은 값이면 다시 안 보냄) */
   private async gameWatchCheck() {
     const rows = this.sql.exec<{ key: string; data: string }>("SELECT key, data FROM cache WHERE key LIKE 'gamewatch:%'").toArray();
-    const all = [...new Set(rows.flatMap((r) => (JSON.parse(r.data) as { list: { id: number }[] }).list.map((x) => x.id)))];
+    const parsed = rows.map((r) => ({ r, v: JSON.parse(r.data) as { list: { id: number; title: string; target: number }[]; origin: string; sent: Record<string, number>; krw?: boolean } })).filter((x) => x.v.krw);
+    const all = [...new Set(parsed.flatMap((x) => x.v.list.map((g) => g.id)))];
     if (!all.length) return;
     const prices = await this.steamPrices(all);
-    for (const row of rows) {
-      const uid = row.key.slice('gamewatch:'.length);
-      const v = JSON.parse(row.data) as { list: { id: number; title: string; target: number }[]; origin: string; sent: Record<string, number> };
+    for (const { r, v } of parsed) {
+      const uid = r.key.slice('gamewatch:'.length);
       const msgs: { title: string; body: string; url: string }[] = [];
       for (const g of v.list) {
         const p = prices[g.id];
-        if (!p || p.price > g.target || v.sent[g.id] === p.price) continue;
-        v.sent[g.id] = p.price;
-        msgs.push({ title: `🎮 ${g.title || p.title} $${p.price}`, body: `Steam 에서 ${p.retail ? `정가 $${p.retail} → ` : ''}$${p.price} · 정해 둔 $${g.target} 아래예요`, url: '/#/games' });
+        if (!p || !p.final || p.final > g.target || v.sent[g.id] === p.final) continue;
+        v.sent[g.id] = p.final;
+        msgs.push({
+          title: `🎮 ${g.title} ${p.final.toLocaleString('ko-KR')}원`,
+          body: `Steam ${p.discount ? `${p.discount}% 할인 · 정가 ${p.initial.toLocaleString('ko-KR')}원 → ` : ''}${p.final.toLocaleString('ko-KR')}원 · 정해 둔 ${g.target.toLocaleString('ko-KR')}원 아래예요`,
+          url: `https://store.steampowered.com/app/${g.id}/`,
+        });
       }
-      this.cacheSet(row.key, JSON.stringify(v));
+      this.cacheSet(r.key, JSON.stringify(v));
       const subs = msgs.length ? this.sql.exec<PushSub & { [k: string]: SqlStorageValue }>('SELECT endpoint, p256dh, auth FROM push_subs WHERE user_id = ?', uid).toArray() : [];
       for (const m of msgs) if (subs.length) await this.pushTo(subs, m, v.origin);
     }
@@ -1543,6 +1605,7 @@ export class Accounts extends DurableObject<Env> {
       ),
       datagokr: !!this.secret('datagokr', 'datagokrkey', 'datagokey', 'publicdata', 'publicdatakey', 'kasi', 'kasikey', 'DATA_GO_KR_KEY'),
       gemini: !!this.keyOf('gemini'),
+      steam: !!this.steamKey(),
     });
   }
 

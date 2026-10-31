@@ -563,29 +563,43 @@ export async function discogsSearch(q: string): Promise<{ list: DiscogsHit[]; di
   return { list, direct: true };
 }
 /** 등록된 서비스 키 (있는지만) */
-export const keysInfo = () => call<{ serpapi: boolean; serpUsed: number; discogs: boolean; datagokr: boolean; gemini: boolean }>('keys');
+export const keysInfo = () => call<{ serpapi: boolean; serpUsed: number; discogs: boolean; datagokr: boolean; gemini: boolean; steam?: boolean }>('keys');
 /** 응원팀 경기 알림 (시작 · 끝). subs: 이 계정에 알림을 받는 기기 수 */
 export const nbaFavGet = () => call<{ team: string; subs: number }>('nba/fav');
 export const nbaFavSet = (team: string) => call<{ team: string; subs: number }>('nba/fav', 'PUT', { team });
 
-/** Steam 게임 (CheapShark): 찾기 · 지금 값 · 값 알림 */
+/** Steam (한국 상점 값, 원): 찾기 · 지금 값 · 값 알림 · 내 Steam */
 export interface SteamHit {
-  id: number;
-  steamAppID: number;
-  title: string;
-  cheapest: number;
+  appid: number;
+  name: string;
+  final: number | null;
+  initial: number | null;
   thumb: string;
 }
 export interface SteamPrice {
-  price: number;
-  retail: number;
-  lowest: number;
-  thumb: string;
-  title: string;
+  final: number;
+  initial: number;
+  discount: number;
+  /** 이 앱이 본 가장 싼 값과 그때 */
+  low: number;
+  lowAt: number;
+}
+export interface SteamMe {
+  name: string;
+  avatar: string;
+  owned: { appid: number; name: string; minutes: number; recent: number; last: number }[];
+  count: number;
 }
 export const gameSearch = (q: string) => call<{ list: SteamHit[] }>(`games/search?q=${encodeURIComponent(q)}`, 'GET', undefined, 25_000);
 export const gamePrices = (ids: number[]) => remember(`gp:${ids.join(',')}`, 30 * MIN, () => call<{ prices: Record<number, SteamPrice> }>(`games/prices?ids=${ids.join(',')}`, 'GET', undefined, 25_000));
 export const gameWatch = (list: { id: number; title: string; target: number }[]) => call<{ ok: true; n: number }>('games/watch', 'PUT', { list });
+export const csMap = (ids: number[]) => call<{ map: Record<string, number> }>(`games/csmap?ids=${ids.join(',')}`, 'GET', undefined, 25_000);
+export const steamMe = (steamid: string) => remember(`steam:${steamid}`, 10 * MIN, () => call<{ me: SteamMe | null; wish: { appid: number; added: number }[]; needKey?: boolean }>(`steam/me?steamid=${steamid}`, 'GET', undefined, 30_000));
+export const steamAch = (steamid: string, appid: number) =>
+  remember(`ach:${steamid}:${appid}`, 30 * MIN, () => call<{ done: number; total: number; list: { name: string; desc: string; at: number }[]; stats: { name: string; value: number }[] }>(`steam/ach?steamid=${steamid}&appid=${appid}`, 'GET', undefined, 30_000));
+export const steamNames = (ids: number[]) => call<{ names: Record<number, string> }>(`steam/names?ids=${ids.join(',')}`, 'GET', undefined, 25_000).then((r) => r.names);
+export const steamStore = (appid: number) => `https://store.steampowered.com/app/${appid}/`;
+export const steamThumb = (appid: number) => `https://shared.fastly.steamstatic.com/store_item_assets/steam/apps/${appid}/capsule_231x87.jpg`;
 
 /** AI 로 읽기 (뒤에서 하고 2초마다 묻는다) */
 async function aiJob<T>(path: string, body: unknown): Promise<T> {

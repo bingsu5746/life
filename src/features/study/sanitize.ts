@@ -267,8 +267,10 @@ const FIX: Record<Collection, Fix> = {
     started: optDate(x.started),
     finished: optDate(x.finished),
     csId: Number.isInteger(x.csId) && (x.csId as number) > 0 ? (x.csId as number) : undefined,
-    thumb: typeof x.thumb === 'string' && /^https:\/\/shared\.fastly\.steamstatic\.com\/[\w\-./:%=?&]+$/.test(x.thumb) ? x.thumb.slice(0, 400) : undefined,
+    steamAppId: Number.isInteger(x.steamAppId) && (x.steamAppId as number) > 0 ? (x.steamAppId as number) : undefined,
+    thumb: typeof x.thumb === 'string' && /^https:\/\/[a-z.]+\.steamstatic\.com\/[\w\-./:%=?&]+$/.test(x.thumb) ? x.thumb.slice(0, 400) : undefined,
     watchPrice: score(x.watchPrice, 0.01, 999),
+    watchWon: score(x.watchWon, 1, 10_000_000),
     created: num(x.created),
   }),
   problems: (x) => ({
@@ -661,6 +663,7 @@ export function sanitizeSettings(s: unknown): StudySettings & { updatedAt: numbe
         )
       : undefined,
     lastBackup: optDate(x.lastBackup),
+    steamId: typeof x.steamId === 'string' && /^\d{17}$/.test(x.steamId) ? x.steamId : undefined,
     shotGoals: isObj(x.shotGoals) ? { fg: score((x.shotGoals as Obj).fg, 1, 100), three: score((x.shotGoals as Obj).three, 1, 100), two: score((x.shotGoals as Obj).two, 1, 100) } : undefined,
     examPlanDefaults: isObj(x.examPlanDefaults) ? { weekday: cl((x.examPlanDefaults as Obj).weekday, 0, 900, 150), weekend: cl((x.examPlanDefaults as Obj).weekend, 0, 900, 240), perLine: cl((x.examPlanDefaults as Obj).perLine, 5, 300, 40) } : undefined,
     diaryForm: isObj(x.diaryForm)

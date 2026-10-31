@@ -7973,3 +7973,47 @@ body.focus-on {
   display: inline-flex;
   gap: 4px;
 }
+.gm-me {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  margin-bottom: 8px;
+}
+.gm-me img {
+  width: 56px;
+  height: 56px;
+  border-radius: 12px;
+}
+.gm-me div {
+  display: grid;
+  gap: 2px;
+}
+.gm-row {
+  display: grid;
+  grid-template-columns: 92px 1fr auto;
+  gap: 10px;
+  align-items: center;
+  padding: 6px 0;
+}
+.gm-row img {
+  width: 92px;
+  height: 34px;
+  border-radius: 6px;
+  object-fit: cover;
+  background: var(--soft);
+}
+.gm-row span {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+.gm-hero {
+  width: 100%;
+  border-radius: 12px;
+}
+.gm-ach {
+  display: grid;
+  gap: 2px;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--line);
+}

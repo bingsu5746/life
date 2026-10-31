@@ -9,6 +9,7 @@ import { Study } from './features/study/Study';
 import { AREAS, HOBBY_PARTS } from './features/study/tabs';
 import { AiPill } from './features/study/AiPill';
 import { toast } from './features/study/ui';
+import { ErrorBoundary } from './ErrorBoundary';
 
 const safeDecode = (s: string) => {
   try {
@@ -139,7 +140,9 @@ export default function App() {
       </header>
       {/* 로그인했으면 첫 동기화가 끝난 뒤에 오늘 분량을 고정한다 (다른 기기의 최신 진도로) */}
       {offline && <div className="offline-bar">인터넷 연결이 끊겼어요 · 이 기기에 저장하고, 다시 연결되면 다른 기기와 맞춰요</div>}
-      <Study path={path} loggedIn={!!auth.user || auth.loading} syncReady={!isLoggedIn() || sync !== 'syncing'} onLogin={() => setLoginOpen(true)} />
+      <ErrorBoundary resetKey={path.join('/')}>
+        <Study path={path} loggedIn={!!auth.user || auth.loading} syncReady={!isLoggedIn() || sync !== 'syncing'} onLogin={() => setLoginOpen(true)} />
+      </ErrorBoundary>
       {loginOpen && <LoginModal onClose={() => setLoginOpen(false)} />}
       {accountOpen && auth.user && <AccountSheet user={auth.user} onClose={() => setAccountOpen(false)} />}
     </div>

@@ -66,6 +66,8 @@ export interface StudySettings {
   school?: { name: string; grade?: number; cls?: string };
   /** 마지막으로 백업 파일을 내려받은 날 */
   lastBackup?: DateStr;
+  /** 내 Steam ID (17자리, 가진 게임 · 찜 목록 보기) */
+  steamId?: string;
   /** 슛 목표 (%): 야투 · 3점 · 2점 */
   shotGoals?: { fg?: number; three?: number; two?: number };
   /** 농구 목표 성공률 (%) */
@@ -670,9 +672,12 @@ export interface Game extends Stamp {
   note?: string;
   started?: DateStr;
   finished?: DateStr;
-  /** Steam 게임이면 CheapShark 번호 · 작은 그림 · 값 알림(이 값(달러) 아래로 내려가면) */
-  csId?: number;
+  /** Steam 번호 · 작은 그림 · 값 알림(한국 Steam 값이 이 값(원) 아래로 내려가면) */
+  steamAppId?: number;
   thumb?: string;
+  watchWon?: number;
+  /** 예전(CheapShark) 번호 · 달러 값 알림: 열 때 Steam 번호로 옮긴다 */
+  csId?: number;
   watchPrice?: number;
   created: number;
 }
