@@ -186,7 +186,7 @@ export function ShotsPage() {
                     l.a ? (
                       <div key={i} className="sh-dist-row">
                         <span>
-                          {i}~{i + 1}m{i === r.byDist.length - 1 ? ' 이상' : ''}
+                          {i === r.byDist.length - 1 ? `${i}m 이상` : `${i}~${i + 1}m`}
                         </span>
                         <div className="sh-bar">
                           <i style={{ width: `${pct(l)}%` }} />
