@@ -28,7 +28,9 @@ export function noteBody(mime: string, data: string, subjects: string[]) {
 export function parseNote(text: string, subjects: string[]): NoteRead {
   const j = obj(text);
   const subject = str(j.subject, 20);
-  return { subject: subject && subjects.includes(subject) ? subject : null, number: str(j.number, 20), question: str(j.question, 4000) };
+  // 모델이 줄바꿈을 글자 그대로(\\n) 쓰는 때가 있어 진짜 줄바꿈으로
+  const q = str(j.question, 4000)?.replace(/\\n/g, '\n') ?? null;
+  return { subject: subject && subjects.includes(subject) ? subject : null, number: str(j.number, 20), question: q };
 }
 
 export const DIARY_KEYS = ['good', 'hard', 'thanks', 'tomorrow', 'dream'] as const;
