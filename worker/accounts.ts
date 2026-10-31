@@ -25,6 +25,7 @@ import { fetch2k } from './nba2k';
 import { hcBody, parseHc } from './homecourt';
 import { diaryBody, noteBody, parseDiary, parseNote } from './aiRead';
 import { cheapShark } from './cheapshark';
+import { lolNewGames, lolOlderGames, lolProfile, RiotError, type LolGame } from './lol';
 import { krPrices, steamAchievements, steamMe, storeNames, storeSearch, wishlist, type KrPrice } from './steam';
 import { hlAverage, fetchHlBox, fetchHlPlayerSeasons, fetchHlStandings, hlMatchId, sameTeam } from './highlightly';
 import { within, fetchGames, fetchNbaAverages, fetchBdlRoster, fetchNbaBox, fetchNbaCareer, fetchNbaRoster, fetchNbaStandings, fetchStandings, nbaGameId, Paid, seasonOf, seasonPage, standingsFrom, type NbaGame } from './nba';
@@ -262,6 +263,8 @@ export class Accounts extends DurableObject<Env> {
           .map(Number)
           .filter((x) => Number.isInteger(x) && x > 0),
       );
+    if (path === 'lol/profile' && req.method === 'GET') return this.lolProfileRoute(new URL(req.url).searchParams.get('id') ?? '');
+    if (path === 'lol/games' && req.method === 'GET') return this.lolGamesRoute(new URL(req.url).searchParams.get('puuid') ?? '', new URL(req.url).searchParams.get('older') === '1');
     if (path === 'steam/names' && req.method === 'GET') {
       const ids = (new URL(req.url).searchParams.get('ids') ?? '')
         .split(',')
@@ -1593,6 +1596,52 @@ export class Accounts extends DurableObject<Env> {
     }
   }
 
+  private riotKey() {
+    return this.secret('riot', 'riotkey', 'riotapikey', 'riotapi', 'lol', 'lolkey');
+  }
+  /** 롤 프로필: { id: '이름#태그' } → 계정 · 레벨 · 랭크 · 숙련도 (10분 기억) */
+  private async lolProfileRoute(id: string): Promise<Response> {
+    const key = this.riotKey();
+    if (!key) return fail('Riot 키가 아직 없어요.', 503);
+    const m = id.trim().match(/^(.{2,16})#([^#\s]{2,5})$/);
+    if (!m) return fail('라이엇 ID 를 「이름#태그」 처럼 넣어 주세요 (예: Hide on bush#KR1).');
+    try {
+      const r = await this.nbaCached(`lol:p:${id.toLowerCase()}`, 10 * 60_000, () => lolProfile(key, m[1], m[2]));
+      return json(r.v);
+    } catch (e) {
+      const st = e instanceof RiotError ? e.status : 502;
+      return fail(st === 404 ? '그 라이엇 ID 를 찾지 못했어요. 이름과 태그를 확인해 주세요.' : `롤 정보를 받지 못했어요. (${(e instanceof Error ? e.message : String(e)).slice(0, 100)})`, st === 404 ? 404 : 502);
+    }
+  }
+  /** 롤 경기: 서버에 모아 둔 경기 + 새 경기(최대 30판). older=1 이면 예전 경기를 40판 더 (올해 통계용) */
+  private async lolGamesRoute(puuid: string, older: boolean): Promise<Response> {
+    const key = this.riotKey();
+    if (!key) return fail('Riot 키가 아직 없어요.', 503);
+    if (!/^[\w-]{40,100}$/.test(puuid)) return fail('계정을 확인해 주세요.');
+    const ck = `lol:g:${puuid}`;
+    const cur = (JSON.parse(this.cacheGet(ck) ?? 'null') as { games: LolGame[]; at: number; end?: boolean } | null) ?? { games: [], at: 0 };
+    const have = new Set(cur.games.map((g) => g.id));
+    let more = false,
+      warn = '';
+    try {
+      if (older) {
+        const r = await lolOlderGames(key, puuid, have, cur.games.length);
+        cur.games.push(...r.games);
+        cur.end = r.end;
+      } else if (Date.now() - cur.at > 60_000) {
+        const r = await lolNewGames(key, puuid, have);
+        cur.games.unshift(...r.games);
+        more = r.more;
+        cur.at = Date.now();
+      }
+    } catch (e) {
+      warn = e instanceof Error ? e.message : String(e);
+    }
+    cur.games = [...new Map(cur.games.map((g) => [g.id, g])).values()].sort((a, b) => b.at - a.at).slice(0, 2000);
+    this.cacheSet(ck, JSON.stringify(cur));
+    return json({ games: cur.games, more, end: !!cur.end, warn });
+  }
+
   /** 어떤 서비스 키가 등록돼 있는지만 (값은 보내지 않음) */
   private keysInfo(): Response {
     const used = Number(this.cacheGet(`serp:${new Date().toISOString().slice(0, 7)}`) ?? 0);
@@ -1606,6 +1655,7 @@ export class Accounts extends DurableObject<Env> {
       datagokr: !!this.secret('datagokr', 'datagokrkey', 'datagokey', 'publicdata', 'publicdatakey', 'kasi', 'kasikey', 'DATA_GO_KR_KEY'),
       gemini: !!this.keyOf('gemini'),
       steam: !!this.steamKey(),
+      riot: !!this.riotKey(),
     });
   }
 
