@@ -1406,7 +1406,8 @@ export class Accounts extends DurableObject<Env> {
         await new Promise((r) => setTimeout(r, 1500 * (i + 1)));
         res = await within((i === 0 ? this.gemFetch() : fetch)(url, init), 15_000, 'Discogs');
       }
-      if (res.status === 429) throw new Error(`Discogs 가 잠깐 막았어요 (1분 횟수). 1분 뒤 다시 해 주세요 [남은 ${res.headers.get('x-discogs-ratelimit-remaining') ?? '?'} · ${(await res.text()).slice(0, 80)}]`);
+      // 그래도 막히면 기기가 직접 찾게 한다 (기기 주소는 따로 센다. 키 없이라 표지는 없음)
+      if (res.status === 429) return json({ busy: true, list: [] });
       if (!res.ok) throw new Error(`Discogs ${res.status}`);
       const j = (await res.json()) as { results?: { id?: number; title?: string; year?: string; cover_image?: string; thumb?: string; genre?: string[]; style?: string[]; community?: { have?: number; want?: number } }[] };
       const list = (j.results ?? [])

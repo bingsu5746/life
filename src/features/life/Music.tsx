@@ -151,12 +151,15 @@ function DiscogsFind({ have }: { have: MusicRecord[] }) {
   const [list, setList] = useState<DiscogsHit[] | null>(null);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
+  const [direct, setDirect] = useState(false);
   const find = async () => {
     if (q.trim().length < 2 || busy) return;
     setBusy(true);
     setErr('');
     try {
-      setList((await discogsSearch(q.trim())).list);
+      const r = await discogsSearch(q.trim());
+      setList(r.list);
+      setDirect(!!r.direct);
     } catch (e) {
       setErr(e instanceof Error ? e.message : '찾지 못했어요');
     } finally {
@@ -208,6 +211,7 @@ function DiscogsFind({ have }: { have: MusicRecord[] }) {
           ))}
         </div>
       )}
+      {direct && list && list.length > 0 && <p className="st-muted sm">Discogs 가 잠깐 바빠서 표지 없이 찾았어요. 조금 뒤 다시 찾으면 표지도 나와요.</p>}
       <p className="st-muted sm">정보 출처: Discogs</p>
     </section>
   );

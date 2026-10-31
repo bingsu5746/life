@@ -535,7 +535,33 @@ export interface DiscogsHit {
   have: number;
   want: number;
 }
-export const discogsSearch = (q: string) => call<{ list: DiscogsHit[] }>(`music/discogs?q=${encodeURIComponent(q)}`, 'GET', undefined, 25_000);
+/** 서버가 Discogs 에 막히면(같은 주소를 여럿이 써서 1분 횟수가 바닥) 이 기기에서 키 없이 직접 찾는다 → 표지는 없음 */
+export async function discogsSearch(q: string): Promise<{ list: DiscogsHit[]; direct?: boolean }> {
+  const r = await call<{ list: DiscogsHit[]; busy?: boolean }>(`music/discogs?q=${encodeURIComponent(q)}`, 'GET', undefined, 25_000);
+  if (!r.busy) return r;
+  const res = await fetch(`https://api.discogs.com/database/search?${new URLSearchParams({ q, type: 'master', per_page: '50' })}`, { signal: AbortSignal.timeout(15_000) }).catch(() => null);
+  if (!res?.ok) throw new ApiError('Discogs 가 잠깐 바빠요. 1분 뒤 다시 해 주세요.', 429);
+  const j = (await res.json()) as { results?: { id?: number; title?: string; year?: string; genre?: string[]; style?: string[]; community?: { have?: number; want?: number } }[] };
+  const list = (j.results ?? [])
+    .map((x) => {
+      const [artist, ...rest] = (x.title ?? '').split(' - ');
+      return {
+        id: x.id ?? 0,
+        artist: rest.length ? artist.replace(/\s*\(\d+\)$/, '').replace(/\*$/, '') : '',
+        title: rest.length ? rest.join(' - ') : artist,
+        year: Number(x.year) || 0,
+        cover: '',
+        genre: (x.genre ?? []).slice(0, 3),
+        style: (x.style ?? []).slice(0, 3),
+        have: x.community?.have ?? 0,
+        want: x.community?.want ?? 0,
+      };
+    })
+    .filter((x) => x.id && x.year >= 2000 && x.have >= 100)
+    .sort((a, b) => b.have - a.have)
+    .slice(0, 20);
+  return { list, direct: true };
+}
 /** 등록된 서비스 키 (있는지만) */
 export const keysInfo = () => call<{ serpapi: boolean; serpUsed: number; discogs: boolean; datagokr: boolean; gemini: boolean }>('keys');
 /** 응원팀 경기 알림 (시작 · 끝). subs: 이 계정에 알림을 받는 기기 수 */
