@@ -70,15 +70,16 @@ export const MOVIE_ITEMS: AreaItem[] = [
   { key: 'rec', label: '추천', icon: 'area-hobby', to: '/movies/rec' },
 ];
 
-/** 게임 안에서의 메뉴 (취미로 돌아가기 + 게임 시간 · 롤 전적 · 롤 챔피언 · Steam). 위시리스트는 취미 메뉴로 */
+/** 게임 안에서의 메뉴 (취미로 돌아가기 + 게임 시간 · 롤 전적 · 롤 챔피언 · 롤 실시간 · Steam). 위시리스트는 취미 메뉴로 */
 export const GAME_ITEMS: AreaItem[] = [
   { key: 'hobby', label: '취미', icon: 'area-hobby', to: '/hobby' },
   { key: 'mine', label: '게임 시간', icon: 'time', to: '/games' },
   { key: 'lol', label: '롤 전적', icon: 'target', to: '/games/lol' },
   { key: 'champs', label: '롤 챔피언', icon: 'search', to: '/games/champs' },
+  { key: 'live', label: '롤 실시간', icon: 'time', to: '/games/live' },
   { key: 'steam', label: 'Steam', icon: 'life', to: '/games/steam' },
 ];
-export const gameItem = (sub?: string) => (sub === 'lol' || sub === 'steam' || sub === 'champs' ? sub : sub === 'champ' ? 'champs' : 'mine');
+export const gameItem = (sub?: string) => (sub === 'lol' || sub === 'steam' || sub === 'champs' || sub === 'live' ? sub : sub === 'champ' ? 'champs' : 'mine');
 /** 롤 챔피언 하나 안에서의 메뉴 (챔피언 목록으로 + 빌드 · 룬 · 아이템 · 카운터 · 스킬 · 팁) */
 export const champItems = (id: string, pos: string): AreaItem[] => [
   { key: 'back', label: '챔피언 목록', icon: 'search', to: '/games/champs' },

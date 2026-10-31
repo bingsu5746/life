@@ -1,10 +1,10 @@
 // 롤 챔피언 통계를 직접 모으기: Riot 은 승률 · 픽률 · 카운터 · 빌드 통계를 주지 않아서,
-// 마스터 이상 솔로랭크(큐 420) 경기를 2분마다 몇 판씩 받아 챔피언 · 포지션 · 아이템 · 룬 · 스펠 · 맞상대별로 센다.
+// 마스터 이상 솔로랭크(큐 420) 경기를 몇 판씩 받아 챔피언 · 포지션 · 아이템 · 룬 · 스펠 · 맞상대별로 센다.
 // Cloudflare 무료 플랜은 저장소에 쓰는 줄이 하루 10만 줄까지라서(공식 문서), 챔피언마다 한 줄(JSON)에 모아 쓴다:
 //   lolagg2 표 k = 'P|패치'      → { games, bans: { 챔프: 수 } }
 //             k = 'C|패치|챔프' → { pos: { 포지션: [판, 승, 킬, 데스, 어시, 딜, 킬관여×1000] }, items · runes · spells: { 포지션: { 열쇠: [판, 승] } }, mu: { 포지션: { 상대: [판, 승, 킬, 데스, 어시, 딜, 킬관여×1000] } } }
 //   lolm2 표 = 이미 센 경기 번호 (30일 보관)
-// 한 판에 쓰는 줄은 챔피언 10줄 + 패치 1줄 + 경기 번호 1줄 = 12줄. 2분마다 3판(하루 2,160판) → 하루 약 2만 6천 줄 (+ 지난 번호 지우기 약 2천 줄).
+// 한 판에 쓰는 줄은 챔피언 10줄 + 패치 1줄 + 경기 번호 1줄 = 12줄. 얼마나 자주 모을지는 accounts.ts 알람이 하루 쓰기량을 보고 정한다.
 import { within } from './nba';
 
 const POS = new Set(['TOP', 'JUNGLE', 'MIDDLE', 'BOTTOM', 'UTILITY']);
@@ -126,7 +126,7 @@ async function riot(key: string, url: string): Promise<unknown> {
   return res.json();
 }
 
-/** 2분에 한 번: 마스터 이상 한 사람의 최근 솔랭 몇 판을 받아 센다 */
+/** 한 번에: 마스터 이상 한 사람의 최근 솔랭 몇 판을 받아 센다 */
 export async function lolMetaTick(key: string, sql: Sql, cacheGet: (k: string) => string | undefined, cacheSet: (k: string, v: string) => void, perTick = 3): Promise<{ counted: number }> {
   let seeds = JSON.parse(cacheGet('lolmeta:seeds') ?? 'null') as { at: number; list: string[] } | null;
   if (!seeds || Date.now() - seeds.at > 24 * 3600_000 || !seeds.list.length) {

@@ -91,6 +91,8 @@ const norm2 = (x: string) => x.toLowerCase().replace(/[^a-z0-9]/g, '');
 
 /** 한 모델을 기다리는 최대 시간 (오래 생각하는 추론 모델은 더 길게) · 새 모델을 더 해 보지 않는 전체 시간 */
 const MODEL_TIMEOUT = 60_000;
+/** 저장소 쓰기를 하루 이만큼까지만 (Cloudflare 무료 한도 10만 줄 중) */
+const LOL_WRITE_CAP = 80_000;
 const THINK_TIMEOUT = 150_000;
 const THINKING = /deepseek-r1|qwq|thinking|magistral|reasoner|gpt-oss|nemotron.*(ultra|super)/i;
 const SOLVE_BUDGET = 150_000;
@@ -147,9 +149,44 @@ export class Accounts extends DurableObject<Env> {
   // 영화 정보 (KOBIS): 결과는 6시간 동안 저장해 두고 같이 쓴다
   private kobisByIp = new Limiter(60, 60 * 60_000);
 
+  /** 오늘(UTC) 저장소에 쓴 줄: 전체 · 롤 통계 */
+  private rw = { day: new Date().toISOString().slice(0, 10), all: 0, lol: 0 };
+  private countWrites(n: number) {
+    const day = new Date().toISOString().slice(0, 10);
+    if (day !== this.rw.day) {
+      const prev = this.rw;
+      this.rw = { day, all: 0, lol: 0 };
+      try {
+        const hist = (JSON.parse(this.cacheGet('rw:hist') ?? '[]') as (typeof prev)[]).filter((h) => h.day !== prev.day);
+        this.cacheSet('rw:hist', JSON.stringify([prev, ...hist].slice(0, 14)));
+      } catch {
+        /* 기록 못 해도 괜찮음 */
+      }
+    }
+    this.rw.all += n;
+  }
+  /** 쓴 줄 수를 저장 (알람마다 한 번 → 하루 약 1,440줄) */
+  private saveWrites() {
+    this.cacheSet('rw:today', JSON.stringify(this.rw));
+  }
+
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
-    this.sql = ctx.storage.sql;
+    // 저장소에 쓴 줄 수를 센다 (Cloudflare 무료 한도: 하루 10만 줄, UTC 0시에 초기화)
+    const raw = ctx.storage.sql;
+    const count = (n: number) => this.countWrites(n);
+    this.sql = new Proxy(raw, {
+      get(t, k) {
+        if (k === 'exec')
+          return (...a: Parameters<SqlStorage['exec']>) => {
+            const c = t.exec(...a);
+            if (c.rowsWritten) count(c.rowsWritten);
+            return c;
+          };
+        const v = Reflect.get(t, k);
+        return typeof v === 'function' ? v.bind(t) : v;
+      },
+    });
     this.sql.exec(`
       CREATE TABLE IF NOT EXISTS users (id TEXT PRIMARY KEY, username TEXT NOT NULL UNIQUE COLLATE NOCASE, nickname TEXT NOT NULL,
         salt TEXT NOT NULL, hash TEXT NOT NULL, created INTEGER NOT NULL, fails INTEGER NOT NULL DEFAULT 0, locked_until INTEGER NOT NULL DEFAULT 0);
@@ -167,6 +204,12 @@ export class Accounts extends DurableObject<Env> {
       CREATE INDEX IF NOT EXISTS films_norm ON films (norm);
     `);
     lolMetaTables(this.sql);
+    try {
+      const r = JSON.parse(this.cacheGet('rw:today') ?? 'null') as typeof this.rw | null;
+      if (r && r.day === new Date().toISOString().slice(0, 10)) this.rw = { ...r };
+    } catch {
+      /* 처음 */
+    }
     // 예전에 만든 표에는 type 칸이 없다
     try {
       this.sql.exec('ALTER TABLE films ADD COLUMN type TEXT');
@@ -1750,7 +1793,7 @@ export class Accounts extends DurableObject<Env> {
     // (다른 알림 때문에 더 늦은 알람이 걸려 있어도 1분 안으로 당긴다)
     const alarm = await this.ctx.storage.getAlarm();
     // 알람이 없거나, 너무 늦게 걸렸거나, 지난 시각에 멈춰 있으면 다시 건다
-    if (this.riotKey() && (alarm === null || alarm > Date.now() + 150_000 || alarm < Date.now() - 120_000)) await this.scheduleAlarm();
+    if (this.riotKey() && (alarm === null || alarm > Date.now() + 90_000 || alarm < Date.now() - 120_000)) await this.scheduleAlarm();
     const patches = metaPatches(this.sql);
     const patch = q.get('patch') === 'all' ? 'all' : (patches.find((x) => x.patch === q.get('patch'))?.patch ?? patches[0]?.patch ?? 'all');
     const status = {
@@ -1760,6 +1803,7 @@ export class Accounts extends DurableObject<Env> {
       alarm: await this.ctx.storage.getAlarm(),
       alarmErr: JSON.parse(this.cacheGet('alarm:err') ?? 'null'),
       pushErr: JSON.parse(this.cacheGet('alarm:pusherr') ?? 'null'),
+      writes: { today: this.rw, hist: JSON.parse(this.cacheGet('rw:hist') ?? '[]'), cap: LOL_WRITE_CAP, limit: 100_000 },
     };
     if (path === 'lol/meta') return json({ patch, patches, status, ...metaTable(this.sql, patch) });
     const cid = Number(q.get('cid'));
@@ -2472,6 +2516,7 @@ export class Accounts extends DurableObject<Env> {
       console.error('alarm failed', msg);
       this.cacheSet('alarm:err', JSON.stringify({ at: Date.now(), msg: msg.slice(0, 300) }));
     } finally {
+      this.saveWrites();
       await this.scheduleAlarm();
     }
   }
@@ -2479,16 +2524,24 @@ export class Accounts extends DurableObject<Env> {
   private async alarmWork() {
     const now = Date.now();
     const rk = this.riotKey();
-    if (rk && now + 5_000 >= Number(this.cacheGet('lolmeta:next') ?? 0)) {
+    // 롤 통계는 남는 쓰기 몫만: 하루 8만 줄(무료 한도 10만의 80%)을 하루 시간에 맞춰 나눈 만큼까지만 쓰고,
+    // 그날 다른 기능(내가 쓰는 것)이 이미 그만큼 썼으면 쉰다 → 나머지 2만 줄 이상은 늘 내 몫으로 남는다
+    this.countWrites(0);
+    const dayFrac = (now % DAY) / DAY;
+    const pace = this.rw.all < LOL_WRITE_CAP * Math.min(1, dayFrac + 1 / 48);
+    if (rk && !pace) this.cacheSet('lolmeta:next', String(now + 300_000));
+    if (rk && pace && now + 5_000 >= Number(this.cacheGet('lolmeta:next') ?? 0)) {
       try {
+        const before = this.rw.all;
         const r = await lolMetaTick(
           rk,
           this.sql,
           (k) => this.cacheGet(k),
           (k, v) => this.cacheSet(k, v),
+          6,
         );
-        // 2분마다 (무료 플랜 하루 쓰기 10만 줄 안쪽으로)
-        this.cacheSet('lolmeta:next', String(now + 120_000));
+        this.rw.lol += this.rw.all - before;
+        this.cacheSet('lolmeta:next', String(now + 60_000));
         this.cacheSet('lolmeta:last', JSON.stringify({ at: now, counted: r.counted }));
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);

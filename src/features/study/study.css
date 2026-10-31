@@ -8972,3 +8972,103 @@ body.focus-on {
   margin-top: 8px;
   overflow-wrap: anywhere;
 }
+
+/* 게임 › 롤 실시간 */
+.ll-me {
+  display: flex;
+  gap: 14px;
+  align-items: center;
+}
+.ll-face {
+  width: 64px;
+  height: 64px;
+  border-radius: 12px;
+}
+.ll-big {
+  font-size: 1.5rem;
+  font-weight: 700;
+}
+.ll-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+}
+.ll-score {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.ll-teams {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+@media (max-width: 720px) {
+  .ll-teams {
+    grid-template-columns: 1fr;
+  }
+}
+.ll-team {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.ll-team li {
+  display: grid;
+  grid-template-columns: 32px 1fr auto;
+  gap: 2px 8px;
+  align-items: center;
+  min-width: 0;
+}
+.ll-team li.dead {
+  opacity: 0.55;
+}
+.ll-team li > img {
+  width: 32px;
+  height: 32px;
+  border-radius: 6px;
+  grid-row: span 2;
+}
+.ll-name {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.ll-items {
+  grid-column: 2 / -1;
+  display: flex;
+  gap: 2px;
+  flex-wrap: wrap;
+}
+.ll-items img {
+  width: 20px;
+  height: 20px;
+  border-radius: 3px;
+}
+.ll-objs {
+  margin: 0;
+  padding-left: 18px;
+}
+.ll-next {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+.ll-next span {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.ll-next img {
+  width: 28px;
+  height: 28px;
+  border-radius: 4px;
+}
+.ll-help li {
+  margin-bottom: 6px;
+}

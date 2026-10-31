@@ -675,6 +675,12 @@ export interface LolMetaStatus {
   matches: number;
   last: { at: number; counted: number } | null;
   err: { at: number; msg: string } | null;
+  writes?: { today: LolWrites; hist: LolWrites[]; cap: number; limit: number };
+}
+export interface LolWrites {
+  day: string;
+  all: number;
+  lol: number;
 }
 export const lolMeta = (patch = '') =>
   remember(`lolmeta:${patch}`, 5 * MIN, () =>

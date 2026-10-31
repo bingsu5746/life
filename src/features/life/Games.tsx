@@ -6,6 +6,7 @@ import { SteamImg } from './SteamImg';
 import { GameTimeCard } from './GameTime';
 import { LolChampsPage } from './LolChamps';
 import { LolChampPage } from './LolChamp';
+import { LolLivePage } from './LolLive';
 import { dailyPlay, pickUnplayed } from './steamPlay';
 import { addDays, diffDays, weekStart } from '../study/dates';
 import { upcomingExams } from '../study/exams';
@@ -25,6 +26,7 @@ const PLATFORMS = ['PC', '스위치', '플레이스테이션', 'Xbox', '폰'];
 export function Games({ sub, sub2, sub3 }: { sub?: string; sub2?: string; sub3?: string }) {
   if (sub === 'lol') return <LolPage />;
   if (sub === 'champs') return <LolChampsPage />;
+  if (sub === 'live') return <LolLivePage />;
   if (sub === 'champ' && sub2) return <LolChampPage id={sub2} sub={sub3} />;
   if (sub === 'steam') return <SteamPage />;
   // 예전 주소 /games/wish 는 취미 › 위시리스트로
