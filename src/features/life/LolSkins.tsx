@@ -1,10 +1,11 @@
 // 롤 챔피언 › 스킨: 모든 스킨(Data Dragon 그림) + 인벤 별점 · 참여자 수 · 가격 · 최근 한줄평
 import { useEffect, useMemo, useState } from 'react';
-import { lolSkins, type InvenSkin } from '../auth/api';
+import { lolSkins, lolSkinVideo, type InvenSkin } from '../auth/api';
 import { Sheet } from '../study/ui';
 import type { Champ, ChampDetail } from './lolDd';
 
 const ART = 'https://ddragon.leagueoflegends.com/cdn/img/champion';
+const INVEN = 'https://static.inven.co.kr/image_2011/site_image/lol/dataninfo/icon';
 type Sort = 'new' | 'star';
 type Comment = { skin: number; text: string; date: string };
 
@@ -53,6 +54,13 @@ export function Skins({ detail, champ }: { detail: ChampDetail | null; champ: Ch
       {sel && (
         <Sheet title={sel.name} onClose={() => setOpen(null)} wide>
           <img className="sk-splash" src={`${ART}/splash/${champ.id}_${sel.num}.jpg`} alt="" />
+          {sel.inv?.ingame && (
+            <>
+              <h4 className="sk-h">게임 안 모습</h4>
+              <img className="sk-splash" src={`${INVEN}/skingame/${encodeURIComponent(sel.inv.ingame)}`} alt="" referrerPolicy="no-referrer" loading="lazy" onError={(e) => (e.currentTarget.style.display = 'none')} />
+            </>
+          )}
+          {sel.inv && <Video code={sel.inv.code} />}
           <p>
             {sel.inv && sel.inv.votes > 0 && (
               <>
@@ -64,17 +72,35 @@ export function Skins({ detail, champ }: { detail: ChampDetail | null; champ: Ch
           </p>
           {sel.comments.length > 0 ? (
             <ul className="sk-comments">
-              {sel.comments.slice(0, 8).map((c, i) => (
+              {sel.comments.map((c, i) => (
                 <li key={i}>
                   “{c.text}” <small className="st-muted">{c.date}</small>
                 </li>
               ))}
             </ul>
           ) : (
-            <p className="st-muted sm">최근 한줄평이 없어요.</p>
+            <p className="st-muted sm">한줄평을 찾지 못했어요.</p>
           )}
         </Sheet>
       )}
+    </>
+  );
+}
+
+/** 스포트라이트 영상 (스킬 모션) */
+function Video({ code }: { code: number }) {
+  const [id, setId] = useState<string | null | undefined>(undefined);
+  useEffect(() => {
+    setId(undefined);
+    lolSkinVideo(code)
+      .then((r) => setId(r.id))
+      .catch(() => setId(null));
+  }, [code]);
+  if (!id) return null;
+  return (
+    <>
+      <h4 className="sk-h">스킬 모션 (스포트라이트)</h4>
+      <iframe className="sk-video" src={`https://www.youtube-nocookie.com/embed/${id}`} title="스포트라이트 영상" allow="encrypted-media; picture-in-picture" allowFullScreen />
     </>
   );
 }

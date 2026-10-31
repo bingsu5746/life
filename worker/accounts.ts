@@ -26,7 +26,7 @@ import { hcBody, parseHc } from './homecourt';
 import { diaryBody, noteBody, parseDiary, parseNote, parseReceipt, parseTocRead, receiptBody, tocBody } from './aiRead';
 import { seojiSearch, seojiToc, yes24Search } from './books';
 import { cheapShark } from './cheapshark';
-import { invenChamps, invenSkins } from './skins';
+import { invenChamps, invenSkins, invenSkinVideo } from './skins';
 import { discordChannels, discordInfo, discordMessages, discordSend } from './discord';
 import { lolMetaTables, lolMetaTick, metaChamp, metaPatches, metaTable } from './lolMeta';
 import { lolMatch, lolNewGames, lolOlderGames, lolProfile, RiotError, type LolGame } from './lol';
@@ -319,6 +319,14 @@ export class Accounts extends DurableObject<Env> {
       if (min) this.cacheSet('lolmeta:next', '0');
       await this.scheduleAlarm();
       return json({ burst: min ? Date.now() + min * 60_000 : 0 });
+    }
+    if (path === 'lol/skinvideo' && req.method === 'GET') {
+      const code = Number(new URL(req.url).searchParams.get('code'));
+      if (!Number.isInteger(code) || code <= 0) return fail('스킨을 확인해 주세요.');
+      return this.nbaCached(`inven:vid:${code}`, 30 * DAY, () => invenSkinVideo(code)).then(
+        (r) => json({ id: r.v }),
+        (e) => fail(`영상을 받지 못했어요. (${(e instanceof Error ? e.message : String(e)).slice(0, 80)})`, 502),
+      );
     }
     if (path === 'lol/skins' && req.method === 'GET') return this.lolSkinsRoute((new URL(req.url).searchParams.get('name') ?? '').trim().slice(0, 30));
     if (path === 'lol/match' && req.method === 'GET') return this.lolMatchRoute(new URL(req.url).searchParams.get('id') ?? '');
@@ -1762,7 +1770,7 @@ export class Accounts extends DurableObject<Env> {
       const map = (await this.nbaCached('inven:champs', 7 * DAY, () => invenChamps())).v;
       const code = map[name] ?? map[name.replace(/\s/g, '')] ?? Object.entries(map).find(([k]) => k.replace(/\s/g, '') === name.replace(/\s/g, ''))?.[1];
       if (!code) return json({ skins: [], comments: [] });
-      return json((await this.nbaCached(`inven:skins:${code}`, DAY, () => invenSkins(code))).v);
+      return json((await this.nbaCached(`inven:skins2:${code}`, DAY, () => invenSkins(code))).v);
     } catch (e) {
       return fail(`스킨 평가를 받지 못했어요. (${(e instanceof Error ? e.message : String(e)).slice(0, 80)})`, 502);
     }

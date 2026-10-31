@@ -30,6 +30,9 @@ export interface InvenSkin {
   price: string;
   votes: number;
   avg: number;
+  /** 인벤 그림 파일 (인게임 · 일러스트) */
+  ingame: string;
+  image: string;
 }
 export interface InvenComment {
   skin: number;
@@ -42,11 +45,12 @@ export async function invenSkins(champ: number): Promise<{ skins: InvenSkin[]; c
   const tag = (b: string, k: string) => un(b.match(new RegExp(`<${k}>([\\s\\S]*?)</${k}>`))?.[1] ?? '');
   const skins = [...x.matchAll(/<skin>([\s\S]*?)<\/skin>/g)].map(([, b]) => {
     const n = tag(b, 'skinnum').match(/^(\d+)/);
-    return { code: Number(tag(b, 'code')), name: tag(b, 'name'), num: n ? Number(n[1]) : null, price: tag(b, 'price').replace(/^입수방법:\s*/, ''), votes: Number(tag(b, 'voteCount')) || 0, avg: Number(tag(b, 'voteAverage')) || 0 };
+    return { code: Number(tag(b, 'code')), name: tag(b, 'name'), num: n ? Number(n[1]) : null, price: tag(b, 'price').replace(/^입수방법:\s*/, ''), ingame: tag(b, 'ingame'), image: tag(b, 'image'), votes: Number(tag(b, 'voteCount')) || 0, avg: Number(tag(b, 'voteAverage')) || 0 };
   });
-  // 한줄평: 최근 5쪽 (50개)
+  // 한줄평: 스킨마다 3개 넘게 모일 때까지 (최대 40쪽 = 400개, Workers 한 요청에 바깥 요청 50번 한도 안쪽)
   const comments: InvenComment[] = [];
-  for (let page = 0; page < 5; page++) {
+  const enough = () => skins.every((s) => comments.filter((c) => c.skin === s.code).length >= 3);
+  for (let page = 0; page < 40 && !enough(); page++) {
     const h = await (await within(fetch(BASE, { method: 'POST', headers: HEAD, body: `mode=controllers&target=skincomments&champcode=${champ}&page=${page}` }), 20_000, '인벤')).text();
     const rows = [...h.matchAll(/<tr class="row">([\s\S]*?)<\/tr>/g)];
     for (const [, r] of rows) {
@@ -58,4 +62,10 @@ export async function invenSkins(champ: number): Promise<{ skins: InvenSkin[]; c
     if (rows.length < 10) break;
   }
   return { skins, comments };
+}
+
+/** 스킨 스포트라이트 영상 (유튜브 번호) */
+export async function invenSkinVideo(code: number): Promise<string | null> {
+  const h = await (await within(fetch(BASE, { method: 'POST', headers: HEAD, body: `mode=controllers&target=skinDetail&skincode=${code}` }), 20_000, '인벤')).text();
+  return h.match(/youtube(?:-nocookie)?\.com\/embed\/([\w-]{6,20})/)?.[1] ?? null;
 }

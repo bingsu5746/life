@@ -103,7 +103,7 @@ export function LolChampPage({ id, sub }: { id: string; sub?: string }) {
           </div>
         )}
       </section>
-      <div className="lc-bar">
+      <div className="lc-bar" hidden={tab === 'skins' || tab === 'skills'}>
         {posList.length > 0 && (
           <div className="st-seg" role="group" aria-label="포지션">
             {posList.map((p) => (
@@ -150,36 +150,13 @@ function ItemIcon({ dd, id, items, size = 36 }: { dd: Dd; id: number; items: Rec
 const isCore = (it?: Item) => !!it && !it.into && !it.boots && it.gold >= 2000;
 const isBoots = (it?: Item) => !!it && it.boots && it.gold >= 900;
 
-/** 3코어 빌드: 완성 아이템 3개를 산 순서별 (판 · 승률). 같은 챔피언이라도 AD · AP · 하이브리드처럼 갈리면 따로 나온다 */
+/** 3코어 빌드: 완성 아이템 3개를 산 순서별 (판 · 승률). AD · AP · 하이브리드처럼 갈리면 따로 나온다 */
 function CoreBuilds({ meta, pos, dd, items, games }: { meta: Meta; pos: string; dd: Dd; items: Record<number, Item> | null; games: number }) {
   const list = forPos(meta.builds ?? [], pos).slice(0, 6);
   if (!list.length) return null;
-  const all = list.reduce((s, x) => s + x.g, 0);
-  // 첫 코어별로 묶어 계열 보기 (예: 바루스 마법사 · 치명타 · 적중)
-  const first = new Map<string, { g: number; w: number }>();
-  for (const x of forPos(meta.builds ?? [], pos)) {
-    const f = x.key.split('>')[0];
-    const c = first.get(f) ?? { g: 0, w: 0 };
-    c.g += x.g;
-    c.w += x.w;
-    first.set(f, c);
-  }
-  const firsts = [...first].sort((a, b) => b[1].g - a[1].g).slice(0, 4);
   return (
     <section className="st-card">
       <h3 className="st-h">3코어 빌드</h3>
-      {firsts.length > 1 && (
-        <div className="lc-firsts">
-          {firsts.map(([id, c]) => (
-            <span key={id}>
-              <ItemIcon dd={dd} id={Number(id)} items={items} size={28} />
-              <small className="st-muted">
-                첫 코어 {pct1((c.g / Math.max(1, all)) * 100)} · 승 {pct1(wr(c))}
-              </small>
-            </span>
-          ))}
-        </div>
-      )}
       <div className="lc-builds">
         {list.map((x) => (
           <div key={x.key} className="lc-build">

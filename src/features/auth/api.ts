@@ -730,8 +730,11 @@ export interface InvenSkin {
   price: string;
   votes: number;
   avg: number;
+  ingame: string;
+  image: string;
 }
-export const lolSkins = (name: string) => remember(`lolskins:${name}`, 60 * MIN, () => call<{ skins: InvenSkin[]; comments: { skin: number; text: string; date: string }[] }>(`lol/skins?name=${encodeURIComponent(name)}`, 'GET', undefined, 40_000));
+export const lolSkinVideo = (code: number) => remember(`lolsv:${code}`, 60 * MIN, () => call<{ id: string | null }>(`lol/skinvideo?code=${code}`, 'GET', undefined, 25_000));
+export const lolSkins = (name: string) => remember(`lolskins:${name}`, 60 * MIN, () => call<{ skins: InvenSkin[]; comments: { skin: number; text: string; date: string }[] }>(`lol/skins?name=${encodeURIComponent(name)}`, 'GET', undefined, 60_000));
 export interface LolMatchP {
   puuid: string;
   name: string;

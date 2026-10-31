@@ -9314,3 +9314,15 @@ body.focus-on {
   display: grid;
   gap: 6px;
 }
+.lc-bar[hidden] {
+  display: none;
+}
+.sk-video {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  border: 0;
+  border-radius: 10px;
+}
+.sk-h {
+  margin: 14px 0 6px;
+}

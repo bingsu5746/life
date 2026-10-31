@@ -6,8 +6,8 @@ import { go } from '../study/ui';
 import { champImg, champMatch, loadDd, type Dd } from './lolDd';
 import { POS } from './lolStats';
 import { OPGG, OPGG_AT, opggHard } from './opgg';
-/** op.gg 값의 무게: 승률은 직접 모은 200판, 픽 · 밴률은 전체 3,000판과 같게 본다 */
-const PRIOR_GAMES = 200;
+/** op.gg 값의 무게: 승률은 직접 모은 2,000판, 픽 · 밴률은 전체 3,000판과 같게 본다 */
+const PRIOR_GAMES = 2000;
 const PRIOR_TOTAL = 3000;
 
 export const POS_ORDER = ['TOP', 'JUNGLE', 'MIDDLE', 'BOTTOM', 'UTILITY'];
