@@ -68,7 +68,7 @@ export function Skins({ detail, champ }: { detail: ChampDetail | null; champ: Ch
               </>
             )}
             {sel.inv?.price && <small className="st-muted"> · {sel.inv.price}</small>}
-            {sel.chromas && <small className="st-muted"> · 크로마 있음</small>}
+            {sel.chromas > 0 && <small className="st-muted"> · 크로마 {sel.chromas}개</small>}
           </p>
           {sel.comments.length > 0 ? (
             <ul className="sk-comments">

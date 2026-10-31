@@ -96,10 +96,11 @@ export interface ChampDetail {
   passive: { name: string; description: string; image: string };
   spells: { id: string; name: string; description: string; cooldownBurn: string; costBurn: string; rangeBurn: string; image: string }[];
   info: { attack: number; defense: number; magic: number; difficulty: number };
-  skins: { num: number; name: string; chromas: boolean }[];
+  /** 스킨 (크로마는 빼고, 부모 스킨에 크로마 수만) */
+  skins: { num: number; name: string; chromas: number }[];
 }
 export const loadChamp = (id: string) =>
-  cached(`c2.${id}`, async (): Promise<ChampDetail> => {
+  cached(`c3.${id}`, async (): Promise<ChampDetail> => {
     const v = await version();
     const j = await getJson<{
       data: Record<
@@ -111,7 +112,7 @@ export const loadChamp = (id: string) =>
           info: ChampDetail['info'];
           passive: { name: string; description: string; image: { full: string } };
           spells: { id: string; name: string; description: string; cooldownBurn: string; costBurn: string; rangeBurn: string; image: { full: string } }[];
-          skins?: { num: number; name: string; chromas?: boolean }[];
+          skins?: { num: number; name: string; chromas?: boolean; parentSkin?: number }[];
         }
       >;
     }>(`${DD}/${v}/data/ko_KR/champion/${id}.json`);
@@ -122,7 +123,7 @@ export const loadChamp = (id: string) =>
       enemytips: c.enemytips,
       info: c.info,
       passive: { name: c.passive.name, description: c.passive.description, image: c.passive.image.full },
-      skins: (c.skins ?? []).map((s) => ({ num: s.num, name: s.name, chromas: !!s.chromas })),
+      skins: (c.skins ?? []).filter((s) => s.parentSkin === undefined).map((s) => ({ num: s.num, name: s.name, chromas: (c.skins ?? []).filter((x) => x.parentSkin === s.num).length })),
       spells: c.spells.map((s) => ({ id: s.id, name: s.name, description: s.description, cooldownBurn: s.cooldownBurn, costBurn: s.costBurn, rangeBurn: s.rangeBurn, image: s.image.full })),
     };
   });
