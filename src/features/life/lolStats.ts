@@ -205,3 +205,30 @@ export function yearRecap(all: LolGame[], year: number): LolYear {
     first: g.length ? Math.min(...g.map((x) => x.at)) : 0,
   };
 }
+
+/** 장신구 · 물약 · 와드처럼 빌드가 아닌 아이템 (Data Dragon 아이템 번호) */
+const NOT_BUILD = new Set([0, 2003, 2010, 2031, 2033, 2055, 2138, 2139, 2140, 3340, 3363, 3364, 3330, 3513]);
+/** 챔피언 하나 자세히: 요약 · 자주 산 아이템 · 스펠 조합 · 포지션 · 최고의 판 */
+export function champDetail(games: LolGame[]) {
+  const g = games.filter((x) => !x.remake);
+  const items = new Map<number, number>();
+  for (const x of g) for (const id of new Set(x.items.slice(0, 6))) if (!NOT_BUILD.has(id)) items.set(id, (items.get(id) ?? 0) + 1);
+  const spells = new Map<string, LolGame[]>();
+  for (const x of g) {
+    const key = [...x.spells].sort((a, b) => a - b).join('-');
+    spells.set(key, [...(spells.get(key) ?? []), x]);
+  }
+  return {
+    s: summary(g),
+    items: [...items]
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 8)
+      .map(([id, n]) => ({ id, n })),
+    spells: [...spells]
+      .sort((a, b) => b[1].length - a[1].length)
+      .slice(0, 3)
+      .map(([key, list]) => ({ key, ids: key.split('-').map(Number), n: list.length, winRate: (list.filter((x) => x.win).length / list.length) * 100 })),
+    pos: byPosition(g),
+    best: [...g].sort((a, b) => kda(b.k, b.d, b.a) - kda(a.k, a.d, a.a) || b.k - a.k)[0],
+  };
+}

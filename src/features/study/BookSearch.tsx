@@ -1,4 +1,4 @@
-// 책 이름을 치면 국립중앙도서관 목록에서 찾아 주는 칸 (문제집 · 독서). 하나 고르면 다시 칠 때까지 목록을 닫는다.
+// 책 이름을 치면 예스24(안 되면 국립중앙도서관) 목록에서 찾아 주는 칸 (문제집 · 독서). 하나 고르면 다시 칠 때까지 목록을 닫는다.
 import { useEffect, useState } from 'react';
 import { bookSearch, isLoggedIn, type BookHit } from '../auth/api';
 
@@ -15,7 +15,7 @@ export function BookSearch({ value, onChange, onPick, placeholder, label, picked
         .then((r) => {
           if (!on) return;
           setItems(r.list.slice(0, 8));
-          setNote(r.needKey ? '책 찾기는 국립중앙도서관 키를 넣으면 돼요 (지금은 직접 써 주세요)' : '');
+          setNote(r.needKey ? '책 찾기는 예스24 · 국립중앙도서관 키가 있어야 돼요 (지금은 직접 써 주세요)' : '');
         })
         .catch(() => on && setItems([]));
     }, 400);
@@ -46,7 +46,7 @@ export function BookSearch({ value, onChange, onPick, placeholder, label, picked
               {b.cover && <img src={b.cover} alt="" loading="lazy" />}
               <span>
                 <b>{b.title}</b>
-                <small className="st-muted">{[b.author, b.publisher, b.date.slice(0, 4), b.price ? `${b.price.toLocaleString('ko-KR')}원` : '', b.toc ? '목차 있음' : ''].filter(Boolean).join(' · ')}</small>
+                <small className="st-muted">{[b.author, b.publisher, b.date.slice(0, 4), b.sale || b.price ? `${(b.sale || b.price).toLocaleString('ko-KR')}원` : '', b.toc || b.tocText ? '목차 있음' : ''].filter(Boolean).join(' · ')}</small>
               </span>
             </button>
           ))}

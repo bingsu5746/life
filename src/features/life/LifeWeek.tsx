@@ -1,4 +1,5 @@
 // 이번 주 돌아보기 화면 (/week, /week/<그 주의 아무 날>)
+import { shareCard, type CardLine } from '../../lib/shareCard';
 import { addDays, isDate, shortDate, weekStart } from '../study/dates';
 import { put, useStudy } from '../study/store';
 import { go, toast, useToday } from '../study/ui';
@@ -34,11 +35,32 @@ export function LifeWeekPage({ day, monthly }: { day?: string; monthly?: boolean
   const cur = monthly ? month === monthOf(today) : weekStart(today) === w.from;
   const prevWord = monthly ? '지난달' : '지난주';
   const pct = (m: number, a: number) => (a ? `${Math.round((m / a) * 100)}%` : '—');
+  // 주간(월간) 리포트 카드: 있는 것만 줄로
+  const share = async () => {
+    const hm = (m: number) => (m >= 60 ? `${Math.round((m / 60) * 10) / 10}시간` : `${m}분`);
+    const shots = w.shots.fg.a + w.shots.tp.a;
+    const lines: CardLine[] = [
+      w.study.now ? { icon: '📚', label: '공부', value: hm(w.study.now), sub: w.study.prev ? `지난 ${monthly ? '달' : '주'} ${hm(w.study.prev)}` : undefined } : null,
+      w.workout.days ? { icon: '🏃', label: '운동', value: `${w.workout.days}일`, sub: w.workout.minutes ? hm(w.workout.minutes) : undefined } : null,
+      shots ? { icon: '🏀', label: '슛', value: `${w.shots.fg.m + w.shots.tp.m}/${shots}`, sub: pct(w.shots.fg.m + w.shots.tp.m, shots) } : null,
+      w.pages || w.booksDone.length ? { icon: '📖', label: '독서', value: `${w.pages}쪽`, sub: w.booksDone.length ? `다 읽음: ${w.booksDone.join(', ')}` : undefined } : null,
+      w.movies.length ? { icon: '🎬', label: '영화', value: `${w.movies.length}편`, sub: w.movies.map((m) => m.title).join(', ') } : null,
+      w.diary.count ? { icon: '📔', label: '일기', value: `${w.diary.count}편`, sub: w.diary.mood ? `평균 기분 ${w.diary.mood.toFixed(1)} / 5` : undefined } : null,
+      w.habits.due ? { icon: '✅', label: '습관', value: pct(w.habits.done, w.habits.due), sub: `${w.habits.done}/${w.habits.due}` } : null,
+      w.spent.now ? { icon: '💰', label: '쓴 돈', value: `${w.spent.now.toLocaleString('ko-KR')}원` } : null,
+    ].filter((x): x is CardLine => !!x);
+    if (!lines.length) return toast('이 기간 기록이 아직 없어요');
+    const title = monthly ? `${monthLabel(month)} 돌아보기` : `${shortDate(w.from)} 주 돌아보기`;
+    if (!(await shareCard(title, lines, `${w.from}-돌아보기.png`, ['#0f172a', '#047857']))) toast('그림을 만들지 못했어요');
+  };
   const shotsAny = w.shots.fg.a + w.shots.tp.a + w.shots.ft.a > 0;
   return (
     <div className="st-page narrow">
       <div className="st-page-head">
         <h2>{monthly ? (cur ? '이번 달' : monthLabel(month)) : cur ? '이번 주' : `${shortDate(w.from)} 주`} 돌아보기</h2>
+        <button className="btn btn-sm" onClick={() => void share()}>
+          그림으로 공유
+        </button>
       </div>
       <div className="st-seg" role="tablist" aria-label="기간">
         <button role="tab" aria-selected={!monthly} className={!monthly ? 'on' : ''} onClick={() => go('/week')}>

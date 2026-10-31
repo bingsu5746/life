@@ -356,7 +356,7 @@ const FIX: Record<Collection, Fix> = {
       : undefined,
     rating: typeof x.rating === 'number' && x.rating >= 0.5 && x.rating <= 5 ? Math.round(x.rating * 2) / 2 : undefined,
     comment: optStr(x.comment)?.slice(0, 2000),
-    cover: typeof x.cover === 'string' && /^https:\/\/[\w.-]*nl\.go\.kr\/[\w\-./:%=?&]+$/.test(x.cover) ? x.cover.slice(0, 500) : undefined,
+    cover: typeof x.cover === 'string' && /^https:\/\/([\w.-]*nl\.go\.kr|image\.yes24\.com)\/[\w\-./:%=?&]+$/.test(x.cover) ? x.cover.slice(0, 500) : undefined,
     isbn: typeof x.isbn === 'string' && /^[\dX]{10,13}$/.test(x.isbn) ? x.isbn : undefined,
     publisher: optStr(x.publisher)?.slice(0, 60),
     price: score(x.price, 1, 10_000_000),

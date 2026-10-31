@@ -8454,3 +8454,23 @@ body.focus-on {
   width: 48px;
   height: 68px;
 }
+.lol-build {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.lol-build span {
+  display: grid;
+  justify-items: center;
+  gap: 2px;
+  grid-auto-flow: row;
+}
+.lol-build img {
+  width: 34px;
+  height: 34px;
+  border-radius: 6px;
+}
+.lol-build small {
+  color: var(--muted);
+  font-size: 0.75rem;
+}

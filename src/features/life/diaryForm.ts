@@ -52,6 +52,8 @@ export function daySummary(d: StudyData, date: string): string[] {
   if (done.length) out.push(`할 일 ${done.length}개 끝냄`);
   for (const w of alive(d.workouts).filter((x) => x.date === date)) out.push(`운동: ${w.kind}${w.minutes ? ` ${w.minutes}분` : ''}`);
   for (const m of alive(d.movies).filter((x) => x.status === 'watched' && x.watched === date)) out.push(`영화: ${m.title}${m.rating ? ` ★${m.rating}` : ''}`);
+  // 그날 다 읽은 책 (한줄평이 있으면 같이)
+  for (const b of alive(d.reads).filter((x) => x.status === 'done' && x.finished === date)) out.push(`책: 「${b.title}」 다 읽음${b.rating ? ` ★${b.rating}` : ''}${b.comment ? ` — ${b.comment}` : ''}`);
   for (const l of alive(d.hobbyLogs).filter((x) => x.date === date)) out.push(`취미: ${d.hobbies[l.hobbyId]?.name ?? '취미'}${l.minutes ? ` ${l.minutes}분` : ''}`);
   const spent = alive(d.moneyTx)
     .filter((t) => t.type === 'out' && t.date === date)

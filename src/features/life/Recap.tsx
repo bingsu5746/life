@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { useStudy } from '../study/store';
 import { Empty, toast, useToday } from '../study/ui';
 import { recap, recapLines } from './recap';
+import { shareCard } from '../../lib/shareCard';
 
 export function RecapPage() {
   const d = useStudy();
@@ -13,54 +14,7 @@ export function RecapPage() {
   const r = recap(d, year);
   const lines = recapLines(r);
   const save = async () => {
-    const W = 1080,
-      H = 260 + lines.length * 150 + 80;
-    const c = document.createElement('canvas');
-    c.width = W;
-    c.height = H;
-    const g = c.getContext('2d')!;
-    const grad = g.createLinearGradient(0, 0, W, H);
-    grad.addColorStop(0, '#1e1b4b');
-    grad.addColorStop(1, '#7c2d12');
-    g.fillStyle = grad;
-    g.fillRect(0, 0, W, H);
-    g.fillStyle = '#fff';
-    g.font = 'bold 72px system-ui, sans-serif';
-    g.fillText(`${year} 나의 한 해`, 80, 160);
-    lines.forEach((l, i) => {
-      const y = 280 + i * 150;
-      g.font = '60px system-ui, sans-serif';
-      g.fillText(l.icon, 80, y + 20);
-      g.font = '36px system-ui, sans-serif';
-      g.fillStyle = 'rgba(255,255,255,.75)';
-      g.fillText(l.label, 180, y - 20);
-      g.fillStyle = '#fff';
-      g.font = 'bold 56px system-ui, sans-serif';
-      g.fillText(l.value, 180, y + 40);
-      if (l.sub) {
-        g.font = '30px system-ui, sans-serif';
-        g.fillStyle = 'rgba(255,255,255,.75)';
-        g.fillText(l.sub.slice(0, 40), 180, y + 85);
-        g.fillStyle = '#fff';
-      }
-    });
-    g.font = '28px system-ui, sans-serif';
-    g.fillStyle = 'rgba(255,255,255,.6)';
-    g.fillText('Life', 80, H - 40);
-    const blob = await new Promise<Blob | null>((ok) => c.toBlob(ok, 'image/png'));
-    if (!blob) return toast('그림을 만들지 못했어요');
-    const file = new File([blob], `${year}-결산.png`, { type: 'image/png' });
-    // 폰에서는 공유 창으로, 안 되면 내려받기
-    const nav = navigator as Navigator & { canShare?: (d: { files: File[] }) => boolean };
-    if (nav.canShare?.({ files: [file] })) {
-      await navigator.share({ files: [file], title: `${year} 나의 한 해` }).catch(() => {});
-      return;
-    }
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = file.name;
-    a.click();
-    setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+    if (!(await shareCard(`${year} 나의 한 해`, lines, `${year}-결산.png`))) toast('그림을 만들지 못했어요');
   };
   return (
     <div className="st-page narrow">

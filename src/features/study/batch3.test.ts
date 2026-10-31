@@ -310,13 +310,14 @@ describe('일기 양식 (diaryForm)', () => {
       todos: {},
       workouts: { w: { id: 'w', date: '2026-10-28', kind: '농구', minutes: 60, updatedAt: 1 } },
       movies: { m: { id: 'm', title: '존 윅', status: 'watched', watched: '2026-10-28', rating: 5, updatedAt: 1 } },
+      reads: { r: { id: 'r', title: '데미안', status: 'done', finished: '2026-10-28', comment: '좋았다', updatedAt: 1 }, r2: { id: 'r2', title: '어제 책', status: 'done', finished: '2026-10-27', updatedAt: 1 } },
       hobbyLogs: {},
       hobbies: {},
       moneyTx: {},
       habits: {},
       diary: { '2026-10-27': { id: '2026-10-27', text: '', parts: { dream: '하늘을 날았다' }, updatedAt: 1 }, '2026-10-26': { id: '2026-10-26', text: 'x', updatedAt: 1 } },
     } as never;
-    expect(daySummary(d, '2026-10-28')).toEqual(['운동: 농구 60분', '영화: 존 윅 ★5']);
+    expect(daySummary(d, '2026-10-28')).toEqual(['운동: 농구 60분', '영화: 존 윅 ★5', '책: 「데미안」 다 읽음 — 좋았다']);
     expect(studySummary(d, '2026-10-28')).toEqual(['모두 1시간 30분']);
     expect(dreamDates(d)).toEqual(['2026-10-27']);
     expect(formOf(d).parts).toEqual(['study', 'done', 'good', 'dream']);

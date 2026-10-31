@@ -625,6 +625,10 @@ export const receiptScan = (image: { mime: string; data: string }) => aiJob<{ am
 export const tocScan = (images: { mime: string; data: string }[]) => aiJob<{ units: { name: string; from: number; to: number | null }[] }>('ai/toc', { images });
 /** 책 찾기 (국립중앙도서관) */
 export interface BookHit {
+  src?: 'yes24' | 'nl';
+  sale?: number;
+  link?: string;
+  tocText?: string;
   title: string;
   author: string;
   publisher: string;

@@ -3,7 +3,8 @@ import { useState } from 'react';
 import { addDays, shortDate } from '../study/dates';
 import { alive, newId, type Reading } from '../study/model';
 import { put, remove, setSettings, useStudy } from '../study/store';
-import { Bar, confirmDelete, Empty, Field, Icon, Sheet, tap, toast, useToday } from '../study/ui';
+import { Bar, confirmDelete, Empty, Field, go, Icon, Sheet, tap, toast, useToday } from '../study/ui';
+import { askAiLater } from '../study/solveJob';
 import { StarInput, starText } from './MovieParts';
 import { BookSearch } from '../study/BookSearch';
 import { bookSearch, isLoggedIn, type BookHit } from '../auth/api';
@@ -161,7 +162,7 @@ function BookFind({ have }: { have: Reading[] }) {
     try {
       const r = await bookSearch(q.trim());
       setList(r.list);
-      if (r.needKey) setNote('책 찾기는 국립중앙도서관 키가 있어야 돼요. Cloudflare 에 넣어 주시면 바로 돼요.');
+      if (r.needKey) setNote('책 찾기는 예스24 · 국립중앙도서관 키가 있어야 돼요.');
     } catch (e) {
       setNote(e instanceof Error ? e.message : '찾지 못했어요');
     } finally {
@@ -211,7 +212,12 @@ function BookFind({ have }: { have: Reading[] }) {
               <div className="dg-info">
                 <b>{b.title}</b>
                 <span>{[b.author, b.publisher].filter(Boolean).join(' · ')}</span>
-                <small className="st-muted">{[b.date.slice(0, 4), b.pages, b.price ? `정가 ${b.price.toLocaleString('ko-KR')}원` : ''].filter(Boolean).join(' · ')}</small>
+                <small className="st-muted">{[b.date.slice(0, 4), b.pages, b.sale ? `${b.sale.toLocaleString('ko-KR')}원${b.price > b.sale ? ` (정가 ${b.price.toLocaleString('ko-KR')}원)` : ''}` : b.price ? `정가 ${b.price.toLocaleString('ko-KR')}원` : ''].filter(Boolean).join(' · ')}</small>
+                {b.link && (
+                  <a className="st-link sm" href={b.link} target="_blank" rel="noreferrer">
+                    예스24 에서 보기 ↗
+                  </a>
+                )}
               </div>
               <div className="dg-btns">
                 <button className="btn btn-sm" onClick={() => add(b, 'reading')}>
@@ -225,7 +231,7 @@ function BookFind({ have }: { have: Reading[] }) {
           ))}
         </div>
       )}
-      <p className="st-muted sm">정보 출처: 국립중앙도서관 ISBN 서지정보</p>
+      <p className="st-muted sm">정보 출처: 예스24 · 국립중앙도서관</p>
     </section>
   );
 }
@@ -292,6 +298,29 @@ function ReadSheet({ item, today, onClose }: { item: Partial<Reading>; today: st
           {item.id && (
             <button className="btn btn-sm st-danger" onClick={() => confirmDelete(`「${item.title}」`) && (remove('reads', item.id!), onClose())}>
               지우기
+            </button>
+          )}
+          {item.id && item.status !== 'want' && (
+            <button
+              className="btn btn-sm"
+              onClick={() => {
+                // 책 제목 · 지은이 · 내가 남긴 밑줄 · 한줄평으로 내용 확인 퀴즈 (AI 화면에 미리 넣어 둠)
+                const q = (item.quotes ?? []).slice(0, 10);
+                askAiLater({
+                  title: `독서 퀴즈: ${item.title}`,
+                  text: [
+                    `내가 ${item.status === 'done' ? '다 읽은' : `${item.read ?? 0}쪽까지 읽은`} 책 「${item.title}」${item.author ? ` (${item.author})` : ''} 으로 내용을 잘 기억하는지 확인하는 퀴즈 5개를 내 줘.`,
+                    '- 객관식 3개 + 생각을 묻는 주관식 2개, 문제만 먼저 쓰고 정답과 해설은 맨 아래 「정답」 제목 아래에.',
+                    '- 이 책을 정확히 모르면 지어내지 말고, 아래 내 밑줄 · 한줄평만으로 문제를 만들어 줘.',
+                    ...(q.length ? ['', '[내가 밑줄 친 문장]', ...q.map((x) => `- ${x.text}${x.page ? ` (${x.page}쪽)` : ''}`)] : []),
+                    ...(item.comment ? ['', `[내 한줄평] ${item.comment}`] : []),
+                  ].join('\n'),
+                });
+                onClose();
+                go('/ai');
+              }}
+            >
+              AI 독서 퀴즈
             </button>
           )}
           <button

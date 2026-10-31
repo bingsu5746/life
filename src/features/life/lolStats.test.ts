@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { byChampion, byPosition, kda, streaks, summary, yearRecap, type LolGame } from './lolStats';
+import { byChampion, byPosition, champDetail, kda, streaks, summary, yearRecap, type LolGame } from './lolStats';
 
 const g = (o: Partial<LolGame>): LolGame => ({
   id: Math.random().toString(),
@@ -47,5 +47,14 @@ describe('롤 통계', () => {
   it('한 해 결산', () => {
     const y = yearRecap([g({ penta: 1, multi: 5 }), g({ at: Date.UTC(2025, 1, 1) })], 2026);
     expect([y.games, y.pentas, y.quadras, y.most?.champ]).toEqual([1, 1, 1, 'Ahri']);
+  });
+});
+
+describe('챔피언 자세히', () => {
+  it('아이템 · 스펠', () => {
+    const c = champDetail([g({ items: [3020, 6655, 0, 0, 0, 2003, 3340], spells: [4, 14] }), g({ items: [3020, 3089, 0, 0, 0, 0, 3364], spells: [14, 4], win: false })]);
+    expect(c.items[0]).toEqual({ id: 3020, n: 2 });
+    expect(c.items.some((x) => x.id === 2003 || x.id === 3340)).toBe(false);
+    expect(c.spells[0]).toMatchObject({ key: '4-14', n: 2, winRate: 50 });
   });
 });

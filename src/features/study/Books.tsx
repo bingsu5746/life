@@ -220,7 +220,7 @@ function BookEditor({ book, onDone }: { book?: Book; onDone: (id?: string, plan?
         </button>
       </div>
       <div className="st-card st-form">
-        <Field label="이름" hint="치면 국립중앙도서관 목록에서 찾아요. 고르면 목차도 있으면 불러와요">
+        <Field label="이름" hint="치면 예스24 목록에서 찾아요. 고르면 목차가 있는 책은 목차도 불러와요">
           <BookSearch
             value={name}
             onChange={setName}
@@ -229,7 +229,13 @@ function BookEditor({ book, onDone }: { book?: Book; onDone: (id?: string, plan?
             label="문제집 이름"
             onPick={(h) => {
               setName(h.title);
-              if (!h.toc || text.trim()) return;
+              if (text.trim()) return;
+              if (h.tocText?.trim()) {
+                setText(h.tocText.trim());
+                toast('목차를 불러왔어요. 쪽이 없는 줄은 고쳐 주세요');
+                return;
+              }
+              if (!h.toc) return;
               setOcr('목차를 불러오는 중…');
               bookToc(h.toc)
                 .then((r) => {

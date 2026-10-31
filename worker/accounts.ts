@@ -24,7 +24,7 @@ import { cleanFact } from './fact';
 import { fetch2k } from './nba2k';
 import { hcBody, parseHc } from './homecourt';
 import { diaryBody, noteBody, parseDiary, parseNote, parseReceipt, parseTocRead, receiptBody, tocBody } from './aiRead';
-import { seojiSearch, seojiToc } from './books';
+import { seojiSearch, seojiToc, yes24Search } from './books';
 import { cheapShark } from './cheapshark';
 import { lolNewGames, lolOlderGames, lolProfile, RiotError, type LolGame } from './lol';
 import { krPrices, steamAchievements, steamMe, storeNames, storeSearch, wishlist, type KrPrice } from './steam';
@@ -1802,14 +1802,29 @@ export class Accounts extends DurableObject<Env> {
   /** 책 찾기 (국립중앙도서관 ISBN 서지정보, 하루 기억) */
   private async bookSearch(q: string): Promise<Response> {
     if (q.length < 2) return json({ list: [] });
+    const yk = this.secret('yes24', 'yes24key', 'yes24api');
     const key = this.nlKey();
-    if (!key) return json({ list: [], needKey: true });
-    try {
-      const r = await this.nbaCached(`nl:${q.toLowerCase()}`, DAY, () => seojiSearch(key, q));
-      return json({ list: r.v });
-    } catch (e) {
-      return fail(`책을 찾지 못했어요. (${(e instanceof Error ? e.message : String(e)).slice(0, 100)})`, 502);
+    if (!yk && !key) return json({ list: [], needKey: true });
+    let why = '';
+    // 1) 예스24 (표지 · 값 · 쪽수 · 목차) → 2) 국립중앙도서관
+    if (yk) {
+      try {
+        const r = await this.nbaCached(`y24:${q.toLowerCase()}`, DAY, () => yes24Search(yk, q));
+        if (r.v.length) return json({ list: r.v });
+      } catch (e) {
+        why = e instanceof Error ? e.message : String(e);
+        console.error('yes24 failed', why);
+      }
     }
+    if (key) {
+      try {
+        const r = await this.nbaCached(`nl:${q.toLowerCase()}`, DAY, () => seojiSearch(key, q));
+        return json({ list: r.v });
+      } catch (e) {
+        why = `${why ? `${why} / ` : ''}${e instanceof Error ? e.message : String(e)}`;
+      }
+    }
+    return why ? fail(`책을 찾지 못했어요. (${why.slice(0, 120)})`, 502) : json({ list: [] });
   }
   private async bookToc(url: string): Promise<Response> {
     try {

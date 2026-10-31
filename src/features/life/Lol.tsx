@@ -3,8 +3,8 @@ import { useEffect, useMemo, useState } from 'react';
 import { lolGames, lolProfile, type LolProfile } from '../auth/api';
 import { LineChart } from '../study/charts';
 import { setSettings, useStudy } from '../study/store';
-import { Empty, toast } from '../study/ui';
-import { byChampion, byHour, byPosition, byWeekday, kda, POS, queueName, QUEUE_FILTER, streaks, summary, yearRecap, type LolGame, type QueueFilter } from './lolStats';
+import { Empty, Sheet, tap, toast } from '../study/ui';
+import { byChampion, byHour, byPosition, byWeekday, champDetail, kda, POS, queueName, QUEUE_FILTER, streaks, summary, yearRecap, type LolGame, type QueueFilter } from './lolStats';
 
 // ===== Data Dragon (챔피언 · 스펠 이름과 그림, 키 없음). 한 번 받으면 이 기기에 하루 기억 =====
 interface Dd {
@@ -73,6 +73,7 @@ export function LolPage() {
   const [end, setEnd] = useState(false);
   const [q, setQ] = useState<QueueFilter>('all');
   const [limit, setLimit] = useState(20);
+  const [champ, setChamp] = useState<string | null>(null);
   const dd = useDd();
   useEffect(() => {
     if (!id) return;
@@ -259,7 +260,7 @@ export function LolPage() {
                 <h3 className="st-h">모스트 챔피언</h3>
                 <div className="lol-champs">
                   {champs.slice(0, 10).map((c) => (
-                    <div key={c.champ} className="lol-champ">
+                    <div key={c.champ} className="lol-champ st-tap" {...tap(() => setChamp(c.champ))}>
                       {dd && <img src={champImg(dd, c.champ)} alt="" loading="lazy" />}
                       <div>
                         <b>{dd?.byId[c.champ] ?? c.champ}</b>
@@ -352,6 +353,7 @@ export function LolPage() {
           )}
 
           <YearCard games={games} dd={dd} end={end} busy={!!busy} onOlder={() => void older()} />
+          {champ && <ChampSheet champ={champ} games={list.filter((g) => g.champ === champ)} dd={dd} onClose={() => setChamp(null)} />}
         </>
       )}
     </div>
@@ -506,5 +508,84 @@ function YearCard({ games, dd, end, busy, onOlder }: { games: LolGame[]; dd: Dd 
         </button>
       )}
     </section>
+  );
+}
+
+/** 챔피언 하나: 판별 KDA 흐름 · 자주 산 아이템 · 스펠 · 포지션 · 최고의 판 · 그 챔피언 경기 */
+function ChampSheet({ champ, games, dd, onClose }: { champ: string; games: LolGame[]; dd: Dd | null; onClose: () => void }) {
+  const c = champDetail(games);
+  const name = dd?.byId[champ] ?? champ;
+  const recent = [...games].sort((a, b) => b.at - a.at);
+  return (
+    <Sheet title={name} onClose={onClose}>
+      <div className="lol-sum">
+        {dd && <img className="lol-icon" src={champImg(dd, champ)} alt="" />}
+        <div>
+          <b className="lol-kda">
+            {c.s.games}판 · 승률 {pct(c.s.winRate)}
+          </b>
+          <small>
+            {f1(c.s.k)} / {f1(c.s.d)} / {f1(c.s.a)} · KDA <b className={c.s.kda >= 4 ? 'lol-good' : ''}>{c.s.kda.toFixed(2)}</b>
+          </small>
+          <small className="st-muted">
+            분당 CS {f1(c.s.csMin)} · 분당 딜 {Math.round(c.s.dmgMin).toLocaleString('ko-KR')} · 킬 관여 {pct(c.s.kp)}
+          </small>
+        </div>
+      </div>
+      {recent.length >= 3 && (
+        <LineChart
+          label="판별 KDA (오른쪽이 최근)"
+          height={120}
+          points={recent
+            .slice(0, 20)
+            .reverse()
+            .map((g, i) => ({ label: String(i + 1), title: `${g.k}/${g.d}/${g.a} ${g.win ? '승' : '패'}`, y: Math.round(kda(g.k, g.d, g.a) * 100) / 100 }))}
+          format={(x) => x.toFixed(1)}
+        />
+      )}
+      {dd && c.items.length > 0 && (
+        <>
+          <h4 className="ta-h">자주 산 아이템</h4>
+          <div className="lol-build">
+            {c.items.map((x) => (
+              <span key={x.id}>
+                <img src={`${IMG}/${dd.v}/img/item/${x.id}.png`} alt="" loading="lazy" />
+                <small>{pct((x.n / c.s.games) * 100)}</small>
+              </span>
+            ))}
+          </div>
+        </>
+      )}
+      {dd && c.spells.length > 0 && (
+        <>
+          <h4 className="ta-h">스펠</h4>
+          <div className="lol-build">
+            {c.spells.map((x) => (
+              <span key={x.key}>
+                {x.ids.map((id) => (dd.spell[id] ? <img key={id} src={`${IMG}/${dd.v}/img/spell/${dd.spell[id]}.png`} alt="" loading="lazy" /> : null))}
+                <small>
+                  {x.n}판 · 승률 {pct(x.winRate)}
+                </small>
+              </span>
+            ))}
+          </div>
+        </>
+      )}
+      {c.pos.length > 0 && <p className="st-muted sm">포지션: {c.pos.map((p) => `${POS[p.pos] ?? p.pos} ${p.games}판`).join(' · ')}</p>}
+      {c.best && (
+        <p className="sm">
+          최고의 판:{' '}
+          <b>
+            {c.best.k}/{c.best.d}/{c.best.a}
+          </b>{' '}
+          ({new Date(c.best.at).toLocaleDateString('ko-KR')}, {c.best.win ? '승' : '패'})
+        </p>
+      )}
+      <div className="lol-games">
+        {recent.slice(0, 10).map((g) => (
+          <GameRow key={g.id} g={g} dd={dd} />
+        ))}
+      </div>
+    </Sheet>
   );
 }

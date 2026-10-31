@@ -1,8 +1,16 @@
-// 책 찾기: 국립중앙도서관 ISBN 서지정보 API (www.nl.go.kr/seoji/SearchApi.do, 키 cert_key).
+// 책 찾기: 예스24 Open API (apis.yes24.com, 머리글 X-Api-Key, developers.yes24.com 문서 확인) → 안 되면 국립중앙도서관.
+// - 예스24 GET /v1/goods/itemList?query=&category=BOOK&detail=Y → { success, data: { items: [{ itemId, title, author, publisher, isbn13, shopPrice, salePrice, publishDate, cover, link, pages, contentDetail: { tableOfContents } }] } }
+// 국립중앙도서관 ISBN 서지정보 API (www.nl.go.kr/seoji/SearchApi.do, 키 cert_key).
 // 응답 칸(이 API 안내 페이지 N31101030500 에서 확인): TITLE · AUTHOR · PUBLISHER · EA_ISBN · TITLE_URL(표지) · BOOK_TB_CNT_URL(목차) · PRE_PRICE(정가) · PAGE · PUBLISH_PREDATE · SUBJECT
 import { within } from './nba';
 
 export interface BookHit {
+  /** 어디서 찾았는지 */
+  src?: 'yes24' | 'nl';
+  /** 예스24 판매가 · 상품 주소 · 목차 글 (예스24 에서 찾았을 때) */
+  sale?: number;
+  link?: string;
+  tocText?: string;
   title: string;
   author: string;
   publisher: string;
@@ -58,4 +66,36 @@ export async function seojiToc(url: string): Promise<string> {
     .replace(/\n{2,}/g, '\n')
     .trim()
     .slice(0, 8000);
+}
+
+export function parseYes24(j: unknown): BookHit[] {
+  const items = ((j as { data?: { items?: Record<string, unknown>[] } })?.data?.items ?? []) as Record<string, unknown>[];
+  return items
+    .map((x) => {
+      const cd = (x.contentDetail ?? {}) as Record<string, unknown>;
+      const n = (v: unknown) => (typeof v === 'number' ? v : Number(s(v).replace(/[^\d]/g, '')) || 0);
+      return {
+        src: 'yes24' as const,
+        title: s(x.title) + (s(x.subTitle) ? ` : ${s(x.subTitle)}` : ''),
+        author: s(x.author),
+        publisher: s(x.publisher),
+        isbn: s(x.isbn13) || s(x.isbn10),
+        cover: /^https:\/\/image\.yes24\.com\//.test(s(x.cover)) ? s(x.cover) : '',
+        toc: '',
+        tocText: s(cd.tableOfContents).slice(0, 8000),
+        price: n(x.shopPrice),
+        sale: n(x.salePrice),
+        pages: x.pages ? `${n(x.pages)}쪽` : '',
+        date: s(x.publishDate).replace(/-/g, ''),
+        link: /^https:\/\/(www|m)\.yes24\.com\//.test(s(x.link)) ? s(x.link) : '',
+      };
+    })
+    .filter((x) => x.title);
+}
+export async function yes24Search(key: string, q: string): Promise<BookHit[]> {
+  const p = new URLSearchParams({ query: q, category: 'BOOK', page: '1', pageSize: '20', detail: 'Y' });
+  const res = await within(fetch(`https://apis.yes24.com/v1/goods/itemList?${p}`, { headers: { 'X-Api-Key': key } }), 15_000, '예스24');
+  const j = (await res.json().catch(() => null)) as { success?: boolean; message?: string } | null;
+  if (!res.ok || j?.success === false) throw new Error(`예스24 ${res.status}${j?.message ? ` ${j.message}` : ''}`);
+  return parseYes24(j);
 }
