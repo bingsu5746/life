@@ -19,6 +19,7 @@ import { go, Icon, Sheet, Toaster, useToday } from './ui';
 const PHONE_TABS: string[] = ['today', 'exams', 'books', 'review', 'words', 'time'];
 
 // 오늘 화면 말고는 열 때 받는다 (처음 여는 속도)
+const MathRoom = lazy(() => import('./MathRoom').then((m) => ({ default: m.MathRoom })));
 const Books = lazy(() => import('./Books').then((m) => ({ default: m.Books })));
 const Life = lazy(() => import('./Life').then((m) => ({ default: m.Life })));
 import { askedSubjects, useVaultCounts, VAULT_ITEMS, vaultItem } from './vault';
@@ -166,6 +167,7 @@ export function Study({ path, loggedIn, syncReady = true, onLogin }: { path: str
   else if (area === 'ai') content = <Solve open={path[1]} />;
   else if (tab === 'books') content = <Books id={id} sub={sub} />;
   else if (tab === 'tutor') content = <Tutors sub={id} />;
+  else if (tab === 'math') content = <MathRoom />;
   else if (tab === 'words') content = <Words id={id} sub={sub} />;
   else if (tab === 'review') content = <Review sub={id} />;
   else if (tab === 'time') content = <Time sub={id} />;

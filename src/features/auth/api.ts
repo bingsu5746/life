@@ -694,3 +694,18 @@ export const lolChampMeta = (cid: number, patch = '') =>
       20_000,
     ),
   );
+
+// ===== Discord 수학 서버 =====
+export interface DcMsg {
+  id: string;
+  at: string;
+  author: string;
+  bot: boolean;
+  text: string;
+  files: { name: string; url: string; type: string; size: number }[];
+  links: string[];
+}
+export const discordInfo = () => call<{ bot: string; appId: string; contentIntent: boolean; invite: string; guilds: { id: string; name: string }[] }>('discord/info', 'GET', undefined, 20_000);
+export const discordChannels = (guild: string) => call<{ channels: { id: string; name: string; cat: string }[] }>(`discord/channels?guild=${guild}`, 'GET', undefined, 20_000).then((r) => r.channels);
+export const discordMsgs = (channel: string, before?: string) => call<{ msgs: DcMsg[] }>(`discord/msgs?channel=${channel}${before ? `&before=${before}` : ''}`, 'GET', undefined, 20_000).then((r) => r.msgs);
+export const discordSend = (channel: string, text: string) => call<{ ok: boolean }>('discord/send', 'POST', { channel, text }, 20_000);

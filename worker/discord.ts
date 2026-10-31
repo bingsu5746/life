@@ -49,7 +49,15 @@ export interface DcMsg {
 export async function discordMessages(token: string, channel: string, before?: string): Promise<DcMsg[]> {
   const q = new URLSearchParams({ limit: '50' });
   if (before) q.set('before', before);
-  const list = (await dc(token, `/channels/${channel}/messages?${q}`)) as { id: string; timestamp: string; content: string; author: { username: string; global_name?: string | null; bot?: boolean }; member?: { nick?: string | null }; attachments?: { filename: string; url: string; content_type?: string; size: number }[]; embeds?: { url?: string }[] }[];
+  const list = (await dc(token, `/channels/${channel}/messages?${q}`)) as {
+    id: string;
+    timestamp: string;
+    content: string;
+    author: { username: string; global_name?: string | null; bot?: boolean };
+    member?: { nick?: string | null };
+    attachments?: { filename: string; url: string; content_type?: string; size: number }[];
+    embeds?: { url?: string }[];
+  }[];
   return list.map((m) => ({
     id: m.id,
     at: m.timestamp,
