@@ -82,7 +82,8 @@ export function parseYes24(j: unknown): BookHit[] {
         isbn: s(x.isbn13) || s(x.isbn10),
         cover: /^https:\/\/image\.yes24\.com\//.test(s(x.cover)) ? s(x.cover) : '',
         toc: '',
-        tocText: s(cd.tableOfContents).slice(0, 8000),
+        // 목차 글에 <B> 같은 태그 · \r 이 섞여 온다 → 글만, 빈 줄 없이
+        tocText: s(cd.tableOfContents).replace(/<[^>]+>/g, '').replace(/&nbsp;/g, ' ').replace(/\r/g, '').split('\n').map((l) => l.replace(/\s+$/, '')).filter((l) => l.trim()).join('\n').slice(0, 8000),
         price: n(x.shopPrice),
         sale: n(x.salePrice),
         pages: x.pages ? `${n(x.pages)}쪽` : '',

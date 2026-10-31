@@ -27,7 +27,7 @@ describe('예스24 응답 (문서 예시 모양)', () => {
             cover: 'https://image.yes24.com/goods/12345678/L',
             link: 'https://www.yes24.com/product/goods/12345678',
             pages: 584,
-            contentDetail: { tableOfContents: '1장 깨끗한 코드\n2장 의미 있는 이름' },
+            contentDetail: { tableOfContents: '<B>1장 깨끗한 코드</b>\r\n\r\n2장 의미 있는 이름   ' },
           },
         ],
       },
