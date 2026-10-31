@@ -506,4 +506,19 @@ export interface HcRead {
   three: number | null;
   zones: { made: number; att: number }[];
 }
-export const bbScan = (image: { mime: string; data: string }) => call<{ read: HcRead; model: string }>('bb/scan', 'POST', { image }, 90_000);
+/** 뒤에서 읽게 하고 2초마다 결과를 묻는다 (AI 가 오래 걸려도 연결이 끊기지 않게, 최대 4분) */
+export async function bbScan(image: { mime: string; data: string }): Promise<{ read: HcRead; model: string }> {
+  const { jobId } = await call<{ jobId: string }>('bb/scan', 'POST', { image }, 60_000);
+  for (let i = 0; i < 120; i++) {
+    await new Promise((r) => setTimeout(r, 2000));
+    const r = await call<{ running?: boolean; missing?: boolean; done?: boolean; read?: HcRead; model?: string; error?: string }>(`bb/scan/${jobId}`, 'GET', undefined, 20_000).catch(
+      () => ({ running: true }) as { running: boolean; missing?: boolean; done?: boolean; read?: HcRead; model?: string; error?: string },
+    );
+    if (r.done) {
+      if (r.read) return { read: r.read, model: r.model ?? '' };
+      throw new Error(r.error ?? '사진을 읽지 못했어요');
+    }
+    if (r.missing) throw new Error('서버가 다시 시작돼서 결과를 잃었어요. 다시 해 주세요.');
+  }
+  throw new Error('사진 읽기가 너무 오래 걸려요. 다시 해 주세요.');
+}

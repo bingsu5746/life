@@ -24,7 +24,7 @@ import { cleanFact } from './fact';
 import { fetch2k } from './nba2k';
 import { hcBody, parseHc } from './homecourt';
 import { hlAverage, fetchHlBox, fetchHlPlayerSeasons, fetchHlStandings, hlMatchId, sameTeam } from './highlightly';
-import { fetchGames, fetchNbaAverages, fetchBdlRoster, fetchNbaBox, fetchNbaCareer, fetchNbaRoster, fetchNbaStandings, fetchStandings, nbaGameId, Paid, seasonOf, seasonPage, standingsFrom, type NbaGame } from './nba';
+import { within, fetchGames, fetchNbaAverages, fetchBdlRoster, fetchNbaBox, fetchNbaCareer, fetchNbaRoster, fetchNbaStandings, fetchStandings, nbaGameId, Paid, seasonOf, seasonPage, standingsFrom, type NbaGame } from './nba';
 import { monthOf, R2_FREE, R2_STOP, r2Block, rollMonth, type R2Use } from './r2guard';
 import { modelFamily, askCompat, askGemini, readGemini, geminiDaily, pacificDay, askOpenRouter, COMPAT, compatModels, geminiModels, openRouterDaily, openRouterModels, pickCompat, SYSTEM as SOLVE_SYSTEM, type Engine, type SolveTurn } from './solve';
 import { filmFacets, searchFilms, type Film } from './catalog';
@@ -252,6 +252,7 @@ export class Accounts extends DurableObject<Env> {
     if (path === 'movies/ott' && req.method === 'POST') return this.ott(body);
     if (path === 'school' && req.method === 'POST') return this.school(body);
     if (path === 'bb/scan' && req.method === 'POST') return this.bbScan(user, body);
+    if (path.startsWith('bb/scan/') && req.method === 'GET') return this.bbScanGet(user, path.slice('bb/scan/'.length));
     if (path === 'nba/games' && req.method === 'GET') return this.nbaGames(new URL(req.url).searchParams.get('date'));
     if (path === 'nba/standings' && req.method === 'GET') return this.nbaStandings();
     if (path === 'nba/box' && req.method === 'GET') return this.nbaBox(new URL(req.url).searchParams);
@@ -1330,7 +1331,8 @@ export class Accounts extends DurableObject<Env> {
     return fail('NBA 공식 기록 서버가 지금 우리 서버에 답하지 않아서, 아래 Highlightly 기록으로 보여 줘요.', 502);
   }
 
-  /** 홈코트 화면 사진 → 숫자 (Gemini 무료 모델 차례로. 문제 풀이와 같은 하루 한도를 같이 센다) */
+  /** 홈코트 화면 사진 → 숫자 (Gemini 무료 모델 차례로, 가벼운 lite 모델부터. 문제 풀이와 같은 하루 한도를 같이 센다).
+   *  오래 걸릴 수 있어서 뒤에서 하고 번호를 돌려준다 → GET bb/scan/{번호} 로 결과 */
   private async bbScan(user: UserRow, b: Record<string, unknown>): Promise<Response> {
     const img = b.image as { mime?: unknown; data?: unknown } | undefined;
     const mime = typeof img?.mime === 'string' && /^image\/(jpeg|png|webp)$/.test(img.mime) ? img.mime : '';
@@ -1341,30 +1343,44 @@ export class Accounts extends DurableObject<Env> {
     if (!this.gemList || Date.now() - this.gemList.at > DAY) this.gemList = { at: Date.now(), v: await geminiModels(key, this.gemFetch()) };
     const chain = this.gemLeft(user.id)
       .map((x) => x.model)
-      .filter((m) => !m.startsWith('gemma'));
+      .filter((m) => !m.startsWith('gemma'))
+      .sort((x, y) => Number(/lite/.test(y)) - Number(/lite/.test(x)));
     if (!chain.length) return fail('오늘 Gemini 무료 사용량을 다 썼어요. 내일 다시 해 주세요.', 429);
-    const tried: string[] = [];
-    for (const m of chain.slice(0, 4)) {
-      try {
-        const res = await this.gemFetch()(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(m)}:generateContent`, {
-          method: 'POST',
-          headers: { 'content-type': 'application/json', 'x-goog-api-key': key },
-          body: JSON.stringify(hcBody(mime, data)),
-          signal: AbortSignal.timeout(60_000),
-        });
-        const j = (await res.json().catch(() => null)) as { error?: { message?: string } } | null;
-        if (!res.ok) {
-          const em = j?.error?.message ?? '';
-          if (res.status === 429 || res.status === 404) this.bumpGem(user.id, m, /per ?day|daily|PerDay/i.test(em) || res.status === 404);
-          throw new Error(`Gemini ${res.status}: ${em.slice(0, 80)}`);
+    const id = crypto.randomUUID().replace(/-/g, '').slice(0, 16);
+    const ck = `bbscan:${user.id}:${id}`;
+    this.cacheSet(ck, JSON.stringify({ running: true }));
+    const run = async () => {
+      const tried: string[] = [];
+      for (const m of chain.slice(0, 3)) {
+        try {
+          const res = await within(this.gemFetch()(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(m)}:generateContent`, { method: 'POST', headers: { 'content-type': 'application/json', 'x-goog-api-key': key }, body: JSON.stringify(hcBody(mime, data)) }), 70_000, m);
+          const j = (await res.json().catch(() => null)) as { error?: { message?: string } } | null;
+          if (!res.ok) {
+            const em = j?.error?.message ?? '';
+            if (res.status === 429 || res.status === 404) this.bumpGem(user.id, m, /per ?day|daily|PerDay/i.test(em) || res.status === 404);
+            throw new Error(`Gemini ${res.status}: ${em.slice(0, 80)}`);
+          }
+          this.bumpGem(user.id, m);
+          console.log('bb scan ok', m);
+          return this.cacheSet(ck, JSON.stringify({ done: true, read: parseHc(readGemini(j)), model: m }));
+        } catch (e) {
+          const msg = e instanceof Error ? e.message : String(e);
+          console.error('bb scan failed', m, msg);
+          tried.push(`${m}: ${msg.slice(0, 80)}`);
         }
-        this.bumpGem(user.id, m);
-        return json({ read: parseHc(readGemini(j)), model: m });
-      } catch (e) {
-        tried.push(`${m}: ${(e instanceof Error ? e.message : String(e)).slice(0, 80)}`);
       }
-    }
-    return fail(`사진을 읽지 못했어요. (${tried.join(' / ').slice(0, 200)})`, 502);
+      this.cacheSet(ck, JSON.stringify({ done: true, error: `사진을 읽지 못했어요. (${tried.join(' / ').slice(0, 200)})` }));
+    };
+    this.ctx.waitUntil(run());
+    return json({ jobId: id });
+  }
+  private bbScanGet(user: UserRow, id: string): Response {
+    if (!/^[a-f0-9]{16}$/.test(id)) return fail('번호가 잘못됐어요.');
+    const c = this.cacheGet(`bbscan:${user.id}:${id}`);
+    if (!c) return json({ missing: true });
+    const v = JSON.parse(c) as { running?: boolean; done?: boolean };
+    if (v.done) this.sql.exec('DELETE FROM cache WHERE key = ?', `bbscan:${user.id}:${id}`);
+    return json(v);
   }
 
   /** 이번 시즌 모든 선수 경기당 평균 (선수 찾기 · 정렬용, 시즌 평균과 같은 표를 6시간 기억) */

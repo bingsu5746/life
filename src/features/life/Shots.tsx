@@ -429,7 +429,7 @@ function HcImport({ today, onClose }: { today: string; onClose: () => void }) {
           {r.error ? ` (${r.error})` : ''}
         </p>
       ))}
-      {busy && <p className="st-muted">사진을 읽는 중… (AI 가 숫자를 읽느라 10~30초 걸릴 수 있어요)</p>}
+      {busy && <p className="st-muted">사진을 읽는 중… (AI 가 숫자를 읽느라 길면 1~2분 걸릴 수 있어요)</p>}
       {chart?.shots && (
         <>
           <ShotChart shots={chart.shots} />
