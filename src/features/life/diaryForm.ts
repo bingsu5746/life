@@ -10,6 +10,10 @@ export const DIARY_PARTS: { key: string; label: string; hint: string }[] = [
   { key: 'dream', label: '꿈', hint: '어젯밤 꾼 꿈이 있다면' },
   { key: 'tomorrow', label: '내일 할 것', hint: '내일 꼭 하고 싶은 것' },
   { key: 'checkin', label: '하루 마감', hint: '하루 마감에서 남긴 한 줄' },
+  { key: 'learned', label: '배운 것', hint: '오늘 새로 알게 된 것' },
+  { key: 'fix', label: '고칠 점', hint: '다음엔 다르게 할 것' },
+  { key: 'worry', label: '고민이나 잡생각', hint: '머릿속에 떠다니는 생각' },
+  { key: 'photo', label: '사진 설명', hint: '오늘의 사진 · 영상 이야기' },
 ];
 
 export const DEFAULT_FORM = { parts: ['study', 'done', 'good', 'dream'], autoFill: true };

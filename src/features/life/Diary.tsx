@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { addPhoto, photoUrl, removePhoto } from '../study/photos';
 import { addDays, longDate, shortDate } from '../study/dates';
 import { alive, type DiaryEntry } from '../study/model';
-import { put, remove, setSettings, useStudy } from '../study/store';
+import { getStudy, put, putMany, remove, setSettings, useStudy } from '../study/store';
 import { confirmDelete, go, tap, toast, useToday } from '../study/ui';
 import { monthLabel, monthOf, shiftMonth } from './calc';
 import { daySummary, DIARY_PARTS, dreamDates, formOf, studySummary } from './diaryForm';
@@ -369,6 +369,7 @@ function Form() {
       <div className="st-page-head">
         <h2>일기 양식</h2>
       </div>
+      <ImportDiary />
       <section className="st-card st-form">
         <p className="st-sub">제목과 본문, 기분은 항상 있어요. 아래에서 매일 쓸 칸을 골라 보세요.</p>
         {DIARY_PARTS.map((p) => {
@@ -427,5 +428,45 @@ function Dictate({ onText }: { onText: (t: string) => void }) {
     >
       {stop ? '■ 그만 듣기' : '🎙 말로 쓰기'}
     </button>
+  );
+}
+
+/** 일기 파일 가져오기 (노션에서 옮긴 것 등): [{ date, title?, mood?(1~5), text, parts? }]. 이미 일기가 있는 날은 건너뛴다 */
+function ImportDiary() {
+  const [busy, setBusy] = useState(false);
+  async function load(f: File) {
+    setBusy(true);
+    try {
+      const list = JSON.parse(await f.text()) as { date?: string; title?: string; mood?: number; text?: string; parts?: Record<string, string> }[];
+      if (!Array.isArray(list)) throw new Error('일기 파일 모양이 아니에요');
+      const have = getStudy().diary;
+      const items = list
+        .filter((x) => x.date && /^\d{4}-\d{2}-\d{2}$/.test(x.date) && !(have[x.date] && !have[x.date].deleted))
+        .map((x) => ({
+          c: 'diary' as const,
+          item: {
+            id: x.date!,
+            title: x.title?.trim() || undefined,
+            mood: x.mood && x.mood >= 1 && x.mood <= 5 ? Math.round(x.mood) : undefined,
+            text: x.text ?? '',
+            parts: x.parts && Object.keys(x.parts).length ? x.parts : undefined,
+          },
+        }));
+      putMany(items);
+      toast(`일기 ${items.length}개를 가져왔어요${list.length > items.length ? ` (이미 있는 ${list.length - items.length}개는 건너뜀)` : ''}`);
+    } catch (e) {
+      toast(e instanceof Error ? e.message : '가져오지 못했어요');
+    } finally {
+      setBusy(false);
+    }
+  }
+  return (
+    <section className="st-card st-form">
+      <b>일기 가져오기</b>
+      <label className="btn">
+        {busy ? '가져오는 중…' : '일기 파일(.json) 고르기'}
+        <input type="file" accept=".json,application/json" hidden onChange={(e) => e.target.files?.[0] && void load(e.target.files[0])} />
+      </label>
+    </section>
   );
 }
