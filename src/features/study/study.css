@@ -9326,3 +9326,36 @@ body.focus-on {
 .sk-h {
   margin: 14px 0 6px;
 }
+
+/* 보기: 맞으면 초록, 틀리면 빨강 · 고른 뒤 반대쪽 뜻 */
+.st-choice.right,
+.pr-choice.right {
+  background: #16a34a;
+  border-color: #16a34a;
+  color: #fff;
+}
+.st-choice.right b {
+  background: rgba(255, 255, 255, 0.25);
+  color: #fff;
+}
+.st-choice.wrong,
+.pr-choice.wrong {
+  background: #dc2626;
+  border-color: #dc2626;
+  color: #fff;
+  text-decoration: none;
+}
+.st-choice.wrong b {
+  background: rgba(255, 255, 255, 0.25);
+  color: #fff;
+}
+.st-choice-txt {
+  display: grid;
+  gap: 2px;
+  text-align: left;
+}
+.st-choice-other {
+  display: block;
+  font-size: 0.82rem;
+  opacity: 0.8;
+}

@@ -257,6 +257,10 @@ function Run({ items, mode, dir, onExit, onRetry }: { items: Item[]; mode: PMode
           {(() => {
             const choices = mode === 'choice' ? cur.choices : cur.q!.choices;
             const right = mode === 'choice' ? back : w.term;
+            // 고른 뒤 보기마다 반대쪽 (단어면 뜻, 뜻이면 단어)
+            const all = alive(getWords());
+            const asTerm = mode === 'blank' || dir === 'ko';
+            const otherOf = (c: string) => (asTerm ? all.find((x) => x.term.toLowerCase() === c.toLowerCase())?.meaning : all.find((x) => x.meaning === c)?.term) ?? '';
             if (!choices)
               return (
                 <p className="st-hint">
@@ -281,6 +285,7 @@ function Run({ items, mode, dir, onExit, onRetry }: { items: Item[]; mode: PMode
                       }}
                     >
                       {c}
+                      {picked !== null && <small className="st-choice-other">{otherOf(c)}</small>}
                     </button>
                   );
                 })}

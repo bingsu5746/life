@@ -776,6 +776,33 @@ function WordRun({ listId, mode }: { listId: string; mode: 'learn' | 'prep' | 'w
   // 객관식 보기는 한 번 정하면 그 카드 동안 그대로 (다시 그릴 때마다 섞이지 않게). step: 지금까지 답한 횟수
   const [step, setStep] = useState(0);
   const choiceCache = useRef(new Map<string, string[] | null>());
+  // 하던 것 이어 하기: 나갔다 들어와도 같은 날이면 남은 단어부터 (이 기기에 기억)
+  const runKey = `my-study.study.word-run.${listId}.${mode}`;
+  const [resumed] = useState(() => {
+    try {
+      const r = JSON.parse(localStorage.getItem(runKey) ?? 'null') as { day: string; queue: string[]; answered: [string, boolean][]; total: number; method: 'card' | 'quiz'; dir: 'en' | 'ko' } | null;
+      return r && r.day === today && r.queue.length ? r : null;
+    } catch {
+      return null;
+    }
+  });
+  useEffect(() => {
+    if (!resumed) return;
+    setMethod(resumed.method);
+    setDir(resumed.dir);
+    setQueue(resumed.queue);
+    setAnswered(new Map(resumed.answered));
+    setTotal(resumed.total);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  useEffect(() => {
+    try {
+      if (queue && queue.length) localStorage.setItem(runKey, JSON.stringify({ day: today, queue, answered: [...answered], total, method, dir }));
+      else if (queue) localStorage.removeItem(runKey);
+    } catch {
+      /* 무시 */
+    }
+  }, [queue, answered, total, method, dir, today, runKey]);
 
   function begin() {
     const all = getWords();
@@ -894,6 +921,8 @@ function WordRun({ listId, mode }: { listId: string; mode: 'learn' | 'prep' | 'w
   if (method === 'quiz' && !choiceCache.current.has(ck)) choiceCache.current.set(ck, choicesFor(cur, pool, Math.random, field));
   const choices = method === 'quiz' ? (choiceCache.current.get(ck) ?? null) : null;
   const useQuiz = method === 'quiz' && choices;
+  // 고른 뒤 보기마다 반대쪽(뜻 ↔ 단어)을 보여 준다
+  const other = (c: string) => (field === 'meaning' ? pool.find((w) => w.meaning === c)?.term : pool.find((w) => w.term === c)?.meaning) ?? '';
   const ask = dir === 'en' ? cur.term : cur.meaning || cur.term;
   const ans = dir === 'en' ? cur.meaning : cur.term;
 
@@ -931,10 +960,14 @@ function WordRun({ listId, mode }: { listId: string; mode: 'learn' | 'prep' | 'w
                     disabled={!!picked}
                     onClick={() => {
                       setPicked(c);
-                      setTimeout(() => reply(c === ans), c === ans ? 450 : 1300);
+                      setTimeout(() => reply(c === ans), c === ans ? 1100 : 2600);
                     }}
                   >
-                    <b>{i + 1}</b> {c}
+                    <b>{i + 1}</b>
+                    <span className="st-choice-txt">
+                      {c}
+                      {picked && <small className="st-choice-other">{other(c)}</small>}
+                    </span>
                   </button>
                 );
               })}

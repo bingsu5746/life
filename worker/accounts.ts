@@ -1910,6 +1910,8 @@ export class Accounts extends DurableObject<Env> {
       riot: !!this.riotKey(),
       nl: !!this.nlKey(),
       yes24: !!this.secret('yes24', 'yes24key', 'yes24api'),
+      // 이름만 (값은 안 보냄): 이름이 달라 못 찾는 키를 고칠 때
+      names: Object.keys(this.env as object).filter((k) => /disc|nl|book|lib/i.test(k)),
     });
   }
 

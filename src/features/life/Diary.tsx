@@ -23,7 +23,7 @@ export function Diary({ sub }: { sub?: string }) {
   if (sub === 'dream') return <Dreams />;
   if (sub === 'form') return <Form />;
   if (sub === 'recap') return <RecapPage />;
-  if (sub && /^\d{4}-\d{2}-\d{2}$/.test(sub)) return <Write date={sub > today ? today : sub} today={today} />;
+  if (sub && /^\d{4}-\d{2}-\d{2}$/.test(sub)) return <Write key={sub > today ? today : sub} date={sub > today ? today : sub} today={today} />;
   return <List month={sub && /^\d{4}-\d{2}$/.test(sub) ? sub : monthOf(today)} today={today} />;
 }
 
@@ -122,17 +122,45 @@ function List({ month, today }: { month: string; today: string }) {
   );
 }
 
+/** 임시저장 (이 기기): 저장 안 하고 나가도 다시 열면 이어 쓰기 */
+interface Draft {
+  mood: number;
+  title: string;
+  text: string;
+  parts: Record<string, string>;
+  photos: string[];
+  at: number;
+}
+const draftKey = (date: string) => `my-study.diary.draft.${date}`;
+function loadDraft(date: string): Draft | null {
+  try {
+    return JSON.parse(localStorage.getItem(draftKey(date)) ?? 'null') as Draft | null;
+  } catch {
+    return null;
+  }
+}
+function setDraft(date: string, v: Draft | null) {
+  try {
+    if (v) localStorage.setItem(draftKey(date), JSON.stringify(v));
+    else localStorage.removeItem(draftKey(date));
+  } catch {
+    /* 저장 공간이 없으면 임시저장만 못 함 */
+  }
+}
+
 function Write({ date, today }: { date: string; today: string }) {
   const d = useStudy();
   const cur = d.diary[date] && !d.diary[date].deleted ? d.diary[date] : undefined;
-  const [mood, setMood] = useState(cur?.mood ?? 0);
-  const [title, setTitle] = useState(cur?.title ?? '');
-  const [text, setText] = useState(cur?.text ?? '');
+  const [draft0] = useState(() => loadDraft(date));
+  const [fromDraft, setFromDraft] = useState(!!draft0);
+  const [mood, setMood] = useState(draft0?.mood ?? cur?.mood ?? 0);
+  const [title, setTitle] = useState(draft0?.title ?? cur?.title ?? '');
+  const [text, setText] = useState(draft0?.text ?? cur?.text ?? '');
   const form = formOf(d);
   const lines = daySummary(d, date);
   const studyLines = studySummary(d, date);
   // 새 일기: 「오늘 한 것」 칸을 앱 기록으로 미리 채운다 (끄면 링크로만). 「공부」 칸은 비어 있으면 늘 공부 기록으로 채운다
-  const [parts, setParts] = useState<Record<string, string>>(() => ({
+  const [parts, setParts] = useState<Record<string, string>>(() => draft0?.parts ?? ({
     ...(cur?.parts ?? {}),
     ...(!cur && form.autoFill && form.parts.includes('done') && lines.length ? { done: lines.join('\n') } : {}),
     ...(form.parts.includes('study') && studyLines.length && !cur?.parts?.study?.trim() ? { study: studyLines.join('\n') } : {}),
@@ -160,16 +188,17 @@ function Write({ date, today }: { date: string; today: string }) {
   };
   const shownParts = DIARY_PARTS.filter((p) => form.parts.includes(p.key) || parts[p.key]?.trim());
   const clean = (x: Record<string, string>) => Object.fromEntries(Object.entries(x).filter(([, v]) => v.trim()));
-  const [photos, setPhotos] = useState<string[]>(cur?.photos ?? []);
+  const [photos, setPhotos] = useState<string[]>(draft0?.photos ?? cur?.photos ?? []);
   const [busy, setBusy] = useState(false);
   // 이 화면에서 넣은 사진: 저장하지 않고 나가면 지운다
   const added = useRef<string[]>([]);
   const savedRef = useRef(false);
+  // 저장도 임시저장도 없이 나가면 넣은 사진을 지운다 (임시저장이 있으면 그대로 둔다)
   useEffect(
     () => () => {
-      if (!savedRef.current) for (const p of added.current) void removePhoto(p);
+      if (!savedRef.current && !loadDraft(date)) for (const p of added.current) void removePhoto(p);
     },
-    [],
+    [date],
   );
   async function addPhotos(files: FileList) {
     setBusy(true);
@@ -188,10 +217,27 @@ function Write({ date, today }: { date: string; today: string }) {
     setBusy(false);
   }
   const changed = JSON.stringify(photos) !== JSON.stringify(cur?.photos ?? []) || mood !== (cur?.mood ?? 0) || title !== (cur?.title ?? '') || text !== (cur?.text ?? '') || JSON.stringify(clean(parts)) !== JSON.stringify(clean(cur?.parts ?? {}));
+  // 바뀌면 0.5초 뒤 이 기기에 임시저장
+  useEffect(() => {
+    if (savedRef.current) return;
+    const t = setTimeout(() => setDraft(date, changed ? { mood, title, text, parts, photos, at: Date.now() } : null), 500);
+    return () => clearTimeout(t);
+  }, [date, changed, mood, title, text, parts, photos]);
+  function discardDraft() {
+    for (const p of photos) if (!(cur?.photos ?? []).includes(p)) void removePhoto(p);
+    setDraft(date, null);
+    setFromDraft(false);
+    setMood(cur?.mood ?? 0);
+    setTitle(cur?.title ?? '');
+    setText(cur?.text ?? '');
+    setParts(cur?.parts ?? {});
+    setPhotos(cur?.photos ?? []);
+  }
   function save() {
     const p = clean(parts);
     if (!text.trim() && !mood && !Object.keys(p).length && !photos.length) return toast('한 줄이라도 써 주세요');
     savedRef.current = true;
+    setDraft(date, null);
     for (const old of cur?.photos ?? []) if (!photos.includes(old)) void removePhoto(old);
     put('diary', { id: date, mood: mood || undefined, title: title.trim() || undefined, text, parts: Object.keys(p).length ? p : undefined, photos: photos.length ? photos : undefined } as DiaryEntry);
     toast('일기를 저장했어요');
@@ -200,7 +246,7 @@ function Write({ date, today }: { date: string; today: string }) {
   return (
     <div className="st-page narrow">
       <div className="st-page-head">
-        <button className="st-back" onClick={() => (!changed || window.confirm('저장하지 않고 나갈까요?')) && go(`/diary/${monthOf(date)}`)} aria-label="일기 목록">
+        <button className="st-back" onClick={() => go(`/diary/${monthOf(date)}`)} aria-label="일기 목록">
           ‹
         </button>
         <h2>{longDate(date)}</h2>
@@ -213,6 +259,14 @@ function Write({ date, today }: { date: string; today: string }) {
           다음 날 ›
         </button>
       </div>
+      {fromDraft && changed && (
+        <p className="st-hint">
+          임시저장한 글을 불러왔어요.{' '}
+          <button className="st-link" onClick={discardDraft}>
+            버리기
+          </button>
+        </p>
+      )}
       <section className="st-card st-form">
         <div className="st-seg dy-moods" role="radiogroup" aria-label="오늘 기분">
           {[1, 2, 3, 4, 5].map((m) => (
