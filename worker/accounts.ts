@@ -32,7 +32,7 @@ import { lolMetaTables, lolMetaTick, metaChamp, metaPatches, metaTable } from '.
 import { lolMatch, lolNewGames, lolOlderGames, lolProfile, RiotError, type LolGame } from './lol';
 import { krPrices, steamAchievements, steamMe, storeItems, storeNames, storeSearch, wishlist, type KrPrice } from './steam';
 import { hlAverage, fetchHlBox, fetchHlPlayerSeasons, fetchHlStandings, hlMatchId, sameTeam } from './highlightly';
-import { within, fetchGames, fetchNbaAverages, fetchBdlRoster, fetchNbaBox, fetchNbaCareer, fetchNbaRoster, fetchNbaStandings, fetchStandings, nbaGameId, Paid, seasonOf, seasonPage, standingsFrom, type NbaGame } from './nba';
+import { within, fetchGames, fetchNbaAverages, fetchBdlRoster, fetchNbaBox, fetchNbaCareer, fetchNbaRoster, fetchNbaStandings, fetchStandings, nbaGameId, nbaScheduleIds, Paid, seasonOf, seasonPage, standingsFrom, type NbaGame } from './nba';
 import { monthOf, R2_FREE, R2_STOP, r2Block, rollMonth, type R2Use } from './r2guard';
 import { modelFamily, askCompat, askGemini, readGemini, geminiDaily, pacificDay, askOpenRouter, COMPAT, compatModels, geminiModels, openRouterDaily, openRouterModels, pickCompat, SYSTEM as SOLVE_SYSTEM, type Engine, type SolveTurn } from './solve';
 import { filmFacets, searchFilms, type Film } from './catalog';
@@ -1417,11 +1417,14 @@ export class Accounts extends DurableObject<Env> {
     if (/^\d{4}-\d{2}-\d{2}$/.test(date) && /^[A-Z]{3}$/.test(home) && /^[A-Z]{3}$/.test(away)) {
       try {
         const gid = await this.nbaCached(`nba:gid:${game}`, 365 * DAY, async () => {
-          const id = await nbaGameId(date, home, away);
+          // 시즌 일정에서 먼저 (지난 경기도 있음), 없으면 그날 점수판
+          const sched = await this.nbaCached('nba:sched', DAY, () => nbaScheduleIds()).catch(() => null);
+          const id = sched?.v[`${date}|${home}|${away}`] ?? (await nbaGameId(date, home, away));
           if (!id) throw new Error('NBA 경기 번호를 찾지 못했어요');
           return id;
         });
-        const r = await this.nbaCached(`nba:box:nbacom:${gid.v}`, ms, () => fetchNbaBox(gid.v));
+        // 끝난 경기는 경기 중에 받아 둔 기록을 쓰지 않게 열쇠를 따로 (끝난 뒤 받은 것만 7일 기억)
+        const r = await this.nbaCached(`nba:box:nbacom:${gid.v}:${final ? 'final' : 'live'}`, ms, () => fetchNbaBox(gid.v));
         if (r.v.length) return json({ lines: r.v, at: r.at, src: 'nba' });
       } catch (e) {
         why = e instanceof Error ? e.message : String(e);
@@ -1440,8 +1443,10 @@ export class Accounts extends DurableObject<Env> {
           return id;
         });
         const abbrOf = (teamName: string) => (sameTeam({ name: teamName, displayName: teamName }, '', homeName) ? home : sameTeam({ name: teamName, displayName: teamName }, '', awayName) ? away : '');
-        const r = await this.nbaCached(`hl:box:${mid.v}`, ms, () => fetchHlBox(hk, mid.v, abbrOf));
-        if (r.v.length) return json({ lines: r.v, at: r.at, src: 'hl' });
+        const r = await this.nbaCached(`hl:box:${mid.v}:${final ? 'final' : 'live'}`, ms, () => fetchHlBox(hk, mid.v, abbrOf));
+        // 두 팀 선수로 맞춰지지 않으면 다른 경기를 잘못 찾은 것 → 쓰지 않는다
+        if (r.v.length && r.v.some((l) => l.team === home) && r.v.some((l) => l.team === away)) return json({ lines: r.v, at: r.at, src: 'hl' });
+        why = why ? `${why} / Highlightly 경기가 맞지 않음` : 'Highlightly 경기가 맞지 않음';
       } catch (e) {
         const m = e instanceof Error ? e.message : String(e);
         why = why ? `${why} / ${m}` : m;

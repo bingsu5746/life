@@ -376,7 +376,7 @@ const MIN = 60_000;
 export const nbaStandings = () => remember('standings', 30 * MIN, () => call<{ season: number; rows: NbaStanding[]; at: number; from: 'nba' | 'hl' | 'api' | 'games'; building?: boolean }>('nba/standings', 'GET', undefined, 40_000));
 /** 경기 선수 기록: NBA 공식 기록을 찾으려고 날짜 · 홈 · 원정 약자도 보낸다. src: 어디서 왔는지 (선수 번호가 달라서) */
 export const nbaBox = (g: { id: number; date: string; home: string; away: string; homeName: string; awayName: string; final: boolean }) =>
-  remember(`box:${g.id}`, g.final ? 24 * 60 * MIN : MIN, () =>
+  remember(`box:${g.id}:${g.final ? 1 : 0}`, g.final ? 24 * 60 * MIN : MIN, () =>
     call<{ lines: NbaLine[]; at: number; src: 'nba' | 'bdl' | 'hl' }>(`nba/box?${new URLSearchParams({ game: String(g.id), date: g.date, home: g.home, away: g.away, homeName: g.homeName, awayName: g.awayName, ...(g.final ? { final: '1' } : {}) })}`, 'GET', undefined, 40_000),
   );
 export const nbaAvg = (p: { id: number; name: string; season: number; src: 'nba' | 'bdl' }) =>

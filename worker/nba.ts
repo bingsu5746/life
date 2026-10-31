@@ -270,6 +270,24 @@ function resultRows(json: unknown, name?: string): Record<string, unknown>[] {
 export const seasonText = (season: number) => `${season}-${String((season + 1) % 100).padStart(2, '0')}`;
 
 /** 날짜(미국) · 홈 · 원정 약자로 NBA 경기 번호 찾기: 날짜별 경기(stats) → 안 되면 오늘 경기(cdn) */
+/** NBA 공식 시즌 일정 전체 (cdn.nba.com): 「미국 날짜|홈|원정」 → NBA 경기 번호. 지난 경기도 찾을 수 있다 */
+export async function nbaScheduleIds(): Promise<Record<string, string>> {
+  const j = (await within(
+    (async () => {
+      const res = await fetch('https://cdn.nba.com/static/json/staticData/scheduleLeagueV2.json', { headers: CDN_HEADERS, signal: AbortSignal.timeout(20_000) });
+      if (!res.ok) throw new Error(`nba.com 일정 ${res.status}`);
+      return res.json();
+    })(),
+    22_000,
+    'cdn.nba.com 일정',
+  )) as { leagueSchedule?: { gameDates?: { games?: { gameId?: string; gameDateEst?: string; homeTeam?: { teamTricode?: string }; awayTeam?: { teamTricode?: string } }[] }[] } };
+  const out: Record<string, string> = {};
+  for (const d of j.leagueSchedule?.gameDates ?? [])
+    for (const g of d.games ?? []) if (g.gameId && g.gameDateEst && g.homeTeam?.teamTricode && g.awayTeam?.teamTricode) out[`${g.gameDateEst.slice(0, 10)}|${g.homeTeam.teamTricode}|${g.awayTeam.teamTricode}`] = g.gameId;
+  if (!Object.keys(out).length) throw new Error('nba.com 일정이 비어 있어요');
+  return out;
+}
+
 export async function nbaGameId(date: string, home: string, away: string): Promise<string | null> {
   const pick = (games: unknown[]) => {
     const g = (games as { gameId?: string; homeTeam?: { teamTricode?: string }; awayTeam?: { teamTricode?: string } }[]).find((x) => x.homeTeam?.teamTricode === home && x.awayTeam?.teamTricode === away);
