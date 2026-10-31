@@ -6,9 +6,12 @@ import { go } from '../study/ui';
 import { champImg, champMatch, loadDd, type Dd } from './lolDd';
 import { POS } from './lolStats';
 import { OPGG, OPGG_AT, opggHard } from './opgg';
+/** op.gg 값의 무게: 승률은 직접 모은 200판, 픽 · 밴률은 전체 3,000판과 같게 본다 */
+const PRIOR_GAMES = 200;
+const PRIOR_TOTAL = 3000;
 
 export const POS_ORDER = ['TOP', 'JUNGLE', 'MIDDLE', 'BOTTOM', 'UTILITY'];
-type Sort = 'win' | 'pick' | 'ban' | 'games';
+type Sort = 'win' | 'pick' | 'ban' | 'games' | 'kda';
 export const pct1 = (x: number) => `${(Math.round(x * 10) / 10).toFixed(1)}%`;
 
 export function useDd2(): Dd | null {
@@ -36,7 +39,6 @@ export function LolChampsPage() {
   const [pos, setPos] = useState('');
   const [patch, setPatch] = useState('');
   const [sort, setSort] = useState<Sort>('win');
-  const [src, setSrc] = useState<'mine' | 'opgg'>('mine');
   const [data, setData] = useState<Awaited<ReturnType<typeof lolMeta>> | null>(null);
   const [err, setErr] = useState('');
   const [tick, setTick] = useState(0);
@@ -58,22 +60,34 @@ export function LolChampsPage() {
   }, [patch, tick]);
   const rows = useMemo(() => {
     if (!dd) return [];
-    if (src === 'opgg')
-      return Object.entries(OPGG)
-        .flatMap(([p, list]) => list.map((r) => ({ cid: r.c, pos: p, g: 0, w: 0, kk: 0, dd: 0, aa: 0, c: dd.champ[r.c], win: r.w, pick: r.p, ban: r.b, kda: 0 })))
-        .filter((r) => r.c && (!pos || r.pos === pos) && champMatch(r.c, q))
-        .filter(mainOnly(pos))
-        .sort((a, b) => (sort === 'win' ? b.win - a.win : sort === 'pick' || sort === 'games' ? b.pick - a.pick : b.ban - a.ban));
-    if (!data) return [];
-    const min = minGames(data.total);
-    return data.rows
-      .filter((r) => dd.champ[r.cid] && (!pos || r.pos === pos) && champMatch(dd.champ[r.cid], q))
-      .map((r) => ({ ...r, pick: r.g }))
+    const total = data?.total ?? 0;
+    const mine = new Map<string, NonNullable<typeof data>['rows'][number]>((data?.rows ?? []).map((r) => [`${r.cid}|${r.pos}`, r]));
+    const og = new Map<string, (typeof OPGG)[string][number]>(Object.entries(OPGG).flatMap(([p, list]) => list.map((r) => [`${r.c}|${p}`, r] as const)));
+    const min = minGames(total);
+    return [...new Set([...mine.keys(), ...og.keys()])]
+      .map((k) => {
+        const [cid, p] = [Number(k.split('|')[0]), k.split('|')[1]];
+        const m = mine.get(k);
+        const o = og.get(k);
+        const g = m?.g ?? 0;
+        // op.gg 값을 「먼저 본 것」으로 두고 직접 모은 판이 쌓일수록 그쪽으로 (판 수만큼 무게)
+        const blend = (prior: number | undefined, val: number, n: number, w: number) => (prior === undefined ? val : (prior * w + val * n) / (w + n));
+        return {
+          cid,
+          pos: p,
+          g,
+          c: dd.champ[cid],
+          has: !!o || g >= min,
+          win: blend(o?.w, g ? ((m?.w ?? 0) / g) * 100 : 0, g, PRIOR_GAMES),
+          pick: blend(o?.p, total ? (g / total) * 100 : 0, total, PRIOR_TOTAL),
+          ban: blend(o?.b, total ? ((data?.bans[cid] ?? 0) / total) * 100 : 0, total, PRIOR_TOTAL),
+          kda: m && g ? (m.dd ? (m.kk + m.aa) / m.dd : m.kk + m.aa) : 0,
+        };
+      })
+      .filter((r) => r.c && r.has && (!pos || r.pos === pos) && champMatch(r.c, q))
       .filter(mainOnly(pos))
-      .filter((r) => r.g >= min)
-      .map((r) => ({ ...r, c: dd.champ[r.cid], win: (r.w / r.g) * 100, pick: (r.g / Math.max(1, data.total)) * 100, ban: ((data.bans[r.cid] ?? 0) / Math.max(1, data.total)) * 100, kda: r.dd ? (r.kk + r.aa) / r.dd : r.kk + r.aa }))
-      .sort((a, b) => (sort === 'win' ? b.win - a.win : sort === 'pick' ? b.pick - a.pick : sort === 'ban' ? b.ban - a.ban : b.g - a.g));
-  }, [data, dd, pos, q, sort, src]);
+      .sort((a, b) => (sort === 'win' ? b.win - a.win : sort === 'pick' ? b.pick - a.pick : sort === 'ban' ? b.ban - a.ban : sort === 'kda' ? b.kda - a.kda : b.g - a.g));
+  }, [data, dd, pos, q, sort]);
   // 검색했는데 통계가 아직 없는 챔피언도 고를 수 있게
   const found =
     dd && q.trim()
@@ -89,11 +103,7 @@ export function LolChampsPage() {
       </div>
       <div className="lc-bar">
         <input className="st-input lc-search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="챔피언 찾기 (가렌, ㄱㄹ, garen)" aria-label="챔피언 찾기" />
-        <select className="st-input lc-patch" value={src} onChange={(e) => setSrc(e.target.value as 'mine' | 'opgg')} aria-label="통계">
-          <option value="mine">직접 모은 통계</option>
-          <option value="opgg">op.gg ({OPGG_AT.slice(5).replace('-', '/')})</option>
-        </select>
-        {src === 'mine' && data && data.patches.length > 0 && (
+        {data && data.patches.length > 0 && (
           <select className="st-input lc-patch" value={patch || data.patch} onChange={(e) => setPatch(e.target.value)} aria-label="패치">
             {data.patches.map((p) => (
               <option key={p.patch} value={p.patch}>
@@ -124,7 +134,7 @@ export function LolChampsPage() {
       {err && <p className="st-muted">{err}</p>}
       {data && (
         <p className="st-muted sm">
-          마스터+ 솔랭 {data.total.toLocaleString('ko-KR')}판{data.status.err && Date.now() - data.status.err.at < 3600_000 ? ` · 모으기 오류: ${data.status.err.msg}` : ''}
+          직접 모은 마스터+ 솔랭 {data.total.toLocaleString('ko-KR')}판 + op.gg({OPGG_AT.slice(5).replace('-', '/')}){data.status.err && Date.now() - data.status.err.at < 3600_000 ? ` · 모으기 오류: ${data.status.err.msg}` : ''}
         </p>
       )}
       {data?.status.writes && (
@@ -156,6 +166,7 @@ export function LolChampsPage() {
                     ['pick', '픽률'],
                     ['ban', '밴률'],
                     ['games', '판'],
+                    ['kda', 'KDA'],
                   ] as const
                 ).map(([k, label]) => (
                   <th key={k} className={`sortable ${sort === k ? 'on' : ''}`} onClick={() => setSort(k)}>
@@ -163,7 +174,6 @@ export function LolChampsPage() {
                     {sort === k ? ' ▾' : ''}
                   </th>
                 ))}
-                {src === 'mine' && <th>KDA</th>}
                 <th className="l">상대하기 어려운 챔피언</th>
               </tr>
             </thead>
@@ -181,8 +191,8 @@ export function LolChampsPage() {
                   <td className={r.win >= 52 ? 'lc-up' : r.win < 48 ? 'lc-down' : ''}>{pct1(r.win)}</td>
                   <td>{pct1(r.pick)}</td>
                   <td>{pct1(r.ban)}</td>
-                  <td>{src === 'mine' ? r.g.toLocaleString('ko-KR') : '-'}</td>
-                  {src === 'mine' && <td>{r.kda.toFixed(2)}</td>}
+                  <td>{r.g ? r.g.toLocaleString('ko-KR') : '-'}</td>
+                  <td>{r.g ? r.kda.toFixed(2) : '-'}</td>
                   <td className="l">
                     <span className="lc-hard">{opggHard(r.cid, r.pos).map((h) => (dd?.champ[h] ? <img key={h} src={champImg(dd.v, dd.champ[h].id)} alt={dd.champ[h].name} title={dd.champ[h].name} loading="lazy" /> : null))}</span>
                   </td>
