@@ -1,18 +1,35 @@
 import { describe, expect, it } from 'vitest';
-import { countMatch } from './lolMeta';
+import { countMatches, metaChamp, metaTable } from './lolMeta';
 
-// sql.exec 를 흉내: lolagg 에 쌓인 것을 지도에 모은다
+// sql.exec 흉내: lolagg2(k → data) 와 lolm2(id) 만
 function fakeSql() {
-  const m = new Map<string, { g: number; w: number; kk: number }>();
+  const agg = new Map<string, string>();
+  const seen = new Set<string>();
+  let writes = 0;
+  const rows = (r: unknown[]) => ({ toArray: () => r });
   return {
-    m,
-    exec: (_q: string, k: string, w: number, kk: number) => {
-      const c = m.get(k) ?? { g: 0, w: 0, kk: 0 };
-      c.g++;
-      c.w += w;
-      c.kk += kk;
-      m.set(k, c);
-      return { toArray: () => [] };
+    agg,
+    get writes() {
+      return writes;
+    },
+    exec: (q: string, ...a: unknown[]) => {
+      if (q.startsWith('SELECT 1 FROM lolm2')) return rows(seen.has(a[0] as string) ? [{}] : []);
+      if (q.startsWith('INSERT INTO lolm2')) {
+        writes++;
+        seen.add(a[0] as string);
+        return rows([]);
+      }
+      if (q.startsWith('SELECT data FROM lolagg2')) return rows(agg.has(a[0] as string) ? [{ data: agg.get(a[0] as string) }] : []);
+      if (q.startsWith('INSERT OR REPLACE INTO lolagg2')) {
+        writes++;
+        agg.set(a[0] as string, a[1] as string);
+        return rows([]);
+      }
+      if (q.startsWith('SELECT k, data FROM lolagg2')) {
+        const pre = q.includes("'P|%'") ? 'P|' : String(a[0]).replace('%', '');
+        return rows([...agg].filter(([k]) => k.startsWith(pre)).map(([k, data]) => ({ k, data })));
+      }
+      throw new Error(q);
     },
   };
 }
@@ -38,24 +55,29 @@ const part = (teamId: number, pos: string, cid: number, win: boolean, kills = 1)
   },
 });
 const POS = ['TOP', 'JUNGLE', 'MIDDLE', 'BOTTOM', 'UTILITY'];
+const match = { info: { queueId: 420, gameVersion: '16.21.123.4', gameDuration: 1800, teams: [{ bans: [{ championId: 7 }, { championId: -1 }] }, { bans: [] }], participants: [...POS.map((p, i) => part(100, p, 10 + i, true)), ...POS.map((p, i) => part(200, p, 20 + i, false))] } };
 
 describe('롤 통계 세기', () => {
-  it('솔랭 한 판: 경기 수 · 챔프 · 아이템(중복 한 번) · 맞상대 · 밴', () => {
+  it('솔랭 한 판: 한 판에 12줄만 쓰고, 티어표 · 챔피언 화면 모양이 맞다', () => {
     const sql = fakeSql();
-    const match = { info: { queueId: 420, gameVersion: '16.21.123.4', gameDuration: 1800, teams: [{ bans: [{ championId: 7 }, { championId: -1 }] }, { bans: [] }], participants: [...POS.map((p, i) => part(100, p, 10 + i, true)), ...POS.map((p, i) => part(200, p, 20 + i, false))] } };
-    expect(countMatch(sql as never, match)).toBe(true);
-    expect(sql.m.get('T|16.21')?.g).toBe(1);
-    expect(sql.m.get('B|16.21|7')?.g).toBe(1);
-    expect(sql.m.get('C|16.21|10|TOP')).toMatchObject({ g: 1, w: 1 });
-    expect(sql.m.get('I|16.21|10|TOP|3071')?.g).toBe(1);
-    expect(sql.m.get('M|16.21|10|TOP|20')).toMatchObject({ g: 1, w: 1 });
-    expect(sql.m.get('M|16.21|20|TOP|10')).toMatchObject({ g: 1, w: 0 });
-    expect(sql.m.get('S|16.21|10|TOP|4-11')?.g).toBe(1);
-    expect([...sql.m.keys()].some((k) => k.startsWith('R|16.21|10|TOP|8000.8400.8010'))).toBe(true);
+    expect(countMatches(sql as never, [{ id: 'KR_1', m: match }])).toBe(1);
+    expect(sql.writes).toBe(12);
+    const t = metaTable(sql as never, '16.21');
+    expect(t.total).toBe(1);
+    expect(t.bans[7]).toBe(1);
+    expect(t.rows.find((r) => r.cid === 10)).toMatchObject({ pos: 'TOP', g: 1, w: 1 });
+    const c = metaChamp(sql as never, '16.21', 10);
+    expect(c.items.find((r) => r.k === 'TOP|3071')?.g).toBe(1);
+    expect(c.spells.find((r) => r.k === 'TOP|4-11')?.g).toBe(1);
+    expect(c.runes.some((r) => r.k.startsWith('TOP|8000.8400.8010'))).toBe(true);
+    expect(c.mine.find((r) => r.k === 'TOP|20')).toMatchObject({ g: 1, w: 1 });
+    expect(c.theirs.find((r) => r.k === 'TOP|20')).toMatchObject({ g: 1, w: 0 });
   });
-  it('일반 · 짧은 판은 안 센다', () => {
+  it('같은 경기는 두 번 안 세고, 일반 · 짧은 판도 안 센다', () => {
     const sql = fakeSql();
-    expect(countMatch(sql as never, { info: { queueId: 430, gameVersion: '16.21.1', gameDuration: 1800, participants: [] } })).toBe(false);
-    expect(sql.m.size).toBe(0);
+    countMatches(sql as never, [{ id: 'KR_1', m: match }]);
+    expect(countMatches(sql as never, [{ id: 'KR_1', m: match }])).toBe(0);
+    expect(countMatches(sql as never, [{ id: 'KR_2', m: { info: { queueId: 430, gameVersion: '16.21.1', gameDuration: 1800, participants: [] } } }])).toBe(0);
+    expect(metaTable(sql as never, 'all').total).toBe(1);
   });
 });

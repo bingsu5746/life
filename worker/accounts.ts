@@ -1748,7 +1748,7 @@ export class Accounts extends DurableObject<Env> {
     // (다른 알림 때문에 더 늦은 알람이 걸려 있어도 1분 안으로 당긴다)
     const alarm = await this.ctx.storage.getAlarm();
     // 알람이 없거나, 너무 늦게 걸렸거나, 지난 시각에 멈춰 있으면 다시 건다
-    if (this.riotKey() && (alarm === null || alarm > Date.now() + 90_000 || alarm < Date.now() - 120_000)) await this.scheduleAlarm();
+    if (this.riotKey() && (alarm === null || alarm > Date.now() + 150_000 || alarm < Date.now() - 120_000)) await this.scheduleAlarm();
     const patches = metaPatches(this.sql);
     const patch = q.get('patch') === 'all' ? 'all' : (patches.find((x) => x.patch === q.get('patch'))?.patch ?? patches[0]?.patch ?? 'all');
     const status = {
@@ -2445,7 +2445,8 @@ export class Accounts extends DurableObject<Env> {
           (k) => this.cacheGet(k),
           (k, v) => this.cacheSet(k, v),
         );
-        this.cacheSet('lolmeta:next', String(now + 60_000));
+        // 2분마다 (무료 플랜 하루 쓰기 10만 줄 안쪽으로)
+        this.cacheSet('lolmeta:next', String(now + 120_000));
         this.cacheSet('lolmeta:last', JSON.stringify({ at: now, counted: r.counted }));
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);

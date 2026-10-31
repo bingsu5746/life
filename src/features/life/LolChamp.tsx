@@ -132,7 +132,7 @@ export function LolChampPage({ id, sub }: { id: string; sub?: string }) {
           </select>
         )}
       </div>
-      {tab !== 'skills' && tab !== 'tips' && meta && !here && <p className="st-muted">아직 이 챔피언의 경기를 충분히 모으지 못했어요. 서버가 1분마다 마스터 이상 솔랭을 모으고 있어요. 스킬 · 팁은 지금 볼 수 있어요.</p>}
+      {tab !== 'skills' && tab !== 'tips' && meta && !here && <p className="st-muted">아직 이 챔피언의 경기를 충분히 모으지 못했어요. 서버가 2분마다 마스터 이상 솔랭을 모으고 있어요. 스킬 · 팁은 지금 볼 수 있어요.</p>}
       {tab === 'build' && here && meta && <Build meta={meta} pos={pos} dd={dd} items={items} runes={runes} onTab={setTab} />}
       {tab === 'runes' && here && meta && <Runes meta={meta} pos={pos} runes={runes} />}
       {tab === 'items' && here && meta && <Items meta={meta} pos={pos} dd={dd} items={items} />}

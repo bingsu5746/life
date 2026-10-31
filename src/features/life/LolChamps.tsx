@@ -93,7 +93,7 @@ export function LolChampsPage() {
       {err && <p className="st-muted">{err}</p>}
       {data && (
         <p className="st-muted sm">
-          마스터 이상 솔로랭크 {data.total.toLocaleString('ko-KR')}판을 이 앱 서버가 직접 모아 센 통계예요 (1분마다 몇 판씩 늘어나요). {data.total < 2000 ? '아직 적어서 숫자가 많이 흔들려요.' : ''}
+          마스터 이상 솔로랭크 {data.total.toLocaleString('ko-KR')}판을 이 앱 서버가 직접 모아 센 통계예요 (2분마다 몇 판씩 늘어나요). {data.total < 2000 ? '아직 적어서 숫자가 많이 흔들려요.' : ''}
           {data.status.err && Date.now() - data.status.err.at < 3600_000 ? ` · 모으기 오류: ${data.status.err.msg}` : ''}
         </p>
       )}
