@@ -7,6 +7,7 @@ import { confirmDelete, Empty, Field, Icon, Sheet, tap, toast, useToday } from '
 import { won } from './calc';
 import { discogsSearch, isLoggedIn, musicSimilar, type DiscogsHit } from '../auth/api';
 import { StarInput, starText } from './MovieParts';
+import { WishGoal } from './WishGoal';
 import { NameSearch } from './NameSearch';
 
 const FORMAT: Record<MusicRecord['format'], string> = { lp: 'LP', cd: 'CD', tape: '카세트', digital: '디지털' };
@@ -360,6 +361,11 @@ function RecordSheet({ item, today, onClose }: { item: Partial<MusicRecord>; tod
           <small className="st-muted">
             들은 날 {item.listens.length}번 · 마지막 {shortDate(item.listens[item.listens.length - 1])}
           </small>
+        )}
+        {item.id && status === 'want' && title.trim() && (
+          <Field group label="사고 싶은 것 → 모으기">
+            <WishGoal name={title.trim()} />
+          </Field>
         )}
         <div className="st-row end">
           {item.id && (

@@ -229,6 +229,7 @@ export function Settings({ cat: cat0 }: { cat?: string }) {
 
           <NotifyTime k="checkinTime" label="하루 마감 알림" fallback="22:00" />
           <NotifyTime k="diaryTime" label="일기 알림" fallback="22:30" />
+          <NotifyTime k="wordQuizTime" label="단어 퀴즈 알림 (자주 틀린 단어 3개)" fallback="07:30" />
         </>
       )}
       {cat === 'life' && (

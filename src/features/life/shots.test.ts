@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { zoneOf } from './homecourt';
-import { durationSecs, report, whenDate, type ShotRec } from './shots';
+import { compareZones, durationSecs, report, similarShooters, whenDate, type ShotRec } from './shots';
 
 describe('zoneOf (FIBA 반코트, 카드 높이 = 폭 × 0.685)', () => {
   it('구역', () => {
@@ -41,5 +41,22 @@ describe('홈코트 글 읽기', () => {
     expect(whenDate('Today at 1:00 PM', '2026-10-31')).toBe('2026-10-31');
     expect(whenDate('Oct 29 at 6:58 PM', '2026-10-31')).toBe('2026-10-29');
     expect(whenDate('Dec 30 at 6:58 PM', '2026-10-31')).toBe('2025-12-30');
+  });
+});
+
+describe('비슷한 선수 · 기간 비교', () => {
+  const many = (x: number, y: number, m: number, a: number): ShotRec[] => Array.from({ length: a }, (_, i) => [x, y, i < m ? 1 : 0]);
+  it('3점을 가장 잘 넣으면 3점 능력치가 높은 선수', () => {
+    const r = report([...many(500, 160, 2, 10), ...many(500, 680, 3, 10), ...many(500, 950, 6, 10)]);
+    const players = [
+      { name: 'shooter', ovr: 80, attrs: { closeShot: 60, midRangeShot: 75, threePointShot: 92 } },
+      { name: 'big', ovr: 85, attrs: { closeShot: 95, midRangeShot: 60, threePointShot: 40 } },
+    ];
+    expect(similarShooters(r, players, 1)[0].p.name).toBe('shooter');
+    expect(similarShooters(report(many(500, 160, 2, 10)), players)).toEqual([]);
+  });
+  it('구역별 비교', () => {
+    const c = compareZones(many(500, 160, 2, 10), many(500, 160, 5, 10));
+    expect(c).toEqual([{ key: 'ra', before: { m: 2, a: 10 }, after: { m: 5, a: 10 }, diff: 30 }]);
   });
 });

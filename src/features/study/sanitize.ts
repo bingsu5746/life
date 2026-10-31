@@ -641,6 +641,7 @@ export function sanitizeSettings(s: unknown): StudySettings & { updatedAt: numbe
     school: isObj(x.school) && typeof x.school.name === 'string' && x.school.name.trim() ? { name: x.school.name.trim().slice(0, 40), grade: score(x.school.grade, 1, 3), cls: typeof x.school.cls === 'string' && /^\d{1,2}$/.test(x.school.cls) ? x.school.cls : undefined } : undefined,
     sleepGoal: score(x.sleepGoal, 3, 12),
     diaryTime: typeof x.diaryTime === 'string' && /^([01]\d|2[0-3]):[0-5]\d$/.test(x.diaryTime) ? x.diaryTime : undefined,
+    wordQuizTime: typeof x.wordQuizTime === 'string' && /^([01]\d|2[0-3]):[0-5]\d$/.test(x.wordQuizTime) ? x.wordQuizTime : undefined,
     checkinTime: typeof x.checkinTime === 'string' && /^([01]\d|2[0-3]):[0-5]\d$/.test(x.checkinTime) ? x.checkinTime : undefined,
     semesterGoals: isObj(x.semesterGoals)
       ? Object.fromEntries(

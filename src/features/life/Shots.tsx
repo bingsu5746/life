@@ -1,6 +1,8 @@
 // 슛 분석 화면 + 홈코트 사진 넣기. 슛 위치는 기기에서 사진 색으로 찾고(homecourt.ts), 숫자는 서버 AI 가 읽는다
-import { useMemo, useState } from 'react';
-import { bbScan, nbaAvg, type HcRead, type NbaAverage } from '../auth/api';
+import { useEffect, useMemo, useState } from 'react';
+import { bbScan, nba2k, nbaAvg, type HcRead, type Nba2kPlayer, type NbaAverage } from '../auth/api';
+import { nbaFace } from './nbaLogo';
+import { NBA_IDS } from './nbaIds';
 import { LineChart } from '../study/charts';
 import { addDays, shortDate } from '../study/dates';
 import { alive, newId, type Workout } from '../study/model';
@@ -9,7 +11,7 @@ import { minutesText } from '../study/timer';
 import { confirmDelete, Empty, go, Icon, Sheet, tap, toast, useToday } from '../study/ui';
 import { AREA_NAME, DRILLS, type DrillArea } from './drills';
 import { findCard, findShots, kindOf, ZONES, type Img, type ZoneKey } from './homecourt';
-import { bestWorst, durationSecs, heat, pct, report, shotSessions, whenDate, type Line, type ShotRec } from './shots';
+import { bestWorst, compareZones, durationSecs, heat, pct, report, shotSessions, similarShooters, whenDate, type Line, type ShotRec } from './shots';
 
 const H = 685; // 카드 세로 (가로 1000 기준, FIBA 반코트 비율)
 const M = 1000 / 15; // 1m = 66.7
@@ -230,6 +232,8 @@ export function ShotsPage() {
             </>
           )}
           {shots.length > 0 && <NbaCompare r={r} />}
+          {shots.length > 0 && <SimilarPlayers r={r} />}
+          <MonthCompare all={all} today={today} />
           {all.length > 1 && (
             <section className="st-card">
               <h3 className="st-h">연습마다</h3>
@@ -662,6 +666,117 @@ function NbaCompare({ r }: { r: ReturnType<typeof report> }) {
           </p>
         </>
       )}
+    </section>
+  );
+}
+
+/** 슛 스타일이 비슷한 NBA 선수 (2K 능력치의 근거리 · 미드 · 3점 모양과 내 성공률 모양 비교, 재미로) */
+function SimilarPlayers({ r }: { r: ReturnType<typeof report> }) {
+  const [players, setPlayers] = useState<Nba2kPlayer[] | null>(null);
+  const [err, setErr] = useState('');
+  const k = r.kinds;
+  const enough = k.paint.a >= 5 && k.mid.a >= 5 && k.three.a >= 5;
+  useEffect(() => {
+    if (!enough || players) return;
+    let live = true;
+    nba2k()
+      .then((x) => live && setPlayers(x.players))
+      .catch((e) => live && setErr(e instanceof Error ? e.message : '선수 목록을 받지 못했어요'));
+    return () => {
+      live = false;
+    };
+  }, [enough, players]);
+  const norm = (x: string) =>
+    x
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .toLowerCase()
+      .replace(/\b(jr|sr|ii|iii|iv)\b/g, '')
+      .replace(/[^a-z]/g, '');
+  const top = players ? similarShooters(r, players, 3) : [];
+  return (
+    <section className="st-card">
+      <h3 className="st-h">슛 스타일이 비슷한 NBA 선수</h3>
+      {!enough ? (
+        <p className="st-muted sm">페인트존 · 미드레인지 · 3점을 각각 5개 넘게 던지면 찾아 드려요.</p>
+      ) : err ? (
+        <p className="st-muted sm">{err}</p>
+      ) : !players ? (
+        <p className="st-muted sm">선수 목록을 받는 중…</p>
+      ) : (
+        <div className="sh-sim">
+          {top.map(({ p, score }) => {
+            const id = NBA_IDS[norm(p.name)];
+            return (
+              <div key={p.name} className="sh-sim-row">
+                {id ? <img src={nbaFace(id)} alt="" loading="lazy" /> : <span className="dg-noimg" aria-hidden />}
+                <div>
+                  <b>{p.name}</b>
+                  <small className="st-muted">
+                    {p.team} · OVR {p.ovr} · 근거리 {p.attrs.closeShot} · 미드 {p.attrs.midRangeShot} · 3점 {p.attrs.threePointShot}
+                  </small>
+                </div>
+                <small className="st-muted">{Math.round(Math.max(0, score) * 100)}%</small>
+              </div>
+            );
+          })}
+        </div>
+      )}
+      <p className="st-muted sm">
+        내 페인트 {Math.round(pct(k.paint))}% · 미드 {Math.round(pct(k.mid))}% · 3점 {Math.round(pct(k.three))}% 중 어디가 강하고 약한지의 모양을 NBA 2K 능력치와 비교했어요 (재미로 보는 것, 실력 비교가 아니에요).
+      </p>
+    </section>
+  );
+}
+
+/** 이번 달과 지난달 구역별 성공률 */
+function MonthCompare({ all, today }: { all: Workout[]; today: string }) {
+  const month = today.slice(0, 7);
+  const t = new Date(`${month}-01T12:00:00Z`);
+  t.setUTCMonth(t.getUTCMonth() - 1);
+  const prev = t.toISOString().slice(0, 7);
+  const of = (m: string) => all.filter((w) => w.date.startsWith(m)).flatMap((w) => w.bb!.shots!);
+  const a = of(prev),
+    b = of(month);
+  if (!a.length || !b.length) return null;
+  const rows = compareZones(a, b);
+  const ra = report(a),
+    rb = report(b);
+  return (
+    <section className="st-card">
+      <h3 className="st-h">이번 달 vs 지난달</h3>
+      <p className="sm">
+        야투 {pctText(ra.total)} → <b>{pctText(rb.total)}</b> · 3점 {pctText(ra.three)} → <b>{pctText(rb.three)}</b>
+      </p>
+      <div className="nba-scroll">
+        <table className="nba-table">
+          <thead>
+            <tr>
+              <th className="l">구역</th>
+              <th>지난달</th>
+              <th>이번 달</th>
+              <th>변화</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((x) => (
+              <tr key={x.key}>
+                <td className="l">{ZONES.find((z) => z.key === x.key)?.label}</td>
+                <td>
+                  {pctText(x.before)} <small className="st-muted">({x.before.a})</small>
+                </td>
+                <td>
+                  {pctText(x.after)} <small className="st-muted">({x.after.a})</small>
+                </td>
+                <td className={x.diff > 0 ? 'up' : x.diff < 0 ? 'down' : ''}>
+                  {x.diff > 0 ? '▲' : x.diff < 0 ? '▼' : ''} {Math.abs(Math.round(x.diff))}%p
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <p className="st-muted sm">괄호 안은 던진 수예요. 적게 던진 구역은 몇 개로도 크게 바뀌어요.</p>
     </section>
   );
 }

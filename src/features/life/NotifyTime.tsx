@@ -4,7 +4,7 @@ import type { StudySettings } from '../study/model';
 import { enableNotify, localTimes } from '../study/notify';
 import { setSettings, useStudy } from '../study/store';
 
-type Key = 'checkinTime' | 'diaryTime';
+type Key = 'checkinTime' | 'diaryTime' | 'wordQuizTime';
 
 export function NotifyTime({ k, label, fallback }: { k: Key; label: string; fallback: string }) {
   const d = useStudy();
@@ -19,8 +19,8 @@ export function NotifyTime({ k, label, fallback }: { k: Key; label: string; fall
       return;
     }
     // 다른 알림이 같은 시각을 쓰면 그 시각은 남겨 둔다
-    const other = k === 'checkinTime' ? d.settings.diaryTime : d.settings.checkinTime;
-    const others = times.filter((x) => x !== cur || x === other);
+    const otherTimes = (['checkinTime', 'diaryTime', 'wordQuizTime'] as const).filter((x) => x !== k).map((x) => d.settings[x]);
+    const others = times.filter((x) => x !== cur || otherTimes.includes(x));
     const want = next ? [...new Set([...others, next])].sort() : others;
     if (want.length > 3) {
       setMsg('알림 시각은 3개까지예요. 설정 → 알림에서 하나를 지운 뒤 다시 해 주세요.');

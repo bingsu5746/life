@@ -351,6 +351,19 @@ export function Analysis({ sessions, today }: { sessions: StudySession[]; today:
   const weeks = weekly(byDate, today, 12);
   const wd = weekdayAverage(byDate, today, range);
   const subj = bySubject(sessions, addDays(today, -(range - 1)), today);
+  // 월별 (최근 6달) · 이번 달과 지난달 같은 날짜까지
+  const months = Array.from({ length: 6 }, (_, i) => {
+    const t = new Date(`${today.slice(0, 7)}-01T12:00:00Z`);
+    t.setUTCMonth(t.getUTCMonth() - (5 - i));
+    const month = t.toISOString().slice(0, 7);
+    return { month, min: [...byDate].filter(([k]) => k.startsWith(month)).reduce((a, [, v]) => a + v, 0) };
+  });
+  const prevMonth = months[months.length - 2]?.month ?? '';
+  const lastMonthSoFar = [...byDate].filter(([k]) => k.startsWith(prevMonth) && k.slice(8) <= today.slice(8)).reduce((a, [, v]) => a + v, 0);
+  // 시간대별: 시작한 시각(한국 시간)으로 0~23시
+  const from = addDays(today, -(range - 1));
+  const hours = Array.from({ length: 24 }, () => 0);
+  for (const x of sessions) if (!x.deleted && x.date >= from && x.date <= today && x.start > 1e12) hours[new Date(x.start + 9 * 3600_000).getUTCHours()] += x.minutes;
   const subjMax = Math.max(1, ...subj.map((x) => x.min));
   const h = (m: number) => (m >= 60 ? `${Math.round((m / 60) * 10) / 10}시간` : `${m}분`);
   // 2시간이 넘는 그래프는 눈금을 시간 단위로
@@ -406,6 +419,29 @@ export function Analysis({ sessions, today }: { sessions: StudySession[]; today:
 
       <h4 className="ta-h">주별 (최근 12주)</h4>
       <BarChart label="최근 12주 주별 공부 시간" height={150} bars={weeks.map((w, i) => ({ label: md(w.start), title: `${shortDate(w.start)} 주`, value: w.min, strong: i === weeks.length - 1 }))} format={h} tickUnit={unit(weeks.map((w) => w.min))} />
+
+      <h4 className="ta-h">월별 (최근 6달)</h4>
+      <BarChart
+        label="최근 6달 월별 공부 시간"
+        height={150}
+        bars={months.map((m, i) => ({ label: `${Number(m.month.slice(5))}월`, title: `${m.month.slice(0, 4)}년 ${Number(m.month.slice(5))}월`, value: m.min, strong: i === months.length - 1 }))}
+        format={h}
+        tickUnit={unit(months.map((m) => m.min))}
+      />
+      {months.length > 1 && (
+        <p className="st-muted sm">
+          이번 달 {minutesText(months[months.length - 1].min)} · 지난달 같은 날짜까지 {minutesText(lastMonthSoFar)}
+          {lastMonthSoFar > 0 && ` (${months[months.length - 1].min >= lastMonthSoFar ? '+' : ''}${Math.round(((months[months.length - 1].min - lastMonthSoFar) / lastMonthSoFar) * 100)}%)`}
+        </p>
+      )}
+
+      <h4 className="ta-h">시간대별 (최근 {range}일, 시작한 시각)</h4>
+      <BarChart label="시간대별 공부 시간" height={140} bars={hours.map((m, i) => ({ label: `${i}`, title: `${i}시~${i + 1}시`, value: m, strong: m === Math.max(...hours) && m > 0 }))} format={h} tickUnit={unit(hours)} />
+      {Math.max(...hours) > 0 && (
+        <p className="st-muted sm">
+          가장 많이 공부한 시간대: {hours.indexOf(Math.max(...hours))}시~{hours.indexOf(Math.max(...hours)) + 1}시
+        </p>
+      )}
 
       <h4 className="ta-h">요일별 평균 (최근 {range}일)</h4>
       <BarChart label="요일별 평균 공부 시간" height={140} bars={wd.map((m, i) => ({ label: WEEKDAYS[(i + 1) % 7], value: m }))} format={h} tickUnit={unit(wd)} />

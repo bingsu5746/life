@@ -6,6 +6,7 @@ import { alive, newId, type Game } from '../study/model';
 import { getStudy, put, remove, useStudy } from '../study/store';
 import { confirmDelete, Empty, Field, Icon, Sheet, tap, toast, useToday } from '../study/ui';
 import { StarInput, starText } from './MovieParts';
+import { WishGoal } from './WishGoal';
 import { NameSearch } from './NameSearch';
 
 type Tab = Game['status'];
@@ -265,6 +266,11 @@ function GameSheet({ item, today, onClose }: { item: Partial<Game>; today: strin
           </Field>
         )}
         <textarea className="st-input" rows={3} value={note} onChange={(e) => setNote(e.target.value)} placeholder={status === 'want' ? '하고 싶은 이유 · 누가 추천했는지' : '한줄평 · 메모'} aria-label="메모" />
+        {item.id && status === 'want' && title.trim() && (
+          <Field group label="사고 싶은 것 → 모으기">
+            <WishGoal name={title.trim()} />
+          </Field>
+        )}
         <div className="st-row end">
           {item.id && (
             <button className="btn btn-sm st-danger" onClick={() => confirmDelete(`「${item.title}」`) && (remove('games', item.id!), onClose())}>

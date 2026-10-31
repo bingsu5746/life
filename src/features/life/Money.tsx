@@ -7,6 +7,7 @@ import { put, remove, setSettings, useStudy } from '../study/store';
 import { Bar, confirmDelete, Empty, Field, go, Icon, Sheet, tap, toast, useToday } from '../study/ui';
 import { budgetView, compareMonths, savingPace, weekAllowance, weekSpent, monthlyAmount, monthLabel, monthlyOut, monthOf, monthSummary, readWon, saved, shiftMonth, upcomingRules, won } from './calc';
 import { WEEKDAYS } from '../study/dates';
+import { guessCategory, topCategory } from './moneyGuess';
 
 const OUT = ['식비', '간식·카페', '교통', '쇼핑', '문화·여가', '교육·책', '통신', '선물', '기타'];
 const IN = ['용돈', '알바', '선물', '기타'];
@@ -123,6 +124,16 @@ export function Money({ sub }: { sub?: string }) {
               {s.byCategory.length > 0 && (
                 <section className="st-card">
                   <h3 className="st-h">어디에 썼나</h3>
+                  {month === monthOf(today) &&
+                    (() => {
+                      const t = topCategory(d, today);
+                      return t ? (
+                        <p className="st-hint">
+                          이번 달 가장 많이 쓴 곳은 <b>{t.category}</b> {won(t.now)}
+                          {t.before > 0 ? ` · 지난달 같은 날까지 ${won(t.before)} (${t.now >= t.before ? '+' : ''}${Math.round(((t.now - t.before) / t.before) * 100)}%)` : ''}
+                        </p>
+                      ) : null;
+                    })()}
                   {s.byCategory.map((c) => (
                     <div key={c.category} className="st-subj-row">
                       <span>{c.category}</span>
@@ -275,6 +286,15 @@ function TxSheet({ item, today, onClose }: { item?: MoneyTx; today: string; onCl
   const [memo, setMemo] = useState(item?.memo ?? '');
   const cats = type === 'out' ? OUT : IN;
   const n = readWon(amount);
+  // 분류를 직접 고르기 전까지는 「무엇에」 글로 분류를 짐작해 바꾼다
+  const [picked, setPicked] = useState(!!item);
+  const d = useStudy();
+  const typeMemo = (v: string) => {
+    setMemo(v);
+    if (picked) return;
+    const g = guessCategory(d, v, type, cats);
+    if (g) setCategory(g);
+  };
   function save() {
     if (!n || !date) return;
     put('moneyTx', { ...(item ?? { created: Date.now() }), id: item?.id ?? newId(), type, amount: n, category: cats.includes(category) ? category : cats[0], date, memo: memo.trim() || undefined } as MoneyTx);
@@ -311,7 +331,7 @@ function TxSheet({ item, today, onClose }: { item?: MoneyTx; today: string; onCl
         <Field group label="분류">
           <div className="st-chips">
             {cats.map((c) => (
-              <button key={c} type="button" className={`st-chip ${category === c ? 'on' : ''}`} aria-pressed={category === c} onClick={() => setCategory(c)}>
+              <button key={c} type="button" className={`st-chip ${category === c ? 'on' : ''}`} aria-pressed={category === c} onClick={() => (setCategory(c), setPicked(true))}>
                 {c}
               </button>
             ))}
@@ -319,7 +339,7 @@ function TxSheet({ item, today, onClose }: { item?: MoneyTx; today: string; onCl
         </Field>
         <div className="st-inline wrap">
           <input className="st-input sm" type="date" value={date} max={today} onChange={(e) => setDate(e.target.value)} aria-label="날짜" />
-          <input className="st-input" value={memo} onChange={(e) => setMemo(e.target.value)} placeholder="무엇에 (예: 떡볶이, 버스)" aria-label="메모" />
+          <input className="st-input" value={memo} onChange={(e) => typeMemo(e.target.value)} placeholder="무엇에 (예: 떡볶이, 버스) · 분류를 짐작해 골라 줘요" aria-label="메모" />
         </div>
         <div className="st-row end">
           {item && (

@@ -113,3 +113,34 @@ export function whenDate(text: string | null | undefined, today: DateStr): DateS
   }
   return today;
 }
+
+/** 슛 스타일이 비슷한 선수: 내 페인트 · 미드 · 3점 성공률의 「잘하고 못하는 모양」과
+ *  2K 능력치(근거리 슛 · 미드레인지 · 3점 슛)의 모양이 비슷한 순 (코사인 유사도). 세 구역 모두 5개 넘게 던졌을 때만 */
+export function similarShooters<T extends { name: string; attrs: Record<string, number>; ovr: number }>(r: ShotReport, players: T[], n = 3): { p: T; score: number }[] {
+  const k = r.kinds;
+  if (k.paint.a < 5 || k.mid.a < 5 || k.three.a < 5) return [];
+  const mine = [pct(k.paint), pct(k.mid), pct(k.three)];
+  const dev = (v: number[]) => {
+    const m = v.reduce((a, b) => a + b, 0) / v.length;
+    return v.map((x) => x - m);
+  };
+  const a = dev(mine);
+  const na = Math.hypot(...a);
+  if (!na) return [];
+  return players
+    .filter((p) => p.attrs.closeShot && p.attrs.midRangeShot && p.attrs.threePointShot && p.ovr >= 70)
+    .map((p) => {
+      const b = dev([p.attrs.closeShot, p.attrs.midRangeShot, p.attrs.threePointShot]);
+      const nb = Math.hypot(...b);
+      return { p, score: nb ? (a[0] * b[0] + a[1] * b[1] + a[2] * b[2]) / (na * nb) : -1 };
+    })
+    .sort((x, y) => y.score - x.score || y.p.ovr - x.p.ovr)
+    .slice(0, n);
+}
+
+/** 두 기간의 구역별 성공률 비교 (둘 다 던진 구역만) */
+export function compareZones(before: ShotRec[], after: ShotRec[]): { key: ZoneKey; before: Line; after: Line; diff: number }[] {
+  const a = report(before),
+    b = report(after);
+  return ZONES.filter((z) => a.zones[z.key].a > 0 && b.zones[z.key].a > 0).map((z) => ({ key: z.key, before: a.zones[z.key], after: b.zones[z.key], diff: pct(b.zones[z.key]) - pct(a.zones[z.key]) }));
+}

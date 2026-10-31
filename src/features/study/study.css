@@ -7881,3 +7881,37 @@ body.focus-on {
   border-radius: 12px;
   background: var(--soft);
 }
+.sh-sim {
+  display: grid;
+  gap: 8px;
+}
+.sh-sim-row {
+  display: grid;
+  grid-template-columns: 48px 1fr auto;
+  gap: 10px;
+  align-items: center;
+}
+.sh-sim-row img,
+.sh-sim-row .dg-noimg {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  object-fit: cover;
+  background: var(--soft);
+}
+.sh-sim-row div {
+  display: grid;
+  gap: 2px;
+}
+.nba-table td.up {
+  color: #16a34a;
+}
+.nba-table td.down {
+  color: var(--bad);
+}
+.wg {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}

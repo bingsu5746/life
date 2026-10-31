@@ -83,7 +83,7 @@ export function morning(d: StudyData, words: WordsData, today: DateStr, date: Da
   const hw = homeworkViews(d, today).filter((h) => !h.finished && h.due === date);
   if (hw.length) parts.push(`오늘 마감 숙제 ${hw.length}개`);
   const plans = planViews(d, words, today);
-  const items = plans.reduce((n, p) => n + (date === today ? p.sched.today.length : p.sched.days.find((x) => x.date === date)?.items.length ?? 0), 0);
+  const items = plans.reduce((n, p) => n + (date === today ? p.sched.today.length : (p.sched.days.find((x) => x.date === date)?.items.length ?? 0)), 0);
   const books = plans.filter((p) => (date === today ? p.sched.today.length : p.sched.days.find((x) => x.date === date)?.items.length)).length;
   if (books) parts.push(`문제집·단어장 ${books}개 (${items}쪽·Day)`);
   const pv = alive(d.previews).filter((p) => !p.done && p.date === date);
@@ -154,13 +154,25 @@ export function buildDigest(d: StudyData, words: WordsData, today: DateStr, time
         out.push({ date, slot, title: '일기 쓸 시간이에요', body: '오늘 하루를 짧게라도 남겨 볼까요? 꿈 꾼 게 있으면 그것도요', url: `/diary/${date}` });
         return;
       }
+      // 단어 퀴즈 알림: 자주 틀린 단어 3개 (누르면 바로 연습)
+      const quiz = d.settings.wordQuizTime === t ? weakQuiz(words, date) : [];
+      if (quiz.length) {
+        out.push({ date, slot, title: '📝 단어 퀴즈', body: `${quiz.join(' · ')} — 뜻이 떠오르나요? 눌러서 연습해요`, url: '/words/practice' });
+        return;
+      }
       const checkin = d.settings.checkinTime === t;
       if (checkin) {
         out.push({ date, slot, title: '오늘 어땠어요?', body: '기분 · 공부 · 운동을 눌러서 하루를 마감해요', url: '/checkin' });
         return;
       }
       const sunday = !am && weekday(date) === 0;
-      out.push({ date, slot, title: y ? '🏆 영화 시상식' : sunday ? '내일 준비 · 이번 주 돌아보기' : am ? '오늘 할 것' : '내일 준비', body: sunday ? `${evening(d, today, date)} · ${weekBody(d, date, today)}` : am ? morning(d, words, today, date) : evening(d, today, date), url: y ? '/movies/ceremony' : sunday ? '/week' : wk ? `/exams/weak-${wk.subjectId}` : weak ? '/words' : undefined });
+      out.push({
+        date,
+        slot,
+        title: y ? '🏆 영화 시상식' : sunday ? '내일 준비 · 이번 주 돌아보기' : am ? '오늘 할 것' : '내일 준비',
+        body: sunday ? `${evening(d, today, date)} · ${weekBody(d, date, today)}` : am ? morning(d, words, today, date) : evening(d, today, date),
+        url: y ? '/movies/ceremony' : sunday ? '/week' : wk ? `/exams/weak-${wk.subjectId}` : weak ? '/words/practice' : undefined,
+      });
     });
   }
   return out.slice(0, 24);

@@ -52,6 +52,8 @@ export interface StudySettings {
   semesterGoals?: Record<Id, SemesterGoal>;
   /** 일기 쓰라는 알림 시각 HH:MM */
   diaryTime?: string;
+  /** 단어 퀴즈 알림 시각 (자주 틀린 단어 3개) */
+  wordQuizTime?: string;
   /** 하루 마감 체크인 알림 시각 HH:MM */
   checkinTime?: string;
   /** 잠 목표 (시간) */
