@@ -9200,3 +9200,33 @@ body.focus-on {
 .lc-ctip + .lc-ctip {
   margin-top: 12px;
 }
+.lc-firsts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+  margin-bottom: 10px;
+}
+.lc-firsts span,
+.lc-build {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.lc-builds {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+.lc-build {
+  justify-content: space-between;
+}
+.lc-path,
+.lc-path > span {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.lc-path i {
+  font-style: normal;
+  color: var(--muted);
+}

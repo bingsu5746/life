@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { countMatches, metaChamp, metaTable } from './lolMeta';
+import { coreOrder, countMatches, metaChamp, metaTable } from './lolMeta';
 
 // sql.exec 흉내: lolagg2(k → data) 와 lolm2(id) 만
 function fakeSql() {
@@ -79,5 +79,15 @@ describe('롤 통계 세기', () => {
     expect(countMatches(sql as never, [{ id: 'KR_1', m: match }])).toBe(0);
     expect(countMatches(sql as never, [{ id: 'KR_2', m: { info: { queueId: 430, gameVersion: '16.21.1', gameDuration: 1800, participants: [] } } }])).toBe(0);
     expect(metaTable(sql as never, 'all').total).toBe(1);
+  });
+  it('타임라인: 완성 아이템 산 순서 (되돌리기 빼고 앞의 3개) → 빌드', () => {
+    const ev = (type: string, participantId: number, itemId: number, beforeId?: number) => ({ type, participantId, itemId, beforeId });
+    const tl = { info: { frames: [{ events: [ev('ITEM_PURCHASED', 1, 1055), ev('ITEM_PURCHASED', 1, 3031), ev('ITEM_UNDO', 1, 0, 3031), ev('ITEM_PURCHASED', 1, 3153)] }, { events: [ev('ITEM_PURCHASED', 1, 3031), ev('ITEM_PURCHASED', 1, 3094), ev('ITEM_PURCHASED', 1, 3036)] }] } };
+    const core = new Set([3031, 3153, 3094, 3036]);
+    const o = coreOrder(tl, core);
+    expect(o.get(1)).toEqual([3153, 3031, 3094]);
+    const sql = fakeSql();
+    countMatches(sql as never, [{ id: 'KR_9', m: match, order: o }]);
+    expect(metaChamp(sql as never, '16.21', 10).builds.find((r) => r.k === 'TOP|3153>3031>3094')).toMatchObject({ g: 1, w: 1 });
   });
 });

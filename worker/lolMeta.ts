@@ -16,6 +16,8 @@ interface ChampAgg {
   runes: Record<string, Record<string, Stat>>;
   spells: Record<string, Record<string, Stat>>;
   mu: Record<string, Record<string, Stat>>;
+  /** 완성 아이템 3개를 산 순서 'a>b>c' (경기 타임라인에서) */
+  builds?: Record<string, Record<string, Stat>>;
 }
 interface PatchAgg {
   games: number;
@@ -62,7 +64,27 @@ type Part = Record<string, unknown> & {
 };
 
 /** 경기들을 메모리에서 센 뒤, 바뀐 챔피언 줄만 한 번씩 쓴다. 센 판 수 */
-export function countMatches(sql: Sql, matches: { id: string; m: unknown }[]): number {
+/** 타임라인에서 사람마다 완성 아이템을 산 순서 (되돌리기 반영, 앞의 3개) */
+export function coreOrder(tl: unknown, core: Set<number>): Map<number, number[]> {
+  const bought = new Map<number, number[]>();
+  const frames = (tl as { info?: { frames?: { events?: { type?: string; participantId?: number; itemId?: number; beforeId?: number }[] }[] } })?.info?.frames ?? [];
+  for (const f of frames)
+    for (const e of f.events ?? []) {
+      const pid = e.participantId ?? 0;
+      if (!pid) continue;
+      const l = bought.get(pid) ?? [];
+      if (e.type === 'ITEM_PURCHASED' && e.itemId && core.has(e.itemId) && !l.includes(e.itemId)) l.push(e.itemId);
+      if (e.type === 'ITEM_UNDO' && e.beforeId && core.has(e.beforeId)) {
+        const i = l.lastIndexOf(e.beforeId);
+        if (i >= 0) l.splice(i, 1);
+      }
+      bought.set(pid, l);
+    }
+  for (const [k, v] of bought) bought.set(k, v.slice(0, 3));
+  return bought;
+}
+
+export function countMatches(sql: Sql, matches: { id: string; m: unknown; order?: Map<number, number[]> }[]): number {
   const patches = new Map<string, PatchAgg>();
   const champs = new Map<string, ChampAgg>();
   const patchOf = (p: string) => {
@@ -75,7 +97,7 @@ export function countMatches(sql: Sql, matches: { id: string; m: unknown }[]): n
     return champs.get(k)!;
   };
   let n = 0;
-  for (const { id, m } of matches) {
+  for (const { id, m, order } of matches) {
     const info = (m as { info?: { queueId?: number; gameVersion?: string; gameDuration?: number; participants?: Part[]; teams?: { bans?: { championId?: number }[] }[] } })?.info;
     if (!info || info.queueId !== 420 || (info.gameDuration ?? 0) < 300) continue;
     const patch = (info.gameVersion ?? '').split('.').slice(0, 2).join('.');
@@ -87,7 +109,7 @@ export function countMatches(sql: Sql, matches: { id: string; m: unknown }[]): n
     pa.games++;
     for (const t of info.teams ?? []) for (const b of t.bans ?? []) if (b.championId && b.championId > 0) pa.bans[b.championId] = (pa.bans[b.championId] ?? 0) + 1;
     const teamKills = (team?: number) => ps.filter((p) => p.teamId === team).reduce((s, p) => s + (p.kills ?? 0), 0);
-    for (const p of ps) {
+    for (const [pi, p] of ps.entries()) {
       const pos = String(p.teamPosition ?? '');
       const cid = p.championId ?? 0;
       if (!POS.has(pos) || !cid) continue;
@@ -98,6 +120,12 @@ export function countMatches(sql: Sql, matches: { id: string; m: unknown }[]): n
       bump(c.pos, pos, win, st);
       c.items[pos] ??= {};
       for (const it of new Set([0, 1, 2, 3, 4, 5].map((i) => Number(p[`item${i}`]) || 0))) if (it) bump(c.items[pos], String(it), win);
+      const path = order?.get(Number(p.participantId) || pi + 1);
+      if (path && path.length === 3) {
+        c.builds ??= {};
+        c.builds[pos] ??= {};
+        bump(c.builds[pos], path.join('>'), win);
+      }
       c.spells[pos] ??= {};
       bump(c.spells[pos], [Number(p.summoner1Id) || 0, Number(p.summoner2Id) || 0].sort((a, b) => a - b).join('-'), win);
       const styles = p.perks?.styles ?? [];
@@ -138,6 +166,21 @@ async function allChamps(cacheGet: (k: string) => string | undefined, cacheSet: 
     .sort((a, b) => a - b);
   cacheSet('lolmeta:champs', JSON.stringify({ at: Date.now(), ids }));
   return ids;
+}
+
+/** 완성 아이템 번호 (Data Dragon: 더 올라가지 않고 2,000골드 이상, 신발 · 소비 아이템 빼고, 소환사의 협곡) */
+async function coreItems(cacheGet: (k: string) => string | undefined, cacheSet: (k: string, v: string) => void): Promise<Set<number>> {
+  const c = JSON.parse(cacheGet('lolmeta:core') ?? 'null') as { at: number; ids: number[] } | null;
+  if (c && Date.now() - c.at < 86_400_000 && c.ids.length) return new Set(c.ids);
+  const v = ((await (await within(fetch('https://ddragon.leagueoflegends.com/api/versions.json'), 15_000, 'Data Dragon')).json()) as string[])[0];
+  const j = (await (await within(fetch(`https://ddragon.leagueoflegends.com/cdn/${v}/data/en_US/item.json`), 15_000, 'Data Dragon')).json()) as {
+    data: Record<string, { into?: string[]; gold?: { total?: number; purchasable?: boolean }; tags?: string[]; maps?: Record<string, boolean>; consumed?: boolean }>;
+  };
+  const ids = Object.entries(j.data)
+    .filter(([, x]) => !x.into?.length && (x.gold?.total ?? 0) >= 2000 && x.gold?.purchasable !== false && !x.tags?.includes('Boots') && !x.consumed && x.maps?.['11'] !== false)
+    .map(([id]) => Number(id));
+  cacheSet('lolmeta:core', JSON.stringify({ at: Date.now(), ids }));
+  return new Set(ids);
 }
 
 /** 챔피언 → 그 챔피언을 하는 마스터 이상 사람들 (센 경기 참가자 · 숙련도 상위에서 알게 된 것, 챔피언마다 최근 8명) */
@@ -195,10 +238,13 @@ export async function lolMetaTick(key: string, sql: Sql, cacheGet: (k: string) =
     sql.exec('DELETE FROM lolm2 WHERE at < ?', Date.now() - 30 * 86_400_000);
     cacheSet('lolmeta:gc', String(Date.now()));
   }
-  const got: { id: string; m: unknown }[] = [];
+  const core = await coreItems(cacheGet, cacheSet).catch(() => new Set<number>());
+  const got: { id: string; m: unknown; order?: Map<number, number[]> }[] = [];
   for (const id of fresh) {
     const m = await riot(key, `https://asia.api.riotgames.com/lol/match/v5/matches/${id}`);
-    got.push({ id, m });
+    // 아이템 산 순서는 타임라인에만 있다 (못 받으면 순서 없이 센다)
+    const tl = core.size ? await riot(key, `https://asia.api.riotgames.com/lol/match/v5/matches/${id}/timeline`).catch(() => null) : null;
+    got.push({ id, m, order: tl ? coreOrder(tl, core) : undefined });
     // 이 판 참가자들도 그 챔피언을 하는 사람으로 기억
     for (const p of ((m as { info?: { queueId?: number; participants?: { puuid?: string; championId?: number }[] } }).info?.queueId === 420 ? (m as { info: { participants?: { puuid?: string; championId?: number }[] } }).info.participants : []) ?? [])
       if (p.puuid && p.championId) addWho(who, p.championId, p.puuid);
@@ -277,7 +323,7 @@ export function metaChamp(sql: Sql, patch: string, cid: number) {
     const c = read<ChampAgg>(sql, `C|${p}|${cid}`);
     if (c) {
       for (const [pos, s] of Object.entries(c.pos)) addTo('pos', pos, s);
-      for (const b of ['items', 'runes', 'spells', 'mu'] as const) for (const [pos, o] of Object.entries(c[b])) for (const [k, s] of Object.entries(o)) addTo(b, `${pos}|${k}`, s);
+      for (const b of ['items', 'runes', 'spells', 'mu', 'builds'] as const) for (const [pos, o] of Object.entries(c[b] ?? {})) for (const [k, s] of Object.entries(o)) addTo(b, `${pos}|${k}`, s);
     }
     // 상대 쪽: 맞상대 챔피언들의 줄에서 상대가 이 챔프인 것
     for (const r of sql.exec<{ k: string; data: string }>('SELECT k, data FROM lolagg2 WHERE k LIKE ?', `C|${p}|%`).toArray()) {
@@ -287,5 +333,5 @@ export function metaChamp(sql: Sql, patch: string, cid: number) {
     }
   }
   const list = (b: string) => [...(sum.get(b)?.values() ?? [])];
-  return { total, bans, pos: list('pos'), items: list('items'), runes: list('runes'), spells: list('spells'), mine: list('mu'), theirs: list('theirs') };
+  return { total, bans, pos: list('pos'), items: list('items'), runes: list('runes'), spells: list('spells'), builds: list('builds'), mine: list('mu'), theirs: list('theirs') };
 }

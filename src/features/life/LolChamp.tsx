@@ -146,6 +146,58 @@ function ItemIcon({ dd, id, items, size = 36 }: { dd: Dd; id: number; items: Rec
 const isCore = (it?: Item) => !!it && !it.into && !it.boots && it.gold >= 2000;
 const isBoots = (it?: Item) => !!it && it.boots && it.gold >= 900;
 
+/** 3코어 빌드: 완성 아이템 3개를 산 순서별 (판 · 승률). 같은 챔피언이라도 AD · AP · 하이브리드처럼 갈리면 따로 나온다 */
+function CoreBuilds({ meta, pos, dd, items, games }: { meta: Meta; pos: string; dd: Dd; items: Record<number, Item> | null; games: number }) {
+  const list = forPos(meta.builds ?? [], pos).slice(0, 6);
+  if (!list.length) return null;
+  const all = list.reduce((s, x) => s + x.g, 0);
+  // 첫 코어별로 묶어 계열 보기 (예: 바루스 마법사 · 치명타 · 적중)
+  const first = new Map<string, { g: number; w: number }>();
+  for (const x of forPos(meta.builds ?? [], pos)) {
+    const f = x.key.split('>')[0];
+    const c = first.get(f) ?? { g: 0, w: 0 };
+    c.g += x.g;
+    c.w += x.w;
+    first.set(f, c);
+  }
+  const firsts = [...first].sort((a, b) => b[1].g - a[1].g).slice(0, 4);
+  return (
+    <section className="st-card">
+      <h3 className="st-h">3코어 빌드</h3>
+      {firsts.length > 1 && (
+        <div className="lc-firsts">
+          {firsts.map(([id, c]) => (
+            <span key={id}>
+              <ItemIcon dd={dd} id={Number(id)} items={items} size={28} />
+              <small className="st-muted">
+                첫 코어 {pct1((c.g / Math.max(1, all)) * 100)} · 승 {pct1(wr(c))}
+              </small>
+            </span>
+          ))}
+        </div>
+      )}
+      <div className="lc-builds">
+        {list.map((x) => (
+          <div key={x.key} className="lc-build">
+            <span className="lc-path">
+              {x.key.split('>').map((id, i) => (
+                <span key={id}>
+                  {i > 0 && <i>›</i>}
+                  <ItemIcon dd={dd} id={Number(id)} items={items} size={34} />
+                </span>
+              ))}
+            </span>
+            <small>
+              {x.g}판 · 승 <b className={wr(x) >= 52 ? 'lc-up' : wr(x) < 48 ? 'lc-down' : ''}>{pct1(wr(x))}</b>
+            </small>
+          </div>
+        ))}
+      </div>
+      <small className="st-muted">{games.toLocaleString('ko-KR')}판 중 3코어까지 간 판 기준</small>
+    </section>
+  );
+}
+
 function Build({ meta, pos, dd, items, runes, onTab }: { meta: Meta; pos: string; dd: Dd; items: Record<number, Item> | null; runes: Record<number, RuneInfo> | null; onTab: (t: string) => void }) {
   const games = meta.pos.find((p) => p.k === pos)?.g ?? 1;
   const it = forPos(meta.items, pos);
@@ -156,6 +208,7 @@ function Build({ meta, pos, dd, items, runes, onTab }: { meta: Meta; pos: string
   const counters = useCounters(meta, pos);
   return (
     <div className="lc-cols">
+      <CoreBuilds meta={meta} pos={pos} dd={dd} items={items} games={games} />
       <section className="st-card">
         <h3 className="st-h">핵심 아이템</h3>
         <div className="lc-items">

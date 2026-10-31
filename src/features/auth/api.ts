@@ -693,7 +693,7 @@ export const lolMeta = (patch = '') =>
   );
 export const lolChampMeta = (cid: number, patch = '') =>
   remember(`lolchamp:${cid}:${patch}`, 5 * MIN, () =>
-    call<{ patch: string; patches: { patch: string; games: number }[]; status: LolMetaStatus; total: number; bans: number; pos: LolAggRow[]; items: LolAggRow[]; runes: LolAggRow[]; spells: LolAggRow[]; mine: LolAggRow[]; theirs: LolAggRow[] }>(
+    call<{ patch: string; patches: { patch: string; games: number }[]; status: LolMetaStatus; total: number; bans: number; pos: LolAggRow[]; items: LolAggRow[]; runes: LolAggRow[]; spells: LolAggRow[]; builds?: LolAggRow[]; mine: LolAggRow[]; theirs: LolAggRow[] }>(
       `lol/champ?cid=${cid}${patch ? `&patch=${encodeURIComponent(patch)}` : ''}`,
       'GET',
       undefined,
