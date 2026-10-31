@@ -567,3 +567,41 @@ export const keysInfo = () => call<{ serpapi: boolean; serpUsed: number; discogs
 /** 응원팀 경기 알림 (시작 · 끝). subs: 이 계정에 알림을 받는 기기 수 */
 export const nbaFavGet = () => call<{ team: string; subs: number }>('nba/fav');
 export const nbaFavSet = (team: string) => call<{ team: string; subs: number }>('nba/fav', 'PUT', { team });
+
+/** Steam 게임 (CheapShark): 찾기 · 지금 값 · 값 알림 */
+export interface SteamHit {
+  id: number;
+  steamAppID: number;
+  title: string;
+  cheapest: number;
+  thumb: string;
+}
+export interface SteamPrice {
+  price: number;
+  retail: number;
+  lowest: number;
+  thumb: string;
+  title: string;
+}
+export const gameSearch = (q: string) => call<{ list: SteamHit[] }>(`games/search?q=${encodeURIComponent(q)}`, 'GET', undefined, 25_000);
+export const gamePrices = (ids: number[]) => remember(`gp:${ids.join(',')}`, 30 * MIN, () => call<{ prices: Record<number, SteamPrice> }>(`games/prices?ids=${ids.join(',')}`, 'GET', undefined, 25_000));
+export const gameWatch = (list: { id: number; title: string; target: number }[]) => call<{ ok: true; n: number }>('games/watch', 'PUT', { list });
+
+/** AI 로 읽기 (뒤에서 하고 2초마다 묻는다) */
+async function aiJob<T>(path: string, body: unknown): Promise<T> {
+  const { jobId } = await call<{ jobId: string }>(path, 'POST', body, 60_000);
+  for (let i = 0; i < 90; i++) {
+    await new Promise((r) => setTimeout(r, 2000));
+    const r = await call<{ running?: boolean; missing?: boolean; done?: boolean; read?: T; error?: string }>(`bb/scan/${jobId}`, 'GET', undefined, 20_000).catch(() => ({ running: true }) as { running: boolean; missing?: boolean; done?: boolean; read?: T; error?: string });
+    if (r.done) {
+      if (r.read) return r.read;
+      throw new Error(r.error ?? 'AI 가 읽지 못했어요');
+    }
+    if (r.missing) throw new Error('서버가 다시 시작돼서 결과를 잃었어요. 다시 해 주세요.');
+  }
+  throw new Error('너무 오래 걸려요. 다시 해 주세요.');
+}
+/** 문제 사진 → 과목 · 번호 · 문제 글 */
+export const noteScan = (image: { mime: string; data: string }, subjects: string[]) => aiJob<{ subject: string | null; number: string | null; question: string | null }>('ai/note', { image, subjects });
+/** 받아쓴 일기 → 칸 나누기 */
+export const diarySplit = (text: string) => aiJob<Partial<Record<'good' | 'hard' | 'thanks' | 'tomorrow' | 'dream', string>>>('ai/diary', { text });

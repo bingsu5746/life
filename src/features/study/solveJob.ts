@@ -216,3 +216,18 @@ if (typeof document !== 'undefined') {
     if (document.visibilityState === 'visible' && job?.status === 'running') void poll();
   });
 }
+
+/** 다른 화면에서 AI 에게 물을 것을 미리 넣어 두기 (AI 화면을 열면 새 대화로 채워짐). noteId: 오답 노트에서 온 연습 */
+export interface Prefill {
+  title: string;
+  text: string;
+  subjectId?: string;
+  noteId?: string;
+}
+const PREFILL_KEY = 'my-study.solve.prefill';
+export const askAiLater = (p: Prefill) => store(PREFILL_KEY, p);
+export function takePrefill(): Prefill | null {
+  const p = load<Prefill | null>(PREFILL_KEY, null);
+  if (p) store(PREFILL_KEY, null);
+  return p;
+}

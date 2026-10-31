@@ -23,6 +23,8 @@ import { fetchSpecialDays } from './holidays';
 import { cleanFact } from './fact';
 import { fetch2k } from './nba2k';
 import { hcBody, parseHc } from './homecourt';
+import { diaryBody, noteBody, parseDiary, parseNote } from './aiRead';
+import { cheapShark } from './cheapshark';
 import { hlAverage, fetchHlBox, fetchHlPlayerSeasons, fetchHlStandings, hlMatchId, sameTeam } from './highlightly';
 import { within, fetchGames, fetchNbaAverages, fetchBdlRoster, fetchNbaBox, fetchNbaCareer, fetchNbaRoster, fetchNbaStandings, fetchStandings, nbaGameId, Paid, seasonOf, seasonPage, standingsFrom, type NbaGame } from './nba';
 import { monthOf, R2_FREE, R2_STOP, r2Block, rollMonth, type R2Use } from './r2guard';
@@ -194,7 +196,7 @@ export class Accounts extends DurableObject<Env> {
 
     let body: Record<string, unknown> = {};
     if (req.method === 'POST' || req.method === 'PUT' || req.method === 'DELETE') {
-      const big = path.startsWith('store/') || path.startsWith('study-photo/') || path === 'solve' || path === 'solve/img' || path === 'bb/scan';
+      const big = path.startsWith('store/') || path.startsWith('study-photo/') || path === 'solve' || path === 'solve/img' || path === 'bb/scan' || path === 'ai/note';
       const text = await req.text();
       if (text.length > (big ? MAX_STORE + 1000 : path === 'translate' || path === 'notify/digest' ? 4 * MAX_SMALL_BODY : MAX_SMALL_BODY)) return fail('보낸 내용이 너무 커요.', 413);
       try {
@@ -252,8 +254,20 @@ export class Accounts extends DurableObject<Env> {
     if (path === 'movies/ott' && req.method === 'POST') return this.ott(body);
     if (path === 'school' && req.method === 'POST') return this.school(body);
     if (path === 'keys' && req.method === 'GET') return this.keysInfo();
+    if (path === 'games/search' && req.method === 'GET') return this.gameSearch((new URL(req.url).searchParams.get('q') ?? '').trim().slice(0, 80));
+    if (path === 'games/prices' && req.method === 'GET')
+      return this.gamePrices(
+        (new URL(req.url).searchParams.get('ids') ?? '')
+          .split(',')
+          .map(Number)
+          .filter((x) => Number.isInteger(x) && x > 0)
+          .slice(0, 50),
+      );
+    if (path === 'games/watch' && req.method === 'PUT') return this.gameWatch(req, user, body);
     if (path === 'nba/fav' && (req.method === 'GET' || req.method === 'PUT')) return this.nbaFav(req, user, body);
     if (path === 'music/discogs' && req.method === 'GET') return this.discogs((new URL(req.url).searchParams.get('q') ?? '').trim().slice(0, 80));
+    if (path === 'ai/note' && req.method === 'POST') return this.noteScan(user, body);
+    if (path === 'ai/diary' && req.method === 'POST') return this.diarySplit(user, body);
     if (path === 'bb/scan' && req.method === 'POST') return this.bbScan(user, body);
     if (path.startsWith('bb/scan/') && req.method === 'GET') return this.bbScanGet(user, path.slice('bb/scan/'.length));
     if (path === 'nba/games' && req.method === 'GET') return this.nbaGames(new URL(req.url).searchParams.get('date'));
@@ -1435,6 +1449,88 @@ export class Accounts extends DurableObject<Env> {
     }
   }
 
+  /** Steam 게임 찾기 (CheapShark, 키 없음). Steam 에 있는 게임만 */
+  private async gameSearch(q: string): Promise<Response> {
+    if (q.length < 2) return fail('게임 이름을 넣어 주세요.');
+    try {
+      const r = await this.nbaCached(`cs:search:${q.toLowerCase()}`, DAY, async () => {
+        const list = (await cheapShark(`games?${new URLSearchParams({ title: q, limit: '30' })}`)) as { gameID?: string; steamAppID?: string | null; external?: string; cheapest?: string; thumb?: string }[];
+        return list.filter((g) => g.gameID && g.steamAppID).map((g) => ({ id: Number(g.gameID), steamAppID: Number(g.steamAppID), title: g.external ?? '', cheapest: Number(g.cheapest) || 0, thumb: g.thumb ?? '' }));
+      });
+      return json({ list: r.v });
+    } catch (e) {
+      return fail(`게임을 찾지 못했어요. (${(e instanceof Error ? e.message : String(e)).slice(0, 80)})`, 502);
+    }
+  }
+  /** 여러 게임의 지금 Steam 값 · 정가 · 역대 최저 (달러, 3시간 기억) */
+  private async gamePrices(ids: number[]): Promise<Response> {
+    if (!ids.length) return json({ prices: {} });
+    try {
+      return json({ prices: await this.steamPrices(ids) });
+    } catch (e) {
+      return fail(`값을 받지 못했어요. (${(e instanceof Error ? e.message : String(e)).slice(0, 80)})`, 502);
+    }
+  }
+  private async steamPrices(ids: number[]): Promise<Record<number, { price: number; retail: number; lowest: number; thumb: string; title: string }>> {
+    const out: Record<number, { price: number; retail: number; lowest: number; thumb: string; title: string }> = {};
+    const need: number[] = [];
+    for (const id of ids) {
+      const c = this.cacheGet(`cs:price:${id}`);
+      const v = c ? (JSON.parse(c) as { at: number; v: (typeof out)[number] }) : null;
+      if (v && Date.now() - v.at < 3 * 3600_000) out[id] = v.v;
+      else need.push(id);
+    }
+    for (let i = 0; i < need.length; i += 25) {
+      const j = (await cheapShark(`games?ids=${need.slice(i, i + 25).join(',')}`)) as Record<string, { info?: { title?: string; thumb?: string }; cheapestPriceEver?: { price?: string }; deals?: { storeID?: string; price?: string; retailPrice?: string }[] }>;
+      for (const [k, g] of Object.entries(j)) {
+        const steam = (g.deals ?? []).find((d) => d.storeID === '1');
+        if (!steam) continue;
+        const v = { price: Number(steam.price) || 0, retail: Number(steam.retailPrice) || 0, lowest: Number(g.cheapestPriceEver?.price) || 0, thumb: g.info?.thumb ?? '', title: g.info?.title ?? '' };
+        out[Number(k)] = v;
+        this.cacheSet(`cs:price:${k}`, JSON.stringify({ at: Date.now(), v }));
+      }
+    }
+    return out;
+  }
+  /** 값 알림: 이 값(달러) 아래로 내려가면 알림. { list: [{ id, title, target }] } (빈 목록이면 끔) */
+  private gameWatch(req: Request, user: UserRow, b: Record<string, unknown>): Response {
+    const list = (Array.isArray(b.list) ? b.list : [])
+      .map((x) => x as { id?: unknown; title?: unknown; target?: unknown })
+      .filter((x) => Number.isInteger(x.id) && typeof x.target === 'number' && x.target > 0 && x.target < 1000)
+      .slice(0, 30)
+      .map((x) => ({ id: x.id as number, title: String(x.title ?? '').slice(0, 80), target: x.target as number }));
+    const ck = `gamewatch:${user.id}`;
+    if (!list.length) this.sql.exec('DELETE FROM cache WHERE key = ?', ck);
+    else {
+      const old = this.cacheGet(ck);
+      const sent = old ? ((JSON.parse(old) as { sent?: Record<string, number> }).sent ?? {}) : {};
+      this.cacheSet(ck, JSON.stringify({ list, origin: new URL(req.url).origin, sent }));
+    }
+    void this.scheduleAlarm();
+    return json({ ok: true, n: list.length });
+  }
+  /** 6시간마다: 값 알림을 건 게임이 목표 값 아래면 알림 (같은 값이면 다시 안 보냄) */
+  private async gameWatchCheck() {
+    const rows = this.sql.exec<{ key: string; data: string }>("SELECT key, data FROM cache WHERE key LIKE 'gamewatch:%'").toArray();
+    const all = [...new Set(rows.flatMap((r) => (JSON.parse(r.data) as { list: { id: number }[] }).list.map((x) => x.id)))];
+    if (!all.length) return;
+    const prices = await this.steamPrices(all);
+    for (const row of rows) {
+      const uid = row.key.slice('gamewatch:'.length);
+      const v = JSON.parse(row.data) as { list: { id: number; title: string; target: number }[]; origin: string; sent: Record<string, number> };
+      const msgs: { title: string; body: string; url: string }[] = [];
+      for (const g of v.list) {
+        const p = prices[g.id];
+        if (!p || p.price > g.target || v.sent[g.id] === p.price) continue;
+        v.sent[g.id] = p.price;
+        msgs.push({ title: `🎮 ${g.title || p.title} $${p.price}`, body: `Steam 에서 ${p.retail ? `정가 $${p.retail} → ` : ''}$${p.price} · 정해 둔 $${g.target} 아래예요`, url: '/#/games' });
+      }
+      this.cacheSet(row.key, JSON.stringify(v));
+      const subs = msgs.length ? this.sql.exec<PushSub & { [k: string]: SqlStorageValue }>('SELECT endpoint, p256dh, auth FROM push_subs WHERE user_id = ?', uid).toArray() : [];
+      for (const m of msgs) if (subs.length) await this.pushTo(subs, m, v.origin);
+    }
+  }
+
   /** 어떤 서비스 키가 등록돼 있는지만 (값은 보내지 않음) */
   private keysInfo(): Response {
     const used = Number(this.cacheGet(`serp:${new Date().toISOString().slice(0, 7)}`) ?? 0);
@@ -1450,15 +1546,11 @@ export class Accounts extends DurableObject<Env> {
     });
   }
 
-  /** 홈코트 화면 사진 → 숫자 (Gemini 무료 모델 차례로, 가벼운 lite 모델부터. 문제 풀이와 같은 하루 한도를 같이 센다).
-   *  오래 걸릴 수 있어서 뒤에서 하고 번호를 돌려준다 → GET bb/scan/{번호} 로 결과 */
-  private async bbScan(user: UserRow, b: Record<string, unknown>): Promise<Response> {
-    const img = b.image as { mime?: unknown; data?: unknown } | undefined;
-    const mime = typeof img?.mime === 'string' && /^image\/(jpeg|png|webp)$/.test(img.mime) ? img.mime : '';
-    const data = typeof img?.data === 'string' ? img.data : '';
-    if (!mime || !data || data.length > 1_500_000 || !/^[A-Za-z0-9+/=]+$/.test(data)) return fail('사진이 너무 크거나 잘못됐어요.', 413);
+  /** Gemini 에게 JSON 으로 묻기를 뒤에서 하고 번호를 돌려준다 → GET bb/scan/{번호} (또는 ai/job/{번호}) 로 { done, read, model }.
+   *  가벼운 lite 모델부터, 모델마다 70초. 문제 풀이와 같은 하루 한도를 같이 센다 */
+  private async aiJob(user: UserRow, body: unknown, parse: (text: string) => unknown, what: string): Promise<Response> {
     const key = this.keyOf('gemini');
-    if (!key) return fail('사진을 읽으려면 Gemini 키가 필요해요.', 503);
+    if (!key) return fail('AI 로 읽으려면 Gemini 키가 필요해요.', 503);
     if (!this.gemList || Date.now() - this.gemList.at > DAY) this.gemList = { at: Date.now(), v: await geminiModels(key, this.gemFetch()) };
     const chain = this.gemLeft(user.id)
       .map((x) => x.model)
@@ -1472,7 +1564,7 @@ export class Accounts extends DurableObject<Env> {
       const tried: string[] = [];
       for (const m of chain.slice(0, 3)) {
         try {
-          const res = await within(this.gemFetch()(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(m)}:generateContent`, { method: 'POST', headers: { 'content-type': 'application/json', 'x-goog-api-key': key }, body: JSON.stringify(hcBody(mime, data)) }), 70_000, m);
+          const res = await within(this.gemFetch()(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(m)}:generateContent`, { method: 'POST', headers: { 'content-type': 'application/json', 'x-goog-api-key': key }, body: JSON.stringify(body) }), 70_000, m);
           const j = (await res.json().catch(() => null)) as { error?: { message?: string } } | null;
           if (!res.ok) {
             const em = j?.error?.message ?? '';
@@ -1480,18 +1572,46 @@ export class Accounts extends DurableObject<Env> {
             throw new Error(`Gemini ${res.status}: ${em.slice(0, 80)}`);
           }
           this.bumpGem(user.id, m);
-          console.log('bb scan ok', m);
-          return this.cacheSet(ck, JSON.stringify({ done: true, read: parseHc(readGemini(j)), model: m }));
+          console.log('ai job ok', what, m);
+          return this.cacheSet(ck, JSON.stringify({ done: true, read: parse(readGemini(j)), model: m }));
         } catch (e) {
           const msg = e instanceof Error ? e.message : String(e);
-          console.error('bb scan failed', m, msg);
+          console.error('ai job failed', what, m, msg);
           tried.push(`${m}: ${msg.slice(0, 80)}`);
         }
       }
-      this.cacheSet(ck, JSON.stringify({ done: true, error: `사진을 읽지 못했어요. (${tried.join(' / ').slice(0, 200)})` }));
+      this.cacheSet(ck, JSON.stringify({ done: true, error: `AI 가 읽지 못했어요. (${tried.join(' / ').slice(0, 200)})` }));
     };
     this.ctx.waitUntil(run());
     return json({ jobId: id });
+  }
+  private imageOf(b: Record<string, unknown>): { mime: string; data: string } | null {
+    const img = b.image as { mime?: unknown; data?: unknown } | undefined;
+    const mime = typeof img?.mime === 'string' && /^image\/(jpeg|png|webp)$/.test(img.mime) ? img.mime : '';
+    const data = typeof img?.data === 'string' ? img.data : '';
+    return mime && data && data.length <= 1_500_000 && /^[A-Za-z0-9+/=]+$/.test(data) ? { mime, data } : null;
+  }
+  /** 홈코트 화면 사진 → 숫자 */
+  private async bbScan(user: UserRow, b: Record<string, unknown>): Promise<Response> {
+    const img = this.imageOf(b);
+    if (!img) return fail('사진이 너무 크거나 잘못됐어요.', 413);
+    return this.aiJob(user, hcBody(img.mime, img.data), parseHc, 'homecourt');
+  }
+  /** 문제 사진 → 과목 · 번호 · 문제 글 (오답 노트 칸 채우기) */
+  private async noteScan(user: UserRow, b: Record<string, unknown>): Promise<Response> {
+    const img = this.imageOf(b);
+    if (!img) return fail('사진이 너무 크거나 잘못됐어요.', 413);
+    const subjects = (Array.isArray(b.subjects) ? b.subjects : [])
+      .filter((x): x is string => typeof x === 'string')
+      .map((x) => x.slice(0, 20))
+      .slice(0, 30);
+    return this.aiJob(user, noteBody(img.mime, img.data, subjects), (t) => parseNote(t, subjects), 'note');
+  }
+  /** 받아쓴 일기 글 → 칸마다 (좋았던 것 · 힘들었던 것 …). 쓴 말만 옮기고 지어내지 않게 */
+  private async diarySplit(user: UserRow, b: Record<string, unknown>): Promise<Response> {
+    const text = typeof b.text === 'string' ? b.text.trim().slice(0, 6000) : '';
+    if (text.length < 5) return fail('나눌 글이 너무 짧아요.');
+    return this.aiJob(user, diaryBody(text), parseDiary, 'diary');
   }
   private bbScanGet(user: UserRow, id: string): Response {
     if (!/^[a-f0-9]{16}$/.test(id)) return fail('번호가 잘못됐어요.');
@@ -1862,7 +1982,9 @@ export class Accounts extends DurableObject<Env> {
     // 응원팀 경기 알림을 켠 사람이 있으면 10분마다 경기를 본다
     const favs = this.sql.exec<{ n: number }>("SELECT COUNT(*) AS n FROM cache WHERE key LIKE 'nbafav:%'").toArray()[0].n;
     const nbaAt = favs ? Math.max(Date.now() + 5_000, Number(this.cacheGet('nba:nextcheck') ?? 0)) : 0;
-    const at = [r?.at ?? 0, nbaAt].filter((x) => x > 0);
+    const games = this.sql.exec<{ n: number }>("SELECT COUNT(*) AS n FROM cache WHERE key LIKE 'gamewatch:%'").toArray()[0].n;
+    const gameAt = games ? Math.max(Date.now() + 5_000, Number(this.cacheGet('games:nextcheck') ?? 0)) : 0;
+    const at = [r?.at ?? 0, nbaAt, gameAt].filter((x) => x > 0);
     if (at.length) await this.ctx.storage.setAlarm(Math.min(...at));
     else await this.ctx.storage.deleteAlarm();
   }
@@ -2000,6 +2122,10 @@ export class Accounts extends DurableObject<Env> {
   /** 정한 시각: 그 사람이 넣어 둔 그날 그 시각 글을 보낸다 */
   async alarm() {
     const now = Date.now();
+    if (now + 30_000 >= Number(this.cacheGet('games:nextcheck') ?? 0) && this.sql.exec<{ n: number }>("SELECT COUNT(*) AS n FROM cache WHERE key LIKE 'gamewatch:%'").toArray()[0].n) {
+      this.cacheSet('games:nextcheck', String(now + 6 * 3600_000));
+      await this.gameWatchCheck().catch((e) => console.error('game watch failed', e instanceof Error ? e.message : String(e)));
+    }
     if (now + 30_000 >= Number(this.cacheGet('nba:nextcheck') ?? 0) && this.sql.exec<{ n: number }>("SELECT COUNT(*) AS n FROM cache WHERE key LIKE 'nbafav:%'").toArray()[0].n) {
       this.cacheSet('nba:nextcheck', String(now + 10 * 60_000));
       await this.nbaFavCheck().catch((e) => console.error('nba fav check failed', e instanceof Error ? e.message : String(e)));

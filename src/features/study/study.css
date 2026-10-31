@@ -7846,3 +7846,38 @@ body.focus-on {
 .sync-info .btn {
   justify-self: start;
 }
+.gm-thumb {
+  width: 92px;
+  height: 34px;
+  border-radius: 6px;
+  object-fit: cover;
+}
+.gm-item img,
+.gm-item .dg-noimg {
+  width: 92px;
+  height: 34px;
+}
+.gm-item {
+  grid-template-columns: 92px 1fr auto;
+}
+.gm-price {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  align-items: baseline;
+}
+.gm-price b.sale {
+  color: #16a34a;
+}
+.gm-price .ok {
+  color: #16a34a;
+}
+.sv-practice {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: var(--soft);
+}

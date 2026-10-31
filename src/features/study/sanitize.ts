@@ -266,6 +266,9 @@ const FIX: Record<Collection, Fix> = {
     note: optStr(x.note)?.slice(0, 5000),
     started: optDate(x.started),
     finished: optDate(x.finished),
+    csId: Number.isInteger(x.csId) && (x.csId as number) > 0 ? (x.csId as number) : undefined,
+    thumb: typeof x.thumb === 'string' && /^https:\/\/shared\.fastly\.steamstatic\.com\/[\w\-./:%=?&]+$/.test(x.thumb) ? x.thumb.slice(0, 400) : undefined,
+    watchPrice: score(x.watchPrice, 0.01, 999),
     created: num(x.created),
   }),
   problems: (x) => ({

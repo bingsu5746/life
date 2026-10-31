@@ -16,6 +16,9 @@ import { loadTimer } from './timerStore';
 import { RetestSheet } from './RetestSheet';
 import { SavedProblems } from './SavedProblems';
 import { VAULT_ITEMS } from './vault';
+import { noteScan } from '../auth/api';
+import { compressProblemImage } from '../../lib/imageCompress';
+import { askAiLater } from './solveJob';
 
 export function Review({ sub }: { sub?: string }) {
   if (sub === 'redo' || sub?.startsWith('redo?')) return <NoteRun />;
@@ -318,6 +321,55 @@ function NoteSheet({ note, today, onClose }: { note?: WrongNote; today: string; 
     // 문제 칸이 비어 있으면 사진 글자를 바로 읽어 채운다
     if (ids.length && !f.question.trim()) void readQuestion(ids);
   }
+  /** 첫 사진을 AI(Gemini)로 읽어 문제 글 · 번호 · 과목을 채운다 (이미 쓴 칸은 그대로) */
+  const [aiBusy, setAiBusy] = useState(false);
+  async function aiRead() {
+    const blob = await photoBlob(f.photos[0]);
+    if (!blob) return toast('사진을 찾지 못했어요');
+    setAiBusy(true);
+    try {
+      const small = await compressProblemImage(blob);
+      const data = await new Promise<string>((ok, no) => {
+        const r = new FileReader();
+        r.onload = () => ok(String(r.result).split(',')[1] ?? '');
+        r.onerror = () => no(new Error('사진을 읽지 못했어요'));
+        r.readAsDataURL(small);
+      });
+      const subs = subjectsOf(d);
+      const got = await noteScan(
+        { mime: small.type || 'image/jpeg', data },
+        subs.map((x) => x.name),
+      );
+      const sid = got.subject ? subs.find((x) => x.name === got.subject)?.id : undefined;
+      setF((x) => ({ ...x, question: x.question.trim() ? x.question : (got.question ?? ''), number: x.number.trim() ? x.number : (got.number ?? ''), subjectId: x.subjectId || sid || '' }));
+      toast(got.question ? 'AI 가 읽어서 채웠어요. 틀린 글자가 있는지 확인해 주세요' : 'AI 가 문제 글을 읽지 못했어요');
+    } catch (e) {
+      toast(e instanceof Error ? e.message : 'AI 가 읽지 못했어요');
+    } finally {
+      setAiBusy(false);
+    }
+  }
+  /** 이 오답과 비슷한 문제를 AI 에게 (AI 화면에 질문을 미리 넣어 둔다) */
+  function similar() {
+    if (!note) return;
+    const sub = d.subjects[note.subjectId]?.name ?? '';
+    askAiLater({
+      title: `비슷한 문제: ${note.question.split('\n')[0].slice(0, 30) || sub}`,
+      subjectId: note.subjectId,
+      noteId: note.id,
+      text: [
+        `아래는 내가 틀렸던 ${sub} 문제야. 같은 개념으로 숫자나 조건만 바꾼 비슷한 문제 1개를 새로 내 줘. 문제만 먼저 쓰고, 정답과 풀이는 맨 아래 「정답과 풀이」 제목 아래에 따로 써 줘.`,
+        '',
+        `문제: ${note.question || '(사진 문제)'}`,
+        note.answer ? `정답: ${note.answer}` : '',
+        note.memo ? `메모: ${note.memo}` : '',
+      ]
+        .filter((x) => x !== '')
+        .join('\n'),
+    });
+    onClose();
+    go('/ai');
+  }
   function save() {
     if (!f.subjectId) return toast('과목을 골라 주세요');
     const base = note ?? {
@@ -398,6 +450,11 @@ function NoteSheet({ note, today, onClose }: { note?: WrongNote; today: string; 
               {ocr ?? '사진 글자 읽기'}
             </button>
           )}
+          {f.photos.length > 0 && (
+            <button type="button" className="btn btn-sm" disabled={!!aiBusy} onClick={() => void aiRead()}>
+              {aiBusy ? 'AI 가 읽는 중…' : 'AI 로 문제 · 과목 · 번호 채우기'}
+            </button>
+          )}
           <label className="st-photo-add">
             {busy ? '넣는 중…' : '+ 사진'}
             <input type="file" accept="image/*" multiple hidden onChange={(e) => e.target.files?.length && void addPhotos(e.target.files)} />
@@ -440,6 +497,11 @@ function NoteSheet({ note, today, onClose }: { note?: WrongNote; today: string; 
               }}
             >
               지우기
+            </button>
+          )}
+          {note && (
+            <button className="btn btn-sm" onClick={similar}>
+              AI 로 비슷한 문제
             </button>
           )}
           {note?.learned && (

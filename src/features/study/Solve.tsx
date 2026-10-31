@@ -1,13 +1,13 @@
 // 문제 풀이: AI 대화 화면. ＋ 로 사진 넣기 · 모델 고르기 · 보내기. 대화는 이 기기에만 저장(글만)
 import { useEffect, useRef, useState } from 'react';
 import { isLoggedIn, keysInfo, solveImgPut, solveImgUrl, solveUsage, type SolveEngine, type SolveTurn } from '../auth/api';
-import { coolLeft, getSolveJob, load, markJobSeen, migrateChats, saveChat, startSolve, useSolveJob, WEB_KEY, type Chat, type Msg } from './solveJob';
+import { coolLeft, getSolveJob, load, markJobSeen, migrateChats, saveChat, startSolve, useSolveJob, takePrefill, WEB_KEY, type Chat, type Msg } from './solveJob';
 import { MathText } from '../../lib/mathText';
 import { compressForStorage, compressProblemImage } from '../../lib/imageCompress';
 import { Icon, Sheet, subjectsOf, SubjectDot, toast, useNow } from './ui';
 import { put, useStudy } from './store';
 import { newId } from './model';
-import { guessNoteSubject } from './mistakes';
+import { guessNoteSubject, redoAnswer } from './mistakes';
 
 const ENGINES: { key: SolveEngine; name: string; desc: string }[] = [
   { key: 'gemini', name: 'Gemini Flash', desc: '무료 · 전 과목 올라운더' },
@@ -113,6 +113,24 @@ export function Solve({ open }: { open?: string }) {
     return `오늘 ${n}번 씀`;
   };
   const [topic, setTopic] = useState('');
+  // 다른 화면(오답 노트 · 시험)에서 미리 넣어 둔 질문이 있으면 새 대화로 채운다 (보내기는 직접)
+  const [practice, setPractice] = useState<string | null>(null);
+  useEffect(() => {
+    const p = takePrefill();
+    if (!p || job?.status === 'running') return;
+    setChat({ id: Date.now().toString(36), at: Date.now(), title: '', subjectId: p.subjectId, msgs: [] });
+    setTopic(p.title);
+    setText(p.text);
+    setPractice(p.noteId ?? null);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  const practiceNote = practice && d.notes[practice] && !d.notes[practice].deleted ? d.notes[practice] : null;
+  const gradePractice = (ok: boolean) => {
+    if (!practiceNote) return;
+    const today = new Date(Date.now() + 9 * 3600_000).toISOString().slice(0, 10);
+    put('notes', redoAnswer(practiceNote, ok, today, d.settings.intervals));
+    setPractice(null);
+    toast(ok ? '맞혔어요! 오답 노트에 적었어요' : '틀렸어요. 오답 노트에서 다시 볼게요');
+  };
   useEffect(() => endRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' }), [chat.msgs.length, busy]);
   useEffect(() => {
     const a = area.current;
@@ -287,6 +305,17 @@ export function Solve({ open }: { open?: string }) {
           ),
         )}
         {busy && <div className="sv-ai sv-busy">{busy}…</div>}
+        {practiceNote && chat.msgs.length >= 2 && !solving && (
+          <div className="sv-practice">
+            <span>오답 노트 연습 문제를 풀어 봤나요?</span>
+            <button className="btn btn-sm btn-primary" onClick={() => gradePractice(true)}>
+              맞혔어요
+            </button>
+            <button className="btn btn-sm" onClick={() => gradePractice(false)}>
+              틀렸어요
+            </button>
+          </div>
+        )}
         {solving && (
           <div className="sv-ai sv-busy">
             푸는 중… <Elapsed from={solving.startedAt} />초 / 약 {Math.round(solving.estimate / 1000)}초<small className="st-muted"> · 다른 화면으로 가도 계속 풀어요</small>

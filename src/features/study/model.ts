@@ -665,6 +665,10 @@ export interface Game extends Stamp {
   note?: string;
   started?: DateStr;
   finished?: DateStr;
+  /** Steam 게임이면 CheapShark 번호 · 작은 그림 · 값 알림(이 값(달러) 아래로 내려가면) */
+  csId?: number;
+  thumb?: string;
+  watchPrice?: number;
   created: number;
 }
 

@@ -2,12 +2,13 @@
 import { lazy, Suspense, useState } from 'react';
 import { addDays, dday, diffDays, longDate, shortDate } from './dates';
 import { addProgress, daysAgo, examDates, examEnd, examProgress, MAX_EXAM_DAYS, nextSubjects, scopeDate, scopeLines, scopeText, timetable, timetableDate, upcomingExams } from './exams';
-import { alive, newId, SUBJECT_COLORS, type Exam, type ExamDay, type ExamKind, type ExamScope, type Subject } from './model';
+import { alive, newId, REASONS, SUBJECT_COLORS, type Exam, type ExamDay, type ExamKind, type ExamScope, type Subject } from './model';
 import { put, useStudy } from './store';
 import { removeExam } from './actions';
 import { ExamPlanPage } from './ExamPlan';
 import { SchoolExams } from './SchoolPanel';
 import { Bar, Check, confirmDelete, Empty, Field, go, Icon, Menu, Sheet, SubjectDot, SubjectPicker, subjectsOf, toast, useToday, tap } from './ui';
+import { askAiLater } from './solveJob';
 
 // 성적 화면은 그래프가 있어 열 때 받는다
 const Grades = lazy(() => import('./Grades').then((m) => ({ default: m.Grades })));
@@ -401,6 +402,37 @@ function ExamDetail({ id }: { id: string }) {
   const saveScopes = (list: ExamScope[]) => put('exams', { ...exam, scopes: list });
   const toggle = (s: ExamScope, lineId: string) => saveScopes((exam.scopes ?? []).map((x) => (x.id === s.id ? { ...x, lines: x.lines.map((l) => (l.id === lineId ? { ...l, done: !l.done, at: Date.now() } : l)) } : x)));
   const left = diffDays(today, exam.date);
+  /** 시험 범위 · 그 과목 오답 · 암기 카드 · AI 풀이 제목을 모아 AI 에게 한 장 요약을 부탁한다 (AI 화면에 미리 넣어 둠) */
+  const summaryNote = (sc: ExamScope) => {
+    const sub = d.subjects[sc.subjectId]?.name ?? '과목';
+    const notes = alive(d.notes)
+      .filter((n) => n.subjectId === sc.subjectId && !n.learned)
+      .sort((a, b) => b.wrong - a.wrong)
+      .slice(0, 20);
+    const decks = new Set(
+      alive(d.decks)
+        .filter((k) => k.subjectId === sc.subjectId)
+        .map((k) => k.id),
+    );
+    const cards = alive(d.cards)
+      .filter((c) => decks.has(c.deckId))
+      .slice(0, 30);
+    const solved = alive(d.problems)
+      .filter((x) => x.subjectId === sc.subjectId)
+      .slice(0, 15);
+    let body = [
+      `${exam.name} ${sub} 시험 대비 한 장 요약 노트를 만들어 줘. 아래 내 자료만 바탕으로, (1) 꼭 알아야 할 핵심 개념 (2) 내가 자주 틀리는 점과 주의할 것 (3) 시험 전날 체크리스트 순서로 짧게 정리해 줘. 자료에 없는 내용은 일반적인 설명이라고 표시해 줘.`,
+      `\n[시험 범위]\n${sc.lines.map((l) => `- ${l.text}`).join('\n') || '(적어 둔 범위 없음)'}${sc.note ? `\n메모: ${sc.note}` : ''}`,
+      notes.length
+        ? `\n[오답 노트 ${notes.length}개]\n${notes.map((n) => `- 문제: ${n.question.replace(/\s+/g, ' ').slice(0, 160) || '(사진)'}${n.answer ? ` / 정답: ${n.answer.slice(0, 60)}` : ''}${n.reason ? ` / 틀린 이유: ${REASONS[n.reason]}` : ''}${n.memo ? ` / 메모: ${n.memo.slice(0, 60)}` : ''}`).join('\n')}`
+        : '',
+      cards.length ? `\n[암기 카드]\n${cards.map((c) => `- ${c.front.slice(0, 60)} → ${c.back.slice(0, 80)}`).join('\n')}` : '',
+      solved.length ? `\n[AI 에게 물어본 문제]\n${solved.map((x) => `- ${x.title}`).join('\n')}` : '',
+    ].join('\n');
+    if (body.length > 7500) body = body.slice(0, 7500) + '\n…(너무 길어서 뒷부분은 뺐어요)';
+    askAiLater({ title: `${exam.name} ${sub} 요약 노트`, subjectId: sc.subjectId, text: body });
+    go('/ai');
+  };
 
   return (
     <div className="st-page">
@@ -414,6 +446,7 @@ function ExamDetail({ id }: { id: string }) {
             { label: '과목 범위 넣기', onClick: () => setScope('new') },
             { label: '이름·날짜·과목 고치기', onClick: () => setEdit(true) },
             { label: '공부 계획', onClick: () => go(`/exams/${exam.id}/plan`) },
+            ...scopes.map((sc) => ({ label: `AI 요약 노트: ${d.subjects[sc.subjectId]?.name ?? '과목'}`, onClick: () => summaryNote(sc) })),
             { label: '이 시험 성적 넣기', onClick: () => go(`/exams/grades/from-${exam.id}`) },
             {
               label: '시험 지우기',
