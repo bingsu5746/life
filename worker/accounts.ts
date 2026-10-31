@@ -167,13 +167,6 @@ export class Accounts extends DurableObject<Env> {
     } catch {
       /* 이미 있음 */
     }
-    // 기능 시험용으로 만들었던 계정(zzdiag_c)을 한 번 지운다 (비밀번호를 잃어 계정 지우기로 못 지움)
-    const diag = this.sql.exec<{ id: string }>("SELECT id FROM users WHERE username = 'zzdiag_c'").toArray()[0];
-    if (diag) {
-      for (const t of ['blobs', 'push_subs', 'notify', 'sessions']) this.sql.exec(`DELETE FROM ${t} WHERE user_id = ?`, diag.id);
-      this.sql.exec("DELETE FROM cache WHERE key LIKE '%' || ? || '%'", diag.id);
-      this.sql.exec('DELETE FROM users WHERE id = ?', diag.id);
-    }
   }
 
   async fetch(req: Request): Promise<Response> {
