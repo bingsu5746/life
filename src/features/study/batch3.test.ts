@@ -19,13 +19,31 @@ describe('문제집 끝내기 예측', () => {
   const ctx = { today: '2026-10-25', settings: { ...emptyStudy().settings, restDays: [] }, exams: {}, tutors: [] } as unknown as PlanCtx;
   const now = Date.UTC(2026, 9, 25, 3);
   it('최근 체크만 센다 (지운 것 빼고)', () => {
-    expect(recentDone([[1, 10, now - 20 * DAY], [11, 30, now - 2 * DAY]], new Set([...Array(30)].map((_, i) => i + 1).filter((p) => p !== 12)), now - 14 * DAY)).toBe(19);
+    expect(
+      recentDone(
+        [
+          [1, 10, now - 20 * DAY],
+          [11, 30, now - 2 * DAY],
+        ],
+        new Set([...Array(30)].map((_, i) => i + 1).filter((p) => p !== 12)),
+        now - 14 * DAY,
+      ),
+    ).toBe(19);
   });
   it('모자라면 며칠·하루 몇 쪽', () => {
     const done = new Set([...Array(60)].map((_, i) => i + 1));
     const t = { units: [], done, reserved: new Set(), subjectId: 's' } as unknown as Target;
     // 최근 14일에 28쪽 → 하루 2쪽. 남은 40쪽 → 20일 필요, 10/25~10/31 7일 → 13일 모자람
-    const f = forecast(plan, t, ctx, [[1, 32, now - 30 * DAY], [33, 60, now - 3 * DAY]], now);
+    const f = forecast(
+      plan,
+      t,
+      ctx,
+      [
+        [1, 32, now - 30 * DAY],
+        [33, 60, now - 3 * DAY],
+      ],
+      now,
+    );
     expect(f).toMatchObject({ perDay: 2, left: 40, daysLeft: 7, need: 6, state: 'short', shortDays: 13 });
     const t2 = { ...t, done: new Set([...Array(90)].map((_, i) => i + 1)) } as Target;
     const ok = forecast(plan, t2, ctx, [[1, 90, now - DAY]], now);
@@ -52,7 +70,10 @@ describe('백지 복습 비교', () => {
     expect(recalled('광합성은 엽록체에서 일어난다', '엽록체에서 광합성이 일어남')).toBe(true);
     expect(recalled('이산화 탄소 + 물 → 포도당 + 산소', '포도당이 생긴다')).toBe(false);
     expect(recalled('이산화 탄소 + 물 → 포도당 + 산소', '포도당이랑 산소가 생긴다')).toBe(true);
-    const pts = [{ id: 'a', text: '빛에너지를 화학 에너지로', done: false }, { id: 'b', text: 'Calvin cycle', done: false }];
+    const pts = [
+      { id: 'a', text: '빛에너지를 화학 에너지로', done: false },
+      { id: 'b', text: 'Calvin cycle', done: false },
+    ];
     expect(guessMissed(pts, '빛에너지 → 화학 에너지')).toEqual(['b']);
   });
 });
@@ -156,8 +177,27 @@ describe('새 자료 다듬기·합치기', () => {
     a.blanks.k = { id: 'k', updatedAt: 5, subjectId: '', title: 't', points: [], box: 1, due: '2026-10-26', wrong: 0, tries: [{ id: 'x', date: '2026-10-24' }].map((t) => ({ ...t, missed: [] })), created: 1 };
     b.blanks.k = { ...a.blanks.k, updatedAt: 4, tries: [{ id: 'y', date: '2026-10-25', missed: [] }] };
     expect(mergeStudy(a, b, 10).blanks.k.tries.map((t) => t.id)).toEqual(['x', 'y']);
-    a.assessments.t = { id: 't', updatedAt: 5, subjectId: '', title: 'x', due: '2026-11-01', steps: [{ id: '1', text: 'a', done: false, at: 1 }, { id: '2', text: 'b', done: false, at: 1 }], done: false, created: 1 };
-    b.assessments.t = { ...a.assessments.t, updatedAt: 4, steps: [{ id: '1', text: 'a', done: true, at: 3 }, { id: '2', text: 'b', done: false, at: 1 }] };
+    a.assessments.t = {
+      id: 't',
+      updatedAt: 5,
+      subjectId: '',
+      title: 'x',
+      due: '2026-11-01',
+      steps: [
+        { id: '1', text: 'a', done: false, at: 1 },
+        { id: '2', text: 'b', done: false, at: 1 },
+      ],
+      done: false,
+      created: 1,
+    };
+    b.assessments.t = {
+      ...a.assessments.t,
+      updatedAt: 4,
+      steps: [
+        { id: '1', text: 'a', done: true, at: 3 },
+        { id: '2', text: 'b', done: false, at: 1 },
+      ],
+    };
     expect(mergeStudy(a, b, 10).assessments.t.steps.map((s) => s.done)).toEqual([true, false]);
   });
 });
@@ -191,12 +231,21 @@ describe('숙제 나누기 (splitHomework)', () => {
   it('40쪽을 10/1 ~ 10/5(마감 전날 10/4)까지 → 4일 10쪽씩, 이어지는 번호', async () => {
     const { splitHomework } = await import('./splitHomework');
     const p = splitHomework(40, 1, '2026-10-01', '2026-10-05', false, []);
-    expect(p.map((x) => [x.date, x.from, x.to])).toEqual([['2026-10-01', 1, 10], ['2026-10-02', 11, 20], ['2026-10-03', 21, 30], ['2026-10-04', 31, 40]]);
+    expect(p.map((x) => [x.date, x.from, x.to])).toEqual([
+      ['2026-10-01', 1, 10],
+      ['2026-10-02', 11, 20],
+      ['2026-10-03', 21, 30],
+      ['2026-10-04', 31, 40],
+    ]);
   });
   it('쉬는 날은 건너뛰고, 분량이 날수보다 적으면 하루 1개', async () => {
     const { splitHomework } = await import('./splitHomework');
     const p = splitHomework(3, 5, '2026-10-01', '2026-10-31', true, ['2026-10-02']);
-    expect(p.map((x) => [x.date, x.from, x.to])).toEqual([['2026-10-01', 5, 5], ['2026-10-03', 6, 6], ['2026-10-04', 7, 7]]);
+    expect(p.map((x) => [x.date, x.from, x.to])).toEqual([
+      ['2026-10-01', 5, 5],
+      ['2026-10-03', 6, 6],
+      ['2026-10-04', 7, 7],
+    ]);
   });
   it('마감이 오늘이면 오늘 한 번에', async () => {
     const { splitHomework } = await import('./splitHomework');
@@ -208,7 +257,11 @@ describe('숙제 다시 나누기 (resplit)', () => {
   it('안 한 번호만 새 마감까지 다시 나눈다', async () => {
     const { resplit } = await import('./splitHomework');
     const p = resplit([11, 12, 13, 14, 21, 22], '2026-10-10', '2026-10-13', false, []);
-    expect(p.map((x) => [x.date, x.from, x.to])).toEqual([['2026-10-10', 11, 12], ['2026-10-11', 13, 14], ['2026-10-12', 21, 22]]);
+    expect(p.map((x) => [x.date, x.from, x.to])).toEqual([
+      ['2026-10-10', 11, 12],
+      ['2026-10-11', 13, 14],
+      ['2026-10-12', 21, 22],
+    ]);
   });
 });
 
@@ -230,7 +283,11 @@ describe('영화 시상식 (awards)', () => {
   it('올해의 영화 · 후보 · 많이 본 장르·장소', async () => {
     const { awards, watchedYears } = await import('../life/awards');
     const mv = (id: string, rating: number, watched: string, extra = {}) => ({ id, title: id, status: 'watched', rating, watched, created: 1, updatedAt: 1, ...extra });
-    const d = { movies: Object.fromEntries([mv('a', 4.5, '2026-03-01', { genre: '액션,범죄', where: '영화관' }), mv('b', 5, '2026-05-01', { genre: '액션', where: '집', again: [{ date: '2026-06-01', where: '집' }] }), mv('c', 2, '2026-07-09', { genre: '드라마', where: '집' }), mv('d', 3, '2025-01-01')].map((m) => [m.id, m])) } as never;
+    const d = {
+      movies: Object.fromEntries(
+        [mv('a', 4.5, '2026-03-01', { genre: '액션,범죄', where: '영화관' }), mv('b', 5, '2026-05-01', { genre: '액션', where: '집', again: [{ date: '2026-06-01', where: '집' }] }), mv('c', 2, '2026-07-09', { genre: '드라마', where: '집' }), mv('d', 3, '2025-01-01')].map((m) => [m.id, m]),
+      ),
+    } as never;
     const a = awards(d, 2026);
     expect(a.count).toBe(3);
     expect(a.best?.id).toBe('b');
@@ -246,18 +303,26 @@ describe('영화 시상식 (awards)', () => {
 
 describe('일기 양식 (diaryForm)', () => {
   it('그날 기록 요약과 꿈 날짜', async () => {
-    const { daySummary, dreamDates, formOf } = await import('../life/diaryForm');
+    const { daySummary, dreamDates, formOf, studySummary } = await import('../life/diaryForm');
     const d = {
       settings: {},
       sessions: { s: { id: 's', date: '2026-10-28', minutes: 90, updatedAt: 1 } },
-      todos: {}, workouts: { w: { id: 'w', date: '2026-10-28', kind: '농구', minutes: 60, updatedAt: 1 } },
+      todos: {},
+      workouts: { w: { id: 'w', date: '2026-10-28', kind: '농구', minutes: 60, updatedAt: 1 } },
       movies: { m: { id: 'm', title: '존 윅', status: 'watched', watched: '2026-10-28', rating: 5, updatedAt: 1 } },
-      hobbyLogs: {}, hobbies: {}, moneyTx: {}, habits: {},
+      hobbyLogs: {},
+      hobbies: {},
+      moneyTx: {},
+      habits: {},
       diary: { '2026-10-27': { id: '2026-10-27', text: '', parts: { dream: '하늘을 날았다' }, updatedAt: 1 }, '2026-10-26': { id: '2026-10-26', text: 'x', updatedAt: 1 } },
     } as never;
-    expect(daySummary(d, '2026-10-28')).toEqual(['공부 1시간 30분', '운동: 농구 60분', '영화: 존 윅 ★5']);
+    expect(daySummary(d, '2026-10-28')).toEqual(['운동: 농구 60분', '영화: 존 윅 ★5']);
+    expect(studySummary(d, '2026-10-28')).toEqual(['모두 1시간 30분']);
     expect(dreamDates(d)).toEqual(['2026-10-27']);
-    expect(formOf(d).parts).toEqual(['done', 'good', 'dream']);
+    expect(formOf(d).parts).toEqual(['study', 'done', 'good', 'dream']);
+    // 예전에 저장한 양식(공부 칸이 없던 때)에도 공부 칸은 켜진다. 새로 저장한 양식에서 끈 것은 꺼진 채로
+    expect(formOf({ settings: { diaryForm: { parts: ['done'], autoFill: true } } } as never).parts).toEqual(['study', 'done']);
+    expect(formOf({ settings: { diaryForm: { parts: ['done'], autoFill: true, known: ['study', 'done'] } } } as never).parts).toEqual(['done']);
   });
 });
 
@@ -276,7 +341,18 @@ describe('습관 요일별 달성률 (weekdayRates)', () => {
 describe('시험 공부 자동 계획 (buildExamPlan)', () => {
   const mk = (over: Record<string, unknown> = {}, lines = 8) => {
     const L = (p: string, n: number) => Array.from({ length: n }, (_, i) => ({ id: `${p}${i}`, text: `${p} ${i + 1}단원`, done: false }));
-    const exam = { id: 'e', name: '중간고사', date: '2026-11-10', kind: 'school', updatedAt: 1, scopes: [{ id: 'sm', subjectId: 'math', lines: L('m', lines) }, { id: 'se', subjectId: 'eng', lines: L('e', lines / 2), date: '2026-11-11' }], plan: { on: true, weekday: 180, weekend: 300, perLine: 40, review: 0.35, ...over } };
+    const exam = {
+      id: 'e',
+      name: '중간고사',
+      date: '2026-11-10',
+      kind: 'school',
+      updatedAt: 1,
+      scopes: [
+        { id: 'sm', subjectId: 'math', lines: L('m', lines) },
+        { id: 'se', subjectId: 'eng', lines: L('e', lines / 2), date: '2026-11-11' },
+      ],
+      plan: { on: true, weekday: 180, weekend: 300, perLine: 40, review: 0.35, ...over },
+    };
     return { settings: { offDates: [], restDays: [], tutorRatio: 0.5 }, subjects: { math: { id: 'math', name: '수학' }, eng: { id: 'eng', name: '영어' } }, exams: { e: exam }, sessions: {}, tutors: {}, notes: {}, grades: {} } as never;
   };
   it('모든 처음 공부를 시험 전에 넣고 하루 시간을 크게 넘기지 않는다', async () => {
@@ -327,7 +403,18 @@ describe('통합 검색 (searchAll)', () => {
     const d = {
       diary: { '2026-10-27': { id: '2026-10-27', text: '오늘은 존 윅을 봤다', parts: { dream: '하늘을 날았다' }, updatedAt: 1 } },
       movies: { m: { id: 'm', title: '존 윅', status: 'watched', comment: '총 쏘는 맛', updatedAt: 1 } },
-      reads: {}, todos: {}, exams: {}, assessments: {}, notes: {}, cards: {}, books: {}, workouts: {}, hobbyLogs: {}, hobbies: {}, wishes: {}, moneyTx: {},
+      reads: {},
+      todos: {},
+      exams: {},
+      assessments: {},
+      notes: {},
+      cards: {},
+      books: {},
+      workouts: {},
+      hobbyLogs: {},
+      hobbies: {},
+      wishes: {},
+      moneyTx: {},
     } as never;
     const hits = searchAll(d, {}, '존 윅');
     expect(hits.map((h) => h.group)).toEqual(['일기', '영화']);
@@ -353,7 +440,16 @@ describe('농구 혼자 연습 (drills)', () => {
   });
   it('시간 안에서 오늘의 연습을 짜고, 골대가 없으면 골대 드릴을 뺀다', async () => {
     const { buildSession, totalMinutes } = await import('../life/drills');
-    const hoop = buildSession({ minutes: 45, have: 'hoop', weak: [{ area: 'ft', why: '' }, { area: 'three', why: '' }], salt: 1, maxLevel: 2 });
+    const hoop = buildSession({
+      minutes: 45,
+      have: 'hoop',
+      weak: [
+        { area: 'ft', why: '' },
+        { area: 'three', why: '' },
+      ],
+      salt: 1,
+      maxLevel: 2,
+    });
     expect(hoop.some((x) => x.area === 'ft')).toBe(true);
     expect(hoop.some((x) => x.area === 'three')).toBe(true);
     expect(totalMinutes(hoop)).toBeLessThanOrEqual(55);
@@ -368,7 +464,11 @@ describe('넣은 슛 합 (shotsBetween)', () => {
   it('기간 안의 농구 기록만 더한다', async () => {
     const { shotsBetween } = await import('../life/drills');
     const w = (id: string, date: string, bb: object, kind = '농구') => ({ id, kind, date, bb, updatedAt: 1 });
-    const d = { workouts: Object.fromEntries([w('a', '2026-10-27', { mode: 'practice', fgm: 5, fga: 10, tpm: 2, tpa: 8 }), w('b', '2026-10-28', { mode: 'game', ftm: 3, fta: 4, fgm: 1, fga: 3 }), w('c', '2026-10-20', { mode: 'practice', fgm: 9, fga: 9 }), w('d', '2026-10-28', { fgm: 9, fga: 9 }, '헬스')].map((x) => [x.id, x])) } as never;
+    const d = {
+      workouts: Object.fromEntries(
+        [w('a', '2026-10-27', { mode: 'practice', fgm: 5, fga: 10, tpm: 2, tpa: 8 }), w('b', '2026-10-28', { mode: 'game', ftm: 3, fta: 4, fgm: 1, fga: 3 }), w('c', '2026-10-20', { mode: 'practice', fgm: 9, fga: 9 }), w('d', '2026-10-28', { fgm: 9, fga: 9 }, '헬스')].map((x) => [x.id, x]),
+      ),
+    } as never;
     expect(shotsBetween(d, '2026-10-26', '2026-10-28')).toEqual({ fg: { m: 6, a: 13 }, tp: { m: 2, a: 8 }, ft: { m: 3, a: 4 } });
   });
 });
@@ -377,7 +477,10 @@ describe('반복 할 일 (dueTodoRules)', () => {
   it('정한 요일에만, 이미 있거나 지운 것은 다시 만들지 않는다', async () => {
     const { dueTodoRules, ruleTodoId } = await import('./todoRules');
     // 2026-10-28 은 수요일(3)
-    const d = { todoRules: { a: { id: 'a', title: '단어 복습', weekdays: [3], start: '2026-10-01', updatedAt: 1 }, b: { id: 'b', title: '운동', weekdays: [], start: '2026-10-01', updatedAt: 1 }, c: { id: 'c', title: '월요일만', weekdays: [1], start: '2026-10-01', updatedAt: 1 } }, todos: { [ruleTodoId('b', '2026-10-28')]: { id: 'x', deleted: true, updatedAt: 1 } } } as never;
+    const d = {
+      todoRules: { a: { id: 'a', title: '단어 복습', weekdays: [3], start: '2026-10-01', updatedAt: 1 }, b: { id: 'b', title: '운동', weekdays: [], start: '2026-10-01', updatedAt: 1 }, c: { id: 'c', title: '월요일만', weekdays: [1], start: '2026-10-01', updatedAt: 1 } },
+      todos: { [ruleTodoId('b', '2026-10-28')]: { id: 'x', deleted: true, updatedAt: 1 } },
+    } as never;
     expect(dueTodoRules(d, '2026-10-28').map((t) => t.title)).toEqual(['단어 복습']);
   });
 });
@@ -395,8 +498,30 @@ describe('시험 계획 돌아보기 (reviewExamPlan)', () => {
   it('끝낸 줄 비율 · 실제 공부 시간 · 점수 · 한 줄 시간', async () => {
     const { reviewExamPlan } = await import('./examPlan');
     const at = Date.parse('2026-10-05T03:00:00Z');
-    const exam = { id: 'e', name: '중간', date: '2026-10-10', updatedAt: 1, scopes: [{ id: 's', subjectId: 'm', lines: [{ id: 'a', text: '1', done: true, at }, { id: 'b', text: '2', done: true, at }, { id: 'c', text: '3', done: true, at }, { id: 'd', text: '4', done: false }] }], plan: { on: true, weekday: 120, weekend: 200, perLine: 40, review: 0.35, started: '2026-10-01' } };
-    const d = { subjects: { m: { id: 'm', name: '수학' } }, sessions: { x: { id: 'x', subjectId: 'm', date: '2026-10-03', minutes: 150, updatedAt: 1 }, y: { id: 'y', subjectId: 'm', date: '2026-10-11', minutes: 999, updatedAt: 1 } }, grades: { g: { id: 'g', examId: 'e', kind: 'school', date: '2026-10-20', updatedAt: 1, scores: [{ id: 'q', subject: '수학', raw: 84 }] } } } as never;
+    const exam = {
+      id: 'e',
+      name: '중간',
+      date: '2026-10-10',
+      updatedAt: 1,
+      scopes: [
+        {
+          id: 's',
+          subjectId: 'm',
+          lines: [
+            { id: 'a', text: '1', done: true, at },
+            { id: 'b', text: '2', done: true, at },
+            { id: 'c', text: '3', done: true, at },
+            { id: 'd', text: '4', done: false },
+          ],
+        },
+      ],
+      plan: { on: true, weekday: 120, weekend: 200, perLine: 40, review: 0.35, started: '2026-10-01' },
+    };
+    const d = {
+      subjects: { m: { id: 'm', name: '수학' } },
+      sessions: { x: { id: 'x', subjectId: 'm', date: '2026-10-03', minutes: 150, updatedAt: 1 }, y: { id: 'y', subjectId: 'm', date: '2026-10-11', minutes: 999, updatedAt: 1 } },
+      grades: { g: { id: 'g', examId: 'e', kind: 'school', date: '2026-10-20', updatedAt: 1, scores: [{ id: 'q', subject: '수학', raw: 84 }] } },
+    } as never;
     const r = reviewExamPlan(d, exam as never)!;
     expect(r.doneRate).toBe(0.75);
     expect(r.subjects[0]).toMatchObject({ lines: 4, done: 3, actual: 150, score: 84 });
@@ -436,7 +561,15 @@ describe('백업 알림 날 (backupDue) · 이번 주 쓴 돈 (weekSpent)', () =
 describe('농구 연습 항목 (practiceTotals · guessKind)', () => {
   it('항목별 슛을 2점·3점·자유투로 더하고, 이름으로 슛 종류를 짐작한다', async () => {
     const { practiceTotals, guessKind } = await import('../life/drills');
-    expect(practiceTotals([{ kind: 'ft', made: 14, att: 20 }, { kind: 'tp', made: 9, att: 25 }, { kind: 'fg', made: 12, att: 20 }, { kind: 'ft', made: 8, att: 10 }, { made: 5, att: 5 }])).toEqual({ fgm: 12, fga: 20, tpm: 9, tpa: 25, ftm: 22, fta: 30 });
+    expect(
+      practiceTotals([
+        { kind: 'ft', made: 14, att: 20 },
+        { kind: 'tp', made: 9, att: 25 },
+        { kind: 'fg', made: 12, att: 20 },
+        { kind: 'ft', made: 8, att: 10 },
+        { made: 5, att: 5 },
+      ]),
+    ).toEqual({ fgm: 12, fga: 20, tpm: 9, tpa: 25, ftm: 22, fta: 30 });
     expect(guessKind('자유투 루틴')).toBe('ft');
     expect(guessKind('3점 캐치 앤 슛')).toBe('tp');
     expect(guessKind('엘보 점퍼')).toBe('fg');
@@ -450,13 +583,26 @@ describe('오답 패턴 (mistakePatterns)', () => {
     const n = (id: string, reason: string | null, page?: number) => ({ id, subjectId: 'm', reason, bookId: page ? 'b' : undefined, page, learned: false, updatedAt: 1, box: 1, due: '2026-10-01', wrong: 1 });
     const d = {
       notes: Object.fromEntries([n('1', 'calc', 12), n('2', 'calc', 14), n('3', 'calc', 30), n('4', 'concept', 31), n('5', 'misread'), n('6', null)].map((x) => [x.id, x])),
-      books: { b: { id: 'b', name: '쎈', units: [{ name: '1단원', from: 1, to: 20 }, { name: '2단원', from: 21, to: 40 }], updatedAt: 1 } },
+      books: {
+        b: {
+          id: 'b',
+          name: '쎈',
+          units: [
+            { name: '1단원', from: 1, to: 20 },
+            { name: '2단원', from: 21, to: 40 },
+          ],
+          updatedAt: 1,
+        },
+      },
     } as never;
     const [p] = mistakePatterns(d);
     expect(p.total).toBe(6);
     expect(p.top).toEqual({ reason: 'calc', n: 3, share: 0.6 });
     expect(p.careless).toBe(0.8);
-    expect(p.units).toEqual([{ name: '쎈 1단원', n: 2 }, { name: '쎈 2단원', n: 2 }]);
+    expect(p.units).toEqual([
+      { name: '쎈 1단원', n: 2 },
+      { name: '쎈 2단원', n: 2 },
+    ]);
     expect(isCareless(p)).toBe(true);
   });
 });
@@ -466,7 +612,14 @@ describe('잔 시간대별 공부 (sleepBuckets)', () => {
     const { sleepBuckets } = await import('./condition');
     const day = (i: number, sleep: number, mood: number | null) => ({ date: `2026-10-${String(i).padStart(2, '0')}`, sleep, mood });
     const days = [day(1, 330, 2), day(2, 340, 3), day(3, 350, null), day(4, 450, 4), day(5, 460, 5), day(6, 440, 4), day(7, 600, null)];
-    const study = new Map([['2026-10-01', 60], ['2026-10-02', 60], ['2026-10-03', 90], ['2026-10-04', 180], ['2026-10-05', 120], ['2026-10-06', 150]]);
+    const study = new Map([
+      ['2026-10-01', 60],
+      ['2026-10-02', 60],
+      ['2026-10-03', 90],
+      ['2026-10-04', 180],
+      ['2026-10-05', 120],
+      ['2026-10-06', 150],
+    ]);
     const r = sleepBuckets(days, study);
     expect(r.buckets[1]).toEqual({ label: '5~6시간', days: 3, study: 70, mood: 2.5 });
     expect(r.buckets[3]).toEqual({ label: '7~8시간', days: 3, study: 150, mood: 4.3 });
@@ -494,7 +647,15 @@ describe('단어 시험 예상 점수 (knowChance · expectedScore)', () => {
     expect(knowChance({ box: 0, wrong: 0, due: '2026-10-28' }, '2026-10-28')).toBe(0.15);
     expect(knowChance({ box: 5, wrong: 0, due: '2026-11-10' }, '2026-10-28')).toBe(0.9);
     expect(knowChance({ box: 2, wrong: 2, due: '2026-10-20' }, '2026-10-28')).toBeCloseTo(0.45);
-    expect(expectedScore([{ box: 5, wrong: 0, due: '2026-11-10' }, { box: 0, wrong: 0, due: '2026-10-28' }], '2026-10-28')).toBe(53);
+    expect(
+      expectedScore(
+        [
+          { box: 5, wrong: 0, due: '2026-11-10' },
+          { box: 0, wrong: 0, due: '2026-10-28' },
+        ],
+        '2026-10-28',
+      ),
+    ).toBe(53);
     expect(expectedScore([], '2026-10-28')).toBeNull();
   });
 });
@@ -520,7 +681,15 @@ describe('내신 목표 역산 (neededScore)', () => {
     // 84×0.3 + 95×0.4 = 25.2 + 38 = 63.2 → (90 − 63.2) / 0.3 = 89.4
     expect(neededScore(g)).toEqual({ need: 89.4, got: 63.2, left: 30, possible: true });
     expect(neededScore({ target: 99, parts: [{ weight: 50, score: 80 }, { weight: 50 }] }).possible).toBe(false);
-    expect(neededScore({ target: 80, parts: [{ weight: 50, score: 90 }, { weight: 50, score: 80 }] })).toEqual({ need: null, got: 85, left: 0, possible: true });
+    expect(
+      neededScore({
+        target: 80,
+        parts: [
+          { weight: 50, score: 90 },
+          { weight: 50, score: 80 },
+        ],
+      }),
+    ).toEqual({ need: null, got: 85, left: 0, possible: true });
   });
 });
 
@@ -589,7 +758,10 @@ describe('용돈 자동 모으기 (autoSaves)', () => {
     d.moneyTx = { a: tx('a', '2026-10-01', 50000), b: tx('b', '2026-10-20', 30000), c: tx('c', '2026-10-21', 10000, '알바') } as never;
     d.savings = { g: { id: 'g', updatedAt: 1, name: '이어폰', target: 100000, deposits: [{ id: 'm', date: '2026-10-02', amount: 5000 }], autoPct: 20, autoSince: '2026-10-10', created: 1 } } as never;
     const [g] = autoSaves(d);
-    expect(g.deposits).toEqual([{ id: 'm', date: '2026-10-02', amount: 5000 }, { id: 'auto-b', date: '2026-10-20', amount: 6000 }]);
+    expect(g.deposits).toEqual([
+      { id: 'm', date: '2026-10-02', amount: 5000 },
+      { id: 'auto-b', date: '2026-10-20', amount: 6000 },
+    ]);
     d.savings = { g } as never;
     expect(autoSaves(d)).toEqual([]);
     d.moneyTx.b = { ...d.moneyTx.b, deleted: true } as never;
@@ -624,13 +796,13 @@ describe('오답 과목 추천 (guessNoteSubject)', () => {
   });
 });
 
-describe('타이머 한 줄 메모 → 일기 오늘 한 것', () => {
+describe('타이머 한 줄 메모 → 일기 공부 칸', () => {
   it('메모가 과목 이름과 함께 들어간다', async () => {
-    const { daySummary } = await import('../life/diaryForm');
+    const { studySummary } = await import('../life/diaryForm');
     const d = emptyStudy();
     d.subjects = { ma: { id: 'ma', name: '수학', color: '#000', order: 1, updatedAt: 1 } } as never;
     d.sessions = { x: { id: 'x', updatedAt: 1, subjectId: 'ma', start: 1, end: 2, minutes: 40, date: '2026-10-29', kind: 'watch', memo: '미적분 3단원' } } as never;
-    expect(daySummary(d, '2026-10-29')).toEqual(['공부 40분', '수학: 미적분 3단원']);
+    expect(studySummary(d, '2026-10-29')).toEqual(['모두 40분', '수학 40분', '수학: 미적분 3단원']);
   });
 });
 
@@ -698,9 +870,41 @@ describe('약점 한 장 (weakSheet)', () => {
     const { weakSheet, isEmptySheet } = await import('./weakSheet');
     const d = emptyStudy();
     d.subjects = { en: { id: 'en', name: '영어', color: '#000', order: 1, updatedAt: 1 }, ma: { id: 'ma', name: '수학', color: '#000', order: 2, updatedAt: 1 } } as never;
-    const note = (id: string, subjectId: string, wrong: number, learned = false) => ({ id, updatedAt: 1, subjectId, question: id, photos: [], myAnswer: '', answer: '', reason: 'concept', memo: '', box: 1, due: '2026-10-29', wrong, learned, created: wrong, comments: [{ id: 'c' + id, date: '2026-10-2' + wrong, text: '시제 확인' }] });
+    const note = (id: string, subjectId: string, wrong: number, learned = false) => ({
+      id,
+      updatedAt: 1,
+      subjectId,
+      question: id,
+      photos: [],
+      myAnswer: '',
+      answer: '',
+      reason: 'concept',
+      memo: '',
+      box: 1,
+      due: '2026-10-29',
+      wrong,
+      learned,
+      created: wrong,
+      comments: [{ id: 'c' + id, date: '2026-10-2' + wrong, text: '시제 확인' }],
+    });
     d.notes = { a: note('a', 'en', 1), b: note('b', 'en', 3), c: note('c', 'en', 2, true), m: note('m', 'ma', 5) } as never;
-    d.blanks = { k: { id: 'k', updatedAt: 1, subjectId: 'en', title: '3과', points: [{ id: 'p1', text: '관계대명사', done: false }, { id: 'p2', text: '분사', done: false }], tries: [{ id: 't', date: '2026-10-28', missed: ['p2'] }], box: 1, due: '2026-10-29', wrong: 0, created: 1 } } as never;
+    d.blanks = {
+      k: {
+        id: 'k',
+        updatedAt: 1,
+        subjectId: 'en',
+        title: '3과',
+        points: [
+          { id: 'p1', text: '관계대명사', done: false },
+          { id: 'p2', text: '분사', done: false },
+        ],
+        tries: [{ id: 't', date: '2026-10-28', missed: ['p2'] }],
+        box: 1,
+        due: '2026-10-29',
+        wrong: 0,
+        created: 1,
+      },
+    } as never;
     d.passages = { s: { id: 's', updatedAt: 1, lang: 'en', title: 'Lesson 3', text: 'x', confusing: true, created: 1 }, t: { id: 't', updatedAt: 1, lang: 'ko', title: '관동별곡', text: 'x', confusing: true, created: 1 } } as never;
     const words = { w: { id: 'w', updatedAt: 1, listId: 'l', term: 'vivid', meaning: '생생한', order: 1, box: 1, due: '2026-10-29', wrong: 2 } } as never;
     const s = weakSheet(d, words, 'en');
@@ -718,7 +922,20 @@ describe('약점 한 장 알림 (weakDue)', () => {
     const { weakDue, buildDigest } = await import('./notifyDigest');
     const d = emptyStudy();
     d.subjects = { ma: { id: 'ma', name: '수학', color: '#000', order: 1, updatedAt: 1 }, en: { id: 'en', name: '영어', color: '#000', order: 2, updatedAt: 1 } } as never;
-    d.exams = { e: { id: 'e', updatedAt: 1, name: '기말', date: '2026-11-02', end: '2026-11-04', kind: 'school', scopes: [{ id: 's1', subjectId: 'ma', date: '2026-11-03', lines: [] }, { id: 's2', subjectId: 'en', date: '2026-11-02', lines: [] }] } } as never;
+    d.exams = {
+      e: {
+        id: 'e',
+        updatedAt: 1,
+        name: '기말',
+        date: '2026-11-02',
+        end: '2026-11-04',
+        kind: 'school',
+        scopes: [
+          { id: 's1', subjectId: 'ma', date: '2026-11-03', lines: [] },
+          { id: 's2', subjectId: 'en', date: '2026-11-02', lines: [] },
+        ],
+      },
+    } as never;
     expect(weakDue(d, '2026-10-29', '2026-10-29')).toBeNull();
     expect(weakDue(d, '2026-10-29', '2026-10-30')).toEqual({ subjectId: 'en', days: 3 });
     expect(weakDue(d, '2026-10-29', '2026-11-02')).toEqual({ subjectId: 'ma', days: 1 });

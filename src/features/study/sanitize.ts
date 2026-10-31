@@ -661,6 +661,12 @@ export function sanitizeSettings(s: unknown): StudySettings & { updatedAt: numbe
             .filter((t): t is string => typeof t === 'string' && /^[a-z]{2,12}$/.test(t))
             .slice(0, 12),
           autoFill: (x.diaryForm as Obj).autoFill !== false,
+          known:
+            (x.diaryForm as Obj).known === undefined
+              ? undefined
+              : arr((x.diaryForm as Obj).known)
+                  .filter((t): t is string => typeof t === 'string' && /^[a-z]{2,12}$/.test(t))
+                  .slice(0, 20),
         }
       : undefined,
     hiddenAreas:

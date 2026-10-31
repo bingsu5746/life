@@ -71,7 +71,7 @@ export interface StudySettings {
   /** 새 시험 계획의 기본값 (지난 시험 돌아보기에서 정함) */
   examPlanDefaults?: { weekday: number; weekend: number; perLine: number };
   /** 일기 양식: 쓸 칸들 · 새 일기에 오늘 한 것을 미리 채울지 */
-  diaryForm?: { parts: string[]; autoFill: boolean };
+  diaryForm?: { parts: string[]; autoFill: boolean; known?: string[] };
   /** 메인 화면에서 숨긴 영역 (예: 'money') */
   hiddenAreas?: string[];
   /** 목표 등급: 성적 종류마다 과목 이름 → 등급 */

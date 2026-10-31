@@ -4,7 +4,7 @@ import { habitOn, toggleHabit } from '../study/habits';
 import { alive, newId, type DiaryEntry, type Workout } from '../study/model';
 import { put, useStudy } from '../study/store';
 import { go, toast, useToday } from '../study/ui';
-import { daySummary } from './diaryForm';
+import { daySummary, studySummary } from './diaryForm';
 import { NotifyTime } from './NotifyTime';
 
 const MOOD = ['', '나쁨', '별로', '보통', '좋음', '최고'];
@@ -20,7 +20,7 @@ export function CheckinPage() {
   const [kind, setKind] = useState('');
   const [min, setMin] = useState('30');
   const [line, setLine] = useState('');
-  const lines = daySummary(d, today);
+  const lines = [...studySummary(d, today).map((x, i) => (i === 0 ? `공부 ${x.replace(/^모두 /, '')}` : x)), ...daySummary(d, today)];
   const workedOut = alive(d.workouts).some((w) => w.date === today);
   const habits = alive(d.habits).filter((h) => !h.archived && habitOn(h, today));
   function save() {

@@ -7,7 +7,7 @@ import { alive, type DiaryEntry } from '../study/model';
 import { put, remove, setSettings, useStudy } from '../study/store';
 import { confirmDelete, go, tap, toast, useToday } from '../study/ui';
 import { monthLabel, monthOf, shiftMonth } from './calc';
-import { daySummary, DIARY_PARTS, dreamDates, formOf } from './diaryForm';
+import { daySummary, DIARY_PARTS, dreamDates, formOf, studySummary } from './diaryForm';
 import { NotifyTime } from './NotifyTime';
 
 /** 기분 점: 좋을수록 진하게 */
@@ -94,8 +94,13 @@ function Write({ date, today }: { date: string; today: string }) {
   const [text, setText] = useState(cur?.text ?? '');
   const form = formOf(d);
   const lines = daySummary(d, date);
-  // 새 일기: 양식의 「오늘 한 것」 칸을 앱 기록으로 미리 채운다 (끄면 링크로만)
-  const [parts, setParts] = useState<Record<string, string>>(() => ({ ...(cur?.parts ?? {}), ...(!cur && form.autoFill && form.parts.includes('done') && lines.length ? { done: lines.join('\n') } : {}) }));
+  const studyLines = studySummary(d, date);
+  // 새 일기: 「오늘 한 것」 칸을 앱 기록으로 미리 채운다 (끄면 링크로만). 「공부」 칸은 비어 있으면 늘 공부 기록으로 채운다
+  const [parts, setParts] = useState<Record<string, string>>(() => ({
+    ...(cur?.parts ?? {}),
+    ...(!cur && form.autoFill && form.parts.includes('done') && lines.length ? { done: lines.join('\n') } : {}),
+    ...(form.parts.includes('study') && studyLines.length && !cur?.parts?.study?.trim() ? { study: studyLines.join('\n') } : {}),
+  }));
   const shownParts = DIARY_PARTS.filter((p) => form.parts.includes(p.key) || parts[p.key]?.trim());
   const clean = (x: Record<string, string>) => Object.fromEntries(Object.entries(x).filter(([, v]) => v.trim()));
   const [photos, setPhotos] = useState<string[]>(cur?.photos ?? []);
@@ -164,13 +169,13 @@ function Write({ date, today }: { date: string; today: string }) {
           <label key={p.key} className="st-field">
             <span className="st-label">
               {p.label}
-              {p.key === 'done' && lines.length > 0 && parts.done?.trim() !== lines.join('\n') && (
-                <button type="button" className="st-link dy-load" onClick={() => setParts({ ...parts, done: lines.join('\n') })}>
-                  기록에서 불러오기
+              {(p.key === 'done' || p.key === 'study') && (p.key === 'done' ? lines : studyLines).length > 0 && parts[p.key]?.trim() !== (p.key === 'done' ? lines : studyLines).join('\n') && (
+                <button type="button" className="st-link dy-load" onClick={() => setParts({ ...parts, [p.key]: (p.key === 'done' ? lines : studyLines).join('\n') })}>
+                  {p.key === 'study' ? '공부 기록으로 다시 채우기' : '기록에서 불러오기'}
                 </button>
               )}
             </span>
-            <textarea className="st-input" rows={p.key === 'done' ? 3 : 2} value={parts[p.key] ?? ''} onChange={(e) => setParts({ ...parts, [p.key]: e.target.value })} placeholder={p.hint} aria-label={p.label} />
+            <textarea className="st-input" rows={p.key === 'done' || p.key === 'study' ? 3 : 2} value={parts[p.key] ?? ''} onChange={(e) => setParts({ ...parts, [p.key]: e.target.value })} placeholder={p.hint} aria-label={p.label} />
           </label>
         ))}
         <textarea className="st-input dy-text" rows={shownParts.length ? 8 : 12} value={text} onChange={(e) => setText(e.target.value)} placeholder="하고 싶은 말을 자유롭게…" aria-label="일기" />
@@ -242,7 +247,7 @@ function Dreams() {
 function Form() {
   const d = useStudy();
   const form = formOf(d);
-  const set = (parts: string[], autoFill = form.autoFill) => setSettings({ diaryForm: { parts: DIARY_PARTS.map((p) => p.key).filter((k) => parts.includes(k)), autoFill } });
+  const set = (parts: string[], autoFill = form.autoFill) => setSettings({ diaryForm: { parts: DIARY_PARTS.map((p) => p.key).filter((k) => parts.includes(k)), autoFill, known: DIARY_PARTS.map((p) => p.key) } });
   return (
     <div className="st-page narrow">
       <div className="st-page-head">

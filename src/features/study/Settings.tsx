@@ -9,7 +9,7 @@ import { TimetableEditor } from './TimetableEditor';
 import { SchoolSettings } from './SchoolPanel';
 import { NotifyTime } from '../life/NotifyTime';
 import { DEFAULT_PLACE } from '../life/weather';
-import { formOf } from '../life/diaryForm';
+import { DIARY_PARTS, formOf } from '../life/diaryForm';
 import { disableNotify, enableNotify, localTimes, notifySupported } from './notify';
 import { isLoggedIn, notifyTest } from '../auth/api';
 import { getStudy, put, remove, resetLocal, setSettings, useStudy } from './store';
@@ -483,7 +483,7 @@ function LifeSettings() {
           <input className="st-input xs" inputMode="numeric" defaultValue={s.readingGoal ?? ''} onBlur={(e) => setSettings({ readingGoal: num(e.target.value) })} aria-label="올해 읽을 책" />권
         </div>
         <label className="st-toggle">
-          <input type="checkbox" checked={formOf(d).autoFill} onChange={(e) => setSettings({ diaryForm: { parts: formOf(d).parts, autoFill: e.target.checked } })} /> 새 일기에 오늘 한 것 미리 채우기
+          <input type="checkbox" checked={formOf(d).autoFill} onChange={(e) => setSettings({ diaryForm: { parts: formOf(d).parts, autoFill: e.target.checked, known: DIARY_PARTS.map((p) => p.key) } })} /> 새 일기에 오늘 한 것 미리 채우기
         </label>
         <button className="st-link" onClick={() => go('/diary/form')}>
           일기 양식 고치기

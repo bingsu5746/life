@@ -1,8 +1,9 @@
-// 일기 양식: 날마다 쓸 칸을 고른다 (본문은 항상). 「오늘 한 것」은 앱에 남긴 기록에서 불러올 수 있다.
+// 일기 양식: 날마다 쓸 칸을 고른다 (본문은 항상). 「공부」는 공부 기록에서 자동으로, 「오늘 한 것」은 나머지 앱 기록에서 불러올 수 있다.
 import { alive, type StudyData } from '../study/model';
 
 export const DIARY_PARTS: { key: string; label: string; hint: string }[] = [
-  { key: 'done', label: '오늘 한 것', hint: '공부·운동·영화 같은 것 (기록에서 불러올 수 있어요)' },
+  { key: 'study', label: '공부', hint: '공부한 시간 · 과목 (공부 기록에서 자동으로 채워요)' },
+  { key: 'done', label: '오늘 한 것', hint: '운동 · 영화 · 할 일 같은 것 (기록에서 불러올 수 있어요)' },
   { key: 'good', label: '좋았던 것', hint: '오늘 좋았던 일' },
   { key: 'hard', label: '힘들었던 것', hint: '속상하거나 어려웠던 일' },
   { key: 'thanks', label: '고마운 것', hint: '고마운 사람이나 일' },
@@ -11,21 +12,42 @@ export const DIARY_PARTS: { key: string; label: string; hint: string }[] = [
   { key: 'checkin', label: '하루 마감', hint: '하루 마감에서 남긴 한 줄' },
 ];
 
-export const DEFAULT_FORM = { parts: ['done', 'good', 'dream'], autoFill: true };
+export const DEFAULT_FORM = { parts: ['study', 'done', 'good', 'dream'], autoFill: true };
 
 /** 설정에 저장한 양식 (없으면 기본) */
 export function formOf(d: Pick<StudyData, 'settings'>): { parts: string[]; autoFill: boolean } {
   const f = d.settings.diaryForm;
-  return f ? { parts: DIARY_PARTS.map((p) => p.key).filter((k) => f.parts.includes(k)), autoFill: f.autoFill } : DEFAULT_FORM;
+  // known: 양식을 저장할 때 있던 칸들. 그 뒤에 새로 생긴 칸(예: 공부)은 켜진 것으로
+  return f ? { parts: DIARY_PARTS.map((p) => p.key).filter((k) => f.parts.includes(k) || (k === 'study' && !f.known?.includes(k))), autoFill: f.autoFill } : DEFAULT_FORM;
 }
 
-/** 그날 앱에 남긴 기록을 한 줄씩 (없으면 빈 목록) */
-export function daySummary(d: StudyData, date: string): string[] {
+/** 그날 공부 기록: 모두 몇 분 · 과목별 · 메모 (없으면 빈 목록) */
+export function studySummary(d: StudyData, date: string): string[] {
   const out: string[] = [];
   const study = alive(d.sessions).filter((s) => s.date === date);
   const min = study.reduce((a, s) => a + s.minutes, 0);
-  if (min) out.push(`공부 ${min >= 60 ? `${Math.floor(min / 60)}시간${min % 60 ? ` ${min % 60}분` : ''}` : `${min}분`}`);
+  if (!min) return out;
+  const t = (m: number) => (m >= 60 ? `${Math.floor(m / 60)}시간${m % 60 ? ` ${m % 60}분` : ''}` : `${m}분`);
+  out.push(`모두 ${t(min)}`);
+  const by = new Map<string, number>();
+  for (const s of study) {
+    const name = s.subjectId && d.subjects[s.subjectId] ? d.subjects[s.subjectId].name : '기타';
+    by.set(name, (by.get(name) ?? 0) + s.minutes);
+  }
+  if (by.size > 1 || !by.has('기타'))
+    out.push(
+      [...by]
+        .sort((a, b) => b[1] - a[1])
+        .map(([n, m]) => `${n} ${t(m)}`)
+        .join(' · '),
+    );
   for (const s of study.filter((x) => x.memo).sort((a, b) => a.start - b.start)) out.push(`${s.subjectId && d.subjects[s.subjectId] ? `${d.subjects[s.subjectId].name}: ` : ''}${s.memo}`);
+  return out;
+}
+
+/** 그날 앱에 남긴 기록 중 공부 말고 나머지를 한 줄씩 (없으면 빈 목록) */
+export function daySummary(d: StudyData, date: string): string[] {
+  const out: string[] = [];
   const done = alive(d.todos).filter((t) => t.done && t.doneAt && new Date(t.doneAt + 9 * 3600_000).toISOString().slice(0, 10) === date);
   if (done.length) out.push(`할 일 ${done.length}개 끝냄`);
   for (const w of alive(d.workouts).filter((x) => x.date === date)) out.push(`운동: ${w.kind}${w.minutes ? ` ${w.minutes}분` : ''}`);
