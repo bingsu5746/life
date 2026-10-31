@@ -78,6 +78,9 @@ export interface StudySettings {
   diaryForm?: { parts: string[]; autoFill: boolean; known?: string[] };
   /** 메인 화면에서 숨긴 영역 (예: 'money') */
   hiddenAreas?: string[];
+  /** 메인 화면: 카드 순서 · 숨긴 카드 · 숨긴 칸(바로 가기 · 아침 · 학교 · 쓸모없는 지식) */
+  homeOrder?: string[];
+  homeHide?: string[];
   /** 목표 등급: 성적 종류마다 과목 이름 → 등급 */
   gradeGoals?: { school?: Record<string, number>; mock?: Record<string, number> };
 }

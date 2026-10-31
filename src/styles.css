@@ -333,3 +333,15 @@ button:disabled {
 .crumb:hover {
   color: var(--text);
 }
+
+/* 인터넷 끊김 표시 */
+.offline-bar {
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  padding: 6px 16px;
+  text-align: center;
+  font-size: 0.85rem;
+  color: #fff;
+  background: var(--bad);
+}

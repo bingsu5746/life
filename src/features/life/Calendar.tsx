@@ -85,7 +85,7 @@ export function CalendarPage() {
 }
 
 /** 그해 공휴일 · 기념일 (로그인했을 때만, 이 기기에 하루 기억) */
-function useSpecialDays(year: number): SpecialDay[] {
+export function useSpecialDays(year: number): SpecialDay[] {
   const ck = `my-study.special.${year}`;
   const read = (): { at: number; days: SpecialDay[] } | null => {
     try {

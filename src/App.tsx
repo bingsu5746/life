@@ -8,6 +8,7 @@ import { isLoggedIn } from './features/auth/api';
 import { Study } from './features/study/Study';
 import { AREAS, HOBBY_PARTS } from './features/study/tabs';
 import { AiPill } from './features/study/AiPill';
+import { toast } from './features/study/ui';
 
 const safeDecode = (s: string) => {
   try {
@@ -27,6 +28,21 @@ export default function App() {
   const [accountOpen, setAccountOpen] = useState(false);
   const [sync, setSync] = useState(getSyncStatus);
   useEffect(() => onSyncStatus(setSync), []);
+  // 인터넷 끊김 표시 · 다른 기기 것이 더 최근이라 바뀐 것 알리기
+  const [offline, setOffline] = useState(() => typeof navigator !== 'undefined' && navigator.onLine === false);
+  useEffect(() => {
+    const up = () => setOffline(false);
+    const down = () => setOffline(true);
+    const conflict = (e: Event) => toast(`다른 기기에서 고친 ${(e as CustomEvent<number>).detail}개가 더 최근이라 그쪽으로 맞췄어요`);
+    window.addEventListener('online', up);
+    window.addEventListener('offline', down);
+    window.addEventListener('my-study-conflict', conflict);
+    return () => {
+      window.removeEventListener('online', up);
+      window.removeEventListener('offline', down);
+      window.removeEventListener('my-study-conflict', conflict);
+    };
+  }, []);
   useEffect(() => {
     const on = () => {
       setPath(parse());
@@ -122,6 +138,7 @@ export default function App() {
         </div>
       </header>
       {/* 로그인했으면 첫 동기화가 끝난 뒤에 오늘 분량을 고정한다 (다른 기기의 최신 진도로) */}
+      {offline && <div className="offline-bar">인터넷 연결이 끊겼어요 · 이 기기에 저장하고, 다시 연결되면 다른 기기와 맞춰요</div>}
       <Study path={path} loggedIn={!!auth.user || auth.loading} syncReady={!isLoggedIn() || sync !== 'syncing'} onLogin={() => setLoginOpen(true)} />
       {loginOpen && <LoginModal onClose={() => setLoginOpen(false)} />}
       {accountOpen && auth.user && <AccountSheet user={auth.user} onClose={() => setAccountOpen(false)} />}

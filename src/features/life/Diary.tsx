@@ -8,6 +8,9 @@ import { put, remove, setSettings, useStudy } from '../study/store';
 import { confirmDelete, go, tap, toast, useToday } from '../study/ui';
 import { monthLabel, monthOf, shiftMonth } from './calc';
 import { daySummary, DIARY_PARTS, dreamDates, formOf, studySummary } from './diaryForm';
+import { diarySplit } from '../auth/api';
+import { LineChart } from '../study/charts';
+import { RecapPage } from './Recap';
 import { NotifyTime } from './NotifyTime';
 
 /** 기분 점: 좋을수록 진하게 */
@@ -19,6 +22,7 @@ export function Diary({ sub }: { sub?: string }) {
   const today = useToday();
   if (sub === 'dream') return <Dreams />;
   if (sub === 'form') return <Form />;
+  if (sub === 'recap') return <RecapPage />;
   if (sub && /^\d{4}-\d{2}-\d{2}$/.test(sub)) return <Write date={sub > today ? today : sub} today={today} />;
   return <List month={sub && /^\d{4}-\d{2}$/.test(sub) ? sub : monthOf(today)} today={today} />;
 }
@@ -60,7 +64,39 @@ function List({ month, today }: { month: string; today: string }) {
             );
           })}
         </div>
+        {(() => {
+          // 이 달 기분 흐름 (기분을 고른 날만)
+          const pts = days.filter((x) => x <= today).map((x) => ({ label: String(Number(x.slice(8))), title: shortDate(x), y: d.diary[x] && !d.diary[x].deleted && d.diary[x].mood ? d.diary[x].mood! : null }));
+          const n = pts.filter((p) => p.y !== null).length;
+          if (n < 2) return null;
+          const avg = pts.reduce((a, p) => a + (p.y ?? 0), 0) / n;
+          return (
+            <>
+              <LineChart label="이 달 기분" height={130} domain={[1, 5]} ticks={[1, 3, 5]} points={pts} format={(v) => MOOD_NAME[Math.round(v)] ?? ''} />
+              <p className="st-muted sm">
+                기분을 남긴 {n}일 평균: {MOOD_NAME[Math.round(avg)]} ({avg.toFixed(1)})
+              </p>
+            </>
+          );
+        })()}
       </section>
+      {month === monthOf(today) &&
+        [1, 2, 3].map((y) => {
+          // 1년 전 · 2년 전 · 3년 전 오늘
+          const day = `${Number(today.slice(0, 4)) - y}${today.slice(4)}`;
+          const e = d.diary[day] && !d.diary[day].deleted ? d.diary[day] : undefined;
+          return e ? (
+            <section key={y} className="st-card dy-entry dy-ago st-tap" {...tap(() => go(`/diary/${day}`))}>
+              <small className="st-muted">
+                📅 {y}년 전 오늘 · {shortDate(day)}
+              </small>
+              <b>
+                <Mood m={e.mood} /> {e.title || ''}
+              </b>
+              <p className="dy-preview">{e.text || Object.values(e.parts ?? {})[0]}</p>
+            </section>
+          ) : null;
+        })}
       <input className="st-input" value={q} onChange={(e) => setQ(e.target.value)} placeholder="모든 일기에서 찾기" aria-label="일기 찾기" />
       {!list.length ? (
         <p className="st-hint">{q ? '찾는 글이 있는 일기가 없어요.' : '이 달에 쓴 일기가 없어요.'}</p>
@@ -101,6 +137,27 @@ function Write({ date, today }: { date: string; today: string }) {
     ...(!cur && form.autoFill && form.parts.includes('done') && lines.length ? { done: lines.join('\n') } : {}),
     ...(form.parts.includes('study') && studyLines.length && !cur?.parts?.study?.trim() ? { study: studyLines.join('\n') } : {}),
   }));
+  // 받아쓴 본문을 AI 가 칸마다 나눠 준다 (빈 칸만 채우고, 이미 쓴 칸은 뒤에 붙임). 글에 없는 말은 안 넣게 했다
+  const [splitting, setSplitting] = useState(false);
+  const split = async () => {
+    setSplitting(true);
+    try {
+      const got = await diarySplit(text);
+      const keys = Object.keys(got) as (keyof typeof got)[];
+      if (!keys.length) return toast('나눌 만한 내용을 찾지 못했어요');
+      setParts((p) => {
+        const next = { ...p };
+        for (const k of keys) next[k] = p[k]?.trim() ? `${p[k].trim()}\n${got[k]}` : got[k]!;
+        return next;
+      });
+      // 나눈 칸이 양식에 없어도 보이게
+      toast(`${keys.length}칸에 나눠 넣었어요. 확인하고 저장해 주세요`);
+    } catch (e) {
+      toast(e instanceof Error ? e.message : 'AI 가 나누지 못했어요');
+    } finally {
+      setSplitting(false);
+    }
+  };
   const shownParts = DIARY_PARTS.filter((p) => form.parts.includes(p.key) || parts[p.key]?.trim());
   const clean = (x: Record<string, string>) => Object.fromEntries(Object.entries(x).filter(([, v]) => v.trim()));
   const [photos, setPhotos] = useState<string[]>(cur?.photos ?? []);
@@ -180,6 +237,11 @@ function Write({ date, today }: { date: string; today: string }) {
         ))}
         <textarea className="st-input dy-text" rows={shownParts.length ? 8 : 12} value={text} onChange={(e) => setText(e.target.value)} placeholder="하고 싶은 말을 자유롭게…" aria-label="일기" />
         <Dictate onText={(t) => setText((x) => (x.trim() ? `${x.replace(/\s+$/, '')} ${t}` : t))} />
+        {text.trim().length >= 20 && (
+          <button type="button" className="btn btn-sm" disabled={splitting} onClick={() => void split()}>
+            {splitting ? 'AI 가 나누는 중…' : 'AI 로 칸 나누기 (좋았던 것 · 힘들었던 것 · 고마운 것 · 내일 · 꿈)'}
+          </button>
+        )}
         <div className="dy-photos">
           {photos.map((id) => (
             <div key={id} className="dy-photo">

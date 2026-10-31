@@ -677,6 +677,18 @@ export function sanitizeSettings(s: unknown): StudySettings & { updatedAt: numbe
                   .slice(0, 20),
         }
       : undefined,
+    homeOrder:
+      x.homeOrder === undefined
+        ? undefined
+        : arr(x.homeOrder)
+            .filter((t): t is string => typeof t === 'string' && /^[a-z]{2,12}$/.test(t))
+            .slice(0, 20),
+    homeHide:
+      x.homeHide === undefined
+        ? undefined
+        : arr(x.homeHide)
+            .filter((t): t is string => typeof t === 'string' && /^[a-z]{2,12}$/.test(t))
+            .slice(0, 20),
     hiddenAreas:
       x.hiddenAreas === undefined
         ? undefined

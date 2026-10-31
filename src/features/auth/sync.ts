@@ -2,7 +2,7 @@
 import { onChange, type SyncName } from '../../lib/dataSync';
 import { exportBackup } from '../study/backup';
 import { mergeStudy, mergeWords, sameJson } from '../study/merge';
-import type { StudyData } from '../study/model';
+import { COLLECTIONS, type StudyData } from '../study/model';
 import { uploadPendingPhotos } from '../study/photos';
 import { sanitizeWords } from '../study/sanitize';
 import { getStudy, getWords, normalize, replaceStudy, replaceWords, resetLocal } from '../study/store';
@@ -99,8 +99,12 @@ async function syncOne(name: SyncName, pushOnly: boolean) {
       continue;
     }
     const remote = g.value ? side.read(g.value) : null;
-    const merged = side.merge(side.local(), remote);
-    if (remote && !sameJson(merged, side.local())) info.pulled = Date.now();
+    const local = side.local();
+    const merged = side.merge(local, remote);
+    if (remote && !sameJson(merged, local)) info.pulled = Date.now();
+    // 이 기기에서 지난번 맞춘 뒤 고친 것인데, 다른 기기 것이 더 최근이라 그쪽으로 바뀐 것 (알려 준다)
+    const lost = info.synced ? lostEdits(name, local, merged, info.synced) : 0;
+    if (lost && typeof window !== 'undefined') window.dispatchEvent(new CustomEvent('my-study-conflict', { detail: lost }));
     side.replace(merged);
     if (remote && sameJson(merged, remote)) return done(g.updatedAt);
     const r = await putStore(name, merged, g.updatedAt);
@@ -108,6 +112,20 @@ async function syncOne(name: SyncName, pushOnly: boolean) {
     at = 0; // 그 사이 또 바뀜: 다시 받아서 합친다
   }
   throw new Error('동기화가 계속 겹쳐요');
+}
+
+type Stamped = Record<string, { updatedAt?: number } | undefined>;
+/** 지난번 맞춘 뒤(since) 이 기기에서 고친 항목 중, 다른 기기 것이 더 나중에 고쳐져서 그쪽으로 바뀐 수 */
+export function lostEdits(name: SyncName, local: unknown, merged: unknown, since: number): number {
+  const count = (a: Stamped | undefined, b: Stamped | undefined) => {
+    let n = 0;
+    for (const [id, x] of Object.entries(a ?? {})) if (x && (x.updatedAt ?? 0) > since && (b?.[id]?.updatedAt ?? 0) > (x.updatedAt ?? 0)) n++;
+    return n;
+  };
+  if (name === 'words') return count(local as Stamped, merged as Stamped);
+  const l = local as Record<string, Stamped>,
+    m = merged as Record<string, Stamped>;
+  return COLLECTIONS.reduce((n, c) => n + count(l[c], m[c]), 0);
 }
 
 /** 이 기기에 다른 계정의 자료가 남아 있으면 지운다. 로그아웃한 뒤 고친 것이 있으면 먼저 백업 파일로 받을지 묻는다 */

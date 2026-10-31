@@ -7915,3 +7915,61 @@ body.focus-on {
   gap: 8px;
   align-items: center;
 }
+.rc-card {
+  display: grid;
+  gap: 16px;
+  padding: 24px;
+  border-radius: 20px;
+  color: #fff;
+  background: linear-gradient(135deg, #1e1b4b, #7c2d12);
+  margin-bottom: 14px;
+}
+.rc-card h3 {
+  margin: 0 0 4px;
+  font-size: 1.6rem;
+}
+.rc-row {
+  display: grid;
+  grid-template-columns: 44px 1fr;
+  gap: 12px;
+  align-items: center;
+}
+.rc-icon {
+  font-size: 2rem;
+}
+.rc-row div {
+  display: grid;
+  gap: 2px;
+}
+.rc-row small {
+  opacity: 0.75;
+}
+.rc-row b {
+  font-size: 1.4rem;
+}
+.dy-ago {
+  display: grid;
+  gap: 4px;
+}
+.hm-edit-row {
+  display: flex;
+  justify-content: flex-end;
+  margin: 4px 0 -4px;
+}
+.hm-editor {
+  display: grid;
+  gap: 8px;
+}
+.hm-edit {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+.hm-edit.off {
+  opacity: 0.55;
+}
+.hm-edit span {
+  display: inline-flex;
+  gap: 4px;
+}

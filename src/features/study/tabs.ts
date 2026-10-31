@@ -55,6 +55,7 @@ export const AREA_ITEMS: Record<Exclude<AreaKey, 'home' | 'study'>, AreaItem[]> 
     { key: '', label: '일기', icon: 'area-diary' },
     { key: 'dream', label: '꿈', icon: 'moon' },
     { key: 'form', label: '양식', icon: 'settings' },
+    { key: 'recap', label: '한 해 결산', icon: 'target' },
   ],
 };
 
@@ -93,7 +94,7 @@ export const movieItem = (sub?: string) => (sub === 'watched' || sub === 'want' 
 /** 지금 주소에서 어느 메뉴가 켜져 있는지 */
 export function activeItem(area: keyof typeof AREA_ITEMS, sub?: string, p0?: string): string {
   if (area === 'hobby' && (HOBBY_PARTS as readonly string[]).includes(p0 ?? '')) return p0!;
-  if (area === 'diary') return sub === 'dream' || sub === 'form' ? sub : '';
+  if (area === 'diary') return sub === 'dream' || sub === 'form' || sub === 'recap' ? sub : '';
   if (area === 'money') return sub === 'fixed' || sub === 'saving' ? sub : '';
   if (area === 'hobby') return sub === 'wish' || sub === 'reading' ? sub : '';
   return '';

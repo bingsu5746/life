@@ -9,6 +9,7 @@ import { ExamPlanPage } from './ExamPlan';
 import { SchoolExams } from './SchoolPanel';
 import { Bar, Check, confirmDelete, Empty, Field, go, Icon, Menu, Sheet, SubjectDot, SubjectPicker, subjectsOf, toast, useToday, tap } from './ui';
 import { askAiLater } from './solveJob';
+import { useSpecialDays } from '../life/Calendar';
 
 // 성적 화면은 그래프가 있어 열 때 받는다
 const Grades = lazy(() => import('./Grades').then((m) => ({ default: m.Grades })));
@@ -388,6 +389,8 @@ function ExamDetail({ id }: { id: string }) {
   const [edit, setEdit] = useState(false);
   const [scope, setScope] = useState<ExamScope | 'new' | null>(null);
   const exam = d.exams[id];
+  const special1 = useSpecialDays(Number(today.slice(0, 4)));
+  const special2 = useSpecialDays(Number(today.slice(0, 4)) + 1);
   if (!exam || exam.deleted)
     return (
       <Empty title="시험을 찾을 수 없어요">
@@ -402,6 +405,10 @@ function ExamDetail({ id }: { id: string }) {
   const saveScopes = (list: ExamScope[]) => put('exams', { ...exam, scopes: list });
   const toggle = (s: ExamScope, lineId: string) => saveScopes((exam.scopes ?? []).map((x) => (x.id === s.id ? { ...x, lines: x.lines.map((l) => (l.id === lineId ? { ...l, done: !l.done, at: Date.now() } : l)) } : x)));
   const left = diffDays(today, exam.date);
+  // 시험까지 남은 공휴일 (공휴일 키가 있을 때만): 시험 날과 겹치면 따로 알린다
+  const sp = [...special1, ...special2].filter((x) => x.holiday && x.date >= today && x.date <= examEnd(exam));
+  const holidaysBefore = sp.filter((x) => x.date < exam.date);
+  const onExam = sp.filter((x) => x.date >= exam.date);
   /** 시험 범위 · 그 과목 오답 · 암기 카드 · AI 풀이 제목을 모아 AI 에게 한 장 요약을 부탁한다 (AI 화면에 미리 넣어 둠) */
   const summaryNote = (sc: ExamScope) => {
     const sub = d.subjects[sc.subjectId]?.name ?? '과목';
@@ -470,6 +477,12 @@ function ExamDetail({ id }: { id: string }) {
             {exam.kind && `${KIND_NAME[exam.kind]} · `}
             {left > 0 ? `${left}일 남았어요` : left === 0 ? '오늘 시험이 시작돼요' : examEnd(exam) >= today ? '시험 기간이에요' : '시험이 끝났어요'}
           </p>
+          {holidaysBefore.length > 0 && (
+            <p className="st-sub">
+              🗓️ 시험 전 공휴일 {holidaysBefore.length}일: {holidaysBefore.map((x) => `${shortDate(x.date)} ${x.name}`).join(' · ')} — 공부 시간을 더 쓸 수 있는 날이에요
+            </p>
+          )}
+          {onExam.length > 0 && <p className="st-sub bad">⚠️ 시험 기간에 공휴일이 있어요: {onExam.map((x) => `${shortDate(x.date)} ${x.name}`).join(' · ')} (시험 날짜를 확인해 보세요)</p>}
         </div>
         {p.total > 0 && (
           <div className="st-exam-hero-bar">

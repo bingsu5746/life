@@ -8,7 +8,7 @@ import { EveBanner } from '../study/Eve';
 import { MorningCard } from './Morning';
 import { alive } from '../study/model';
 import { todaySummary } from '../study/select';
-import { put, useStudy, useWords } from '../study/store';
+import { put, setSettings, useStudy, useWords } from '../study/store';
 import { useCallback, useEffect, useState } from 'react';
 import { DEFAULT_PLACE, getWeather, weatherText, type Weather } from './weather';
 import { minutesText } from '../study/timer';
@@ -21,7 +21,12 @@ export function Home(_: { loggedIn: boolean; onLogin: () => void }) {
   const words = useWords();
   const today = useToday();
   const hidden = d.settings.hiddenAreas ?? [];
-  const show = (k: string) => !hidden.includes(k);
+  const homeHide = d.settings.homeHide ?? [];
+  const show = (k: string) => !hidden.includes(k) && !homeHide.includes(k);
+  const on = (k: string) => !homeHide.includes(k);
+  const [editing, setEditing] = useState(false);
+  const order = d.settings.homeOrder ?? [];
+  const areaList = AREAS.filter((a) => a.key !== 'home' && !hidden.includes(a.key)).sort((a, b) => (order.indexOf(a.key) + 1 || 99) - (order.indexOf(b.key) + 1 || 99));
 
   // 공부
   const sum = todaySummary(d, words, today);
@@ -120,20 +125,22 @@ export function Home(_: { loggedIn: boolean; onLogin: () => void }) {
           <WeatherChip />
         </div>
       </header>
-      <nav className="hm-quick" aria-label="바로 가기">
-        {[
-          { to: '/calendar', icon: 'exams', label: '달력' },
-          { to: '/plan', icon: 'target', label: '주간 계획' },
-          { to: '/week', icon: 'review', label: '돌아보기' },
-          { to: '/checkin', icon: 'moon', label: '하루 마감', on: new Date().getHours() >= 20 },
-          { to: '/insights', icon: 'time', label: '통계' },
-        ].map((x) => (
-          <button key={x.to} className={x.on ? 'on' : ''} onClick={() => go(x.to)}>
-            <Icon name={x.icon} />
-            <span>{x.label}</span>
-          </button>
-        ))}
-      </nav>
+      {on('quick') && (
+        <nav className="hm-quick" aria-label="바로 가기">
+          {[
+            { to: '/calendar', icon: 'exams', label: '달력' },
+            { to: '/plan', icon: 'target', label: '주간 계획' },
+            { to: '/week', icon: 'review', label: '돌아보기' },
+            { to: '/checkin', icon: 'moon', label: '하루 마감', on: new Date().getHours() >= 20 },
+            { to: '/insights', icon: 'time', label: '통계' },
+          ].map((x) => (
+            <button key={x.to} className={x.on ? 'on' : ''} onClick={() => go(x.to)}>
+              <Icon name={x.icon} />
+              <span>{x.label}</span>
+            </button>
+          ))}
+        </nav>
+      )}
       <ChangeBanner today={today} />
       <EveBanner today={today} />
       {weekday(today) === 0 && !d.settings.weekTargets?.[addDays(weekStart(today), 7)] && (
@@ -141,44 +148,52 @@ export function Home(_: { loggedIn: boolean; onLogin: () => void }) {
           다음 주 계획 세우기 ›
         </button>
       )}
-      <MorningCard today={today} />
-      <SchoolHome today={today} />
+      {on('morning') && <MorningCard today={today} />}
+      {on('school') && <SchoolHome today={today} />}
+      <div className="hm-edit-row">
+        <button className="st-link" onClick={() => setEditing(!editing)}>
+          {editing ? '다 했어요' : '메인 화면 편집'}
+        </button>
+      </div>
+      {editing && <HomeEdit list={areaList} />}
       <div className="hm-grid">
-        {AREAS.filter((a) => a.key !== 'home' && show(a.key)).map((a) => {
-          const c = cards[a.key];
-          return (
-            <section key={a.key} className="hm-card">
-              <button className="hm-main" onClick={() => go(`/${a.key}`)}>
-                <span className="hm-title">
-                  <Icon name={`area-${a.key}`} /> {a.label}
-                  {(c.streak ?? 0) >= 2 && (
-                    <span className="hm-streak" title={`${c.streak}일 연속`}>
-                      🔥 {c.streak}
+        {areaList
+          .filter((a) => show(a.key))
+          .map((a) => {
+            const c = cards[a.key];
+            return (
+              <section key={a.key} className="hm-card">
+                <button className="hm-main" onClick={() => go(`/${a.key}`)}>
+                  <span className="hm-title">
+                    <Icon name={`area-${a.key}`} /> {a.label}
+                    {(c.streak ?? 0) >= 2 && (
+                      <span className="hm-streak" title={`${c.streak}일 연속`}>
+                        🔥 {c.streak}
+                      </span>
+                    )}
+                  </span>
+                  {c.badge && (
+                    <span className="hm-dday">
+                      <b>{c.badge.big}</b>
+                      <small>{c.badge.small}</small>
                     </span>
                   )}
-                </span>
-                {c.badge && (
-                  <span className="hm-dday">
-                    <b>{c.badge.big}</b>
-                    <small>{c.badge.small}</small>
-                  </span>
-                )}
-                {c.lines.map((l, i) => (
-                  <span key={i} className={i === 0 ? 'hm-big' : 'hm-line'}>
-                    {l}
-                  </span>
-                ))}
-              </button>
-              {c.action && (
-                <button className="btn btn-sm hm-act" onClick={() => go(c.action!.to)}>
-                  {c.action.label}
+                  {c.lines.map((l, i) => (
+                    <span key={i} className={i === 0 ? 'hm-big' : 'hm-line'}>
+                      {l}
+                    </span>
+                  ))}
                 </button>
-              )}
-            </section>
-          );
-        })}
+                {c.action && (
+                  <button className="btn btn-sm hm-act" onClick={() => go(c.action!.to)}>
+                    {c.action.label}
+                  </button>
+                )}
+              </section>
+            );
+          })}
       </div>
-      <FactCard />
+      {on('fact') && <FactCard />}
       {(() => {
         const last = d.settings.lastBackup;
         const days = last ? Math.floor((Date.parse(today) - Date.parse(last)) / 86_400_000) : null;
@@ -300,6 +315,52 @@ function FactCard() {
         <span aria-hidden>💡</span> 쓸모없는 지식 <i aria-hidden>{busy ? '…' : '↻'}</i>
       </button>
       <p lang={fact.ko ? 'ko' : 'en'}>{fact.ko || fact.en}</p>
+    </section>
+  );
+}
+
+/** 메인 화면 편집: 카드 순서(위 · 아래) · 보이기 · 숨기기, 다른 칸 보이기 · 숨기기 (모든 기기에 같이) */
+function HomeEdit({ list }: { list: { key: string; label: string }[] }) {
+  const d = useStudy();
+  const hide = d.settings.homeHide ?? [];
+  const keys = list.map((a) => a.key);
+  const move = (i: number, by: number) => {
+    const next = [...keys];
+    const j = i + by;
+    if (j < 0 || j >= next.length) return;
+    [next[i], next[j]] = [next[j], next[i]];
+    setSettings({ homeOrder: next });
+  };
+  const toggle = (k: string) => setSettings({ homeHide: hide.includes(k) ? hide.filter((x) => x !== k) : [...hide, k] });
+  const extras = [
+    ['quick', '바로 가기 (달력 · 주간 계획 …)'],
+    ['morning', '아침 카드'],
+    ['school', '학교 (급식 · 시간표)'],
+    ['fact', '쓸모없는 지식'],
+  ];
+  return (
+    <section className="st-card hm-editor">
+      <small className="st-muted">카드 순서와 보이기를 바꿔요. 모든 기기에 같이 적용돼요.</small>
+      {list.map((a, i) => (
+        <div key={a.key} className={`hm-edit ${hide.includes(a.key) ? 'off' : ''}`}>
+          <label className="st-toggle">
+            <input type="checkbox" checked={!hide.includes(a.key)} onChange={() => toggle(a.key)} /> {a.label}
+          </label>
+          <span>
+            <button className="btn btn-sm" disabled={i === 0} onClick={() => move(i, -1)} aria-label={`${a.label} 위로`}>
+              ↑
+            </button>
+            <button className="btn btn-sm" disabled={i === list.length - 1} onClick={() => move(i, 1)} aria-label={`${a.label} 아래로`}>
+              ↓
+            </button>
+          </span>
+        </div>
+      ))}
+      {extras.map(([k, label]) => (
+        <label key={k} className="st-toggle">
+          <input type="checkbox" checked={!hide.includes(k)} onChange={() => toggle(k)} /> {label}
+        </label>
+      ))}
     </section>
   );
 }
