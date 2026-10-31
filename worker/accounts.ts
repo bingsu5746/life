@@ -1769,7 +1769,7 @@ export class Accounts extends DurableObject<Env> {
 
   /** Discord 봇 (수학 서버). 가족 서버 글이라, 처음 연결한 계정만 쓸 수 있다 */
   private async discordRoute(req: Request, path: string, user: UserRow, body: Record<string, unknown>): Promise<Response> {
-    const token = this.secret('discord', 'discordtoken', 'discordbot', 'discordbottoken');
+    const token = this.secret('discordbottoken', 'discordtoken', 'discordbot', 'discord');
     if (!token) return fail('Discord 봇 토큰이 아직 등록되지 않았어요.', 503);
     const owner = this.cacheGet('discord:owner');
     if (owner && owner !== String(user.id)) return fail('이 Discord 봇은 다른 계정에 연결돼 있어요.', 403);
