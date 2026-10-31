@@ -1,5 +1,5 @@
 // 독서: 읽는 중인 책의 쪽 수, 읽고 싶은 책, 다 읽은 책의 별점·한줄평·리뷰
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { addDays, shortDate } from '../study/dates';
 import { alive, newId, type Reading } from '../study/model';
 import { put, remove, setSettings, useStudy } from '../study/store';
@@ -149,19 +149,53 @@ function ReadStats({ all, today }: { all: Reading[]; today: string }) {
   );
 }
 
+/** 친 말과 얼마나 비슷한지: 제목이 같음 > 제목이 그 말로 시작 > 제목에 들어 있음 > 지은이에 들어 있음 > 글자가 겹치는 만큼 */
+const flat = (x: string) => x.toLowerCase().replace(/[\s\p{P}]/gu, '');
+function likeness(b: BookHit, q: string): number {
+  const t = flat(b.title);
+  const k = flat(q);
+  if (!k) return 0;
+  if (t === k) return 1000;
+  if (t.startsWith(k)) return 900 - t.length;
+  if (t.includes(k)) return 800 - t.indexOf(k) - t.length / 10;
+  if (flat(b.author).includes(k)) return 600;
+  const chars = new Set(k);
+  return [...new Set(t)].filter((c) => chars.has(c)).length * 10 - t.length / 10;
+}
+const byLikeness = (list: BookHit[], q: string) => [...list].sort((a, b) => likeness(b, q) - likeness(a, q));
+
 /** 책 찾기 (국립중앙도서관): 표지 · 지은이 · 출판사 · 정가 → 읽고 싶어요 · 읽는 중에 바로 */
 function BookFind({ have }: { have: Reading[] }) {
   const [q, setQ] = useState('');
   const [list, setList] = useState<BookHit[] | null>(null);
   const [busy, setBusy] = useState(false);
   const [note, setNote] = useState('');
+  // 치는 대로 찾기 (0.45초 쉬면): 제목이 친 말과 비슷한 순서로
+  useEffect(() => {
+    const k = q.trim();
+    if (k.length < 2) return setList(null);
+    let on = true;
+    const t = setTimeout(() => {
+      bookSearch(k)
+        .then((r) => {
+          if (!on) return;
+          setList(byLikeness(r.list, k));
+          setNote(r.needKey ? '책 찾기는 예스24 · 국립중앙도서관 키가 있어야 돼요.' : '');
+        })
+        .catch((e) => on && setNote(e instanceof Error ? e.message : '찾지 못했어요'));
+    }, 450);
+    return () => {
+      on = false;
+      clearTimeout(t);
+    };
+  }, [q]);
   const find = async () => {
     if (q.trim().length < 2 || busy) return;
     setBusy(true);
     setNote('');
     try {
       const r = await bookSearch(q.trim());
-      setList(r.list);
+      setList(byLikeness(r.list, q.trim()));
       if (r.needKey) setNote('책 찾기는 예스24 · 국립중앙도서관 키가 있어야 돼요.');
     } catch (e) {
       setNote(e instanceof Error ? e.message : '찾지 못했어요');
