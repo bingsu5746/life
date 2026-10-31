@@ -10,19 +10,22 @@ export const DIARY_PARTS: { key: string; label: string; hint: string }[] = [
   { key: 'dream', label: '꿈', hint: '어젯밤 꾼 꿈이 있다면' },
   { key: 'tomorrow', label: '내일 할 것', hint: '내일 꼭 하고 싶은 것' },
   { key: 'checkin', label: '하루 마감', hint: '하루 마감에서 남긴 한 줄' },
+  { key: 'sleep', label: '잠 · 컨디션', hint: '잔 시간과 일어나서 컨디션 (기록에서 자동으로 채워요)' },
   { key: 'learned', label: '배운 것', hint: '오늘 새로 알게 된 것' },
   { key: 'fix', label: '고칠 점', hint: '다음엔 다르게 할 것' },
   { key: 'worry', label: '고민이나 잡생각', hint: '머릿속에 떠다니는 생각' },
-  { key: 'photo', label: '사진 설명', hint: '오늘의 사진 · 영상 이야기' },
+  { key: 'photo', label: '오늘의 사진', hint: '오늘의 사진 · 영상 이야기' },
 ];
 
-export const DEFAULT_FORM = { parts: ['study', 'done', 'good', 'dream'], autoFill: true };
+export const DEFAULT_FORM = { parts: ['sleep', 'study', 'done', 'good', 'dream', 'photo'], autoFill: true };
+/** 양식을 저장한 뒤에 새로 생긴 칸 중 처음부터 켜 둘 것 */
+const NEW_ON = ['study', 'sleep', 'photo'];
 
 /** 설정에 저장한 양식 (없으면 기본) */
 export function formOf(d: Pick<StudyData, 'settings'>): { parts: string[]; autoFill: boolean } {
   const f = d.settings.diaryForm;
   // known: 양식을 저장할 때 있던 칸들. 그 뒤에 새로 생긴 칸(예: 공부)은 켜진 것으로
-  return f ? { parts: DIARY_PARTS.map((p) => p.key).filter((k) => f.parts.includes(k) || (k === 'study' && !f.known?.includes(k))), autoFill: f.autoFill } : DEFAULT_FORM;
+  return f ? { parts: DIARY_PARTS.map((p) => p.key).filter((k) => f.parts.includes(k) || (NEW_ON.includes(k) && !f.known?.includes(k))), autoFill: f.autoFill } : DEFAULT_FORM;
 }
 
 /** 그날 공부 기록: 모두 몇 분 · 과목별 · 메모 (없으면 빈 목록) */
@@ -75,4 +78,21 @@ export function dreamDates(d: Pick<StudyData, 'diary'>): string[] {
     .map((e) => e.id)
     .sort()
     .reverse();
+}
+
+const MOOD_WORD = ['', '나쁨', '별로', '보통', '좋음', '최고'];
+/** 잠 · 컨디션 한 줄 (기록의 잠든 시각 · 일어난 시각 · 일어나서 컨디션) */
+export function sleepSummary(d: StudyData, date: string): string[] {
+  const c = d.conditions?.[date];
+  if (!c || c.deleted) return [];
+  const out: string[] = [];
+  if (c.sleep && c.wake) {
+    const [sh, sm] = c.sleep.split(':').map(Number);
+    const [wh, wm] = c.wake.split(':').map(Number);
+    let min = wh * 60 + wm - (sh * 60 + sm);
+    if (min <= 0) min += 24 * 60;
+    out.push(`${c.sleep} 잠 → ${c.wake} 일어남 (${Math.floor(min / 60)}시간${min % 60 ? ` ${min % 60}분` : ''})`);
+  } else if (c.wake) out.push(`${c.wake} 일어남`);
+  if (c.mood) out.push(`일어나서 컨디션: ${MOOD_WORD[c.mood] ?? c.mood} (${c.mood}/5)`);
+  return out;
 }

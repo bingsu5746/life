@@ -320,10 +320,10 @@ describe('일기 양식 (diaryForm)', () => {
     expect(daySummary(d, '2026-10-28')).toEqual(['운동: 농구 60분', '영화: 존 윅 ★5', '책: 「데미안」 다 읽음 — 좋았다']);
     expect(studySummary(d, '2026-10-28')).toEqual(['모두 1시간 30분']);
     expect(dreamDates(d)).toEqual(['2026-10-27']);
-    expect(formOf(d).parts).toEqual(['study', 'done', 'good', 'dream']);
+    expect(formOf(d).parts).toEqual(['sleep', 'study', 'done', 'good', 'dream', 'photo']);
     // 예전에 저장한 양식(공부 칸이 없던 때)에도 공부 칸은 켜진다. 새로 저장한 양식에서 끈 것은 꺼진 채로
-    expect(formOf({ settings: { diaryForm: { parts: ['done'], autoFill: true } } } as never).parts).toEqual(['study', 'done']);
-    expect(formOf({ settings: { diaryForm: { parts: ['done'], autoFill: true, known: ['study', 'done'] } } } as never).parts).toEqual(['done']);
+    expect(formOf({ settings: { diaryForm: { parts: ['done'], autoFill: true } } } as never).parts).toEqual(['study', 'done', 'sleep', 'photo']);
+    expect(formOf({ settings: { diaryForm: { parts: ['done'], autoFill: true, known: ['study', 'done', 'sleep', 'photo'] } } } as never).parts).toEqual(['done']);
   });
 });
 

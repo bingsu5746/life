@@ -9401,3 +9401,20 @@ body.focus-on {
     height: 18px;
   }
 }
+
+/* 일기: 칸이 글 길이만큼 늘어남 · 글자 수는 왼쪽 끝 */
+.dy-auto {
+  resize: none;
+  overflow: hidden;
+  min-height: 2.6em;
+}
+.dy-foot {
+  justify-content: flex-end;
+  align-items: center;
+}
+.dy-count {
+  margin-right: auto;
+}
+.dy-count span {
+  opacity: 0.7;
+}

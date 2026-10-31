@@ -246,9 +246,9 @@ export class Accounts extends DurableObject<Env> {
 
     let body: Record<string, unknown> = {};
     if (req.method === 'POST' || req.method === 'PUT' || req.method === 'DELETE') {
-      const big = path.startsWith('store/') || path.startsWith('study-photo/') || path === 'solve' || path === 'solve/img' || path === 'bb/scan' || path === 'ai/note' || path === 'ai/receipt' || path === 'ai/toc';
+      const big = path.startsWith('store/') || path.startsWith('study-photo/') || path === 'solve' || path === 'solve/img' || path === 'bb/scan' || path === 'ai/note' || path === 'ai/receipt' || path === 'ai/toc' || path === 'ai/stt';
       const text = await req.text();
-      if (text.length > (big ? MAX_STORE + 1000 : path === 'translate' || path === 'notify/digest' ? 4 * MAX_SMALL_BODY : MAX_SMALL_BODY)) return fail('보낸 내용이 너무 커요.', 413);
+      if (text.length > (big ? MAX_STORE + 1000 : path === 'translate' || path === 'notify/digest' || path === 'ai/diary' ? 4 * MAX_SMALL_BODY : MAX_SMALL_BODY)) return fail('보낸 내용이 너무 커요.', 413);
       try {
         const parsed: unknown = text ? JSON.parse(text) : {};
         if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return fail('잘못된 요청이에요.');
@@ -376,6 +376,7 @@ export class Accounts extends DurableObject<Env> {
     if (path === 'books/search' && req.method === 'GET') return this.bookSearch((new URL(req.url).searchParams.get('q') ?? '').trim().slice(0, 80));
     if (path === 'books/toc' && req.method === 'GET') return this.bookToc(new URL(req.url).searchParams.get('url') ?? '');
     if (path === 'ai/diary' && req.method === 'POST') return this.diarySplit(user, body);
+    if (path === 'ai/stt' && req.method === 'POST') return this.stt(user, body);
     if (path === 'bb/scan' && req.method === 'POST') return this.bbScan(user, body);
     if (path.startsWith('bb/scan/') && req.method === 'GET') return this.bbScanGet(user, path.slice('bb/scan/'.length));
     if (path === 'nba/games' && req.method === 'GET') return this.nbaGames(new URL(req.url).searchParams.get('date'));
@@ -2034,6 +2035,21 @@ export class Accounts extends DurableObject<Env> {
     }
   }
   /** 받아쓴 일기 글 → 칸마다 (좋았던 것 · 힘들었던 것 …). 쓴 말만 옮기고 지어내지 않게 */
+  /** 말로 쓰기: 녹음을 Workers AI Whisper 로 받아쓴다 (한국어). 한 번에 1.2MB(약 2~3분)까지 */
+  private sttByUser = new Limiter(60, 60 * 60_000);
+  private async stt(user: UserRow, b: Record<string, unknown>): Promise<Response> {
+    const audio = typeof b.audio === 'string' ? b.audio : '';
+    if (!audio || audio.length > 1_700_000 || !/^[A-Za-z0-9+/=]+$/.test(audio.slice(0, 200))) return fail('녹음을 확인해 주세요.');
+    const wait = this.sttByUser.hit(user.id);
+    if (wait) return fail(`잠시 뒤에 다시 해 주세요. (${wait}초)`, 429);
+    try {
+      const out = (await within(this.env.AI.run('@cf/openai/whisper-large-v3-turbo' as never, { audio, language: 'ko', vad_filter: true, initial_prompt: '고등학생의 하루 일기입니다.' } as never), 60_000, '받아쓰기')) as { text?: string };
+      return json({ text: (out.text ?? '').trim() });
+    } catch (e) {
+      return fail(`받아쓰지 못했어요. (${(e instanceof Error ? e.message : String(e)).slice(0, 80)})`, 502);
+    }
+  }
+
   private async diarySplit(user: UserRow, b: Record<string, unknown>): Promise<Response> {
     const text = typeof b.text === 'string' ? b.text.trim().slice(0, 6000) : '';
     if (text.length < 5) return fail('나눌 글이 너무 짧아요.');

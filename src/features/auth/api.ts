@@ -645,7 +645,9 @@ export interface BookHit {
 export const bookSearch = (q: string) => remember(`bk:${q}`, 60 * MIN, () => call<{ list: BookHit[]; needKey?: boolean }>(`books/search?q=${encodeURIComponent(q)}`, 'GET', undefined, 20_000));
 export const bookToc = (url: string) => call<{ text: string }>(`books/toc?url=${encodeURIComponent(url)}`, 'GET', undefined, 20_000);
 /** 받아쓴 일기 → 칸 나누기 */
-export const diarySplit = (text: string) => aiJob<Partial<Record<'good' | 'hard' | 'thanks' | 'tomorrow' | 'dream', string>>>('ai/diary', { text });
+export const diarySplit = (text: string) => aiJob<Partial<Record<'done' | 'good' | 'hard' | 'thanks' | 'learned' | 'fix' | 'worry' | 'tomorrow' | 'dream', string>>>('ai/diary', { text });
+/** 녹음(base64) → 받아쓴 글 (서버 Whisper) */
+export const speechToText = (audio: string) => call<{ text: string }>('ai/stt', 'POST', { audio }, 70_000).then((r) => r.text);
 
 /** 롤 (Riot API): 프로필 · 경기 (서버가 모아 둔다) */
 export interface LolProfile {
