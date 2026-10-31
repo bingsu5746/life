@@ -23,7 +23,7 @@ import { fetchSpecialDays } from './holidays';
 import { cleanFact } from './fact';
 import { fetch2k } from './nba2k';
 import { hcBody, parseHc } from './homecourt';
-import { diaryBody, noteBody, parseDiary, parseNote } from './aiRead';
+import { diaryBody, noteBody, parseDiary, parseNote, parseReceipt, receiptBody } from './aiRead';
 import { cheapShark } from './cheapshark';
 import { lolNewGames, lolOlderGames, lolProfile, RiotError, type LolGame } from './lol';
 import { krPrices, steamAchievements, steamMe, storeNames, storeSearch, wishlist, type KrPrice } from './steam';
@@ -198,7 +198,7 @@ export class Accounts extends DurableObject<Env> {
 
     let body: Record<string, unknown> = {};
     if (req.method === 'POST' || req.method === 'PUT' || req.method === 'DELETE') {
-      const big = path.startsWith('store/') || path.startsWith('study-photo/') || path === 'solve' || path === 'solve/img' || path === 'bb/scan' || path === 'ai/note';
+      const big = path.startsWith('store/') || path.startsWith('study-photo/') || path === 'solve' || path === 'solve/img' || path === 'bb/scan' || path === 'ai/note' || path === 'ai/receipt';
       const text = await req.text();
       if (text.length > (big ? MAX_STORE + 1000 : path === 'translate' || path === 'notify/digest' ? 4 * MAX_SMALL_BODY : MAX_SMALL_BODY)) return fail('보낸 내용이 너무 커요.', 413);
       try {
@@ -293,6 +293,7 @@ export class Accounts extends DurableObject<Env> {
     if (path === 'nba/fav' && (req.method === 'GET' || req.method === 'PUT')) return this.nbaFav(req, user, body);
     if (path === 'music/discogs' && req.method === 'GET') return this.discogs((new URL(req.url).searchParams.get('q') ?? '').trim().slice(0, 80));
     if (path === 'ai/note' && req.method === 'POST') return this.noteScan(user, body);
+    if (path === 'ai/receipt' && req.method === 'POST') return this.receiptScan(user, body);
     if (path === 'ai/diary' && req.method === 'POST') return this.diarySplit(user, body);
     if (path === 'bb/scan' && req.method === 'POST') return this.bbScan(user, body);
     if (path.startsWith('bb/scan/') && req.method === 'GET') return this.bbScanGet(user, path.slice('bb/scan/'.length));
@@ -1772,6 +1773,12 @@ export class Accounts extends DurableObject<Env> {
       .map((x) => x.slice(0, 20))
       .slice(0, 30);
     return this.aiJob(user, noteBody(img.mime, img.data, subjects), (t) => parseNote(t, subjects), 'note');
+  }
+  /** 영수증 사진 → 금액 · 날짜 · 가게 (돈 기록 채우기) */
+  private async receiptScan(user: UserRow, b: Record<string, unknown>): Promise<Response> {
+    const img = this.imageOf(b);
+    if (!img) return fail('사진이 너무 크거나 잘못됐어요.', 413);
+    return this.aiJob(user, receiptBody(img.mime, img.data), parseReceipt, 'receipt');
   }
   /** 받아쓴 일기 글 → 칸마다 (좋았던 것 · 힘들었던 것 …). 쓴 말만 옮기고 지어내지 않게 */
   private async diarySplit(user: UserRow, b: Record<string, unknown>): Promise<Response> {

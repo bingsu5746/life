@@ -54,3 +54,35 @@ export function parseDiary(text: string): DiaryRead {
   }
   return out;
 }
+
+export interface ReceiptRead {
+  amount: number | null;
+  date: string | null;
+  store: string | null;
+  items: string[];
+}
+export function receiptBody(mime: string, data: string) {
+  const prompt = [
+    'This is a photo of a Korean receipt (영수증) or a payment screen. Read ONLY what is printed. Never guess.',
+    'Return JSON with exactly these keys:',
+    '"amount": the total paid amount in won as an integer (합계 / 결제금액 / 받을금액), or null;',
+    '"date": the purchase date as YYYY-MM-DD, or null;',
+    '"store": the store or merchant name as printed, or null;',
+    '"items": up to 5 item names as printed (short), [] if none.',
+  ].join('\n');
+  return { contents: [{ role: 'user', parts: [{ inlineData: { mimeType: mime, data } }, { text: prompt }] }], generationConfig: json };
+}
+export function parseReceipt(text: string): ReceiptRead {
+  const j = obj(text);
+  const amt = typeof j.amount === 'number' ? j.amount : typeof j.amount === 'string' ? Number(j.amount.replace(/[^\d]/g, '')) : NaN;
+  const date = typeof j.date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(j.date) ? j.date : null;
+  return {
+    amount: Number.isFinite(amt) && amt > 0 && amt < 100_000_000 ? Math.round(amt) : null,
+    date,
+    store: str(j.store, 40),
+    items: (Array.isArray(j.items) ? j.items : [])
+      .map((x) => str(x, 40))
+      .filter((x): x is string => !!x)
+      .slice(0, 5),
+  };
+}

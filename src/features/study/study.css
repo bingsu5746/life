@@ -8377,3 +8377,47 @@ body.focus-on {
   display: grid;
   gap: 4px;
 }
+/* 공부 모드 스위치 (메인 구석) */
+.sm-toggle {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 6px;
+  border: 0;
+  background: none;
+  color: var(--muted);
+  touch-action: pan-y;
+  cursor: pointer;
+}
+.sm-track {
+  width: 34px;
+  height: 20px;
+  border-radius: 999px;
+  background: var(--line-strong);
+  position: relative;
+  transition: background var(--dur, 0.2s);
+}
+.sm-track i {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #fff;
+  transition: transform var(--dur, 0.2s);
+}
+.sm-toggle.on .sm-track {
+  background: var(--accent);
+}
+.sm-toggle.on .sm-track i {
+  transform: translateX(14px);
+}
+.sm-toggle.on small {
+  color: var(--accent);
+  font-weight: 600;
+}
+.mn-receipt {
+  justify-self: start;
+}

@@ -9,6 +9,8 @@ import { MorningCard } from './Morning';
 import { alive } from '../study/model';
 import { todaySummary } from '../study/select';
 import { put, setSettings, useStudy, useWords } from '../study/store';
+import { STUDY_MODE_AREAS, useStudyMode } from '../../lib/studyMode';
+import { StudyModeToggle } from './StudyModeToggle';
 import { useCallback, useEffect, useState } from 'react';
 import { DEFAULT_PLACE, getWeather, weatherText, type Weather } from './weather';
 import { minutesText } from '../study/timer';
@@ -22,8 +24,10 @@ export function Home(_: { loggedIn: boolean; onLogin: () => void }) {
   const today = useToday();
   const hidden = d.settings.hiddenAreas ?? [];
   const homeHide = d.settings.homeHide ?? [];
-  const show = (k: string) => !hidden.includes(k) && !homeHide.includes(k);
-  const on = (k: string) => !homeHide.includes(k);
+  const studyMode = useStudyMode();
+  // 공부 모드: 공부 · AI 카드와 공부에 필요한 칸만
+  const show = (k: string) => !hidden.includes(k) && !homeHide.includes(k) && (!studyMode || STUDY_MODE_AREAS.includes(k));
+  const on = (k: string) => !homeHide.includes(k) && (!studyMode || k === 'school');
   const [editing, setEditing] = useState(false);
   const order = d.settings.homeOrder ?? [];
   const areaList = AREAS.filter((a) => a.key !== 'home' && !hidden.includes(a.key)).sort((a, b) => (order.indexOf(a.key) + 1 || 99) - (order.indexOf(b.key) + 1 || 99));
@@ -122,7 +126,8 @@ export function Home(_: { loggedIn: boolean; onLogin: () => void }) {
       <header className="hm-head">
         <div className="hm-top">
           <h2>{longDate(today)}</h2>
-          <WeatherChip />
+          {!studyMode && <WeatherChip />}
+          <StudyModeToggle />
         </div>
       </header>
       {on('quick') && (
@@ -141,8 +146,8 @@ export function Home(_: { loggedIn: boolean; onLogin: () => void }) {
           ))}
         </nav>
       )}
-      <ChangeBanner today={today} />
-      <EveBanner today={today} />
+      {!studyMode && <ChangeBanner today={today} />}
+      {!studyMode && <EveBanner today={today} />}
       {weekday(today) === 0 && !d.settings.weekTargets?.[addDays(weekStart(today), 7)] && (
         <button className="hm-plan" onClick={() => go('/plan')}>
           다음 주 계획 세우기 ›
@@ -150,11 +155,13 @@ export function Home(_: { loggedIn: boolean; onLogin: () => void }) {
       )}
       {on('morning') && <MorningCard today={today} />}
       {on('school') && <SchoolHome today={today} />}
-      <div className="hm-edit-row">
-        <button className="st-link" onClick={() => setEditing(!editing)}>
-          {editing ? '다 했어요' : '메인 화면 편집'}
-        </button>
-      </div>
+      {!studyMode && (
+        <div className="hm-edit-row">
+          <button className="st-link" onClick={() => setEditing(!editing)}>
+            {editing ? '다 했어요' : '메인 화면 편집'}
+          </button>
+        </div>
+      )}
       {editing && <HomeEdit list={areaList} />}
       <div className="hm-grid">
         {areaList

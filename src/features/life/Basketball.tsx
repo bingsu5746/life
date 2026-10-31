@@ -9,6 +9,7 @@ import { minutesText } from '../study/timer';
 import { BbGoals, ItemTrend, ShotSummary } from './BbStats';
 import { courtNames } from './bb';
 import { report } from './shots';
+import { BbWeek } from './BbWeek';
 import { confirmDelete, Empty, go, Icon, Sheet, tap, toast, useToday } from '../study/ui';
 
 const md = (x: string) => shortDate(x).replace(/\(.\)/, '');
@@ -57,6 +58,7 @@ export function Basketball({ sub }: { sub?: string }) {
         </Empty>
       ) : (
         <>
+          <BbWeek />
           <BbGoals />
           <ShotSummary />
           <ItemTrend />

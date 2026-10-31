@@ -11,3 +11,11 @@ describe('aiRead', () => {
     expect(parseDiary('```json\n{"good":"농구 이겼다","hard":null,"x":"y","thanks":" "}\n```')).toEqual({ good: '농구 이겼다' });
   });
 });
+
+describe('영수증', () => {
+  it('금액 · 날짜 · 가게', async () => {
+    const { parseReceipt } = await import('./aiRead');
+    expect(parseReceipt('{"amount":"12,500원","date":"2026-10-30","store":"메가커피","items":["아메리카노"]}')).toEqual({ amount: 12500, date: '2026-10-30', store: '메가커피', items: ['아메리카노'] });
+    expect(parseReceipt('{"amount":null,"date":"어제","store":null,"items":null}')).toEqual({ amount: null, date: null, store: null, items: [] });
+  });
+});

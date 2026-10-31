@@ -619,6 +619,8 @@ async function aiJob<T>(path: string, body: unknown): Promise<T> {
 }
 /** 문제 사진 → 과목 · 번호 · 문제 글 */
 export const noteScan = (image: { mime: string; data: string }, subjects: string[]) => aiJob<{ subject: string | null; number: string | null; question: string | null }>('ai/note', { image, subjects });
+/** 영수증 사진 → 금액 · 날짜 · 가게 */
+export const receiptScan = (image: { mime: string; data: string }) => aiJob<{ amount: number | null; date: string | null; store: string | null; items: string[] }>('ai/receipt', { image });
 /** 받아쓴 일기 → 칸 나누기 */
 export const diarySplit = (text: string) => aiJob<Partial<Record<'good' | 'hard' | 'thanks' | 'tomorrow' | 'dream', string>>>('ai/diary', { text });
 

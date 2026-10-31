@@ -8,6 +8,8 @@ import { Bar, confirmDelete, Empty, Field, go, Icon, Sheet, tap, toast, useToday
 import { budgetView, compareMonths, savingPace, weekAllowance, weekSpent, monthlyAmount, monthLabel, monthlyOut, monthOf, monthSummary, readWon, saved, shiftMonth, upcomingRules, won } from './calc';
 import { WEEKDAYS } from '../study/dates';
 import { guessCategory, topCategory } from './moneyGuess';
+import { receiptScan } from '../auth/api';
+import { compressProblemImage } from '../../lib/imageCompress';
 
 const OUT = ['식비', '간식·카페', '교통', '쇼핑', '문화·여가', '교육·책', '통신', '선물', '기타'];
 const IN = ['용돈', '알바', '선물', '기타'];
@@ -289,6 +291,30 @@ function TxSheet({ item, today, onClose }: { item?: MoneyTx; today: string; onCl
   // 분류를 직접 고르기 전까지는 「무엇에」 글로 분류를 짐작해 바꾼다
   const [picked, setPicked] = useState(!!item);
   const d = useStudy();
+  // 영수증 사진을 AI(Gemini)로 읽어 금액 · 날짜 · 무엇에(가게) 를 채운다 (사진은 저장하지 않음)
+  const [reading, setReading] = useState(false);
+  const readReceipt = async (f: File) => {
+    setReading(true);
+    try {
+      const small = await compressProblemImage(f);
+      const data = await new Promise<string>((ok, no) => {
+        const r = new FileReader();
+        r.onload = () => ok(String(r.result).split(',')[1] ?? '');
+        r.onerror = () => no(new Error('사진을 읽지 못했어요'));
+        r.readAsDataURL(small);
+      });
+      const got = await receiptScan({ mime: small.type || 'image/jpeg', data });
+      if (got.amount) setAmount(got.amount.toLocaleString('ko-KR'));
+      if (got.date && got.date <= today) setDate(got.date);
+      const what = got.store ?? got.items[0] ?? '';
+      if (what) typeMemo(what);
+      toast(got.amount ? '영수증을 읽어 채웠어요. 맞는지 확인해 주세요' : '금액을 읽지 못했어요. 직접 넣어 주세요');
+    } catch (e) {
+      toast(e instanceof Error ? e.message : '영수증을 읽지 못했어요');
+    } finally {
+      setReading(false);
+    }
+  };
   const typeMemo = (v: string) => {
     setMemo(v);
     if (picked) return;
@@ -312,6 +338,12 @@ function TxSheet({ item, today, onClose }: { item?: MoneyTx; today: string; onCl
             들어온 돈
           </button>
         </div>
+        {type === 'out' && !item && (
+          <label className="btn btn-sm mn-receipt">
+            {reading ? '영수증 읽는 중…' : '📷 영수증 사진으로 채우기'}
+            <input type="file" accept="image/*" hidden disabled={reading} onChange={(e) => e.target.files?.[0] && void readReceipt(e.target.files[0])} />
+          </label>
+        )}
         <div className="st-inline">
           <input
             className="st-input mn-amount"

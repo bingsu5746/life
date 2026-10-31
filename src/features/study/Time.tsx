@@ -1,4 +1,6 @@
 // 공부 타이머 · 기록 (설계 §10)
+import { askAiLater } from './solveJob';
+import { coachPrompt } from './coach';
 import { useState } from 'react';
 import { addDays, daysBetween, shortDate, weekStart, WEEKDAYS } from './dates';
 import { BarChart, TableView } from './charts';
@@ -92,6 +94,9 @@ function TimeHome({ sub }: { sub?: string }) {
           </button>
           <button className="st-link" onClick={() => go('/insights/study')}>
             자세히
+          </button>
+          <button className="st-link" onClick={() => (askAiLater({ title: 'AI 코치: 다음 주 공부 계획', text: coachPrompt(d, today) }), go('/ai'))}>
+            AI 코치
           </button>
           <button className="btn btn-sm" onClick={() => setManual(true)}>
             <Icon name="plus" /> 공부 시간 넣기

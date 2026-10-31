@@ -68,6 +68,7 @@ const PRELOAD = [
   () => import('./Words'),
 ];
 
+import { STUDY_MODE_AREAS, useStudyMode } from '../../lib/studyMode';
 import { activeItem, AREA_ITEMS, AREAS, BASKETBALL_ITEMS, basketballItem, GAME_ITEMS, gameItem, HOBBY_PARTS, MOVIE_ITEMS, movieItem, NBA_ITEMS, nbaItem, SETTING_CATS, TABS, type AreaKey } from './tabs';
 export { TABS };
 /** 메뉴에는 없지만 열 수 있는 화면 (설정은 맨 위 막대의 톱니) */
@@ -173,12 +174,13 @@ export function Study({ path, loggedIn, syncReady = true, onLogin }: { path: str
   else if (tab === 'exams') content = <Exams id={id} sub={sub} />;
   else content = <Today />;
 
+  const studyMode = useStudyMode();
   const studyTabs = TABS.filter((t) => t.key === 'today' || t.key === tab || !d.settings.hiddenTabs?.includes(t.key));
   return (
     <main className={`study ${running ? 'running' : ''}`}>
       {!running && area === 'home' && (
         <nav className="st-nav" aria-label="영역">
-          {AREAS.filter((a) => a.key === 'home' || !d.settings.hiddenAreas?.includes(a.key)).map((a) => (
+          {AREAS.filter((a) => (a.key === 'home' || !d.settings.hiddenAreas?.includes(a.key)) && (!studyMode || STUDY_MODE_AREAS.includes(a.key))).map((a) => (
             <button key={a.key} className={`st-tab ${area === a.key ? 'on' : ''}`} aria-current={area === a.key ? 'page' : undefined} onClick={() => go(a.key === 'home' ? '/' : `/${a.key}`)}>
               <Icon name={`area-${a.key}`} />
               <span className="st-tab-label">{a.label}</span>

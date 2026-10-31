@@ -132,10 +132,10 @@ export function streaks(games: LolGame[]): { now: number; nowWin: boolean; bestW
 /** 시간대별 (한국 시간 0~23시를 4칸으로) · 요일별 승률 */
 export function byHour(games: LolGame[]): { label: string; games: number; winRate: number }[] {
   const slots = [
-    ['새벽 (0~6시)', 0, 6],
-    ['오전 (6~12시)', 6, 12],
-    ['오후 (12~18시)', 12, 18],
-    ['저녁 (18~24시)', 18, 24],
+    ['새벽', 0, 6],
+    ['오전', 6, 12],
+    ['오후', 12, 18],
+    ['저녁', 18, 24],
   ] as const;
   return slots.map(([label, a, b]) => {
     const list = games.filter((g) => {
