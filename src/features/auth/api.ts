@@ -649,6 +649,15 @@ export const bookSearch = (q: string) => remember(`bk:${q}`, 60 * MIN, () => cal
 export const bookToc = (url: string) => call<{ text: string }>(`books/toc?url=${encodeURIComponent(url)}`, 'GET', undefined, 20_000);
 /** 받아쓴 일기 → 칸 나누기 */
 export const diarySplit = (text: string) => aiJob<Partial<Record<'done' | 'good' | 'hard' | 'thanks' | 'learned' | 'fix' | 'worry' | 'tomorrow' | 'dream', string>>>('ai/diary', { text });
+/** AI 코치: 기록 글 → 다음 주 계획 */
+export interface CoachPlan {
+  good: string | null;
+  fix: string | null;
+  focus: string[];
+  plan: { day: string; items: { subject: string; minutes: number; what: string }[] }[];
+  tip: string | null;
+}
+export const coachPlan = (text: string) => aiJob<CoachPlan>('ai/coach', { text });
 /** 녹음(base64) → 받아쓴 글 (서버 Whisper) */
 export const speechToText = (audio: string) => call<{ text: string }>('ai/stt', 'POST', { audio }, 70_000).then((r) => r.text);
 

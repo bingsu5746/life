@@ -108,6 +108,20 @@ export const BASKETBALL_ITEMS: AreaItem[] = [
 export const basketballItem = (sub?: string) => (sub === 'drills' || sub === 'nba' || sub === 'shots' ? sub : 'log');
 
 /** NBA 안에서의 메뉴 (농구로 돌아가기 + 경기 · 순위 · 로스터 · 선수) */
+/** 돌아보기: 이번 주 · 이번 달 · AI 코치 · 영역별 통계 */
+export const REVIEW_ITEMS: AreaItem[] = [
+  { key: 'week', label: '이번 주', icon: 'review', to: '/week' },
+  { key: 'month', label: '이번 달', icon: 'exams', to: '/month' },
+  { key: 'coach', label: 'AI 코치', icon: 'area-ai', to: '/insights/coach' },
+  { key: 'study', label: '공부', icon: 'area-study', to: '/insights/study' },
+  { key: 'grades', label: '성적', icon: 'target', to: '/insights/grades' },
+  { key: 'fitness', label: '운동', icon: 'area-fitness', to: '/insights/fitness' },
+  { key: 'hobby', label: '취미', icon: 'area-hobby', to: '/insights/hobby' },
+  { key: 'money', label: '돈', icon: 'area-money', to: '/insights/money' },
+  { key: 'year', label: '올해', icon: 'time', to: '/insights/year' },
+];
+export const reviewItem = (p0: string, sub?: string) => (p0 === 'week' || p0 === 'month' ? p0 : REVIEW_ITEMS.some((x) => x.key === sub) ? sub! : 'study');
+
 export const NBA_ITEMS: AreaItem[] = [
   { key: 'back', label: '농구', icon: 'ball', to: '/basketball' },
   { key: 'games', label: '경기', icon: 'game', to: '/basketball/nba' },

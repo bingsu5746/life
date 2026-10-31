@@ -9611,3 +9611,91 @@ body.focus-on {
 .ev-when .st-input {
   min-width: 0;
 }
+
+/* AI 코치 */
+.co-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.co-skel {
+  height: 220px;
+  border-radius: 14px;
+  background: linear-gradient(90deg, var(--surface) 25%, var(--line) 50%, var(--surface) 75%);
+  background-size: 200% 100%;
+  animation: co-shine 1.2s linear infinite;
+}
+@keyframes co-shine {
+  to {
+    background-position: -200% 0;
+  }
+}
+.co-two {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
+}
+.co-note small {
+  font-weight: 600;
+}
+.co-note p {
+  margin: 4px 0 0;
+}
+.co-note.good small {
+  color: var(--good, #16a34a);
+}
+.co-note.fix small {
+  color: var(--warn);
+}
+.co-focus {
+  margin: 0;
+  padding-left: 1.2em;
+  display: grid;
+  gap: 4px;
+}
+.co-plan {
+  display: grid;
+}
+.co-day {
+  display: grid;
+  grid-template-columns: 28px 1fr auto;
+  align-items: start;
+  gap: 10px;
+  padding: 10px 0;
+  border-top: 1px solid var(--line);
+}
+.co-day:first-child {
+  border-top: 0;
+}
+.co-day > b.we {
+  color: var(--bad);
+}
+.co-items {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+.co-item {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px;
+}
+.co-sub {
+  font-weight: 600;
+}
+.co-total {
+  color: var(--muted);
+  white-space: nowrap;
+}
+.co-tip {
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: var(--surface);
+}
+@media (prefers-reduced-motion: reduce) {
+  .co-skel {
+    animation: none;
+  }
+}

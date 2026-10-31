@@ -122,3 +122,50 @@ export function parseTocRead(text: string): TocRead {
     .slice(0, 200);
   return { units };
 }
+
+/** AI 코치: 기록 글 → 잘한 점 · 고칠 점 · 먼저 할 것 · 요일별 계획 */
+export interface CoachRead {
+  good: string | null;
+  fix: string | null;
+  focus: string[];
+  plan: { day: string; items: { subject: string; minutes: number; what: string }[] }[];
+  tip: string | null;
+}
+const DAYS = ['월', '화', '수', '목', '금', '토', '일'];
+export function coachBody(record: string) {
+  const prompt = [
+    '너는 한국 고등학생의 공부 코치야. 아래 기록만 보고 다음 주(월~일) 공부 계획을 짜 줘. 기록에 없는 사실은 지어내지 마.',
+    '- 요일마다 할 과목 · 분 · 할 일 (실제로 공부한 양에서 크게 벗어나지 않게, 평일은 학교가 있으니 적게)',
+    '- 시험이 가까운 과목과 오답이 많은 과목을 먼저',
+    '- 말투는 친근한 반말, 짧게',
+    'JSON: {"good": 이번 주 잘한 점 한 문장, "fix": 고칠 점 한 문장, "focus": [다음 주 가장 먼저 할 것 1~3개 (짧게)], "plan": [{"day": "월"~"일", "items": [{"subject": 과목, "minutes": 분(정수), "what": 할 일 (짧게)}]}] (7일 모두), "tip": 한 줄 조언}',
+    '',
+    record,
+  ].join('\n');
+  return { contents: [{ role: 'user', parts: [{ text: prompt }] }], generationConfig: { responseMimeType: 'application/json', temperature: 0.4 } };
+}
+export function parseCoach(text: string): CoachRead {
+  const j = obj(text);
+  const plan = (Array.isArray(j.plan) ? j.plan : [])
+    .map((p) => p as { day?: unknown; items?: unknown })
+    .filter((p) => typeof p.day === 'string' && DAYS.includes(p.day.trim().slice(0, 1)))
+    .map((p) => ({
+      day: (p.day as string).trim().slice(0, 1),
+      items: (Array.isArray(p.items) ? p.items : [])
+        .map((x) => x as { subject?: unknown; minutes?: unknown; what?: unknown })
+        .map((x) => ({ subject: str(x.subject, 20) ?? '', minutes: Math.max(0, Math.min(600, Math.round(Number(x.minutes) || 0))), what: str(x.what, 80) ?? '' }))
+        .filter((x) => x.subject || x.what)
+        .slice(0, 6),
+    }))
+    .slice(0, 7);
+  return {
+    good: str(j.good, 200),
+    fix: str(j.fix, 200),
+    focus: (Array.isArray(j.focus) ? j.focus : [])
+      .map((x) => str(x, 80))
+      .filter((x): x is string => !!x)
+      .slice(0, 3),
+    plan,
+    tip: str(j.tip, 200),
+  };
+}

@@ -23,7 +23,7 @@ import { fetchSpecialDays } from './holidays';
 import { cleanFact, goodKo } from './fact';
 import { fetch2k } from './nba2k';
 import { hcBody, parseHc } from './homecourt';
-import { diaryBody, noteBody, parseDiary, parseNote, parseReceipt, parseTocRead, receiptBody, tocBody } from './aiRead';
+import { coachBody, diaryBody, noteBody, parseCoach, parseDiary, parseNote, parseReceipt, parseTocRead, receiptBody, tocBody } from './aiRead';
 import { seojiSearch, seojiToc, yes24Search } from './books';
 import { cheapShark } from './cheapshark';
 import { invenChamps, invenSkins, invenSkinVideo } from './skins';
@@ -248,7 +248,7 @@ export class Accounts extends DurableObject<Env> {
     if (req.method === 'POST' || req.method === 'PUT' || req.method === 'DELETE') {
       const big = path.startsWith('store/') || path.startsWith('study-photo/') || path === 'solve' || path === 'solve/img' || path === 'bb/scan' || path === 'ai/note' || path === 'ai/receipt' || path === 'ai/toc' || path === 'ai/stt';
       const text = await req.text();
-      if (text.length > (big ? MAX_STORE + 1000 : path === 'translate' || path === 'notify/digest' || path === 'notify/remind' || path === 'ai/diary' ? 4 * MAX_SMALL_BODY : MAX_SMALL_BODY)) return fail('보낸 내용이 너무 커요.', 413);
+      if (text.length > (big ? MAX_STORE + 1000 : path === 'translate' || path === 'notify/digest' || path === 'notify/remind' || path === 'ai/diary' || path === 'ai/coach' ? 4 * MAX_SMALL_BODY : MAX_SMALL_BODY)) return fail('보낸 내용이 너무 커요.', 413);
       try {
         const parsed: unknown = text ? JSON.parse(text) : {};
         if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return fail('잘못된 요청이에요.');
@@ -376,6 +376,11 @@ export class Accounts extends DurableObject<Env> {
     if (path === 'books/search' && req.method === 'GET') return this.bookSearch((new URL(req.url).searchParams.get('q') ?? '').trim().slice(0, 80));
     if (path === 'books/toc' && req.method === 'GET') return this.bookToc(new URL(req.url).searchParams.get('url') ?? '');
     if (path === 'ai/diary' && req.method === 'POST') return this.diarySplit(user, body);
+    if (path === 'ai/coach' && req.method === 'POST') {
+      const text = typeof body.text === 'string' ? body.text.trim().slice(0, 6000) : '';
+      if (text.length < 20) return fail('기록이 너무 적어요.');
+      return this.aiJob(user, coachBody(text), parseCoach, 'coach');
+    }
     if (path === 'ai/stt' && req.method === 'POST') return this.stt(user, body);
     if (path === 'bb/scan' && req.method === 'POST') return this.bbScan(user, body);
     if (path.startsWith('bb/scan/') && req.method === 'GET') return this.bbScanGet(user, path.slice('bb/scan/'.length));

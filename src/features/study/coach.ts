@@ -1,4 +1,4 @@
-// AI 학습 코치: 지난 7일 공부 · 과목별 목표 · 다가오는 시험(범위 진도) · 남은 오답 · 숙제를 모아 AI 에게 다음 주 계획을 부탁하는 글
+// AI 학습 코치: 지난 7일 공부 · 과목별 목표 · 다가오는 시험(범위 진도) · 남은 오답 · 숙제를 모은 글 (서버 AI 가 이걸 보고 다음 주 계획을 짠다)
 import { addDays, diffDays } from './dates';
 import { examProgress, upcomingExams } from './exams';
 import { alive, type StudyData } from './model';
@@ -6,7 +6,7 @@ import { homeworkViews } from './select';
 
 const h = (m: number) => (m >= 60 ? `${Math.floor(m / 60)}시간${m % 60 ? ` ${m % 60}분` : ''}` : `${m}분`);
 
-export function coachPrompt(d: StudyData, today: string): string {
+export function coachRecord(d: StudyData, today: string): string {
   const from = addDays(today, -6);
   const ses = alive(d.sessions).filter((s) => s.date >= from && s.date <= today);
   const subs = alive(d.subjects);
@@ -26,11 +26,7 @@ export function coachPrompt(d: StudyData, today: string): string {
   const notes = subs.map((s) => ({ s, n: alive(d.notes).filter((x) => x.subjectId === s.id && !x.learned).length })).filter((x) => x.n);
   const hw = homeworkViews(d, today).filter((x) => !x.finished).length;
   return [
-    '나는 고등학생이야. 아래 내 기록을 보고 다음 주(월~일) 공부 계획을 짜 줘.',
-    '- 요일마다 무엇을 몇 분 할지 표로 (평일 · 주말 나눠서, 내가 실제로 공부한 양에서 크게 벗어나지 않게)',
-    '- 이번 주 잘한 점 1개, 고칠 점 1개',
-    '- 시험이 가까운 과목과 오답이 많은 과목을 먼저',
-    '',
+    `[과목] ${subs.map((s) => s.name).join(', ') || '없음'}`,
     `[지난 7일] 모두 ${h(total)} · 공부한 날 ${days}일`,
     ...(by.length ? by : ['- (과목별 기록 없음)']),
     '',

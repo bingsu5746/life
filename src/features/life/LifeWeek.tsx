@@ -62,14 +62,6 @@ export function LifeWeekPage({ day, monthly }: { day?: string; monthly?: boolean
           그림으로 공유
         </button>
       </div>
-      <div className="st-seg" role="tablist" aria-label="기간">
-        <button role="tab" aria-selected={!monthly} className={!monthly ? 'on' : ''} onClick={() => go('/week')}>
-          주
-        </button>
-        <button role="tab" aria-selected={!!monthly} className={monthly ? 'on' : ''} onClick={() => go('/month')}>
-          달
-        </button>
-      </div>
       <div className="st-inline between">
         <button className="btn btn-sm" onClick={() => go(monthly ? `/month/${shiftMonth(month, -1)}` : `/week/${addDays(w.from, -7)}`)} aria-label={prevWord}>
           ‹

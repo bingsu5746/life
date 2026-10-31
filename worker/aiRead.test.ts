@@ -29,3 +29,15 @@ describe('목차 사진', () => {
     ]);
   });
 });
+
+describe('AI 코치 답 읽기', () => {
+  it('요일 · 분 · 칸을 정리하고 이상한 값은 버린다', async () => {
+    const { parseCoach } = await import('./aiRead');
+    const r = parseCoach('```json\n{"good":"매일 했어","fix":null,"focus":["수학 오답","",3],"plan":[{"day":"월요일","items":[{"subject":"수학","minutes":"45","what":"오답"},{"minutes":9999}]},{"day":"X","items":[]}],"tip":"자기 전 단어"}\n```');
+    expect(r.good).toBe('매일 했어');
+    expect(r.fix).toBeNull();
+    expect(r.focus).toEqual(['수학 오답']);
+    expect(r.plan).toEqual([{ day: '월', items: [{ subject: '수학', minutes: 45, what: '오답' }] }]);
+    expect(r.tip).toBe('자기 전 단어');
+  });
+});

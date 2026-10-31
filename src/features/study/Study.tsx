@@ -73,7 +73,7 @@ const PRELOAD = [
 ];
 
 import { STUDY_MODE_AREAS, useStudyMode } from '../../lib/studyMode';
-import { activeItem, AREA_ITEMS, AREAS, BASKETBALL_ITEMS, basketballItem, GAME_ITEMS, gameItem, champItems, champItem, HOBBY_PARTS, MOVIE_ITEMS, movieItem, NBA_ITEMS, nbaItem, SETTING_CATS, TABS, type AreaKey } from './tabs';
+import { activeItem, AREA_ITEMS, AREAS, BASKETBALL_ITEMS, basketballItem, GAME_ITEMS, gameItem, champItems, champItem, HOBBY_PARTS, MOVIE_ITEMS, movieItem, NBA_ITEMS, nbaItem, REVIEW_ITEMS, reviewItem, SETTING_CATS, TABS, type AreaKey } from './tabs';
 export { TABS };
 /** 메뉴에는 없지만 열 수 있는 화면 (설정은 맨 위 막대의 톱니) */
 const HIDDEN = ['settings'];
@@ -201,7 +201,7 @@ export function Study({ path, loggedIn, syncReady = true, onLogin }: { path: str
   const studyTabs = TABS.filter((t) => t.key === 'today' || t.key === tab || !d.settings.hiddenTabs?.includes(t.key));
   return (
     <main className={`study ${running ? 'running' : ''}`}>
-      {!running && area === 'home' && (
+      {!running && area === 'home' && !isWeek && !isInsights && (
         <nav className="st-nav" aria-label="영역">
           {AREAS.filter((a) => (a.key === 'home' || !d.settings.hiddenAreas?.includes(a.key)) && (!studyMode || STUDY_MODE_AREAS.includes(a.key))).map((a) => (
             <button key={a.key} className={`st-tab ${area === a.key ? 'on' : ''}`} aria-current={area === a.key ? 'page' : undefined} onClick={() => go(a.key === 'home' ? '/' : `/${a.key}`)}>
@@ -213,6 +213,25 @@ export function Study({ path, loggedIn, syncReady = true, onLogin }: { path: str
         </nav>
       )}
       {!running && area === 'ai' && <AiNav path={path} />}
+      {!running && (isWeek || isInsights) && (
+        <nav className="st-nav" aria-label="돌아보기 메뉴">
+          <button className="st-tab st-tab-home" onClick={() => go('/')}>
+            <Icon name="area-home" />
+            <span className="st-tab-label">메인으로</span>
+            <span className="st-tab-short">메인</span>
+          </button>
+          {REVIEW_ITEMS.map((it) => {
+            const on = reviewItem(p0, path[1]) === it.key;
+            return (
+              <button key={it.key} className={`st-tab ${on ? 'on' : ''}`} aria-current={on ? 'page' : undefined} onClick={() => go(it.to!)}>
+                <Icon name={it.icon} />
+                <span className="st-tab-label">{it.label}</span>
+                <span className="st-tab-short">{it.label}</span>
+              </button>
+            );
+          })}
+        </nav>
+      )}
       {!running && area !== 'home' && area !== 'study' && area !== 'ai' && (
         <nav className="st-nav" aria-label={`${AREAS.find((a) => a.key === area)?.label} 메뉴`}>
           <button className="st-tab st-tab-home" onClick={() => go('/')}>

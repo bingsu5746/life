@@ -136,7 +136,7 @@ export function Home(_: { loggedIn: boolean; onLogin: () => void }) {
             { to: '/plan', icon: 'target', label: '주간 계획' },
             { to: '/week', icon: 'review', label: '돌아보기' },
             { to: '/checkin', icon: 'moon', label: '하루 마감', on: new Date().getHours() >= 20 },
-            { to: '/insights', icon: 'time', label: '통계' },
+            { to: '/insights/coach', icon: 'area-ai', label: 'AI 코치' },
           ].map((x) => (
             <button key={x.to} className={x.on ? 'on' : ''} onClick={() => go(x.to)}>
               <Icon name={x.icon} />
