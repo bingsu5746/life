@@ -1809,7 +1809,7 @@ export class Accounts extends DurableObject<Env> {
     // 1) 예스24 (표지 · 값 · 쪽수 · 목차) → 2) 국립중앙도서관
     if (yk) {
       try {
-        const r = await this.nbaCached(`y24:${q.toLowerCase()}`, DAY, () => yes24Search(yk, q));
+        const r = await this.nbaCached(`y24b:${q.toLowerCase()}`, DAY, () => yes24Search(yk, q));
         if (r.v.length) return json({ list: r.v });
       } catch (e) {
         why = e instanceof Error ? e.message : String(e);
