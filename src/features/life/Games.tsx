@@ -1,6 +1,11 @@
 // 게임: 하는 중 · 하고 싶어요 · 끝낸 것 (기기 · 한 시간 · 별점 · 한줄평) · 한국 Steam 값 · 값 알림 · 내 Steam(가진 게임 · 찜 · 업적)
 import { useEffect, useState } from 'react';
-import { csMap, gamePrices, gameSearch, gameWatch, isLoggedIn, steamAch, steamMe, steamNames, steamStore, steamThumb, type SteamHit, type SteamMe, type SteamPrice } from '../auth/api';
+import { csMap, gamePrices, gameSearch, gameWatch, isLoggedIn, steamAch, steamMe, steamNames, steamStore, steamThumb, steamWatchGet, steamWatchSet, type SteamHit, type SteamMe, type SteamPrice } from '../auth/api';
+import { LolPage } from './Lol';
+import { dailyPlay, pickUnplayed } from './steamPlay';
+import { addDays, diffDays, weekStart } from '../study/dates';
+import { upcomingExams } from '../study/exams';
+import { minutesText } from '../study/timer';
 import { shortDate } from '../study/dates';
 import { alive, newId, type Game } from '../study/model';
 import { getStudy, put, remove, setSettings, useStudy } from '../study/store';
@@ -13,7 +18,14 @@ type Tab = Game['status'];
 const TAB_NAME: Record<Tab, string> = { playing: '하는 중', want: '하고 싶어요', done: '끝낸 것' };
 const PLATFORMS = ['PC', '스위치', '플레이스테이션', 'Xbox', '폰'];
 
-export function Games(_: { sub?: string }) {
+export function Games({ sub }: { sub?: string }) {
+  if (sub === 'lol') return <LolPage />;
+  if (sub === 'steam') return <SteamPage />;
+  if (sub === 'wish') return <WishPage />;
+  return <MyGames />;
+}
+
+function MyGames() {
   const d = useStudy();
   const today = useToday();
   const [tab, setTab] = useState<Tab>('playing');
@@ -79,8 +91,6 @@ export function Games(_: { sub?: string }) {
           ))}
         </div>
       )}
-      {isLoggedIn() && <MySteam have={all} />}
-      {isLoggedIn() && <SteamFind have={all} />}
       <OtherGames have={all} />
       {edit && <GameSheet item={edit} today={today} onClose={() => setEdit(null)} />}
     </div>
@@ -573,5 +583,246 @@ function GameSheet({ item, today, onClose }: { item: Partial<Game>; today: strin
         </div>
       </div>
     </Sheet>
+  );
+}
+
+/** 게임 › Steam: 내 Steam · 이번 주 게임 vs 공부 · 시험 기간 게임 목표 · 안 해 본 게임 · 찾기 */
+function SteamPage() {
+  const d = useStudy();
+  const all = alive(d.games);
+  if (!isLoggedIn())
+    return (
+      <div className="st-page narrow">
+        <h2>Steam</h2>
+        <p className="st-muted">로그인하면 Steam 을 볼 수 있어요.</p>
+      </div>
+    );
+  return (
+    <div className="st-page narrow">
+      <div className="st-page-head">
+        <h2>Steam</h2>
+      </div>
+      <SteamInsights />
+      <MySteam have={all} />
+      <SteamFind have={all} />
+    </div>
+  );
+}
+
+/** Steam 한 시간으로: 이번 주 게임 vs 공부 · 시험 기간 하루 목표 · 이번 주 해 볼 안 해 본 게임 · 찜 할인 알림 */
+function SteamInsights() {
+  const d = useStudy();
+  const today = useToday();
+  const sid = d.settings.steamId ?? '';
+  const [data, setData] = useState<Awaited<ReturnType<typeof steamMe>> | null>(null);
+  const [alertOn, setAlertOn] = useState<boolean | null>(null);
+  useEffect(() => {
+    if (!sid) return;
+    steamMe(sid)
+      .then(setData)
+      .catch(() => {});
+    steamWatchGet()
+      .then((r) => setAlertOn(r.on))
+      .catch(() => {});
+  }, [sid]);
+  if (!sid) return null;
+  const hist = data?.hist ?? {};
+  const days = Array.from({ length: 7 }, (_, i) => addDays(today, i - 6));
+  const play = dailyPlay(hist);
+  const playOf = (dd: string) => play.find((x) => x.date === dd)?.min ?? 0;
+  const studyOf = (dd: string) =>
+    alive(d.sessions)
+      .filter((x) => x.date === dd)
+      .reduce((a, x) => a + x.minutes, 0);
+  const weekPlay = days.reduce((a, dd) => a + playOf(dd), 0);
+  const weekStudy = days.reduce((a, dd) => a + studyOf(dd), 0);
+  const recordedDays = Object.keys(hist).length;
+  const limit = d.settings.gameLimit;
+  const exam = upcomingExams(d, today).find((e) => diffDays(today, e.date) <= (limit?.examDays ?? 14) && diffDays(today, e.date) >= 0);
+  const pick = data?.me ? pickUnplayed(data.me.owned, weekStart(today)) : null;
+  const max = Math.max(1, ...days.map((dd) => Math.max(playOf(dd), studyOf(dd))));
+  return (
+    <>
+      <section className="st-card">
+        <div className="sh-head">
+          <h3 className="st-h">이번 주 게임 vs 공부</h3>
+          <small className="st-muted">
+            게임 {minutesText(weekPlay)} · 공부 {minutesText(weekStudy)}
+          </small>
+        </div>
+        {recordedDays < 2 ? (
+          <p className="st-muted sm">Steam 한 시간은 하루 한 번 적어 두고 그 차이로 날마다 한 시간을 셈해요. 내일부터 보여요 (아래 「찜 할인 알림」을 켜 두면 앱을 안 열어도 서버가 6시간마다 적어 둬요).</p>
+        ) : (
+          <div className="gs-week">
+            {days.map((dd) => (
+              <div key={dd} title={`${shortDate(dd)} 게임 ${minutesText(playOf(dd))} · 공부 ${minutesText(studyOf(dd))}`}>
+                <span className="gs-bars">
+                  <i className="g" style={{ height: `${(playOf(dd) / max) * 100}%` }} />
+                  <i className="s" style={{ height: `${(studyOf(dd) / max) * 100}%` }} />
+                </span>
+                <small>{shortDate(dd).replace(/\(.\)/, '').split('/').pop()}</small>
+              </div>
+            ))}
+          </div>
+        )}
+        <p className="st-muted sm">
+          <i className="gs-dot g" /> 게임(Steam) <i className="gs-dot s" /> 공부 · Steam 기록은 하루 한 번만 적어서 하루가 밀릴 수 있어요.
+        </p>
+      </section>
+
+      <section className="st-card">
+        <h3 className="st-h">시험 기간 게임 목표</h3>
+        <GameLimitEdit />
+        {limit && exam && (
+          <p className={playOf(today) > limit.min ? 'bad' : ''}>
+            {exam.name} D-{diffDays(today, exam.date)} · 오늘 Steam {minutesText(playOf(today))} / 목표 {minutesText(limit.min)} {playOf(today) > limit.min ? '— 넘었어요!' : '✓'}
+          </p>
+        )}
+        {limit && !exam && (
+          <p className="st-muted sm">
+            시험 {limit.examDays}일 전부터 하루 {minutesText(limit.min)}까지로 봐요. 지금은 시험 기간이 아니에요.
+          </p>
+        )}
+      </section>
+
+      {pick && (
+        <section className="st-card gm-pick">
+          <img src={steamThumb(pick.appid)} alt="" />
+          <div>
+            <small className="st-muted">이번 주 해 볼 게임 (가졌는데 한 번도 안 한 것)</small>
+            <b>{pick.name}</b>
+            <a className="st-link" href={`steam://run/${pick.appid}`}>
+              Steam 에서 열기
+            </a>
+          </div>
+        </section>
+      )}
+
+      {alertOn !== null && (
+        <label className="st-toggle">
+          <input
+            type="checkbox"
+            checked={alertOn}
+            onChange={async (e) => {
+              const r = await steamWatchSet(sid, e.target.checked).catch(() => null);
+              if (r) setAlertOn(r.on);
+              toast(r?.on ? '찜한 게임이 할인하면 알려 드려요 (6시간마다 확인, 설정 › 알림이 켜져 있어야 해요)' : '찜 할인 알림을 껐어요');
+            }}
+          />{' '}
+          찜한 게임이 할인을 시작하면 알림
+        </label>
+      )}
+    </>
+  );
+}
+
+function GameLimitEdit() {
+  const d = useStudy();
+  const l = d.settings.gameLimit;
+  const [min, setMin] = useState(String(l?.min ?? 60));
+  const [days, setDays] = useState(String(l?.examDays ?? 14));
+  return (
+    <div className="st-inline wrap">
+      시험
+      <input className="st-input xs" inputMode="numeric" value={days} onChange={(e) => setDays(e.target.value.replace(/\D/g, '').slice(0, 2))} aria-label="시험 며칠 전부터" />
+      일 전부터 하루
+      <input className="st-input xs" inputMode="numeric" value={min} onChange={(e) => setMin(e.target.value.replace(/\D/g, '').slice(0, 3))} aria-label="하루 게임 분" />
+      분까지
+      <button className="btn btn-sm" onClick={() => (setSettings({ gameLimit: Number(min) > 0 && Number(days) > 0 ? { min: Number(min), examDays: Number(days) } : undefined }), toast('정했어요'))}>
+        {l ? '바꾸기' : '정하기'}
+      </button>
+      {l && (
+        <button className="st-link" onClick={() => setSettings({ gameLimit: undefined })}>
+          끄기
+        </button>
+      )}
+    </div>
+  );
+}
+
+/** 게임 › 위시리스트: 사고 싶은 게임 · 음반 · Steam 찜을 한곳에 (한국 값 · 모으기) */
+function WishPage() {
+  const d = useStudy();
+  const sid = d.settings.steamId ?? '';
+  const games = alive(d.games).filter((g) => g.status === 'want');
+  const records = alive(d.records).filter((r) => r.status === 'want');
+  const [wish, setWish] = useState<{ appid: number; added: number }[]>([]);
+  useEffect(() => {
+    if (!sid || !isLoggedIn()) return;
+    steamMe(sid)
+      .then((r) => setWish(r.wish))
+      .catch(() => {});
+  }, [sid]);
+  const steamIds = [...new Set([...games.map((g) => g.steamAppId).filter((x): x is number => !!x), ...wish.map((w) => w.appid)])];
+  const prices = useSteamPrices(steamIds.slice(0, 100));
+  const names = useSteamNames(
+    wish
+      .map((w) => w.appid)
+      .filter((id) => !games.some((g) => g.steamAppId === id))
+      .slice(0, 100),
+  );
+  const steamOnly = wish.filter((w) => !games.some((g) => g.steamAppId === w.appid));
+  const total = [...games.map((g) => (g.steamAppId ? (prices[g.steamAppId]?.final ?? 0) : 0)), ...steamOnly.map((w) => prices[w.appid]?.final ?? 0), ...records.map((r) => r.price ?? 0)].reduce((a, b) => a + b, 0);
+  const onSale = steamIds.filter((id) => (prices[id]?.discount ?? 0) > 0).length;
+  return (
+    <div className="st-page narrow">
+      <div className="st-page-head">
+        <h2>위시리스트</h2>
+      </div>
+      <div className="mv-summary">
+        <span>
+          게임 <b>{games.length + steamOnly.length}</b>
+        </span>
+        <span>
+          음반 <b>{records.length}</b>
+        </span>
+        {total > 0 && (
+          <span>
+            모두 <b>{won(total)}</b>
+          </span>
+        )}
+        {onSale > 0 && (
+          <span>
+            할인 중 <b>{onSale}</b>
+          </span>
+        )}
+      </div>
+      {!games.length && !records.length && !steamOnly.length && (
+        <Empty title="사고 싶은 것이 아직 없어요">
+          <p>게임 › Steam 에서 찾아 「하고 싶어요」를 누르거나, 음악에서 「사고 싶어요」를 넣으면 여기에 모여요. Steam 찜 목록도 같이 보여요.</p>
+        </Empty>
+      )}
+      {(games.length > 0 || steamOnly.length > 0) && (
+        <section className="st-card">
+          <h3 className="st-h">게임</h3>
+          {[...games.map((g) => ({ key: g.id, appid: g.steamAppId, name: g.title, g })), ...steamOnly.map((w) => ({ key: `w${w.appid}`, appid: w.appid as number | undefined, name: names[w.appid] ?? `Steam ${w.appid}`, g: undefined as Game | undefined }))]
+            .sort((a, b) => (b.appid ? (prices[b.appid]?.discount ?? 0) : 0) - (a.appid ? (prices[a.appid]?.discount ?? 0) : 0))
+            .map((x) => (
+              <div key={x.key} className="gm-row">
+                {x.appid ? <img src={steamThumb(x.appid)} alt="" loading="lazy" /> : <span className="dg-noimg" />}
+                <span>
+                  {x.name} {!x.g && <small className="st-muted">· Steam 찜</small>}
+                  {x.appid && <PriceLine appid={x.appid} p={prices[x.appid]} watch={x.g?.watchWon} />}
+                  {x.g && <WishGoal name={x.g.title} />}
+                </span>
+              </div>
+            ))}
+        </section>
+      )}
+      {records.length > 0 && (
+        <section className="st-card">
+          <h3 className="st-h">음반</h3>
+          {records.map((r) => (
+            <div key={r.id} className="gm-row">
+              {r.cover ? <img className="lp-cover" src={r.cover} alt="" loading="lazy" /> : <span className="dg-noimg" />}
+              <span>
+                {r.title} <small className="st-muted">{r.artist}</small>
+                <WishGoal name={r.title} />
+              </span>
+            </div>
+          ))}
+        </section>
+      )}
+    </div>
   );
 }

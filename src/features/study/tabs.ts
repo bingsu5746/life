@@ -68,6 +68,16 @@ export const MOVIE_ITEMS: AreaItem[] = [
   { key: 'rec', label: '추천', icon: 'area-hobby', to: '/movies/rec' },
 ];
 
+/** 게임 안에서의 메뉴 (취미로 돌아가기 + 내 게임 · 롤 · Steam · 위시리스트) */
+export const GAME_ITEMS: AreaItem[] = [
+  { key: 'hobby', label: '취미', icon: 'area-hobby', to: '/hobby' },
+  { key: 'mine', label: '내 게임', icon: 'game', to: '/games' },
+  { key: 'lol', label: '롤', icon: 'target', to: '/games/lol' },
+  { key: 'steam', label: 'Steam', icon: 'life', to: '/games/steam' },
+  { key: 'wish', label: '위시리스트', icon: 'save', to: '/games/wish' },
+];
+export const gameItem = (sub?: string) => (sub === 'lol' || sub === 'steam' || sub === 'wish' ? sub : 'mine');
+
 /** 농구 안에서의 메뉴 (취미로 돌아가기 + 농구 연습 · 농구 기록 · NBA) */
 export const BASKETBALL_ITEMS: AreaItem[] = [
   { key: 'hobby', label: '취미', icon: 'area-hobby', to: '/hobby' },

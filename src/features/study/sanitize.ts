@@ -663,6 +663,8 @@ export function sanitizeSettings(s: unknown): StudySettings & { updatedAt: numbe
         )
       : undefined,
     lastBackup: optDate(x.lastBackup),
+    gameLimit: isObj(x.gameLimit) && score((x.gameLimit as Obj).min, 1, 1440) && score((x.gameLimit as Obj).examDays, 1, 60) ? { min: (x.gameLimit as Obj).min as number, examDays: (x.gameLimit as Obj).examDays as number } : undefined,
+    lolId: typeof x.lolId === 'string' && /^.{2,16}#[^#\s]{2,5}$/.test(x.lolId) ? x.lolId : undefined,
     steamId: typeof x.steamId === 'string' && /^\d{17}$/.test(x.steamId) ? x.steamId : undefined,
     shotGoals: isObj(x.shotGoals) ? { fg: score((x.shotGoals as Obj).fg, 1, 100), three: score((x.shotGoals as Obj).three, 1, 100), two: score((x.shotGoals as Obj).two, 1, 100) } : undefined,
     examPlanDefaults: isObj(x.examPlanDefaults) ? { weekday: cl((x.examPlanDefaults as Obj).weekday, 0, 900, 150), weekend: cl((x.examPlanDefaults as Obj).weekend, 0, 900, 240), perLine: cl((x.examPlanDefaults as Obj).perLine, 5, 300, 40) } : undefined,

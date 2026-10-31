@@ -276,6 +276,8 @@ export class Accounts extends DurableObject<Env> {
         (e) => fail(`이름을 받지 못했어요. (${(e instanceof Error ? e.message : String(e)).slice(0, 80)})`, 502),
       );
     }
+    if (path === 'steam/watch' && req.method === 'PUT') return this.steamWatch(req, user, body);
+    if (path === 'steam/watch' && req.method === 'GET') return json({ on: this.steamWatchOn(user) });
     if (path === 'steam/me' && req.method === 'GET') return this.steamMeRoute(new URL(req.url).searchParams.get('steamid') ?? '');
     if (path === 'steam/ach' && req.method === 'GET') return this.steamAchRoute(new URL(req.url).searchParams.get('steamid') ?? '', Number(new URL(req.url).searchParams.get('appid')));
     if (path === 'games/search' && req.method === 'GET') return this.gameSearch((new URL(req.url).searchParams.get('q') ?? '').trim().slice(0, 80));
@@ -1537,9 +1539,60 @@ export class Accounts extends DurableObject<Env> {
       const wish = await this.nbaCached(`st:wish:${steamid}`, 10 * 60_000, () => wishlist(steamid)).catch(() => ({ v: [] as { appid: number; added: number }[] }));
       if (!key) return json({ me: null, wish: wish.v, needKey: true });
       const me = await this.nbaCached(`st:me:${steamid}`, 10 * 60_000, () => steamMe(key, steamid));
-      return json({ me: me.v, wish: wish.v });
+      this.steamSnap(steamid, me.v);
+      return json({ me: me.v, wish: wish.v, hist: this.steamHist(steamid) });
     } catch (e) {
       return fail(`Steam 정보를 받지 못했어요. 프로필이 「공개」인지 확인해 주세요. (${(e instanceof Error ? e.message : String(e)).slice(0, 80)})`, 502);
+    }
+  }
+  /** 하루 한 번(마지막 것으로) 게임마다 모두 한 시간을 적어 둔다 → 날마다 한 시간 = 다음 날 기록과의 차이 (최근 70일) */
+  private steamSnap(steamid: string, me: { owned: { appid: number; minutes: number }[] }) {
+    const ck = `st:hist:${steamid}`;
+    const h = (JSON.parse(this.cacheGet(ck) ?? '{}') as Record<string, Record<number, number>>) ?? {};
+    const day = new Date(Date.now() + 9 * 3600_000).toISOString().slice(0, 10);
+    h[day] = Object.fromEntries(me.owned.filter((g) => g.minutes > 0).map((g) => [g.appid, g.minutes]));
+    const keep = Object.keys(h).sort().slice(-70);
+    this.cacheSet(ck, JSON.stringify(Object.fromEntries(keep.map((k) => [k, h[k]]))));
+  }
+  private steamHist(steamid: string): Record<string, Record<number, number>> {
+    return (JSON.parse(this.cacheGet(`st:hist:${steamid}`) ?? '{}') as Record<string, Record<number, number>>) ?? {};
+  }
+  /** 찜 할인 알림 · 한 시간 기록을 서버가 6시간마다 하게: { steamid, on } */
+  private steamWatch(req: Request, user: UserRow, b: Record<string, unknown>): Response {
+    const ck = `steamwish:${user.id}`;
+    const steamid = typeof b.steamid === 'string' && /^\d{17}$/.test(b.steamid) ? b.steamid : '';
+    if (!steamid || b.on !== true) this.sql.exec('DELETE FROM cache WHERE key = ?', ck);
+    else this.cacheSet(ck, JSON.stringify({ steamid, origin: new URL(req.url).origin, sent: (JSON.parse(this.cacheGet(ck) ?? 'null') as { sent?: Record<string, number> } | null)?.sent ?? {} }));
+    void this.scheduleAlarm();
+    return json({ on: !!steamid && b.on === true });
+  }
+  private steamWatchOn(user: UserRow): boolean {
+    return !!this.cacheGet(`steamwish:${user.id}`);
+  }
+  /** 찜한 게임이 새로 할인하면 한 번 알림 (같은 값이면 다시 안 보냄) · 한 시간 기록 */
+  private async steamWishCheck() {
+    const rows = this.sql.exec<{ key: string; data: string }>("SELECT key, data FROM cache WHERE key LIKE 'steamwish:%'").toArray();
+    const key = this.steamKey();
+    for (const row of rows) {
+      const uid = row.key.slice('steamwish:'.length);
+      const v = JSON.parse(row.data) as { steamid: string; origin: string; sent: Record<string, number> };
+      try {
+        if (key) this.steamSnap(v.steamid, await steamMe(key, v.steamid));
+        const wish = await wishlist(v.steamid);
+        const prices = await this.steamPrices(wish.map((w) => w.appid).slice(0, 150));
+        const sale = wish.filter((w) => prices[w.appid]?.discount > 0 && v.sent[w.appid] !== prices[w.appid].final);
+        for (const w of wish) if (!prices[w.appid]?.discount) delete v.sent[w.appid];
+        if (sale.length) {
+          for (const w of sale) v.sent[w.appid] = prices[w.appid].final;
+          const names = await storeNames(sale.map((w) => w.appid)).catch(() => ({}) as Record<number, string>);
+          const top = sale.sort((a, b) => prices[b.appid].discount - prices[a.appid].discount).slice(0, 3);
+          const subs = this.sql.exec<PushSub & { [k: string]: SqlStorageValue }>('SELECT endpoint, p256dh, auth FROM push_subs WHERE user_id = ?', uid).toArray();
+          if (subs.length) await this.pushTo(subs, { title: `🎮 찜한 게임 ${sale.length}개 할인 시작`, body: top.map((w) => `${names[w.appid] ?? w.appid} ${prices[w.appid].discount}% → ${prices[w.appid].final.toLocaleString('ko-KR')}원`).join(' · '), url: '/#/games/wish' }, v.origin);
+        }
+        this.cacheSet(row.key, JSON.stringify(v));
+      } catch (e) {
+        console.error('steam wish check failed', e instanceof Error ? e.message : String(e));
+      }
     }
   }
   private async steamAchRoute(steamid: string, appid: number): Promise<Response> {
@@ -2095,7 +2148,7 @@ export class Accounts extends DurableObject<Env> {
     // 응원팀 경기 알림을 켠 사람이 있으면 10분마다 경기를 본다
     const favs = this.sql.exec<{ n: number }>("SELECT COUNT(*) AS n FROM cache WHERE key LIKE 'nbafav:%'").toArray()[0].n;
     const nbaAt = favs ? Math.max(Date.now() + 5_000, Number(this.cacheGet('nba:nextcheck') ?? 0)) : 0;
-    const games = this.sql.exec<{ n: number }>("SELECT COUNT(*) AS n FROM cache WHERE key LIKE 'gamewatch:%'").toArray()[0].n;
+    const games = this.sql.exec<{ n: number }>("SELECT COUNT(*) AS n FROM cache WHERE key LIKE 'gamewatch:%' OR key LIKE 'steamwish:%'").toArray()[0].n;
     const gameAt = games ? Math.max(Date.now() + 5_000, Number(this.cacheGet('games:nextcheck') ?? 0)) : 0;
     const at = [r?.at ?? 0, nbaAt, gameAt].filter((x) => x > 0);
     if (at.length) await this.ctx.storage.setAlarm(Math.min(...at));
@@ -2235,9 +2288,10 @@ export class Accounts extends DurableObject<Env> {
   /** 정한 시각: 그 사람이 넣어 둔 그날 그 시각 글을 보낸다 */
   async alarm() {
     const now = Date.now();
-    if (now + 30_000 >= Number(this.cacheGet('games:nextcheck') ?? 0) && this.sql.exec<{ n: number }>("SELECT COUNT(*) AS n FROM cache WHERE key LIKE 'gamewatch:%'").toArray()[0].n) {
+    if (now + 30_000 >= Number(this.cacheGet('games:nextcheck') ?? 0) && this.sql.exec<{ n: number }>("SELECT COUNT(*) AS n FROM cache WHERE key LIKE 'gamewatch:%' OR key LIKE 'steamwish:%'").toArray()[0].n) {
       this.cacheSet('games:nextcheck', String(now + 6 * 3600_000));
       await this.gameWatchCheck().catch((e) => console.error('game watch failed', e instanceof Error ? e.message : String(e)));
+      await this.steamWishCheck().catch((e) => console.error('steam wish failed', e instanceof Error ? e.message : String(e)));
     }
     if (now + 30_000 >= Number(this.cacheGet('nba:nextcheck') ?? 0) && this.sql.exec<{ n: number }>("SELECT COUNT(*) AS n FROM cache WHERE key LIKE 'nbafav:%'").toArray()[0].n) {
       this.cacheSet('nba:nextcheck', String(now + 10 * 60_000));

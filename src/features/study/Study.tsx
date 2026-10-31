@@ -68,7 +68,7 @@ const PRELOAD = [
   () => import('./Words'),
 ];
 
-import { activeItem, AREA_ITEMS, AREAS, BASKETBALL_ITEMS, basketballItem, HOBBY_PARTS, MOVIE_ITEMS, movieItem, NBA_ITEMS, nbaItem, SETTING_CATS, TABS, type AreaKey } from './tabs';
+import { activeItem, AREA_ITEMS, AREAS, BASKETBALL_ITEMS, basketballItem, GAME_ITEMS, gameItem, HOBBY_PARTS, MOVIE_ITEMS, movieItem, NBA_ITEMS, nbaItem, SETTING_CATS, TABS, type AreaKey } from './tabs';
 export { TABS };
 /** 메뉴에는 없지만 열 수 있는 화면 (설정은 맨 위 막대의 톱니) */
 const HIDDEN = ['settings'];
@@ -195,8 +195,8 @@ export function Study({ path, loggedIn, syncReady = true, onLogin }: { path: str
             <span className="st-tab-label">메인으로</span>
             <span className="st-tab-short">메인</span>
           </button>
-          {(p0 === 'movies' ? MOVIE_ITEMS : isNba ? NBA_ITEMS : p0 === 'basketball' ? BASKETBALL_ITEMS : AREA_ITEMS[area]).map((it) => {
-            const on = (p0 === 'movies' ? movieItem(path[1]) : isNba ? nbaItem(path[2]) : p0 === 'basketball' ? basketballItem(path[1]) : activeItem(area, path[1], p0)) === it.key;
+          {(p0 === 'movies' ? MOVIE_ITEMS : p0 === 'games' ? GAME_ITEMS : isNba ? NBA_ITEMS : p0 === 'basketball' ? BASKETBALL_ITEMS : AREA_ITEMS[area]).map((it) => {
+            const on = (p0 === 'movies' ? movieItem(path[1]) : p0 === 'games' ? gameItem(path[1]) : isNba ? nbaItem(path[2]) : p0 === 'basketball' ? basketballItem(path[1]) : activeItem(area, path[1], p0)) === it.key;
             return (
               <button key={it.key} className={`st-tab ${on ? 'on' : ''}`} aria-current={on ? 'page' : undefined} onClick={() => go(it.to ?? (it.key ? `/${area}/${it.key}` : `/${area}`))}>
                 <Icon name={it.icon} />

@@ -66,6 +66,10 @@ export interface StudySettings {
   school?: { name: string; grade?: number; cls?: string };
   /** 마지막으로 백업 파일을 내려받은 날 */
   lastBackup?: DateStr;
+  /** 시험 기간 게임 목표: 시험 examDays 일 전부터 하루 min 분까지 */
+  gameLimit?: { min: number; examDays: number };
+  /** 롤 라이엇 ID (이름#태그) */
+  lolId?: string;
   /** 내 Steam ID (17자리, 가진 게임 · 찜 목록 보기) */
   steamId?: string;
   /** 슛 목표 (%): 야투 · 3점 · 2점 */

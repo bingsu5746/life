@@ -594,7 +594,9 @@ export const gameSearch = (q: string) => call<{ list: SteamHit[] }>(`games/searc
 export const gamePrices = (ids: number[]) => remember(`gp:${ids.join(',')}`, 30 * MIN, () => call<{ prices: Record<number, SteamPrice> }>(`games/prices?ids=${ids.join(',')}`, 'GET', undefined, 25_000));
 export const gameWatch = (list: { id: number; title: string; target: number }[]) => call<{ ok: true; n: number }>('games/watch', 'PUT', { list });
 export const csMap = (ids: number[]) => call<{ map: Record<string, number> }>(`games/csmap?ids=${ids.join(',')}`, 'GET', undefined, 25_000);
-export const steamMe = (steamid: string) => remember(`steam:${steamid}`, 10 * MIN, () => call<{ me: SteamMe | null; wish: { appid: number; added: number }[]; needKey?: boolean }>(`steam/me?steamid=${steamid}`, 'GET', undefined, 30_000));
+export const steamMe = (steamid: string) => remember(`steam:${steamid}`, 10 * MIN, () => call<{ me: SteamMe | null; wish: { appid: number; added: number }[]; needKey?: boolean; hist?: Record<string, Record<number, number>> }>(`steam/me?steamid=${steamid}`, 'GET', undefined, 30_000));
+export const steamWatchGet = () => call<{ on: boolean }>('steam/watch');
+export const steamWatchSet = (steamid: string, on: boolean) => call<{ on: boolean }>('steam/watch', 'PUT', { steamid, on });
 export const steamAch = (steamid: string, appid: number) =>
   remember(`ach:${steamid}:${appid}`, 30 * MIN, () => call<{ done: number; total: number; list: { name: string; desc: string; at: number }[]; stats: { name: string; value: number }[] }>(`steam/ach?steamid=${steamid}&appid=${appid}`, 'GET', undefined, 30_000));
 export const steamNames = (ids: number[]) => call<{ names: Record<number, string> }>(`steam/names?ids=${ids.join(',')}`, 'GET', undefined, 25_000).then((r) => r.names);
@@ -619,3 +621,16 @@ async function aiJob<T>(path: string, body: unknown): Promise<T> {
 export const noteScan = (image: { mime: string; data: string }, subjects: string[]) => aiJob<{ subject: string | null; number: string | null; question: string | null }>('ai/note', { image, subjects });
 /** 받아쓴 일기 → 칸 나누기 */
 export const diarySplit = (text: string) => aiJob<Partial<Record<'good' | 'hard' | 'thanks' | 'tomorrow' | 'dream', string>>>('ai/diary', { text });
+
+/** 롤 (Riot API): 프로필 · 경기 (서버가 모아 둔다) */
+export interface LolProfile {
+  puuid: string;
+  gameName: string;
+  tagLine: string;
+  level: number;
+  icon: number;
+  ranks: { queue: string; tier: string; rank: string; lp: number; wins: number; losses: number }[];
+  mastery: { champ: number; level: number; points: number; last: number }[];
+}
+export const lolProfile = (id: string) => remember(`lolp:${id}`, 5 * MIN, () => call<LolProfile>(`lol/profile?id=${encodeURIComponent(id)}`, 'GET', undefined, 30_000));
+export const lolGames = (puuid: string, older = false) => call<{ games: import('../life/lolStats').LolGame[]; more: boolean; end: boolean; warn: string }>(`lol/games?puuid=${encodeURIComponent(puuid)}${older ? '&older=1' : ''}`, 'GET', undefined, 90_000);

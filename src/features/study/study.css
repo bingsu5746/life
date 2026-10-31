@@ -8017,3 +8017,363 @@ body.focus-on {
   padding: 6px 0;
   border-bottom: 1px solid var(--line);
 }
+
+/* ===== 롤 ===== */
+.lol-head {
+  display: grid;
+  grid-template-columns: 72px 1fr;
+  gap: 12px 14px;
+  align-items: center;
+}
+.lol-icon {
+  width: 72px;
+  height: 72px;
+  border-radius: 16px;
+}
+.lol-name {
+  font-size: 1.3rem;
+  display: block;
+}
+.lol-name small {
+  font-weight: 400;
+  margin-left: 4px;
+}
+.lol-ranks {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+.lol-rank {
+  display: grid;
+  gap: 2px;
+  padding: 12px;
+  border-radius: 12px;
+  background: var(--soft);
+  border-left: 4px solid var(--line-strong);
+}
+.lol-rank small {
+  color: var(--muted);
+}
+.lol-rank b {
+  font-size: 1.1rem;
+}
+.t-iron, .t-bronze { border-left-color: #a16207; }
+.t-silver { border-left-color: #94a3b8; }
+.t-gold { border-left-color: #eab308; }
+.t-platinum { border-left-color: #14b8a6; }
+.t-emerald { border-left-color: #10b981; }
+.t-diamond { border-left-color: #6366f1; }
+.t-master { border-left-color: #a855f7; }
+.t-grandmaster { border-left-color: #ef4444; }
+.t-challenger { border-left-color: #f59e0b; }
+.lol-sum {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  margin-bottom: 12px;
+}
+.lol-sum > div:last-child {
+  display: grid;
+  gap: 2px;
+}
+.lol-donut {
+  width: 76px;
+  height: 76px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: conic-gradient(#3b82f6 var(--p), #ef4444 0);
+  position: relative;
+}
+.lol-donut::before {
+  content: '';
+  position: absolute;
+  inset: 9px;
+  border-radius: 50%;
+  background: var(--surface);
+}
+.lol-donut b {
+  position: relative;
+}
+.lol-kda {
+  font-size: 1.25rem;
+}
+.lol-good {
+  color: #0ea5e9;
+}
+.lol-champs {
+  display: grid;
+  gap: 6px;
+}
+.lol-champ {
+  display: grid;
+  grid-template-columns: 40px 1fr auto 64px;
+  gap: 10px;
+  align-items: center;
+}
+.lol-champ img {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+}
+.lol-champ div {
+  display: grid;
+  gap: 1px;
+  min-width: 0;
+}
+.lol-champ-r {
+  text-align: right;
+}
+.sh-bar i.good {
+  background: #3b82f6;
+}
+.sh-bar i.low {
+  background: #ef4444;
+}
+.lol-games {
+  display: grid;
+  gap: 6px;
+}
+.lol-game {
+  display: grid;
+  grid-template-columns: 84px 76px 96px 1fr auto;
+  gap: 10px;
+  align-items: center;
+  padding: 8px 10px;
+  border-radius: 10px;
+  border-left: 5px solid #3b82f6;
+  background: color-mix(in srgb, #3b82f6 9%, var(--surface));
+}
+.lol-game.lose {
+  border-left-color: #ef4444;
+  background: color-mix(in srgb, #ef4444 9%, var(--surface));
+}
+.lol-game.remake {
+  border-left-color: var(--muted);
+  background: var(--soft);
+}
+.lol-game-meta,
+.lol-game-kda,
+.lol-game-more {
+  display: grid;
+  gap: 1px;
+  font-size: 0.85rem;
+}
+.lol-game-meta small,
+.lol-game-more small {
+  color: var(--muted);
+}
+.lol-game-champ {
+  position: relative;
+  display: flex;
+  gap: 3px;
+  align-items: center;
+}
+.lol-game-champ > img {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+}
+.lol-game-champ i {
+  position: absolute;
+  left: 28px;
+  top: 30px;
+  font-style: normal;
+  font-size: 0.7rem;
+  padding: 0 4px;
+  border-radius: 6px;
+  color: #fff;
+  background: #111827;
+}
+.lol-spells {
+  display: grid;
+  gap: 2px;
+}
+.lol-spells img {
+  width: 20px;
+  height: 20px;
+  border-radius: 4px;
+}
+.lol-multi {
+  color: #ef4444;
+  font-weight: 700;
+}
+.lol-items {
+  display: grid;
+  grid-template-columns: repeat(4, 24px);
+  gap: 2px;
+}
+.lol-items img,
+.lol-items span {
+  width: 24px;
+  height: 24px;
+  border-radius: 4px;
+  background: var(--soft);
+}
+@media (max-width: 640px) {
+  .lol-game {
+    grid-template-columns: 70px 72px 1fr;
+  }
+  .lol-game-more {
+    display: none;
+  }
+  .lol-items {
+    grid-column: 1 / -1;
+    grid-template-columns: repeat(7, 22px);
+  }
+  .lol-champ {
+    grid-template-columns: 36px 1fr auto 52px;
+  }
+}
+.lol-mastery {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+  gap: 10px;
+}
+.lol-mastery div {
+  display: grid;
+  justify-items: center;
+  gap: 2px;
+  text-align: center;
+}
+.lol-mastery img {
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+}
+.lol-mastery small {
+  color: var(--muted);
+  font-size: 0.75rem;
+}
+.lol-year {
+  display: grid;
+  gap: 12px;
+  padding: 20px;
+  border-radius: 20px;
+  color: #fff;
+  background: linear-gradient(135deg, #0f172a, #1e3a8a 60%, #b45309);
+}
+.lol-year h3 {
+  margin: 0;
+}
+.lol-year-big {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 10px;
+}
+.lol-year-big div {
+  display: grid;
+  gap: 2px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.1);
+}
+.lol-year-big small {
+  opacity: 0.75;
+}
+.lol-year-big b {
+  font-size: 1.25rem;
+}
+.lol-year-list {
+  margin: 0;
+  padding-left: 0;
+  list-style: none;
+  display: grid;
+  gap: 6px;
+}
+.lol-year-list li {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.lol-year-list img {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+}
+.lol-months {
+  display: grid;
+  grid-template-columns: repeat(12, 1fr);
+  gap: 4px;
+  height: 80px;
+  align-items: end;
+}
+.lol-months div {
+  display: grid;
+  height: 100%;
+  align-items: end;
+  justify-items: center;
+}
+.lol-months i {
+  width: 100%;
+  min-height: 2px;
+  border-radius: 4px 4px 0 0;
+  background: #fbbf24;
+}
+.lol-months small {
+  opacity: 0.7;
+  font-size: 0.7rem;
+}
+.lol-year-note {
+  margin: 0;
+  opacity: 0.75;
+  font-size: 0.85rem;
+}
+.lol-year .st-input {
+  color: var(--text);
+}
+.gs-week {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 6px;
+  height: 110px;
+  align-items: end;
+}
+.gs-week > div {
+  display: grid;
+  height: 100%;
+  grid-template-rows: 1fr auto;
+  justify-items: center;
+}
+.gs-bars {
+  display: flex;
+  gap: 2px;
+  align-items: end;
+  height: 100%;
+}
+.gs-bars i {
+  width: 10px;
+  min-height: 2px;
+  border-radius: 3px 3px 0 0;
+}
+.gs-bars i.g,
+.gs-dot.g {
+  background: #8b5cf6;
+}
+.gs-bars i.s,
+.gs-dot.s {
+  background: var(--accent);
+}
+.gs-dot {
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  margin: 0 3px 0 6px;
+}
+.gm-pick {
+  display: grid;
+  grid-template-columns: 140px 1fr;
+  gap: 12px;
+  align-items: center;
+}
+.gm-pick img {
+  width: 140px;
+  border-radius: 8px;
+}
+.gm-pick div {
+  display: grid;
+  gap: 4px;
+}
