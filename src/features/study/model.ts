@@ -64,6 +64,8 @@ export interface StudySettings {
   school?: { name: string; grade?: number; cls?: string };
   /** 마지막으로 백업 파일을 내려받은 날 */
   lastBackup?: DateStr;
+  /** 슛 목표 (%): 야투 · 3점 · 2점 */
+  shotGoals?: { fg?: number; three?: number; two?: number };
   /** 농구 목표 성공률 (%) */
   bbGoals?: { ft?: number; fg?: number; tp?: number };
   /** 올해 읽을 책 수 */

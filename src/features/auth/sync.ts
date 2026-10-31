@@ -39,6 +39,10 @@ const set = (s: SyncStatus) => {
   listeners.forEach((f) => f(s));
 };
 export const getSyncStatus = () => status;
+
+/** 마지막으로 서버와 맞춘 때 · 다른 기기에서 바꾼 것을 마지막으로 받아 합친 때 (이 창에서) */
+const info = { synced: 0, pulled: 0, error: '' };
+export const getSyncInfo = () => ({ ...info, status });
 export function onSyncStatus(f: (s: SyncStatus) => void) {
   listeners.add(f);
   return () => void listeners.delete(f);
@@ -96,6 +100,7 @@ async function syncOne(name: SyncName, pushOnly: boolean) {
     }
     const remote = g.value ? side.read(g.value) : null;
     const merged = side.merge(side.local(), remote);
+    if (remote && !sameJson(merged, side.local())) info.pulled = Date.now();
     side.replace(merged);
     if (remote && sameJson(merged, remote)) return done(g.updatedAt);
     const r = await putStore(name, merged, g.updatedAt);
@@ -133,10 +138,13 @@ async function doRun(names: SyncName[], pushOnly = false) {
     setOwner(userId);
     setKey(DIRTY_KEY, null);
     fails = 0;
+    info.synced = Date.now();
+    info.error = '';
     set('saved');
     // 올리지 못한 오답 사진 (로그인 전에 넣었거나 올리다 실패한 것)
     void uploadPendingPhotos();
-  } catch {
+  } catch (e) {
+    info.error = e instanceof Error ? e.message : String(e);
     if (!isLoggedIn()) return set('local');
     set('error');
     retryTimer = window.setTimeout(() => void run(['study', 'words']), RETRY[Math.min(fails, RETRY.length - 1)]);

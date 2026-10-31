@@ -657,6 +657,7 @@ export function sanitizeSettings(s: unknown): StudySettings & { updatedAt: numbe
         )
       : undefined,
     lastBackup: optDate(x.lastBackup),
+    shotGoals: isObj(x.shotGoals) ? { fg: score((x.shotGoals as Obj).fg, 1, 100), three: score((x.shotGoals as Obj).three, 1, 100), two: score((x.shotGoals as Obj).two, 1, 100) } : undefined,
     examPlanDefaults: isObj(x.examPlanDefaults) ? { weekday: cl((x.examPlanDefaults as Obj).weekday, 0, 900, 150), weekend: cl((x.examPlanDefaults as Obj).weekend, 0, 900, 240), perLine: cl((x.examPlanDefaults as Obj).perLine, 5, 300, 40) } : undefined,
     diaryForm: isObj(x.diaryForm)
       ? {

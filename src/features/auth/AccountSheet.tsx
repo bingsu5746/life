@@ -1,8 +1,8 @@
 // 계정: 닉네임 · 비밀번호 바꾸기 · 로그아웃(이 기기 자료 지우기) · 모든 기기에서 로그아웃 · 계정 지우기
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Field, Sheet, toast } from '../study/ui';
 import { changeNickname, changePassword, deleteAccount, logout, type Account } from './api';
-import { forgetDevice } from './sync';
+import { forgetDevice, getSyncInfo, onSyncStatus, syncAll } from './sync';
 
 type View = 'menu' | 'nickname' | 'password' | 'logout' | 'delete';
 
@@ -169,6 +169,7 @@ export function AccountSheet({ user, onClose }: { user: Account; onClose: () => 
   return (
     <Sheet title={user.nickname || user.username} onClose={onClose}>
       <p className="st-hint">아이디 {user.username}</p>
+      <SyncInfo />
       <div className="st-addlist">
         {(
           [
@@ -186,5 +187,44 @@ export function AccountSheet({ user, onClose }: { user: Account; onClose: () => 
         ))}
       </div>
     </Sheet>
+  );
+}
+
+const ago = (t: number) => {
+  if (!t) return '아직 없음';
+  const s = Math.round((Date.now() - t) / 1000);
+  return s < 60 ? '방금' : s < 3600 ? `${Math.floor(s / 60)}분 전` : `${Math.floor(s / 3600)}시간 전`;
+};
+/** 동기화 상태: 이 기기가 서버와 마지막으로 맞춘 때 · 다른 기기에서 바꾼 것을 받은 때 · 지금 맞추기 */
+function SyncInfo() {
+  const [i, setI] = useState(getSyncInfo);
+  useEffect(() => {
+    const off = onSyncStatus(() => setI(getSyncInfo()));
+    const t = window.setInterval(() => setI(getSyncInfo()), 15_000);
+    return () => {
+      off();
+      clearInterval(t);
+    };
+  }, []);
+  return (
+    <div className="sync-info">
+      <div>
+        <small>동기화</small>
+        <b className={i.status === 'error' ? 'bad' : ''}>{i.status === 'syncing' ? '맞추는 중…' : i.status === 'error' ? '실패 (잠시 뒤 다시 해요)' : i.status === 'saved' ? '모든 기기와 맞춰져 있어요' : '이 기기에만 저장 중'}</b>
+      </div>
+      <div>
+        <small>마지막으로 서버와 맞춘 때</small>
+        <b>{ago(i.synced)}</b>
+      </div>
+      <div>
+        <small>다른 기기에서 바꾼 것을 받은 때</small>
+        <b>{ago(i.pulled)}</b>
+      </div>
+      {i.error && <small className="bad">{i.error}</small>}
+      <button className="btn btn-sm" disabled={i.status === 'syncing'} onClick={() => void syncAll().then(() => toast('서버와 맞췄어요'))}>
+        지금 맞추기
+      </button>
+      <small className="st-muted">다른 기기에서 넣은 것이 안 보이면 「지금 맞추기」를 눌러 보세요. 앱으로 돌아올 때 · 켜 둔 동안 3분마다 저절로도 맞춰요.</small>
+    </div>
   );
 }
