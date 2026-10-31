@@ -24,6 +24,12 @@ export function useDd2(): Dd | null {
 /** 표본이 적으면 승률이 튀어서, 너무 적은 판은 순위에서 뺀다 (전체 경기 수에 맞춰 0.5% 픽률 또는 최소 10판) */
 export const minGames = (total: number) => Math.max(10, Math.round(total * 0.005));
 
+/** 「전체」에서는 챔피언마다 가장 많이 하는 포지션 한 줄만 */
+const mainOnly =
+  (pos: string) =>
+  <T extends { cid: number; pick: number }>(r: T, _i: number, all: T[]) =>
+    !!pos || !all.some((o) => o.cid === r.cid && o.pick > r.pick);
+
 export function LolChampsPage() {
   const dd = useDd2();
   const [q, setQ] = useState('');
@@ -56,11 +62,15 @@ export function LolChampsPage() {
       return Object.entries(OPGG)
         .flatMap(([p, list]) => list.map((r) => ({ cid: r.c, pos: p, g: 0, w: 0, kk: 0, dd: 0, aa: 0, c: dd.champ[r.c], win: r.w, pick: r.p, ban: r.b, kda: 0 })))
         .filter((r) => r.c && (!pos || r.pos === pos) && champMatch(r.c, q))
+        .filter(mainOnly(pos))
         .sort((a, b) => (sort === 'win' ? b.win - a.win : sort === 'pick' || sort === 'games' ? b.pick - a.pick : b.ban - a.ban));
     if (!data) return [];
     const min = minGames(data.total);
     return data.rows
-      .filter((r) => dd.champ[r.cid] && (!pos || r.pos === pos) && r.g >= min && champMatch(dd.champ[r.cid], q))
+      .filter((r) => dd.champ[r.cid] && (!pos || r.pos === pos) && champMatch(dd.champ[r.cid], q))
+      .map((r) => ({ ...r, pick: r.g }))
+      .filter(mainOnly(pos))
+      .filter((r) => r.g >= min)
       .map((r) => ({ ...r, c: dd.champ[r.cid], win: (r.w / r.g) * 100, pick: (r.g / Math.max(1, data.total)) * 100, ban: ((data.bans[r.cid] ?? 0) / Math.max(1, data.total)) * 100, kda: r.dd ? (r.kk + r.aa) / r.dd : r.kk + r.aa }))
       .sort((a, b) => (sort === 'win' ? b.win - a.win : sort === 'pick' ? b.pick - a.pick : sort === 'ban' ? b.ban - a.ban : b.g - a.g));
   }, [data, dd, pos, q, sort, src]);
