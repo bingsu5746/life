@@ -2,6 +2,8 @@
 import { useEffect, useState } from 'react';
 import { csMap, gamePrices, gameSearch, gameWatch, isLoggedIn, steamAch, steamMe, steamNames, steamStore, steamThumb, steamWatchGet, steamWatchSet, type SteamHit, type SteamMe, type SteamPrice } from '../auth/api';
 import { LolPage } from './Lol';
+import { LolChampsPage } from './LolChamps';
+import { LolChampPage } from './LolChamp';
 import { dailyPlay, pickUnplayed } from './steamPlay';
 import { addDays, diffDays, weekStart } from '../study/dates';
 import { upcomingExams } from '../study/exams';
@@ -18,8 +20,10 @@ type Tab = Game['status'];
 const TAB_NAME: Record<Tab, string> = { playing: '하는 중', want: '하고 싶어요', done: '끝낸 것' };
 const PLATFORMS = ['PC', '스위치', '플레이스테이션', 'Xbox', '폰'];
 
-export function Games({ sub }: { sub?: string }) {
+export function Games({ sub, sub2, sub3 }: { sub?: string; sub2?: string; sub3?: string }) {
   if (sub === 'lol') return <LolPage />;
+  if (sub === 'champs') return <LolChampsPage />;
+  if (sub === 'champ' && sub2) return <LolChampPage id={sub2} sub={sub3} />;
   if (sub === 'steam') return <SteamPage />;
   if (sub === 'wish') return <WishPage />;
   return <MyGames />;

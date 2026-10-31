@@ -72,11 +72,27 @@ export const MOVIE_ITEMS: AreaItem[] = [
 export const GAME_ITEMS: AreaItem[] = [
   { key: 'hobby', label: '취미', icon: 'area-hobby', to: '/hobby' },
   { key: 'mine', label: '내 게임', icon: 'game', to: '/games' },
-  { key: 'lol', label: '롤', icon: 'target', to: '/games/lol' },
+  { key: 'lol', label: '롤 전적', icon: 'target', to: '/games/lol' },
+  { key: 'champs', label: '롤 챔피언', icon: 'search', to: '/games/champs' },
   { key: 'steam', label: 'Steam', icon: 'life', to: '/games/steam' },
   { key: 'wish', label: '위시리스트', icon: 'save', to: '/games/wish' },
 ];
-export const gameItem = (sub?: string) => (sub === 'lol' || sub === 'steam' || sub === 'wish' ? sub : 'mine');
+export const gameItem = (sub?: string) => (sub === 'lol' || sub === 'steam' || sub === 'wish' || sub === 'champs' ? sub : sub === 'champ' ? 'champs' : 'mine');
+/** 롤 챔피언 하나 안에서의 메뉴 (챔피언 목록으로 + 빌드 · 룬 · 아이템 · 카운터 · 스킬 · 팁) */
+export const champItems = (id: string, pos: string): AreaItem[] => [
+  { key: 'back', label: '챔피언 목록', icon: 'search', to: '/games/champs' },
+  ...(
+    [
+      ['build', '빌드', 'target'],
+      ['runes', '룬', 'life'],
+      ['items', '아이템', 'save'],
+      ['counter', '카운터', 'game'],
+      ['skills', '스킬', 'books'],
+      ['tips', '팁', 'solve'],
+    ] as const
+  ).map(([k, label, icon]) => ({ key: k, label, icon, to: `/games/champ/${id}/${k}${pos ? `-${pos}` : ''}` })),
+];
+export const champItem = (sub?: string) => (sub ?? 'build').split('-')[0];
 
 /** 농구 안에서의 메뉴 (취미로 돌아가기 + 농구 연습 · 농구 기록 · NBA) */
 export const BASKETBALL_ITEMS: AreaItem[] = [

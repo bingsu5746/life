@@ -1708,10 +1708,11 @@ export class Accounts extends DurableObject<Env> {
     // 모으기 알람이 아직 안 돌고 있으면 켠다
     // (다른 알림 때문에 더 늦은 알람이 걸려 있어도 1분 안으로 당긴다)
     const alarm = await this.ctx.storage.getAlarm();
-    if (this.riotKey() && (alarm === null || alarm > Date.now() + 90_000)) await this.scheduleAlarm();
+    // 알람이 없거나, 너무 늦게 걸렸거나, 지난 시각에 멈춰 있으면 다시 건다
+    if (this.riotKey() && (alarm === null || alarm > Date.now() + 90_000 || alarm < Date.now() - 120_000)) await this.scheduleAlarm();
     const patches = metaPatches(this.sql);
     const patch = q.get('patch') === 'all' ? 'all' : (patches.find((x) => x.patch === q.get('patch'))?.patch ?? patches[0]?.patch ?? 'all');
-    const status = { matches: patches.reduce((a, x) => a + x.games, 0), last: JSON.parse(this.cacheGet('lolmeta:last') ?? 'null'), err: JSON.parse(this.cacheGet('lolmeta:err') ?? 'null'), alarm: await this.ctx.storage.getAlarm() };
+    const status = { matches: patches.reduce((a, x) => a + x.games, 0), last: JSON.parse(this.cacheGet('lolmeta:last') ?? 'null'), err: JSON.parse(this.cacheGet('lolmeta:err') ?? 'null'), alarm: await this.ctx.storage.getAlarm(), alarmErr: JSON.parse(this.cacheGet('alarm:err') ?? 'null'), pushErr: JSON.parse(this.cacheGet('alarm:pusherr') ?? 'null') };
     if (path === 'lol/meta') return json({ patch, patches, status, ...metaTable(this.sql, patch) });
     const cid = Number(q.get('cid'));
     if (!Number.isInteger(cid) || cid <= 0) return fail('챔피언을 확인해 주세요.');
@@ -2368,6 +2369,19 @@ export class Accounts extends DurableObject<Env> {
 
   /** 정한 시각: 그 사람이 넣어 둔 그날 그 시각 글을 보낸다 */
   async alarm() {
+    // 무엇이 실패해도 다음 알람은 꼭 다시 건다 (예전에는 한 번 실패하면 알람이 멈춰 모든 알림이 안 갔다)
+    try {
+      await this.alarmWork();
+    } catch (e) {
+      const msg = e instanceof Error ? `${e.message} ${e.stack?.split('\n')[1]?.trim() ?? ''}` : String(e);
+      console.error('alarm failed', msg);
+      this.cacheSet('alarm:err', JSON.stringify({ at: Date.now(), msg: msg.slice(0, 300) }));
+    } finally {
+      await this.scheduleAlarm();
+    }
+  }
+
+  private async alarmWork() {
     const now = Date.now();
     const rk = this.riotKey();
     if (rk && now + 5_000 >= Number(this.cacheGet('lolmeta:next') ?? 0)) {
@@ -2407,11 +2421,16 @@ export class Accounts extends DurableObject<Env> {
       const e = entries.find((x) => x.date === date && x.slot === slot);
       // 기기를 오래 안 열어 날짜 글이 없으면 짧은 기본 글 (한참 지난 내용을 보내지 않게)
       const message = e ? { title: e.title, body: e.body, url: e.url } : { title: 'Life', body: '오늘 할 것을 확인해 보세요' };
-      const subs = this.sql.exec<PushSub & { [k: string]: SqlStorageValue }>('SELECT endpoint, p256dh, auth FROM push_subs WHERE user_id = ?', n.user_id).toArray();
-      if (subs.length) await this.pushTo(subs, message, n.origin);
+      // 한 사람 알림이 실패해도 다음 시각으로 넘기고 다른 사람 것은 보낸다
+      try {
+        const subs = this.sql.exec<PushSub & { [k: string]: SqlStorageValue }>('SELECT endpoint, p256dh, auth FROM push_subs WHERE user_id = ?', n.user_id).toArray();
+        if (subs.length) await this.pushTo(subs, message, n.origin);
+      } catch (err) {
+        console.error('notify push failed', n.user_id, err instanceof Error ? err.message : String(err));
+        this.cacheSet('alarm:pusherr', JSON.stringify({ at: Date.now(), msg: (err instanceof Error ? err.message : String(err)).slice(0, 200) }));
+      }
       this.sql.exec('UPDATE notify SET next_at = ? WHERE user_id = ?', nextFire(times, n.tz, Math.max(now, n.next_at) + 1000), n.user_id);
     }
-    await this.scheduleAlarm();
   }
 
   private async deleteAccount(user: UserRow, b: Record<string, unknown>, ip: string) {
