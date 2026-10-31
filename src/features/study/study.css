@@ -8900,3 +8900,11 @@ body.focus-on {
   gap: 8px;
   line-height: 1.55;
 }
+.lc-patch {
+  width: auto;
+  min-width: 120px;
+}
+.lc-skill small {
+  display: block;
+  margin-top: 2px;
+}

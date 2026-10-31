@@ -63,7 +63,7 @@ export function LolChampsPage() {
       <div className="lc-bar">
         <input className="st-input lc-search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="챔피언 찾기 (가렌, ㄱㄹ, garen)" aria-label="챔피언 찾기" />
         {data && data.patches.length > 0 && (
-          <select className="st-input xs" value={patch || data.patch} onChange={(e) => setPatch(e.target.value)} aria-label="패치">
+          <select className="st-input lc-patch" value={patch || data.patch} onChange={(e) => setPatch(e.target.value)} aria-label="패치">
             {data.patches.map((p) => (
               <option key={p.patch} value={p.patch}>
                 패치 {p.patch}

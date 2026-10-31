@@ -122,7 +122,7 @@ export function LolChampPage({ id, sub }: { id: string; sub?: string }) {
           </div>
         )}
         {meta && meta.patches.length > 0 && (
-          <select className="st-input xs" value={patch || meta.patch} onChange={(e) => setPatch(e.target.value)} aria-label="패치">
+          <select className="st-input lc-patch" value={patch || meta.patch} onChange={(e) => setPatch(e.target.value)} aria-label="패치">
             {meta.patches.map((p) => (
               <option key={p.patch} value={p.patch}>
                 패치 {p.patch}
