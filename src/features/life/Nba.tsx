@@ -249,7 +249,9 @@ function Games() {
       live = false;
     };
   }, [date, tick]);
-  useEffect(() => setGames(null), [date]);
+  useEffect(() => {
+    setGames(null);
+  }, [date]);
   // 경기 중이면 1분마다 (화면이 보일 때만)
   useEffect(() => {
     if (!anyLive) return;

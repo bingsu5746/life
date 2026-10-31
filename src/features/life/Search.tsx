@@ -9,7 +9,9 @@ export function Search({ q0 = '' }: { q0?: string }) {
   const words = useWords();
   const [q, setQ] = useState(q0);
   const ref = useRef<HTMLInputElement>(null);
-  useEffect(() => ref.current?.focus(), []);
+  useEffect(() => {
+    ref.current?.focus();
+  }, []);
   const hits = searchAll(d, words, q);
   const groups = [...new Set(hits.map((h) => h.group))];
   return (

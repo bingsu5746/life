@@ -35,7 +35,9 @@ export function Hobby({ sub, sub2 }: { sub?: string; sub2?: string }) {
 }
 
 function MovedToMovies({ sub }: { sub?: string }) {
-  useEffect(() => window.location.replace(sub ? `#/movies/${sub}` : '#/movies'), [sub]);
+  useEffect(() => {
+    window.location.replace(sub ? `#/movies/${sub}` : '#/movies');
+  }, [sub]);
   return null;
 }
 

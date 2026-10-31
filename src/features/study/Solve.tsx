@@ -53,7 +53,9 @@ export function Solve({ open }: { open?: string }) {
     }
   };
   // 예전 대화를 저장소로 옮기기 · 저장소에서 고른 대화 열기
-  useEffect(() => migrateChats(d.problems), []); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    migrateChats(d.problems);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
   // 옆 메뉴 「새 대화」(/ai) 를 누르면 새로
   const lastOpen = useRef(open);
   useEffect(() => {
@@ -131,7 +133,10 @@ export function Solve({ open }: { open?: string }) {
     setPractice(null);
     toast(ok ? '맞혔어요! 오답 노트에 적었어요' : '틀렸어요. 오답 노트에서 다시 볼게요');
   };
-  useEffect(() => endRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' }), [chat.msgs.length, busy]);
+  useEffect(() => {
+    // 최신 브라우저는 scrollIntoView 가 Promise 를 돌려줘서, 그대로 돌려주면 React 가 정리 함수로 부르다 오류 (l is not a function)
+    endRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
+  }, [chat.msgs.length, busy]);
   useEffect(() => {
     const a = area.current;
     if (!a) return;
