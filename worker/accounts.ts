@@ -1386,7 +1386,15 @@ export class Accounts extends DurableObject<Env> {
       if (Date.now() - v.at < 7 * DAY) return json({ list: v.list });
     }
     try {
-      const res = await within(fetch(`https://api.discogs.com/database/search?${new URLSearchParams({ q, type: 'master', per_page: '50' })}`, { headers: { authorization: auth, 'user-agent': 'LifeApp/1.0 +https://life.silent-recipe-8e5c.workers.dev' } }), 15_000, 'Discogs');
+      // Discogs 는 보내는 곳(IP)마다 1분 횟수를 센다. Cloudflare 주소는 여럿이 같이 써서 429 가 날 수 있다 → 잠시 뒤, 미국 중계 서버로도 다시
+      const url = `https://api.discogs.com/database/search?${new URLSearchParams({ q, type: 'master', per_page: '50' })}`;
+      const init = { headers: { authorization: auth, 'user-agent': 'LifeApp/1.0 +https://life.silent-recipe-8e5c.workers.dev' } };
+      let res = await within(fetch(url, init), 15_000, 'Discogs');
+      for (let i = 0; i < 2 && res.status === 429; i++) {
+        await new Promise((r) => setTimeout(r, 1500 * (i + 1)));
+        res = await within((i === 0 ? this.gemFetch() : fetch)(url, init), 15_000, 'Discogs');
+      }
+      if (res.status === 429) throw new Error('Discogs 가 잠깐 막았어요 (1분 횟수). 1분 뒤 다시 해 주세요');
       if (!res.ok) throw new Error(`Discogs ${res.status}`);
       const j = (await res.json()) as { results?: { id?: number; title?: string; year?: string; cover_image?: string; thumb?: string; genre?: string[]; style?: string[]; community?: { have?: number; want?: number } }[] };
       const list = (j.results ?? [])
