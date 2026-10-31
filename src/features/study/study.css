@@ -9359,3 +9359,45 @@ body.focus-on {
   font-size: 0.82rem;
   opacity: 0.8;
 }
+
+/* 아주 좁은 폰 (아이폰 SE 1세대 320px 등) */
+.hm-quick button span {
+  white-space: nowrap;
+}
+@media (max-width: 860px) {
+  /* 메뉴 칸이 많으면 겹치지 않고 옆으로 밀리게 (칸마다 최소 너비) */
+  /* (공부 메뉴는 「더 보기」로 칸 수를 맞춰서 빼고) */
+  .st-nav:not(:has(.st-tab-more)) {
+    overflow-x: auto;
+  }
+  .st-nav:not(:has(.st-tab-more)) .st-tab {
+    flex: 1 0 54px;
+  }
+  .st-tab-short {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 100%;
+  }
+}
+@media (max-width: 380px) {
+  .hm-quick {
+    gap: 5px;
+  }
+  .hm-quick button {
+    padding: 10px 2px;
+    font-size: 0.68rem;
+    letter-spacing: -0.03em;
+  }
+}
+/* 폰 가로: 아래 메뉴를 낮게 */
+@media (max-width: 960px) and (max-height: 460px) {
+  .st-nav .st-tab {
+    flex-direction: row;
+    gap: 6px;
+    padding: 4px 0;
+  }
+  .st-nav .st-icon {
+    width: 18px;
+    height: 18px;
+  }
+}
