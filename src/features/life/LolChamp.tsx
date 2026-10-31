@@ -78,17 +78,6 @@ export function LolChampPage({ id, sub }: { id: string; sub?: string }) {
         <div>
           <h2>{champ.name}</h2>
           <small className="st-muted">{champ.title}</small>
-          {detail && (
-            <div className="lc-skills">
-              <img src={`${DD}/${dd.v}/img/passive/${detail.passive.image}`} alt={detail.passive.name} title={detail.passive.name} />
-              {detail.spells.map((s, i) => (
-                <span key={s.id}>
-                  <img src={`${DD}/${dd.v}/img/spell/${s.image}`} alt={s.name} title={s.name} />
-                  <i>{'QWER'[i]}</i>
-                </span>
-              ))}
-            </div>
-          )}
         </div>
         {here && meta && (
           <div className="lc-stats">

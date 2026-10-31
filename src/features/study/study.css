@@ -9072,3 +9072,128 @@ body.focus-on {
 .ll-help li {
   margin-bottom: 6px;
 }
+
+/* 롤 전적 › 경기 자세히 */
+.lol-game {
+  grid-template-columns: 84px 76px 96px minmax(130px, 1fr) auto;
+  cursor: pointer;
+}
+.lol-game-more small {
+  white-space: nowrap;
+}
+.lm-team {
+  margin-bottom: 14px;
+  border-radius: 10px;
+  overflow: hidden;
+  border-left: 5px solid #3b82f6;
+  background: color-mix(in srgb, #3b82f6 7%, var(--surface));
+}
+.lm-team.lose {
+  border-left-color: #ef4444;
+  background: color-mix(in srgb, #ef4444 7%, var(--surface));
+}
+.lm-head {
+  display: flex;
+  gap: 10px;
+  align-items: baseline;
+  flex-wrap: wrap;
+  padding: 8px 10px;
+}
+.lm-head small {
+  color: var(--muted);
+}
+.lm-row {
+  display: grid;
+  grid-template-columns: 36px 18px minmax(70px, 1fr) 64px 110px 92px auto;
+  gap: 8px;
+  align-items: center;
+  padding: 5px 10px;
+  font-size: 0.85rem;
+}
+.lm-row.me {
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+}
+.lm-champ {
+  position: relative;
+}
+.lm-champ img {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  display: block;
+}
+.lm-champ i {
+  position: absolute;
+  right: -4px;
+  bottom: -2px;
+  font-style: normal;
+  font-size: 0.65rem;
+  padding: 0 3px;
+  border-radius: 5px;
+  color: #fff;
+  background: #111827;
+}
+.lm-sp {
+  display: grid;
+  gap: 1px;
+}
+.lm-sp img {
+  width: 17px;
+  height: 17px;
+  border-radius: 3px;
+}
+.lm-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.lm-kda,
+.lm-cs {
+  display: grid;
+  white-space: nowrap;
+}
+.lm-kda small,
+.lm-cs small,
+.lm-dmg small {
+  color: var(--muted);
+}
+.lm-dmg {
+  display: grid;
+  gap: 2px;
+}
+.lm-dmg i {
+  display: block;
+  height: 6px;
+  border-radius: 3px;
+  background: #ef4444;
+}
+.lm-items {
+  display: grid;
+  grid-template-columns: repeat(7, 22px);
+  gap: 2px;
+}
+.lm-items img,
+.lm-items b {
+  width: 22px;
+  height: 22px;
+  border-radius: 4px;
+  background: var(--soft);
+  display: block;
+}
+@media (max-width: 720px) {
+  .lm-row {
+    grid-template-columns: 36px 18px 1fr 64px;
+  }
+  .lm-dmg,
+  .lm-cs {
+    display: none;
+  }
+  .lm-items {
+    grid-column: 3 / -1;
+  }
+}
+@media (max-width: 640px) {
+  .lol-game {
+    grid-template-columns: 70px 72px 1fr;
+  }
+}

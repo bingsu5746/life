@@ -28,7 +28,7 @@ import { seojiSearch, seojiToc, yes24Search } from './books';
 import { cheapShark } from './cheapshark';
 import { discordChannels, discordInfo, discordMessages, discordSend } from './discord';
 import { lolMetaTables, lolMetaTick, metaChamp, metaPatches, metaTable } from './lolMeta';
-import { lolNewGames, lolOlderGames, lolProfile, RiotError, type LolGame } from './lol';
+import { lolMatch, lolNewGames, lolOlderGames, lolProfile, RiotError, type LolGame } from './lol';
 import { krPrices, steamAchievements, steamMe, storeItems, storeNames, storeSearch, wishlist, type KrPrice } from './steam';
 import { hlAverage, fetchHlBox, fetchHlPlayerSeasons, fetchHlStandings, hlMatchId, sameTeam } from './highlightly';
 import { within, fetchGames, fetchNbaAverages, fetchBdlRoster, fetchNbaBox, fetchNbaCareer, fetchNbaRoster, fetchNbaStandings, fetchStandings, nbaGameId, Paid, seasonOf, seasonPage, standingsFrom, type NbaGame } from './nba';
@@ -312,6 +312,7 @@ export class Accounts extends DurableObject<Env> {
           .filter((x) => Number.isInteger(x) && x > 0),
       );
     if ((path === 'lol/meta' || path === 'lol/champ') && req.method === 'GET') return this.lolMetaRoute(path, new URL(req.url).searchParams);
+    if (path === 'lol/match' && req.method === 'GET') return this.lolMatchRoute(new URL(req.url).searchParams.get('id') ?? '');
     if (path === 'lol/profile' && req.method === 'GET') return this.lolProfileRoute(new URL(req.url).searchParams.get('id') ?? '');
     if (path === 'lol/games' && req.method === 'GET') return this.lolGamesRoute(new URL(req.url).searchParams.get('puuid') ?? '', new URL(req.url).searchParams.get('older') === '1');
     if (path === 'steam/thumbs' && req.method === 'GET') {
@@ -1745,6 +1746,17 @@ export class Accounts extends DurableObject<Env> {
     return this.secret('riot', 'riotkey', 'riotapikey', 'riotapi', 'lol', 'lolkey');
   }
   /** 롤 프로필: { id: '이름#태그' } → 계정 · 레벨 · 랭크 · 숙련도 (10분 기억) */
+  private async lolMatchRoute(id: string): Promise<Response> {
+    const key = this.riotKey();
+    if (!key) return fail('Riot 키가 아직 없어요.', 503);
+    if (!/^[A-Z0-9]{2,6}_\d{5,15}$/.test(id)) return fail('경기를 확인해 주세요.');
+    try {
+      return json((await this.nbaCached(`lol:m:${id}`, 7 * DAY, () => lolMatch(key, id))).v);
+    } catch (e) {
+      return fail(`경기 정보를 받지 못했어요. (${(e instanceof Error ? e.message : String(e)).slice(0, 100)})`, 502);
+    }
+  }
+
   private async lolProfileRoute(id: string): Promise<Response> {
     const key = this.riotKey();
     if (!key) return fail('Riot 키가 아직 없어요.', 503);

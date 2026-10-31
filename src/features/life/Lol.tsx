@@ -4,6 +4,7 @@ import { lolGames, lolProfile, type LolProfile } from '../auth/api';
 import { LineChart } from '../study/charts';
 import { setSettings, useStudy } from '../study/store';
 import { Empty, go, Sheet, tap, toast } from '../study/ui';
+import { MatchSheet } from './LolMatch';
 import { byChampion, byHour, byPosition, byWeekday, champDetail, kda, POS, queueName, QUEUE_FILTER, streaks, summary, yearRecap, type LolGame, type QueueFilter } from './lolStats';
 
 // ===== Data Dragon (챔피언 · 스펠 이름과 그림, 키 없음). 한 번 받으면 이 기기에 하루 기억 =====
@@ -397,41 +398,45 @@ export function LolPage() {
 
 function GameRow({ g, dd }: { g: LolGame; dd: Dd | null }) {
   const r = kda(g.k, g.d, g.a);
+  const [open, setOpen] = useState(false);
   return (
-    <div className={`lol-game ${g.remake ? 'remake' : g.win ? 'win' : 'lose'}`}>
-      <div className="lol-game-meta">
-        <b>{queueName(g.q)}</b>
-        <small>{ago(g.at)}</small>
-        <small>{g.remake ? '다시하기' : g.win ? '승리' : '패배'}</small>
-        <small>
-          {Math.floor(g.dur / 60)}분 {g.dur % 60}초
-        </small>
+    <>
+      {open && <MatchSheet id={g.id} me={g} dd={dd} onClose={() => setOpen(false)} />}
+      <div className={`lol-game st-tap ${g.remake ? 'remake' : g.win ? 'win' : 'lose'}`} {...tap(() => setOpen(true))}>
+        <div className="lol-game-meta">
+          <b>{queueName(g.q)}</b>
+          <small>{ago(g.at)}</small>
+          <small>{g.remake ? '다시하기' : g.win ? '승리' : '패배'}</small>
+          <small>
+            {Math.floor(g.dur / 60)}분 {g.dur % 60}초
+          </small>
+        </div>
+        <div className="lol-game-champ">
+          {dd && <img src={champImg(dd, g.champ)} alt={dd.byId[g.champ] ?? g.champ} loading="lazy" />}
+          <i>{g.lvl}</i>
+          <span className="lol-spells">{dd && g.spells.map((sp, i) => (dd.spell[sp] ? <img key={i} src={`${IMG}/${dd.v}/img/spell/${dd.spell[sp]}.png`} alt="" loading="lazy" /> : null))}</span>
+        </div>
+        <div className="lol-game-kda">
+          <b>
+            {g.k} / <span className="bad">{g.d}</span> / {g.a}
+          </b>
+          <small className={r >= 4 ? 'lol-good' : ''}>{r.toFixed(2)} KDA</small>
+          {g.multi >= 2 && <small className="lol-multi">{['', '', '더블킬', '트리플킬', '쿼드라킬', '펜타킬'][Math.min(5, g.multi)]}</small>}
+        </div>
+        <div className="lol-game-more">
+          <small>킬관여 {pct(g.kp * 100)}</small>
+          <small>
+            CS {g.cs} ({f1(g.cs / Math.max(1, g.dur / 60))})
+          </small>
+          <small>
+            딜 {g.dmg.toLocaleString('ko-KR')}
+            {g.dmgRank === 1 ? ' 🥇' : ''}
+          </small>
+          <small>시야 {g.vision}</small>
+        </div>
+        <div className="lol-items">{dd && g.items.map((it, i) => (it ? <img key={i} src={`${IMG}/${dd.v}/img/item/${it}.png`} alt="" loading="lazy" /> : <span key={i} />))}</div>
       </div>
-      <div className="lol-game-champ">
-        {dd && <img src={champImg(dd, g.champ)} alt={dd.byId[g.champ] ?? g.champ} loading="lazy" />}
-        <i>{g.lvl}</i>
-        <span className="lol-spells">{dd && g.spells.map((sp, i) => (dd.spell[sp] ? <img key={i} src={`${IMG}/${dd.v}/img/spell/${dd.spell[sp]}.png`} alt="" loading="lazy" /> : null))}</span>
-      </div>
-      <div className="lol-game-kda">
-        <b>
-          {g.k} / <span className="bad">{g.d}</span> / {g.a}
-        </b>
-        <small className={r >= 4 ? 'lol-good' : ''}>{r.toFixed(2)} KDA</small>
-        {g.multi >= 2 && <small className="lol-multi">{['', '', '더블킬', '트리플킬', '쿼드라킬', '펜타킬'][Math.min(5, g.multi)]}</small>}
-      </div>
-      <div className="lol-game-more">
-        <small>킬관여 {pct(g.kp * 100)}</small>
-        <small>
-          CS {g.cs} ({f1(g.cs / Math.max(1, g.dur / 60))})
-        </small>
-        <small>
-          딜 {g.dmg.toLocaleString('ko-KR')}
-          {g.dmgRank === 1 ? ' 🥇' : ''}
-        </small>
-        <small>시야 {g.vision}</small>
-      </div>
-      <div className="lol-items">{dd && g.items.map((it, i) => (it ? <img key={i} src={`${IMG}/${dd.v}/img/item/${it}.png`} alt="" loading="lazy" /> : <span key={i} />))}</div>
-    </div>
+    </>
   );
 }
 

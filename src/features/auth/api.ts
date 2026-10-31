@@ -715,3 +715,33 @@ export const discordInfo = () => call<{ bot: string; appId: string; contentInten
 export const discordChannels = (guild: string) => call<{ channels: { id: string; name: string; cat: string }[] }>(`discord/channels?guild=${guild}`, 'GET', undefined, 20_000).then((r) => r.channels);
 export const discordMsgs = (channel: string, before?: string) => call<{ msgs: DcMsg[] }>(`discord/msgs?channel=${channel}${before ? `&before=${before}` : ''}`, 'GET', undefined, 20_000).then((r) => r.msgs);
 export const discordSend = (channel: string, text: string) => call<{ ok: boolean }>('discord/send', 'POST', { channel, text }, 20_000);
+
+export interface LolMatchP {
+  puuid: string;
+  name: string;
+  team: number;
+  win: boolean;
+  champ: string;
+  lvl: number;
+  pos: string;
+  k: number;
+  d: number;
+  a: number;
+  cs: number;
+  gold: number;
+  dmg: number;
+  taken: number;
+  vision: number;
+  wards: number;
+  items: number[];
+  spells: number[];
+}
+export interface LolMatch {
+  id: string;
+  at: number;
+  dur: number;
+  q: number;
+  players: LolMatchP[];
+  teams: { id: number; win: boolean; obj: Record<string, number> }[];
+}
+export const lolMatch = (id: string) => remember(`lolm:${id}`, 60 * MIN, () => call<LolMatch>(`lol/match?id=${encodeURIComponent(id)}`, 'GET', undefined, 20_000));

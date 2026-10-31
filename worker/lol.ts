@@ -166,3 +166,71 @@ export async function lolOlderGames(key: string, puuid: string, have: Set<string
   }
   return { games, end: page.length < 100 && ids.length <= max };
 }
+
+/** 경기 하나 자세히: 10명 기록 · 팀 오브젝트 */
+export interface LolMatchP {
+  puuid: string;
+  name: string;
+  team: number;
+  win: boolean;
+  champ: string;
+  lvl: number;
+  pos: string;
+  k: number;
+  d: number;
+  a: number;
+  cs: number;
+  gold: number;
+  dmg: number;
+  taken: number;
+  vision: number;
+  wards: number;
+  items: number[];
+  spells: number[];
+  ks?: number;
+}
+export interface LolMatch {
+  id: string;
+  at: number;
+  dur: number;
+  q: number;
+  players: LolMatchP[];
+  teams: { id: number; win: boolean; obj: Record<string, number> }[];
+}
+export async function lolMatch(key: string, id: string): Promise<LolMatch> {
+  const m = (await riot(key, `https://asia.api.riotgames.com/lol/match/v5/matches/${id}`)) as { info?: { gameCreation?: number; gameDuration?: number; queueId?: number; participants?: P[]; teams?: { teamId?: number; win?: boolean; objectives?: Record<string, { kills?: number }> }[] } };
+  const info = m.info;
+  if (!info) throw new Error('경기 정보가 없어요');
+  return {
+    id,
+    at: info.gameCreation ?? 0,
+    dur: info.gameDuration ?? 0,
+    q: info.queueId ?? 0,
+    players: (info.participants ?? []).map((p) => {
+      const n = (k: string) => (typeof p[k] === 'number' ? (p[k] as number) : 0);
+      const s = (k: string) => (typeof p[k] === 'string' ? (p[k] as string) : '');
+      return {
+        puuid: p.puuid ?? '',
+        name: s('riotIdGameName') ? `${s('riotIdGameName')}#${s('riotIdTagline')}` : s('summonerName'),
+        team: p.teamId ?? 0,
+        win: p.win === true,
+        champ: p.championName ?? '',
+        lvl: n('champLevel'),
+        pos: String(p.teamPosition || ''),
+        k: n('kills'),
+        d: n('deaths'),
+        a: n('assists'),
+        cs: n('totalMinionsKilled') + n('neutralMinionsKilled'),
+        gold: n('goldEarned'),
+        dmg: n('totalDamageDealtToChampions'),
+        taken: n('totalDamageTaken'),
+        vision: n('visionScore'),
+        wards: n('wardsPlaced'),
+        items: [0, 1, 2, 3, 4, 5, 6].map((i) => n(`item${i}`)),
+        spells: [n('summoner1Id'), n('summoner2Id')],
+        ks: (p.perks as { styles?: { selections?: { perk?: number }[] }[] } | undefined)?.styles?.[0]?.selections?.[0]?.perk,
+      };
+    }),
+    teams: (info.teams ?? []).map((t) => ({ id: t.teamId ?? 0, win: t.win === true, obj: Object.fromEntries(Object.entries(t.objectives ?? {}).map(([k, v]) => [k, v.kills ?? 0])) })),
+  };
+}
