@@ -675,6 +675,7 @@ export interface LolMetaStatus {
   matches: number;
   last: { at: number; counted: number } | null;
   err: { at: number; msg: string } | null;
+  burst?: number;
   writes?: { today: LolWrites; hist: LolWrites[]; cap: number; limit: number };
 }
 export interface LolWrites {
@@ -682,6 +683,12 @@ export interface LolWrites {
   all: number;
   lol: number;
 }
+export const lolCrawl = (minutes: number) => call<{ burst: number }>('lol/crawl', 'POST', { minutes });
+/** 기억해 둔 것 없이 바로 (모으는 중 상태 보기) */
+export const lolMetaNow = (patch = '') => {
+  memo.delete(`lolmeta:${patch}`);
+  return lolMeta(patch);
+};
 export const lolMeta = (patch = '') =>
   remember(`lolmeta:${patch}`, 5 * MIN, () =>
     call<{ patch: string; patches: { patch: string; games: number }[]; status: LolMetaStatus; total: number; rows: { cid: number; pos: string; g: number; w: number; kk: number; dd: number; aa: number }[]; bans: Record<number, number> }>(

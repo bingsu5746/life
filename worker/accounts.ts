@@ -312,6 +312,13 @@ export class Accounts extends DurableObject<Env> {
           .filter((x) => Number.isInteger(x) && x > 0),
       );
     if ((path === 'lol/meta' || path === 'lol/champ') && req.method === 'GET') return this.lolMetaRoute(path, new URL(req.url).searchParams);
+    if (path === 'lol/crawl' && req.method === 'POST') {
+      const min = Math.max(0, Math.min(60, Number(body.minutes) || 0));
+      this.cacheSet('lolmeta:burst', String(min ? Date.now() + min * 60_000 : 0));
+      if (min) this.cacheSet('lolmeta:next', '0');
+      await this.scheduleAlarm();
+      return json({ burst: min ? Date.now() + min * 60_000 : 0 });
+    }
     if (path === 'lol/match' && req.method === 'GET') return this.lolMatchRoute(new URL(req.url).searchParams.get('id') ?? '');
     if (path === 'lol/profile' && req.method === 'GET') return this.lolProfileRoute(new URL(req.url).searchParams.get('id') ?? '');
     if (path === 'lol/games' && req.method === 'GET') return this.lolGamesRoute(new URL(req.url).searchParams.get('puuid') ?? '', new URL(req.url).searchParams.get('older') === '1');
@@ -1815,6 +1822,7 @@ export class Accounts extends DurableObject<Env> {
       alarm: await this.ctx.storage.getAlarm(),
       alarmErr: JSON.parse(this.cacheGet('alarm:err') ?? 'null'),
       pushErr: JSON.parse(this.cacheGet('alarm:pusherr') ?? 'null'),
+      burst: Number(this.cacheGet('lolmeta:burst') ?? 0),
       writes: { today: this.rw, hist: JSON.parse(this.cacheGet('rw:hist') ?? '[]'), cap: LOL_WRITE_CAP, limit: 100_000 },
     };
     if (path === 'lol/meta') return json({ patch, patches, status, ...metaTable(this.sql, patch) });
@@ -2540,7 +2548,9 @@ export class Accounts extends DurableObject<Env> {
     // 그날 다른 기능(내가 쓰는 것)이 이미 그만큼 썼으면 쉰다 → 나머지 2만 줄 이상은 늘 내 몫으로 남는다
     this.countWrites(0);
     const dayFrac = (now % DAY) / DAY;
-    const pace = this.rw.all < LOL_WRITE_CAP * Math.min(1, dayFrac + 1 / 48);
+    // 「빠르게 모으기」 중이면 하루 몫 나누기 없이 하루 상한까지, 30초마다 8판 (Riot 한도 2분 100번 안쪽)
+    const burst = now < Number(this.cacheGet('lolmeta:burst') ?? 0) && this.rw.all < LOL_WRITE_CAP;
+    const pace = burst || this.rw.all < LOL_WRITE_CAP * Math.min(1, dayFrac + 1 / 48);
     if (rk && !pace) this.cacheSet('lolmeta:next', String(now + 300_000));
     if (rk && pace && now + 5_000 >= Number(this.cacheGet('lolmeta:next') ?? 0)) {
       try {
@@ -2550,16 +2560,16 @@ export class Accounts extends DurableObject<Env> {
           this.sql,
           (k) => this.cacheGet(k),
           (k, v) => this.cacheSet(k, v),
-          6,
+          burst ? 8 : 6,
         );
         this.rw.lol += this.rw.all - before;
-        this.cacheSet('lolmeta:next', String(now + 60_000));
+        this.cacheSet('lolmeta:next', String(now + (burst ? 30_000 : 60_000)));
         this.cacheSet('lolmeta:last', JSON.stringify({ at: now, counted: r.counted, champ: r.champ }));
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
         console.error('lol meta tick failed', msg);
-        // 401/403(키 문제)이면 1시간, 그 밖(429 등)은 5분 쉼
-        this.cacheSet('lolmeta:next', String(now + (/40[13]/.test(msg) ? 3600_000 : 300_000)));
+        // 401/403(키 문제)이면 1시간, 429(Riot 한도)는 2분, 그 밖은 5분 쉼
+        this.cacheSet('lolmeta:next', String(now + (/40[13]/.test(msg) ? 3600_000 : /429/.test(msg) ? 120_000 : 300_000)));
         this.cacheSet('lolmeta:err', JSON.stringify({ at: now, msg }));
       }
     }

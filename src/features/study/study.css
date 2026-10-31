@@ -9230,3 +9230,33 @@ body.focus-on {
   font-style: normal;
   color: var(--muted);
 }
+.lc-use {
+  padding: 12px 16px;
+}
+.lc-use-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.lc-use-bar {
+  position: relative;
+  height: 8px;
+  margin-top: 8px;
+  border-radius: 4px;
+  background: var(--soft);
+}
+.lc-use-bar i {
+  display: block;
+  height: 100%;
+  border-radius: 4px;
+  background: var(--accent);
+}
+.lc-use-bar b {
+  position: absolute;
+  top: -3px;
+  width: 2px;
+  height: 14px;
+  background: #ef4444;
+}

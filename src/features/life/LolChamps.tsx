@@ -1,6 +1,7 @@
 // 게임 › 롤 챔피언: 검색(초성 · 영어) · 포지션 · 패치 · 티어표(승률 · 픽률 · 밴률). 통계는 서버가 모은 마스터 이상 솔랭
 import { useEffect, useMemo, useState } from 'react';
-import { lolMeta } from '../auth/api';
+import { lolCrawl, lolMeta, lolMetaNow } from '../auth/api';
+import { toast } from '../study/ui';
 import { go } from '../study/ui';
 import { champImg, champMatch, loadDd, type Dd } from './lolDd';
 import { POS } from './lolStats';
@@ -30,15 +31,23 @@ export function LolChampsPage() {
   const [sort, setSort] = useState<Sort>('win');
   const [data, setData] = useState<Awaited<ReturnType<typeof lolMeta>> | null>(null);
   const [err, setErr] = useState('');
+  const [tick, setTick] = useState(0);
+  const burst = (data?.status.burst ?? 0) > Date.now();
+  // 빠르게 모으는 중이면 15초마다 새로
+  useEffect(() => {
+    if (!burst) return;
+    const t = setTimeout(() => setTick((n) => n + 1), 15_000);
+    return () => clearTimeout(t);
+  }, [burst, data]);
   useEffect(() => {
     let live = true;
-    lolMeta(patch)
+    (tick ? lolMetaNow : lolMeta)(patch)
       .then((r) => live && setData(r))
       .catch((e) => live && setErr(e instanceof Error ? e.message : '통계를 받지 못했어요'));
     return () => {
       live = false;
     };
-  }, [patch]);
+  }, [patch, tick]);
   const rows = useMemo(() => {
     if (!data || !dd) return [];
     const min = minGames(data.total);
@@ -96,7 +105,20 @@ export function LolChampsPage() {
           마스터+ 솔랭 {data.total.toLocaleString('ko-KR')}판{data.status.err && Date.now() - data.status.err.at < 3600_000 ? ` · 모으기 오류: ${data.status.err.msg}` : ''}
         </p>
       )}
-      {data?.status.writes && <WriteUse w={data.status.writes} />}
+      {data?.status.writes && (
+        <WriteUse
+          w={data.status.writes}
+          burst={data.status.burst ?? 0}
+          onCrawl={(min) =>
+            lolCrawl(min)
+              .then(() => {
+                toast(min ? `${min}분 동안 빠르게 모아요` : '멈췄어요');
+                setTick((n) => n + 1);
+              })
+              .catch((e) => toast(e instanceof Error ? e.message : '실패했어요'))
+          }
+        />
+      )}
       {!data && !err && <p className="st-muted">받는 중…</p>}
       {data && rows.length > 0 && (
         <section className="st-card lc-table-wrap">
@@ -149,22 +171,33 @@ export function LolChampsPage() {
   );
 }
 
-/** 서버 저장소 쓰기량 (Cloudflare 무료 한도 하루 10만 줄, UTC 0시 = 한국 오전 9시에 초기화) */
-function WriteUse({ w }: { w: NonNullable<Awaited<ReturnType<typeof lolMeta>>['status']['writes']> }) {
+/** 서버 쓰기 한도 · 오늘 쓴 양 · 빠르게 모으기 */
+function WriteUse({ w, burst, onCrawl }: { w: NonNullable<Awaited<ReturnType<typeof lolMeta>>['status']['writes']>; burst: number; onCrawl: (min: number) => void }) {
   const n = (x: number) => x.toLocaleString('ko-KR');
-  const rows = [w.today, ...w.hist].slice(0, 7);
+  const on = burst > Date.now();
   return (
-    <details className="st-muted sm">
-      <summary>
-        서버 쓰기 {n(w.today.all)} / {n(w.limit)}줄
-      </summary>
-      <ul>
-        {rows.map((r) => (
-          <li key={r.day}>
-            {r.day}: 전체 {n(r.all)} · 롤 통계 {n(r.lol)} · 나머지 {n(r.all - r.lol)}
-          </li>
-        ))}
-      </ul>
-    </details>
+    <section className="st-card lc-use">
+      <div className="lc-use-top">
+        <span>
+          서버 쓰기 <b>{n(w.today.all)}</b> / {n(w.limit)}줄{' '}
+          <small className="st-muted">
+            (롤 통계 {n(w.today.lol)} · 상한 {n(w.cap)})
+          </small>
+        </span>
+        {on ? (
+          <button className="btn btn-sm" onClick={() => onCrawl(0)}>
+            멈추기 ({Math.ceil((burst - Date.now()) / 60_000)}분 남음)
+          </button>
+        ) : (
+          <button className="btn btn-sm btn-primary" onClick={() => onCrawl(10)} disabled={w.today.all >= w.cap}>
+            빠르게 모으기 10분
+          </button>
+        )}
+      </div>
+      <div className="lc-use-bar">
+        <i style={{ width: `${Math.min(100, (w.today.all / w.limit) * 100)}%` }} />
+        <b style={{ left: `${(w.cap / w.limit) * 100}%` }} />
+      </div>
+    </section>
   );
 }
