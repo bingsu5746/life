@@ -22,10 +22,11 @@ import { relayFetch, type Relay } from './relay';
 import { fetchSpecialDays } from './holidays';
 import { cleanFact } from './fact';
 import { fetch2k } from './nba2k';
+import { hcBody, parseHc } from './homecourt';
 import { hlAverage, fetchHlBox, fetchHlPlayerSeasons, fetchHlStandings, hlMatchId, sameTeam } from './highlightly';
 import { fetchGames, fetchNbaAverages, fetchBdlRoster, fetchNbaBox, fetchNbaCareer, fetchNbaRoster, fetchNbaStandings, fetchStandings, nbaGameId, Paid, seasonOf, seasonPage, standingsFrom, type NbaGame } from './nba';
 import { monthOf, R2_FREE, R2_STOP, r2Block, rollMonth, type R2Use } from './r2guard';
-import { modelFamily, askCompat, askGemini, geminiDaily, pacificDay, askOpenRouter, COMPAT, compatModels, geminiModels, openRouterDaily, openRouterModels, pickCompat, SYSTEM as SOLVE_SYSTEM, type Engine, type SolveTurn } from './solve';
+import { modelFamily, askCompat, askGemini, readGemini, geminiDaily, pacificDay, askOpenRouter, COMPAT, compatModels, geminiModels, openRouterDaily, openRouterModels, pickCompat, SYSTEM as SOLVE_SYSTEM, type Engine, type SolveTurn } from './solve';
 import { filmFacets, searchFilms, type Film } from './catalog';
 import { buildRecommendInput, normTitle, readRecommendations, readRecommendRequest } from './recommend';
 import { allowedEndpoint, localDate, makeVapid, nextFire, sendPush, type PushSub, type Vapid } from './push';
@@ -193,7 +194,7 @@ export class Accounts extends DurableObject<Env> {
 
     let body: Record<string, unknown> = {};
     if (req.method === 'POST' || req.method === 'PUT' || req.method === 'DELETE') {
-      const big = path.startsWith('store/') || path.startsWith('study-photo/') || path === 'solve' || path === 'solve/img';
+      const big = path.startsWith('store/') || path.startsWith('study-photo/') || path === 'solve' || path === 'solve/img' || path === 'bb/scan';
       const text = await req.text();
       if (text.length > (big ? MAX_STORE + 1000 : path === 'translate' || path === 'notify/digest' ? 4 * MAX_SMALL_BODY : MAX_SMALL_BODY)) return fail('보낸 내용이 너무 커요.', 413);
       try {
@@ -250,6 +251,7 @@ export class Accounts extends DurableObject<Env> {
     if (path === 'movies/recommend' && req.method === 'POST') return this.recommend(user, body);
     if (path === 'movies/ott' && req.method === 'POST') return this.ott(body);
     if (path === 'school' && req.method === 'POST') return this.school(body);
+    if (path === 'bb/scan' && req.method === 'POST') return this.bbScan(user, body);
     if (path === 'nba/games' && req.method === 'GET') return this.nbaGames(new URL(req.url).searchParams.get('date'));
     if (path === 'nba/standings' && req.method === 'GET') return this.nbaStandings();
     if (path === 'nba/box' && req.method === 'GET') return this.nbaBox(new URL(req.url).searchParams);
@@ -1326,6 +1328,43 @@ export class Accounts extends DurableObject<Env> {
       }
     }
     return fail('NBA 공식 기록 서버가 지금 우리 서버에 답하지 않아서, 아래 Highlightly 기록으로 보여 줘요.', 502);
+  }
+
+  /** 홈코트 화면 사진 → 숫자 (Gemini 무료 모델 차례로. 문제 풀이와 같은 하루 한도를 같이 센다) */
+  private async bbScan(user: UserRow, b: Record<string, unknown>): Promise<Response> {
+    const img = b.image as { mime?: unknown; data?: unknown } | undefined;
+    const mime = typeof img?.mime === 'string' && /^image\/(jpeg|png|webp)$/.test(img.mime) ? img.mime : '';
+    const data = typeof img?.data === 'string' ? img.data : '';
+    if (!mime || !data || data.length > 1_500_000 || !/^[A-Za-z0-9+/=]+$/.test(data)) return fail('사진이 너무 크거나 잘못됐어요.', 413);
+    const key = this.keyOf('gemini');
+    if (!key) return fail('사진을 읽으려면 Gemini 키가 필요해요.', 503);
+    if (!this.gemList || Date.now() - this.gemList.at > DAY) this.gemList = { at: Date.now(), v: await geminiModels(key, this.gemFetch()) };
+    const chain = this.gemLeft(user.id)
+      .map((x) => x.model)
+      .filter((m) => !m.startsWith('gemma'));
+    if (!chain.length) return fail('오늘 Gemini 무료 사용량을 다 썼어요. 내일 다시 해 주세요.', 429);
+    const tried: string[] = [];
+    for (const m of chain.slice(0, 4)) {
+      try {
+        const res = await this.gemFetch()(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(m)}:generateContent`, {
+          method: 'POST',
+          headers: { 'content-type': 'application/json', 'x-goog-api-key': key },
+          body: JSON.stringify(hcBody(mime, data)),
+          signal: AbortSignal.timeout(60_000),
+        });
+        const j = (await res.json().catch(() => null)) as { error?: { message?: string } } | null;
+        if (!res.ok) {
+          const em = j?.error?.message ?? '';
+          if (res.status === 429 || res.status === 404) this.bumpGem(user.id, m, /per ?day|daily|PerDay/i.test(em) || res.status === 404);
+          throw new Error(`Gemini ${res.status}: ${em.slice(0, 80)}`);
+        }
+        this.bumpGem(user.id, m);
+        return json({ read: parseHc(readGemini(j)), model: m });
+      } catch (e) {
+        tried.push(`${m}: ${(e instanceof Error ? e.message : String(e)).slice(0, 80)}`);
+      }
+    }
+    return fail(`사진을 읽지 못했어요. (${tried.join(' / ').slice(0, 200)})`, 502);
   }
 
   /** 이번 시즌 모든 선수 경기당 평균 (선수 찾기 · 정렬용, 시즌 평균과 같은 표를 6시간 기억) */

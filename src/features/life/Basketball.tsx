@@ -8,6 +8,7 @@ import { put, remove, useStudy } from '../study/store';
 import { minutesText } from '../study/timer';
 import { BbGoals, ItemTrend, ShotSummary } from './BbStats';
 import { courtNames } from './bb';
+import { report } from './shots';
 import { confirmDelete, Empty, go, Icon, Sheet, tap, toast, useToday } from '../study/ui';
 
 const md = (x: string) => shortDate(x).replace(/\(.\)/, '');
@@ -176,6 +177,12 @@ function BbSheet({ item, today, onClose }: { item?: Workout; today: string; onCl
       blk: mode === 'game' ? num('blk') : undefined,
       court: court.trim().slice(0, 30) || undefined,
     };
+    // 홈코트 사진으로 넣은 슛 위치는 그대로 두고, 2점 · 3점 수도 슛 위치로 다시 센다
+    const hcShots = item?.bb?.shots;
+    if (hcShots?.length) {
+      const r = report(hcShots);
+      Object.assign(bb, { shots: hcShots, hc: item?.bb?.hc, fgm: r.two.m || undefined, fga: r.two.a || undefined, tpm: r.three.a ? r.three.m : undefined, tpa: r.three.a || undefined });
+    }
     put('workouts', { ...(item ?? { created: Date.now() }), id: item?.id ?? newId(), date, kind: '농구', minutes: m > 0 && m <= 1440 ? Math.round(m) : undefined, memo: memo.trim() || undefined, bb } as Workout);
     toast(item ? '고쳤어요' : '농구 기록을 넣었어요');
     onClose();

@@ -493,3 +493,17 @@ export const solveImgUrl = (key: string) => `/api/solve/img/${key}`;
 /** 풀이를 서버에 맡기기 (바로 돌아옴) · 끝났는지 묻기 */
 export const solveJobStart = (engine: SolveEngine, turns: SolveTurn[], jobId: string) => call<{ jobId: string }>('solve', 'POST', { engine, turns, jobId });
 export const solveJobGet = (jobId: string) => call<{ running?: boolean; step?: string; missing?: boolean; done?: boolean; code?: number; result?: unknown }>(`solve/job/${jobId}`);
+
+/** 홈코트 화면 사진 → 숫자 (서버 AI 가 읽음) */
+export interface HcRead {
+  kind: 'chart' | 'zones' | 'other';
+  when: string | null;
+  duration: string | null;
+  make: number | null;
+  attempt: number | null;
+  paint: number | null;
+  mid: number | null;
+  three: number | null;
+  zones: { made: number; att: number }[];
+}
+export const bbScan = (image: { mime: string; data: string }) => call<{ read: HcRead; model: string }>('bb/scan', 'POST', { image }, 90_000);

@@ -256,6 +256,7 @@ const ICON_PATHS: Record<string, string> = {
   up: 'M12 19V5M6 11l6-6 6 6',
   more: 'M6 12h.01M12 12h.01M18 12h.01',
   chevron: 'M9 6l6 6-6 6',
+  court: 'M4 4h16v16H4zM9.5 4v6h5V4M6 20a6 6 0 0 1 12 0',
 };
 
 /** 선 아이콘 (24×24) */

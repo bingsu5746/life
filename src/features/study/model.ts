@@ -478,6 +478,10 @@ export interface BasketballStat {
   items?: PracticeItem[];
   /** 코트 (어디서 했는지) */
   court?: string;
+  /** 슛 위치 (홈코트 사진에서): [가로 0~1000, 세로 0~1000(베이스라인이 0), 넣었으면 1] */
+  shots?: [number, number, 0 | 1][];
+  /** 홈코트 화면에 적힌 값 (페인트 · 미드레인지 · 3점 %, 걸린 초) */
+  hc?: { paint?: number; mid?: number; three?: number; secs?: number };
 }
 
 export interface PracticeItem {

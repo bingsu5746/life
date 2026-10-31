@@ -72,9 +72,10 @@ export const BASKETBALL_ITEMS: AreaItem[] = [
   { key: 'hobby', label: '취미', icon: 'area-hobby', to: '/hobby' },
   { key: 'drills', label: '농구 연습', icon: 'target', to: '/basketball/drills' },
   { key: 'log', label: '농구 기록', icon: 'ball', to: '/basketball' },
+  { key: 'shots', label: '슛 분석', icon: 'court', to: '/basketball/shots' },
   { key: 'nba', label: 'NBA', icon: 'game', to: '/basketball/nba' },
 ];
-export const basketballItem = (sub?: string) => (sub === 'drills' || sub === 'nba' ? sub : 'log');
+export const basketballItem = (sub?: string) => (sub === 'drills' || sub === 'nba' || sub === 'shots' ? sub : 'log');
 
 /** NBA 안에서의 메뉴 (농구로 돌아가기 + 경기 · 순위 · 로스터 · 선수) */
 export const NBA_ITEMS: AreaItem[] = [

@@ -41,6 +41,13 @@ function bbStat(v: unknown) {
     ftm: s('ftm'),
     fta: s('fta'),
     court: typeof v.court === 'string' && v.court.trim() ? v.court.trim().slice(0, 30) : undefined,
+    shots: Array.isArray(v.shots)
+      ? (v.shots as unknown[])
+          .filter((p): p is [number, number, number] => Array.isArray(p) && p.length === 3 && p.every((x) => Number.isInteger(x)) && p[0] >= 0 && p[0] <= 1000 && p[1] >= 0 && p[1] <= 1000 && (p[2] === 0 || p[2] === 1))
+          .slice(0, 2000)
+          .map((p) => [p[0], p[1], p[2] as 0 | 1] as [number, number, 0 | 1])
+      : undefined,
+    hc: isObj(v.hc) ? { paint: score(v.hc.paint, 0, 100), mid: score(v.hc.mid, 0, 100), three: score(v.hc.three, 0, 100), secs: score(v.hc.secs, 0, 86400) } : undefined,
     items: Array.isArray(v.items)
       ? v.items
           .filter((i): i is Obj => isObj(i) && typeof i.name === 'string' && !!i.name.trim())
