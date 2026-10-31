@@ -28,7 +28,6 @@ export function Home(_: { loggedIn: boolean; onLogin: () => void }) {
   // 공부 모드: 공부 · AI 카드와 공부에 필요한 칸만
   const show = (k: string) => !hidden.includes(k) && !homeHide.includes(k) && (!studyMode || STUDY_MODE_AREAS.includes(k));
   const on = (k: string) => !homeHide.includes(k) && (!studyMode || k === 'school');
-  const [editing, setEditing] = useState(false);
   const order = d.settings.homeOrder ?? [];
   const areaList = AREAS.filter((a) => a.key !== 'home' && !hidden.includes(a.key)).sort((a, b) => (order.indexOf(a.key) + 1 || 99) - (order.indexOf(b.key) + 1 || 99));
 
@@ -155,14 +154,6 @@ export function Home(_: { loggedIn: boolean; onLogin: () => void }) {
       )}
       {on('morning') && <MorningCard today={today} />}
       {on('school') && <SchoolHome today={today} />}
-      {!studyMode && (
-        <div className="hm-edit-row">
-          <button className="st-link" onClick={() => setEditing(!editing)}>
-            {editing ? '다 했어요' : '메인 화면 편집'}
-          </button>
-        </div>
-      )}
-      {editing && <HomeEdit list={areaList} />}
       <div className="hm-grid">
         {areaList
           .filter((a) => show(a.key))
@@ -331,6 +322,15 @@ function FactCard() {
 }
 
 /** 메인 화면 편집: 카드 순서(위 · 아래) · 보이기 · 숨기기, 다른 칸 보이기 · 숨기기 (모든 기기에 같이) */
+/** 설정 › 일반: 메인 화면 카드 순서 · 보이기 */
+export function HomeEditor() {
+  const d = useStudy();
+  const hidden = d.settings.hiddenAreas ?? [];
+  const order = d.settings.homeOrder ?? [];
+  const list = AREAS.filter((a) => a.key !== 'home' && !hidden.includes(a.key)).sort((a, b) => (order.indexOf(a.key) + 1 || 99) - (order.indexOf(b.key) + 1 || 99));
+  return <HomeEdit list={list} />;
+}
+
 function HomeEdit({ list }: { list: { key: string; label: string }[] }) {
   const d = useStudy();
   const hide = d.settings.homeHide ?? [];

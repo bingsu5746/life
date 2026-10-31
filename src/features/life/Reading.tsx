@@ -76,9 +76,6 @@ export function ReadingPage() {
         </div>
       ) : !list.length ? (
         <Empty title={all.length ? '이 칸에는 책이 없어요' : '읽는 책을 넣어 보세요'}>
-          <button className="btn btn-primary" onClick={() => setEdit({ status: tab })}>
-            책 넣기
-          </button>
         </Empty>
       ) : (
         <div className="mv-list">

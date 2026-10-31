@@ -1,5 +1,6 @@
 // 공부 설정: 과목 · 시험 · 쉬는 날 · 과외 날 비율 · 복습 간격 · 타이머
 import { useState } from 'react';
+import { HomeEditor } from '../life/Home';
 import { shortDate } from './dates';
 import { alive, newId, SUBJECT_COLORS, type StudyData, type Subject } from './model';
 import { exportBackup, importBackup } from './backup';
@@ -32,6 +33,8 @@ export function Settings({ cat: cat0 }: { cat?: string }) {
 
       {cat === 'general' && (
         <>
+          <h3 className="st-h">메인 화면</h3>
+          <HomeEditor />
           <section className="st-card st-form">
             <h3 className="st-h">화면</h3>
             <div className="st-seg" role="radiogroup" aria-label="화면 밝기">

@@ -173,9 +173,6 @@ function HobbyMain({ sub, view }: { sub?: string; view: 'main' | 'wish' }) {
       {view === 'main' && !hobbies.length && (
         <Empty icon="🎸" title="좋아하는 취미를 만들어 보세요">
           <p>기타·그림·게임처럼 꾸준히 하고 싶은 것을 만들고 한 시간을 적어 두면, 한 주를 돌아볼 때 보여 드려요.</p>
-          <button className="btn btn-primary" onClick={() => setHobbyEdit('new')}>
-            취미 만들기
-          </button>
         </Empty>
       )}
 

@@ -63,9 +63,6 @@ export function Travel() {
           )}
       {map ? null : !list.length ? (
         <Empty title={tab === 'want' ? '가 보고 싶은 곳을 모아 두세요' : '다녀온 곳을 남겨 보세요'}>
-          <button className="btn btn-primary" onClick={() => setEdit({ status: tab, kind: 'food' })}>
-            장소 넣기
-          </button>
         </Empty>
       ) : (
         [...groups].map(([region, ps]) => (

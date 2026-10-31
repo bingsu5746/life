@@ -103,9 +103,6 @@ export function Movies({ sub }: { sub?: string }) {
       {mineSub === 'watched' &&
         (!watched.length ? (
           <Empty title="본 영화를 기록해 보세요">
-            <button className="btn btn-primary" onClick={() => setEdit({ status: 'watched' })}>
-              본 영화 넣기
-            </button>
           </Empty>
         ) : (
           <>
@@ -207,9 +204,6 @@ export function Movies({ sub }: { sub?: string }) {
       {mineSub === 'want' &&
         (!want.length ? (
           <Empty title="보고 싶은 영화가 없어요">
-            <button className="btn btn-primary" onClick={() => setEdit({ status: 'want' })}>
-              보고 싶은 영화 넣기
-            </button>
           </Empty>
         ) : (
           <div className="mv-list">

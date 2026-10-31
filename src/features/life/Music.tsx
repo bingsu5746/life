@@ -93,9 +93,6 @@ export function Music(_: { sub?: string }) {
       {!list.length ? (
         <Empty title={tab === 'have' ? '가진 LP를 넣어 보세요' : '사고 싶은 음반을 적어 두세요'}>
           <p>{tab === 'have' ? '앨범 · 아티스트 · 산 값을 적고, 들을 때마다 「들었어요」를 누르면 많이 들은 판이 보여요.' : '레코드 가게에서 찾을 판을 적어 두고, 사면 「샀어요」로 옮겨요.'}</p>
-          <button className="btn btn-primary" onClick={() => setEdit({ status: tab, format: 'lp' })}>
-            음반 넣기
-          </button>
         </Empty>
       ) : (
         <div className="lp-grid">
