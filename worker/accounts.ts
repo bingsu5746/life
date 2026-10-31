@@ -26,6 +26,7 @@ import { hcBody, parseHc } from './homecourt';
 import { diaryBody, noteBody, parseDiary, parseNote, parseReceipt, parseTocRead, receiptBody, tocBody } from './aiRead';
 import { seojiSearch, seojiToc, yes24Search } from './books';
 import { cheapShark } from './cheapshark';
+import { discordChannels, discordInfo, discordMessages, discordSend } from './discord';
 import { lolMetaTables, lolMetaTick, metaChamp, metaPatches, metaTable } from './lolMeta';
 import { lolNewGames, lolOlderGames, lolProfile, RiotError, type LolGame } from './lol';
 import { krPrices, steamAchievements, steamMe, storeItems, storeNames, storeSearch, wishlist, type KrPrice } from './steam';
@@ -259,6 +260,7 @@ export class Accounts extends DurableObject<Env> {
     if (path === 'movies/ott' && req.method === 'POST') return this.ott(body);
     if (path === 'school' && req.method === 'POST') return this.school(body);
     if (path === 'keys' && req.method === 'GET') return this.keysInfo();
+    if (path.startsWith('discord/')) return this.discordRoute(req, path, user, body);
     if (path === 'games/csmap' && req.method === 'GET')
       return this.csMap(
         (new URL(req.url).searchParams.get('ids') ?? '')
@@ -1763,6 +1765,46 @@ export class Accounts extends DurableObject<Env> {
     const cid = Number(q.get('cid'));
     if (!Number.isInteger(cid) || cid <= 0) return fail('챔피언을 확인해 주세요.');
     return json({ patch, patches, status, ...metaChamp(this.sql, patch, cid) });
+  }
+
+  /** Discord 봇 (수학 서버). 가족 서버 글이라, 처음 연결한 계정만 쓸 수 있다 */
+  private async discordRoute(req: Request, path: string, user: UserRow, body: Record<string, unknown>): Promise<Response> {
+    const token = this.secret('discord', 'discordtoken', 'discordbot', 'discordbottoken');
+    if (!token) return fail('Discord 봇 토큰이 아직 등록되지 않았어요.', 503);
+    const owner = this.cacheGet('discord:owner');
+    if (owner && owner !== String(user.id)) return fail('이 Discord 봇은 다른 계정에 연결돼 있어요.', 403);
+    // 처음으로 채널을 연 계정이 주인이 된다 (토큰 확인만 하는 info 는 주인을 정하지 않음)
+    if (!owner && path !== 'discord/info') this.cacheSet('discord:owner', String(user.id));
+    const q = new URL(req.url).searchParams;
+    const id = (x: unknown) => (typeof x === 'string' && /^\d{5,25}$/.test(x) ? x : '');
+    const err = (e: unknown) => {
+      const msg = e instanceof Error ? e.message : String(e);
+      const why = /401/.test(msg) ? '봇 토큰이 맞지 않아요. 개발자 포털 Bot 메뉴의 Token 을 다시 넣어 주세요.' : /403/.test(msg) ? '봇에게 이 채널 권한이 없어요.' : /404/.test(msg) ? '채널이나 서버를 찾지 못했어요. 봇이 서버에 들어가 있는지 확인해 주세요.' : '';
+      return fail(`${why || 'Discord 에 연결하지 못했어요.'} (${msg.slice(0, 100)})`, 502);
+    };
+    try {
+      if (path === 'discord/info' && req.method === 'GET') return json(await discordInfo(token));
+      if (path === 'discord/channels' && req.method === 'GET') {
+        const g = id(q.get('guild'));
+        if (!g) return fail('서버를 확인해 주세요.');
+        return json({ channels: await discordChannels(token, g) });
+      }
+      if (path === 'discord/msgs' && req.method === 'GET') {
+        const c = id(q.get('channel'));
+        if (!c) return fail('채널을 확인해 주세요.');
+        return json({ msgs: await discordMessages(token, c, id(q.get('before')) || undefined) });
+      }
+      if (path === 'discord/send' && req.method === 'POST') {
+        const c = id(body.channel);
+        const text = typeof body.text === 'string' ? body.text.trim() : '';
+        if (!c || !text) return fail('채널과 내용을 확인해 주세요.');
+        await discordSend(token, c, text);
+        return json({ ok: true });
+      }
+    } catch (e) {
+      return err(e);
+    }
+    return fail('없는 요청이에요.', 404);
   }
 
   /** 어떤 서비스 키가 등록돼 있는지만 (값은 보내지 않음) */
