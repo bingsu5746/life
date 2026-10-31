@@ -491,7 +491,7 @@ export const solveUsage = () => call<{ available: SolveEngine[]; vision?: Record
 export const solveImgPut = (mime: string, data: string) => call<{ key: string }>('solve/img', 'POST', { mime, data });
 export const solveImgUrl = (key: string) => `/api/solve/img/${key}`;
 /** 풀이를 서버에 맡기기 (바로 돌아옴) · 끝났는지 묻기 */
-export const solveJobStart = (engine: SolveEngine, turns: SolveTurn[], jobId: string) => call<{ jobId: string }>('solve', 'POST', { engine, turns, jobId });
+export const solveJobStart = (engine: SolveEngine, turns: SolveTurn[], jobId: string, web = false) => call<{ jobId: string }>('solve', 'POST', { engine, turns, jobId, ...(web ? { web: true } : {}) });
 export const solveJobGet = (jobId: string) => call<{ running?: boolean; step?: string; missing?: boolean; done?: boolean; code?: number; result?: unknown }>(`solve/job/${jobId}`);
 
 /** 홈코트 화면 사진 → 숫자 (서버 AI 가 읽음) */
@@ -522,3 +522,22 @@ export async function bbScan(image: { mime: string; data: string }): Promise<{ r
   }
   throw new Error('사진 읽기가 너무 오래 걸려요. 다시 해 주세요.');
 }
+
+/** Discogs 음반 찾기 (2000년 이후 · 모은 사람 100명 넘는 것, 인기 순) */
+export interface DiscogsHit {
+  id: number;
+  artist: string;
+  title: string;
+  year: number;
+  cover: string;
+  genre: string[];
+  style: string[];
+  have: number;
+  want: number;
+}
+export const discogsSearch = (q: string) => call<{ list: DiscogsHit[] }>(`music/discogs?q=${encodeURIComponent(q)}`, 'GET', undefined, 25_000);
+/** 등록된 서비스 키 (있는지만) */
+export const keysInfo = () => call<{ serpapi: boolean; serpUsed: number; discogs: boolean; datagokr: boolean; gemini: boolean }>('keys');
+/** 응원팀 경기 알림 (시작 · 끝). subs: 이 계정에 알림을 받는 기기 수 */
+export const nbaFavGet = () => call<{ team: string; subs: number }>('nba/fav');
+export const nbaFavSet = (team: string) => call<{ team: string; subs: number }>('nba/fav', 'PUT', { team });

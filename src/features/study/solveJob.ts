@@ -30,6 +30,8 @@ export const CHATS_KEY = 'my-study.solve.chats';
 const JOB_KEY = 'my-study.solve.job';
 const COOL_KEY = 'my-study.solve.cool';
 const DUR_KEY = 'my-study.solve.durations';
+/** 웹 검색 참고(SerpApi) 켜기 */
+export const WEB_KEY = 'my-study.solve.web';
 
 export const load = <T>(k: string, fb: T): T => {
   try {
@@ -154,7 +156,7 @@ export async function startSolve(engine: SolveEngine, chat: Chat) {
   const hasImage = !!lastMsg?.images?.length || !!lastMsg?.imgKeys?.length;
   setJob({ id, engine, chat, startedAt: Date.now(), estimate: estimateMs(engine, hasImage), hasImage, status: 'running' });
   try {
-    await solveJobStart(engine, turnsOf(chat.msgs), id);
+    await solveJobStart(engine, turnsOf(chat.msgs), id, load<boolean>(WEB_KEY, false));
   } catch (e) {
     finish(e instanceof Error ? e.message : '풀지 못했어요', e instanceof ApiError ? e.status : 0);
     return;

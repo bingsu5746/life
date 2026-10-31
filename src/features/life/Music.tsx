@@ -5,7 +5,7 @@ import { alive, newId, type MusicRecord } from '../study/model';
 import { put, remove, useStudy } from '../study/store';
 import { confirmDelete, Empty, Field, Icon, Sheet, tap, toast, useToday } from '../study/ui';
 import { won } from './calc';
-import { isLoggedIn, musicSimilar } from '../auth/api';
+import { discogsSearch, isLoggedIn, musicSimilar, type DiscogsHit } from '../auth/api';
 import { StarInput, starText } from './MovieParts';
 import { NameSearch } from './NameSearch';
 
@@ -100,9 +100,13 @@ export function Music(_: { sub?: string }) {
         <div className="lp-grid">
           {list.map((r) => (
             <article key={r.id} className="lp-card st-tap" {...tap(() => setEdit(r))}>
-              <div className="lp-disc" aria-hidden>
-                <i />
-              </div>
+              {r.cover ? (
+                <img className="lp-cover" src={r.cover} alt="" loading="lazy" />
+              ) : (
+                <div className="lp-disc" aria-hidden>
+                  <i />
+                </div>
+              )}
               <div className="lp-info">
                 <b>{r.title}</b>
                 <span>{r.artist}</span>
@@ -134,9 +138,78 @@ export function Music(_: { sub?: string }) {
           ))}
         </div>
       )}
+      {isLoggedIn() && <DiscogsFind have={all} />}
       {tab === 'have' && have.length > 0 && <MusicRec onPick={(artist) => setEdit({ status: 'want', format: 'lp', artist })} />}
       {edit && <RecordSheet item={edit} today={today} onClose={() => setEdit(null)} />}
     </div>
+  );
+}
+
+/** Discogs 에서 음반 찾기 → 가진 음반 · 사고 싶어요에 바로 넣기 (2000년 이후, 모은 사람이 많은 순) */
+function DiscogsFind({ have }: { have: MusicRecord[] }) {
+  const [q, setQ] = useState('');
+  const [list, setList] = useState<DiscogsHit[] | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState('');
+  const find = async () => {
+    if (q.trim().length < 2 || busy) return;
+    setBusy(true);
+    setErr('');
+    try {
+      setList((await discogsSearch(q.trim())).list);
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : '찾지 못했어요');
+    } finally {
+      setBusy(false);
+    }
+  };
+  const add = (h: DiscogsHit, status: MusicRecord['status']) => {
+    const same = have.find((r) => r.discogsId === h.id || (r.title.toLowerCase() === h.title.toLowerCase() && r.artist.toLowerCase() === h.artist.toLowerCase()));
+    if (same) return toast(`이미 ${same.status === 'have' ? '내 음반' : '사고 싶어요'}에 있어요`);
+    put('records', { id: newId(), created: Date.now(), title: h.title, artist: h.artist, format: 'lp', status, year: h.year || undefined, cover: h.cover || undefined, discogsId: h.id, genre: [...h.genre, ...h.style].slice(0, 3).join(', ') || undefined } as MusicRecord);
+    toast(status === 'have' ? '내 음반에 넣었어요' : '사고 싶어요에 넣었어요');
+  };
+  return (
+    <section className="st-card">
+      <h3 className="st-h">음반 찾기 (Discogs)</h3>
+      <form
+        className="st-inline"
+        onSubmit={(e) => {
+          e.preventDefault();
+          void find();
+        }}
+      >
+        <input className="st-input" value={q} onChange={(e) => setQ(e.target.value)} placeholder="가수나 앨범 이름 (영어가 잘 찾아져요)" aria-label="찾을 음반" />
+        <button className="btn btn-sm btn-primary" disabled={busy || q.trim().length < 2}>
+          {busy ? '찾는 중…' : '찾기'}
+        </button>
+      </form>
+      {err && <p className="st-muted sm">{err}</p>}
+      {list && !list.length && <p className="st-muted sm">2000년 이후에 나온, 많이 모은 음반 중에는 없어요.</p>}
+      {list && list.length > 0 && (
+        <div className="dg-list">
+          {list.map((h) => (
+            <div key={h.id} className="dg-item">
+              {h.cover ? <img src={h.cover} alt="" loading="lazy" /> : <span className="dg-noimg" aria-hidden />}
+              <div className="dg-info">
+                <b>{h.title}</b>
+                <span>{h.artist}</span>
+                <small className="st-muted">{[h.year, h.genre[0], `${h.have.toLocaleString('ko-KR')}명이 가짐`].filter(Boolean).join(' · ')}</small>
+              </div>
+              <div className="dg-btns">
+                <button className="btn btn-sm" onClick={() => add(h, 'have')}>
+                  가졌어요
+                </button>
+                <button className="btn btn-sm" onClick={() => add(h, 'want')}>
+                  사고 싶어요
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+      <p className="st-muted sm">정보 출처: Discogs</p>
+    </section>
   );
 }
 
@@ -253,7 +326,8 @@ function RecordSheet({ item, today, onClose }: { item: Partial<MusicRecord>; tod
         </div>
         <div className="st-inline wrap">
           <input className="st-input xs" inputMode="numeric" value={year} onChange={(e) => setYear(e.target.value.replace(/\D/g, '').slice(0, 4))} placeholder="발매 연도" aria-label="발매 연도" />
-          <input className="st-input sm" inputMode="numeric" value={price} onChange={(e) => setPrice(e.target.value.replace(/\D/g, '') ? Number(e.target.value.replace(/\D/g, '').slice(0, 9)).toLocaleString('ko-KR') : '')} placeholder={status === 'want' ? '예상 값' : '산 값'} aria-label="값 (원)" />원
+          <input className="st-input sm" inputMode="numeric" value={price} onChange={(e) => setPrice(e.target.value.replace(/\D/g, '') ? Number(e.target.value.replace(/\D/g, '').slice(0, 9)).toLocaleString('ko-KR') : '')} placeholder={status === 'want' ? '예상 값' : '산 값'} aria-label="값 (원)" />
+          원
         </div>
         {status === 'have' && (
           <>
@@ -278,7 +352,11 @@ function RecordSheet({ item, today, onClose }: { item: Partial<MusicRecord>; tod
           </>
         )}
         <textarea className="st-input" rows={3} value={note} onChange={(e) => setNote(e.target.value)} placeholder="좋아하는 곡 · 메모" aria-label="메모" />
-        {item.listens && item.listens.length > 0 && <small className="st-muted">들은 날 {item.listens.length}번 · 마지막 {shortDate(item.listens[item.listens.length - 1])}</small>}
+        {item.listens && item.listens.length > 0 && (
+          <small className="st-muted">
+            들은 날 {item.listens.length}번 · 마지막 {shortDate(item.listens[item.listens.length - 1])}
+          </small>
+        )}
         <div className="st-row end">
           {item.id && (
             <button className="btn btn-sm st-danger" onClick={() => confirmDelete(`「${item.title}」`) && (remove('records', item.id!), onClose())}>

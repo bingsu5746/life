@@ -1,11 +1,12 @@
 // 문제 풀이: AI 대화 화면. ＋ 로 사진 넣기 · 모델 고르기 · 보내기. 대화는 이 기기에만 저장(글만)
 import { useEffect, useRef, useState } from 'react';
-import { isLoggedIn, solveImgPut, solveImgUrl, solveUsage, type SolveEngine, type SolveTurn } from '../auth/api';
-import { coolLeft, getSolveJob, load, markJobSeen, migrateChats, saveChat, startSolve, useSolveJob, type Chat, type Msg } from './solveJob';
+import { isLoggedIn, keysInfo, solveImgPut, solveImgUrl, solveUsage, type SolveEngine, type SolveTurn } from '../auth/api';
+import { coolLeft, getSolveJob, load, markJobSeen, migrateChats, saveChat, startSolve, useSolveJob, WEB_KEY, type Chat, type Msg } from './solveJob';
 import { MathText } from '../../lib/mathText';
 import { compressForStorage, compressProblemImage } from '../../lib/imageCompress';
 import { Icon, Sheet, subjectsOf, SubjectDot, toast, useNow } from './ui';
-import { useStudy } from './store';
+import { put, useStudy } from './store';
+import { newId } from './model';
 import { guessNoteSubject } from './mistakes';
 
 const ENGINES: { key: SolveEngine; name: string; desc: string }[] = [
@@ -193,6 +194,37 @@ export function Solve({ open }: { open?: string }) {
     void ask(engine, next);
   }
 
+  /** AI 답을 오답 노트로 (질문 글 + 답). 과목은 이 대화의 과목 → 짐작 → 없으면 고르라고 */
+  function toNote(i: number) {
+    const q = [...chat.msgs.slice(0, i)].reverse().find((x) => x.role === 'user');
+    const sid = (chat.subjectId && d.subjects[chat.subjectId] && !d.subjects[chat.subjectId].deleted ? chat.subjectId : undefined) ?? guessNoteSubject(d, Date.now(), undefined, q?.text ?? chat.title)?.id;
+    if (!sid) return toast('위에서 과목을 먼저 골라 주세요');
+    const hasImg = !!(q?.imgKeys?.length || q?.images?.length);
+    const today = new Date(Date.now() + 9 * 3600_000).toISOString().slice(0, 10);
+    put('notes', {
+      id: newId(),
+      created: Date.now(),
+      box: 1,
+      due: today,
+      wrong: 1,
+      subjectId: sid,
+      question: [chat.title, q?.text].filter(Boolean).join('\n').slice(0, 4000) || '(사진 문제)',
+      photos: [],
+      myAnswer: '',
+      answer: chat.msgs[i].text.slice(0, 8000),
+      reason: null,
+      memo: hasImg ? 'AI 풀이에서 넣음 · 문제 사진은 저장소 › AI 풀이에 있어요' : 'AI 풀이에서 넣음',
+    });
+    toast('오답 노트에 넣었어요');
+  }
+  /** 같은 개념으로 비슷한 문제 하나 더 */
+  function similar() {
+    if (job?.status === 'running') return toast('다른 문제를 푸는 중이에요');
+    const next: Chat = { ...chat, msgs: [...chat.msgs, { role: 'user', text: '방금 문제와 같은 개념 · 비슷한 난이도로 새 문제 1개를 내 주세요. 문제만 먼저 쓰고, 정답과 풀이는 맨 아래 「정답과 풀이」 제목 아래에 따로 써 주세요.' }] };
+    setChat(next);
+    void ask(engine, next);
+  }
+
   /** 대화(마지막이 질문)를 그 모델로 서버에 맡긴다. 끝나면 위의 useEffect 가 받아 붙인다 */
   async function ask(eng: SolveEngine, next: Chat) {
     setBusy('');
@@ -240,6 +272,14 @@ export function Solve({ open }: { open?: string }) {
                   <button className="st-link" onClick={() => void navigator.clipboard?.writeText(m.text).then(() => toast('복사했어요'))}>
                     복사
                   </button>
+                  <button className="st-link" onClick={() => toNote(i)}>
+                    오답 노트에
+                  </button>
+                  {i === chat.msgs.length - 1 && !solving && !busy && (
+                    <button className="st-link" onClick={() => similar()}>
+                      비슷한 문제 내 줘
+                    </button>
+                  )}
                 </div>
               )}
               {!m.error && typeof m.ms === 'number' && <small className="sv-took">{tookText(m.ms)} 걸림</small>}
@@ -374,6 +414,7 @@ export function Solve({ open }: { open?: string }) {
                 </span>
               </button>
             ))}
+            <WebToggle />
             {usage?.r2 && (
               <div className="sv-r2">
                 사진 저장소 {(usage.r2.bytes / 1024 ** 2).toFixed(1)}MB / {(usage.r2.free.bytes / 1024 ** 3).toFixed(0)}GB · 이번 달 올리기 {usage.r2.a.toLocaleString('ko-KR')} / {usage.r2.free.a.toLocaleString('ko-KR')} · 보기 {usage.r2.b.toLocaleString('ko-KR')} /{' '}
@@ -433,4 +474,40 @@ function Elapsed({ from }: { from: number }) {
 function tookText(ms: number) {
   const sec = Math.max(1, Math.round(ms / 1000));
   return sec < 60 ? `${sec}초` : `${Math.floor(sec / 60)}분${sec % 60 ? ` ${sec % 60}초` : ''}`;
+}
+
+/** 웹 검색 참고 (SerpApi): 키가 있을 때만. 사이트 전체로 한 달 240번 (무료 250번) */
+function WebToggle() {
+  const [info, setInfo] = useState<{ serpapi: boolean; serpUsed: number } | null>(null);
+  const [on, setOn] = useState(() => load<boolean>(WEB_KEY, false));
+  useEffect(() => {
+    let live = true;
+    keysInfo()
+      .then((r) => live && setInfo(r))
+      .catch(() => {});
+    return () => {
+      live = false;
+    };
+  }, []);
+  if (!info?.serpapi) return null;
+  return (
+    <label className="st-toggle sv-web">
+      <input
+        type="checkbox"
+        checked={on}
+        onChange={(e) => {
+          setOn(e.target.checked);
+          try {
+            localStorage.setItem(WEB_KEY, JSON.stringify(e.target.checked));
+          } catch {
+            /* 무시 */
+          }
+        }}
+      />
+      <span>
+        <b>웹 검색 참고</b>
+        <small className="st-muted"> 글로 물은 질문을 구글에서 먼저 찾아보고 AI 에게 같이 줘요 (사진만 있으면 안 함) · 이번 달 {info.serpUsed}/240번</small>
+      </span>
+    </label>
+  );
 }

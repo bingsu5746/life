@@ -26,6 +26,8 @@ import {
   type NbaLine,
   type NbaStanding,
   type NbaTeam,
+  nbaFavGet,
+  nbaFavSet,
 } from '../auth/api';
 import { addDays, longDate } from '../study/dates';
 import { go, Sheet, toast } from '../study/ui';
@@ -214,6 +216,22 @@ function Games() {
   const fav = readFav();
   const today = usToday();
   const anyLive = !!games?.some(isLive);
+  const [alert, setAlert] = useState<{ team: string; subs: number } | null>(null);
+  useEffect(() => {
+    if (!fav) return;
+    nbaFavGet()
+      .then(setAlert)
+      .catch(() => {});
+  }, [fav]);
+  const toggleAlert = async () => {
+    try {
+      const r = await nbaFavSet(alert?.team ? '' : fav);
+      setAlert(r);
+      toast(r.team ? `${fav} 경기가 시작하고 끝나면 알려 드려요${r.subs ? '' : ' (설정 › 알림을 먼저 켜야 받을 수 있어요)'}` : '응원팀 경기 알림을 껐어요');
+    } catch (e) {
+      toast(e instanceof Error ? e.message : '바꾸지 못했어요');
+    }
+  };
 
   const [tick, setTick] = useState(0);
   // 날짜가 바뀌면 처음부터, tick 이 바뀌면(경기 중 1분마다) 그대로 둔 채 새로
@@ -243,6 +261,15 @@ function Games() {
 
   return (
     <>
+      {fav && alert && (
+        <label className="st-toggle nba-alert">
+          <input type="checkbox" checked={!!alert.team} onChange={() => void toggleAlert()} />
+          <span>
+            <b>★ {fav} 경기 알림</b>
+            <small className="st-muted"> 경기가 시작할 때와 끝날 때(점수) 알려 줘요{alert.team && !alert.subs ? ' · 설정 › 알림을 켜야 받을 수 있어요' : ''}</small>
+          </span>
+        </label>
+      )}
       <div className="nba-days">
         <button className="btn btn-sm" aria-label="전날" onClick={() => setDate(addDays(date, -1))}>
           ‹
@@ -425,6 +452,10 @@ function GamePage({ id }: { id: number }) {
       /* 무시 */
     }
     toast(next ? `${abbr} 을 응원팀으로 정했어요` : '응원팀을 지웠어요');
+    // 경기 알림을 켜 뒀으면 새 응원팀으로 바꾼다
+    void nbaFavGet()
+      .then((r) => (r.team ? nbaFavSet(next) : r))
+      .catch(() => {});
   };
   const season = g?.season ?? (g ? (Number(g.date.slice(5, 7)) >= 9 ? Number(g.date.slice(0, 4)) : Number(g.date.slice(0, 4)) - 1) : 0);
   const st = g ? statusText(g) : null;

@@ -251,6 +251,9 @@ export class Accounts extends DurableObject<Env> {
     if (path === 'movies/recommend' && req.method === 'POST') return this.recommend(user, body);
     if (path === 'movies/ott' && req.method === 'POST') return this.ott(body);
     if (path === 'school' && req.method === 'POST') return this.school(body);
+    if (path === 'keys' && req.method === 'GET') return this.keysInfo();
+    if (path === 'nba/fav' && (req.method === 'GET' || req.method === 'PUT')) return this.nbaFav(req, user, body);
+    if (path === 'music/discogs' && req.method === 'GET') return this.discogs((new URL(req.url).searchParams.get('q') ?? '').trim().slice(0, 80));
     if (path === 'bb/scan' && req.method === 'POST') return this.bbScan(user, body);
     if (path.startsWith('bb/scan/') && req.method === 'GET') return this.bbScanGet(user, path.slice('bb/scan/'.length));
     if (path === 'nba/games' && req.method === 'GET') return this.nbaGames(new URL(req.url).searchParams.get('date'));
@@ -383,6 +386,15 @@ export class Accounts extends DurableObject<Env> {
   /** Gemini 는 미국 중계 서버를 거쳐 보낸다 (지원 지역 문제) */
   private gemFetch(): typeof fetch {
     return relayFetch((this.env as unknown as { RELAY?: DurableObjectNamespace<Relay> }).RELAY);
+  }
+
+  /** 이름을 정확히 모르는 비밀값 찾기: 대소문자 · _ · - 무시하고 후보 이름과 같은 것 */
+  private secret(...names: string[]): string | undefined {
+    const env = this.env as unknown as Record<string, unknown>;
+    const n = (x: string) => x.toLowerCase().replace(/[^a-z0-9]/g, '');
+    const want = names.map(n);
+    for (const k of Object.keys(env)) if (want.includes(n(k)) && typeof env[k] === 'string' && (env[k] as string).trim()) return (env[k] as string).trim();
+    return undefined;
   }
 
   private keyOf(engine: Engine): string | undefined {
@@ -662,6 +674,16 @@ export class Accounts extends DurableObject<Env> {
     if (wait) return fail(`너무 자주 물었어요. ${wait}초 뒤에 다시 해 주세요.`, 429);
     const key = this.keyOf(engine);
     if (!key) return fail('이 모델의 키가 아직 없어요.', 503);
+    // 웹 검색 참고 (SerpApi, 사이트 전체 한 달 240번까지): 마지막 질문 글로 구글 검색 → 결과 몇 개를 질문 뒤에 붙인다
+    if (b.web === true) {
+      const last = turns[turns.length - 1];
+      const q = last.text.replace(/\s+/g, ' ').trim().slice(0, 200);
+      if (q.length >= 4) {
+        step('웹에서 찾아보는 중');
+        const found = await this.webSearch(q).catch((e) => (console.error('serp failed', e instanceof Error ? e.message : String(e)), null));
+        if (found?.length) last.text += `\n\n[웹 검색 결과 — 참고용이에요. 틀릴 수 있으니 풀이는 직접 확인하고, 참고했다면 어느 결과인지 밝혀 주세요]\n${found.map((r, i) => `${i + 1}. ${r.title} — ${r.snippet} (${r.link})`).join('\n')}`;
+      }
+    }
     let needImage = turns.some((t) => t.images?.length);
     /** 저장소에서 꺼낸 사진(이어서 묻기)은 사진을 못 읽는 모델이면 빼고 글만 보낸다 */
     const dropStored = () => {
@@ -1331,6 +1353,82 @@ export class Accounts extends DurableObject<Env> {
     return fail('NBA 공식 기록 서버가 지금 우리 서버에 답하지 않아서, 아래 Highlightly 기록으로 보여 줘요.', 502);
   }
 
+  /** 구글 검색 (SerpApi). 사이트 전체로 한 달 240번까지 (무료 250번) */
+  private async webSearch(q: string): Promise<{ title: string; snippet: string; link: string }[] | null> {
+    const key = this.secret('serpapi', 'serpapikey', 'serp', 'serpkey', 'serpapiapikey');
+    if (!key) return null;
+    const mk = `serp:${new Date().toISOString().slice(0, 7)}`;
+    const used = Number(this.cacheGet(mk) ?? 0);
+    if (used >= 240) return null;
+    this.cacheSet(mk, String(used + 1));
+    const res = await within(fetch(`https://serpapi.com/search.json?${new URLSearchParams({ engine: 'google', q, hl: 'ko', gl: 'kr', num: '5', api_key: key })}`), 15_000, 'SerpApi');
+    if (!res.ok) throw new Error(`SerpApi ${res.status}`);
+    const j = (await res.json()) as { answer_box?: { title?: string; answer?: string; snippet?: string; link?: string }; organic_results?: { title?: string; snippet?: string; link?: string }[] };
+    const out: { title: string; snippet: string; link: string }[] = [];
+    const ab = j.answer_box;
+    if (ab && (ab.answer || ab.snippet)) out.push({ title: ab.title ?? '바로 답', snippet: String(ab.answer ?? ab.snippet).slice(0, 300), link: ab.link ?? '' });
+    for (const r of j.organic_results ?? []) if (r.title && r.snippet) out.push({ title: r.title.slice(0, 120), snippet: r.snippet.slice(0, 300), link: r.link ?? '' });
+    return out.slice(0, 5);
+  }
+
+  /** 음반 찾기 (Discogs, 키 · 비밀은 Cloudflare 비밀값). 2000년 이후 · 모은 사람 100명 넘는 것만, 인기 순 */
+  private async discogs(q: string): Promise<Response> {
+    if (q.length < 2) return fail('찾을 음반이나 가수를 넣어 주세요.');
+    const key = this.secret('discogskey', 'discogsconsumerkey', 'discogsuserkey', 'discogsapikey');
+    const sec = this.secret('discogssecret', 'discogsconsumersecret', 'discogsusersecret', 'discogsapisecret');
+    const token = this.secret('discogs', 'discogstoken', 'discogsusertoken', 'discogspersonaltoken', 'discogsaccesstoken');
+    const auth = key && sec ? `Discogs key=${key}, secret=${sec}` : token ? `Discogs token=${token}` : '';
+    if (!auth) return fail('Discogs 키가 아직 없어요.', 503);
+    const ck = `discogs:${q.toLowerCase()}`;
+    const c = this.cacheGet(ck);
+    if (c) {
+      const v = JSON.parse(c) as { at: number; list: unknown[] };
+      if (Date.now() - v.at < 7 * DAY) return json({ list: v.list });
+    }
+    try {
+      const res = await within(fetch(`https://api.discogs.com/database/search?${new URLSearchParams({ q, type: 'master', per_page: '50' })}`, { headers: { authorization: auth, 'user-agent': 'LifeApp/1.0 +https://life.silent-recipe-8e5c.workers.dev' } }), 15_000, 'Discogs');
+      if (!res.ok) throw new Error(`Discogs ${res.status}`);
+      const j = (await res.json()) as { results?: { id?: number; title?: string; year?: string; cover_image?: string; thumb?: string; genre?: string[]; style?: string[]; community?: { have?: number; want?: number } }[] };
+      const list = (j.results ?? [])
+        .map((r) => {
+          const [artist, ...rest] = (r.title ?? '').split(' - ');
+          return {
+            id: r.id ?? 0,
+            artist: rest.length ? artist.replace(/\s*\(\d+\)$/, '').replace(/\*$/, '') : '',
+            title: rest.length ? rest.join(' - ') : artist,
+            year: Number(r.year) || 0,
+            cover: r.cover_image || r.thumb || '',
+            genre: (r.genre ?? []).slice(0, 3),
+            style: (r.style ?? []).slice(0, 3),
+            have: r.community?.have ?? 0,
+            want: r.community?.want ?? 0,
+          };
+        })
+        .filter((r) => r.id && r.year >= 2000 && r.have >= 100)
+        .sort((a, b) => b.have - a.have)
+        .slice(0, 20);
+      this.cacheSet(ck, JSON.stringify({ at: Date.now(), list }));
+      return json({ list });
+    } catch (e) {
+      return fail(`음반을 찾지 못했어요. (${(e instanceof Error ? e.message : String(e)).slice(0, 80)})`, 502);
+    }
+  }
+
+  /** 어떤 서비스 키가 등록돼 있는지만 (값은 보내지 않음) */
+  private keysInfo(): Response {
+    const used = Number(this.cacheGet(`serp:${new Date().toISOString().slice(0, 7)}`) ?? 0);
+    return json({
+      serpapi: !!this.secret('serpapi', 'serpapikey', 'serp', 'serpkey', 'serpapiapikey'),
+      serpUsed: used,
+      discogs: !!(
+        (this.secret('discogskey', 'discogsconsumerkey', 'discogsuserkey', 'discogsapikey') && this.secret('discogssecret', 'discogsconsumersecret', 'discogsusersecret', 'discogsapisecret')) ||
+        this.secret('discogs', 'discogstoken', 'discogsusertoken', 'discogspersonaltoken', 'discogsaccesstoken')
+      ),
+      datagokr: !!this.secret('datagokr', 'datagokrkey', 'datagokey', 'publicdata', 'publicdatakey', 'kasi', 'kasikey', 'DATA_GO_KR_KEY'),
+      gemini: !!this.keyOf('gemini'),
+    });
+  }
+
   /** 홈코트 화면 사진 → 숫자 (Gemini 무료 모델 차례로, 가벼운 lite 모델부터. 문제 풀이와 같은 하루 한도를 같이 센다).
    *  오래 걸릴 수 있어서 뒤에서 하고 번호를 돌려준다 → GET bb/scan/{번호} 로 결과 */
   private async bbScan(user: UserRow, b: Record<string, unknown>): Promise<Response> {
@@ -1582,7 +1680,7 @@ export class Accounts extends DurableObject<Env> {
     const year = Number(y);
     if (!Number.isInteger(year) || year < 2000 || year > 2100) return fail('연도를 확인해 주세요.');
     const env = this.env as unknown as Record<string, string | undefined>;
-    const key = env.Datagokr || env.DATA_GO_KR_KEY;
+    const key = env.Datagokr || env.DATA_GO_KR_KEY || this.secret('datagokr', 'datagokrkey', 'datagokey', 'publicdata', 'publicdatakey', 'kasi', 'kasikey');
     if (!key) return fail('공휴일을 보려면 공공데이터포털 키(Datagokr)가 필요해요.', 503);
     const ck = `holidays:${year}`;
     const c = this.sql.exec<{ data: string; at: number }>('SELECT data, at FROM cache WHERE key = ?', ck).toArray()[0];
@@ -1740,8 +1838,69 @@ export class Accounts extends DurableObject<Env> {
   /** 다음 알림 시각에 깨어나도록 */
   private async scheduleAlarm() {
     const r = this.sql.exec<{ at: number | null }>('SELECT MIN(next_at) AS at FROM notify WHERE next_at IS NOT NULL').toArray()[0];
-    if (r?.at) await this.ctx.storage.setAlarm(r.at);
+    // 응원팀 경기 알림을 켠 사람이 있으면 10분마다 경기를 본다
+    const favs = this.sql.exec<{ n: number }>("SELECT COUNT(*) AS n FROM cache WHERE key LIKE 'nbafav:%'").toArray()[0].n;
+    const nbaAt = favs ? Math.max(Date.now() + 5_000, Number(this.cacheGet('nba:nextcheck') ?? 0)) : 0;
+    const at = [r?.at ?? 0, nbaAt].filter((x) => x > 0);
+    if (at.length) await this.ctx.storage.setAlarm(Math.min(...at));
     else await this.ctx.storage.deleteAlarm();
+  }
+
+  /** 응원팀 경기 알림: { team: 'LAL' | '' }. 켤 때 이미 시작했거나 끝난 경기는 알리지 않는다 */
+  private async nbaFav(req: Request, user: UserRow, b: Record<string, unknown>): Promise<Response> {
+    const ck = `nbafav:${user.id}`;
+    const subs = this.sql.exec<{ n: number }>('SELECT COUNT(*) AS n FROM push_subs WHERE user_id = ?', user.id).toArray()[0].n;
+    if (req.method === 'GET') {
+      const c = this.cacheGet(ck);
+      return json({ team: c ? (JSON.parse(c) as { team: string }).team : '', subs });
+    }
+    const team = typeof b.team === 'string' && /^[A-Z]{2,3}$/.test(b.team) ? b.team : '';
+    if (!team) this.sql.exec('DELETE FROM cache WHERE key = ?', ck);
+    else this.cacheSet(ck, JSON.stringify({ team, origin: new URL(req.url).origin, sent: {}, init: false }));
+    await this.scheduleAlarm();
+    return json({ team, subs });
+  }
+
+  /** 응원팀 경기가 시작했거나 끝났으면 알림 (10분마다) */
+  private async nbaFavCheck() {
+    const rows = this.sql.exec<{ key: string; data: string }>("SELECT key, data FROM cache WHERE key LIKE 'nbafav:%'").toArray();
+    if (!rows.length) return;
+    const usToday = new Date(Date.now() - 5 * 3600_000).toISOString().slice(0, 10);
+    const days = [new Date(Date.parse(usToday) - DAY).toISOString().slice(0, 10), usToday];
+    const games: NbaGame[] = [];
+    for (const dd of days) {
+      const r = await this.nbaGames(dd);
+      if (r.ok) games.push(...((await r.json()) as { games: NbaGame[] }).games);
+    }
+    for (const row of rows) {
+      const uid = row.key.slice('nbafav:'.length);
+      const v = JSON.parse(row.data) as { team: string; origin: string; sent: Record<string, 1>; init: boolean };
+      const mine = games.filter((g) => g.home.abbr === v.team || g.away.abbr === v.team);
+      const msgs: { title: string; body: string; url: string }[] = [];
+      for (const g of mine) {
+        const fin = /final/i.test(g.status);
+        const live = !fin && g.period > 0;
+        const score = `${g.away.abbr} ${g.awayScore} : ${g.homeScore} ${g.home.abbr}`;
+        const url = `/#/basketball/nba/game-${g.id}`;
+        if ((live || fin) && !v.sent[`${g.id}:s`]) {
+          v.sent[`${g.id}:s`] = 1;
+          if (v.init && live) msgs.push({ title: `🏀 ${g.away.abbr} @ ${g.home.abbr} 경기 시작`, body: `${g.period}쿼터 · ${score}`, url });
+        }
+        if (fin && !v.sent[`${g.id}:e`]) {
+          v.sent[`${g.id}:e`] = 1;
+          const mineScore = g.home.abbr === v.team ? g.homeScore : g.awayScore;
+          const other = g.home.abbr === v.team ? g.awayScore : g.homeScore;
+          if (v.init) msgs.push({ title: `🏀 ${v.team} ${mineScore > other ? '승리!' : '패배'}`, body: `경기 끝 · ${score}`, url });
+        }
+      }
+      v.init = true;
+      // 오래된 기록은 지운다 (최근 40개만)
+      v.sent = Object.fromEntries(Object.entries(v.sent).slice(-40));
+      this.cacheSet(row.key, JSON.stringify(v));
+      if (!msgs.length) continue;
+      const subs = this.sql.exec<PushSub & { [k: string]: SqlStorageValue }>('SELECT endpoint, p256dh, auth FROM push_subs WHERE user_id = ?', uid).toArray();
+      for (const m of msgs) if (subs.length) await this.pushTo(subs, m, v.origin);
+    }
   }
 
   private async notifyRoute(req: Request, path: string, user: UserRow, b: Record<string, unknown>): Promise<Response> {
@@ -1820,6 +1979,10 @@ export class Accounts extends DurableObject<Env> {
   /** 정한 시각: 그 사람이 넣어 둔 그날 그 시각 글을 보낸다 */
   async alarm() {
     const now = Date.now();
+    if (now + 30_000 >= Number(this.cacheGet('nba:nextcheck') ?? 0) && this.sql.exec<{ n: number }>("SELECT COUNT(*) AS n FROM cache WHERE key LIKE 'nbafav:%'").toArray()[0].n) {
+      this.cacheSet('nba:nextcheck', String(now + 10 * 60_000));
+      await this.nbaFavCheck().catch((e) => console.error('nba fav check failed', e instanceof Error ? e.message : String(e)));
+    }
     const due = this.sql.exec<{ user_id: string; times: string; tz: number; next_at: number; digest: string; origin: string }>('SELECT * FROM notify WHERE next_at IS NOT NULL AND next_at <= ?', now + 30_000).toArray();
     for (const n of due) {
       const times = JSON.parse(n.times) as string[];

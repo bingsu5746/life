@@ -7712,3 +7712,61 @@ body.focus-on {
   display: grid;
   gap: 4px;
 }
+
+/* ===== 음반 표지 · Discogs 찾기 ===== */
+.lp-cover {
+  width: 56px;
+  height: 56px;
+  border-radius: 8px;
+  object-fit: cover;
+  background: var(--soft);
+}
+.dg-list {
+  display: grid;
+  gap: 8px;
+  margin-top: 10px;
+}
+.dg-item {
+  display: grid;
+  grid-template-columns: 56px 1fr auto;
+  gap: 10px;
+  align-items: center;
+}
+.dg-item img,
+.dg-noimg {
+  width: 56px;
+  height: 56px;
+  border-radius: 8px;
+  object-fit: cover;
+  background: var(--soft);
+}
+.dg-info {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+.dg-info b,
+.dg-info span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.dg-btns {
+  display: grid;
+  gap: 4px;
+}
+@media (max-width: 520px) {
+  .dg-item {
+    grid-template-columns: 48px 1fr;
+  }
+  .dg-btns {
+    grid-column: 1 / -1;
+    grid-template-columns: 1fr 1fr;
+  }
+}
+.nba-alert {
+  margin-bottom: 10px;
+}
+.sv-web {
+  margin-top: 10px;
+}

@@ -316,6 +316,9 @@ const FIX: Record<Collection, Fix> = {
     rating: typeof x.rating === 'number' && x.rating >= 0.5 && x.rating <= 5 ? Math.round(x.rating * 2) / 2 : undefined,
     note: optStr(x.note)?.slice(0, 5000),
     listens: x.listens === undefined ? undefined : dates(x.listens).slice(-1000),
+    cover: typeof x.cover === 'string' && /^https:\/\/i\.discogs\.com\/[\w\-./:%=]+$/.test(x.cover) ? x.cover.slice(0, 500) : undefined,
+    discogsId: Number.isInteger(x.discogsId) && (x.discogsId as number) > 0 ? (x.discogsId as number) : undefined,
+    genre: optStr(x.genre)?.slice(0, 60),
     created: num(x.created),
   }),
   passages: (x) => ({

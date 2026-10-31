@@ -685,6 +685,10 @@ export interface MusicRecord extends Stamp {
   note?: string;
   /** 들은 날들 */
   listens?: DateStr[];
+  /** 표지 사진 주소 (Discogs 에서 찾아 넣었을 때) · Discogs 번호 · 장르 */
+  cover?: string;
+  discogsId?: number;
+  genre?: string;
   created: number;
 }
 
