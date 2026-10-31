@@ -8908,3 +8908,19 @@ body.focus-on {
   display: block;
   margin-top: 2px;
 }
+.gs-stack {
+  display: flex;
+  flex-direction: column;
+  width: 14px;
+  min-height: 2px;
+  border-radius: 4px 4px 0 0;
+  overflow: hidden;
+  align-self: end;
+}
+.gs-stack i.l,
+.gs-dot.l {
+  background: #2563eb;
+}
+.gs-stack i.g {
+  background: #8b5cf6;
+}

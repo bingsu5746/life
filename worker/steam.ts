@@ -58,7 +58,7 @@ export async function wishlist(steamid: string): Promise<{ appid: number; added:
 export interface SteamMe {
   name: string;
   avatar: string;
-  owned: { appid: number; name: string; minutes: number; recent: number; last: number }[];
+  owned: { appid: number; name: string; minutes: number; recent: number; last: number; icon?: string }[];
   count: number;
 }
 export async function steamMe(key: string, steamid: string): Promise<SteamMe> {
@@ -66,11 +66,13 @@ export async function steamMe(key: string, steamid: string): Promise<SteamMe> {
   const [sum, owned] = await Promise.all([
     get(`${base}/ISteamUser/GetPlayerSummaries/v2/?key=${key}&steamids=${steamid}`, 'Steam 프로필') as Promise<{ response?: { players?: { personaname?: string; avatarfull?: string }[] } }>,
     get(`${base}/IPlayerService/GetOwnedGames/v1/?key=${key}&steamid=${steamid}&include_appinfo=1&include_played_free_games=1`, 'Steam 가진 게임') as Promise<{
-      response?: { game_count?: number; games?: { appid?: number; name?: string; playtime_forever?: number; playtime_2weeks?: number; rtime_last_played?: number }[] };
+      response?: { game_count?: number; games?: { appid?: number; name?: string; playtime_forever?: number; playtime_2weeks?: number; rtime_last_played?: number; img_icon_url?: string }[] };
     }>,
   ]);
   const p = sum.response?.players?.[0];
-  const games = (owned.response?.games ?? []).filter((g) => g.appid).map((g) => ({ appid: g.appid!, name: g.name ?? '', minutes: g.playtime_forever ?? 0, recent: g.playtime_2weeks ?? 0, last: g.rtime_last_played ?? 0 }));
+  const games = (owned.response?.games ?? [])
+    .filter((g) => g.appid)
+    .map((g) => ({ appid: g.appid!, name: g.name ?? '', minutes: g.playtime_forever ?? 0, recent: g.playtime_2weeks ?? 0, last: g.rtime_last_played ?? 0, icon: g.img_icon_url ? `https://media.steampowered.com/steamcommunity/public/images/apps/${g.appid}/${g.img_icon_url}.jpg` : undefined }));
   return { name: p?.personaname ?? '', avatar: p?.avatarfull ?? '', owned: games.sort((a, b) => b.minutes - a.minutes), count: owned.response?.game_count ?? games.length };
 }
 
@@ -97,13 +99,28 @@ export async function steamAchievements(key: string, steamid: string, appid: num
   };
 }
 
-/** 게임 이름 (번호만 있을 때, 한국 상점 기준). IStoreBrowseService/GetItems (키 없음). 한국에서 볼 수 없는 것은 빠진다 */
-export async function storeNames(ids: number[]): Promise<Record<number, string>> {
-  const out: Record<number, string> = {};
+/** 게임 이름 · 작은 그림 (번호만 있을 때, 한국 상점 기준). IStoreBrowseService/GetItems (키 없음).
+ *  요즘 게임은 그림 주소에 고유 번호가 붙어서(steam/apps/{번호}/{해시}/capsule_231x87.jpg) 여기서 받은 주소를 써야 한다 */
+export async function storeItems(ids: number[]): Promise<Record<number, { name: string; thumb: string }>> {
+  const out: Record<number, { name: string; thumb: string }> = {};
   for (let i = 0; i < ids.length; i += 50) {
-    const input = JSON.stringify({ ids: ids.slice(i, i + 50).map((appid) => ({ appid })), context: { language: 'koreana', country_code: 'KR' }, data_request: {} });
-    const j = (await get(`https://api.steampowered.com/IStoreBrowseService/GetItems/v1/?${new URLSearchParams({ input_json: input })}`, 'Steam 이름')) as { response?: { store_items?: { appid?: number; name?: string; success?: number }[] } };
-    for (const x of j.response?.store_items ?? []) if (x.appid && x.name && x.success === 1) out[x.appid] = x.name;
+    const input = JSON.stringify({ ids: ids.slice(i, i + 50).map((appid) => ({ appid })), context: { language: 'koreana', country_code: 'KR' }, data_request: { include_assets: true } });
+    const j = (await get(`https://api.steampowered.com/IStoreBrowseService/GetItems/v1/?${new URLSearchParams({ input_json: input })}`, 'Steam 이름')) as {
+      response?: { store_items?: { appid?: number; name?: string; success?: number; assets?: { asset_url_format?: string; small_capsule?: string; header?: string } }[] };
+    };
+    for (const x of j.response?.store_items ?? []) {
+      if (!x.appid || x.success !== 1) continue;
+      const a = x.assets;
+      const file = a?.small_capsule || a?.header;
+      out[x.appid] = { name: x.name ?? '', thumb: a?.asset_url_format && file ? `https://shared.fastly.steamstatic.com/store_item_assets/${a.asset_url_format.replace('${FILENAME}', file)}` : '' };
+    }
   }
   return out;
+}
+export async function storeNames(ids: number[]): Promise<Record<number, string>> {
+  return Object.fromEntries(
+    Object.entries(await storeItems(ids))
+      .filter(([, v]) => v.name)
+      .map(([k, v]) => [k, v.name]),
+  );
 }

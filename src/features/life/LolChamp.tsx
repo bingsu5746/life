@@ -490,7 +490,6 @@ function Skills({ detail, dd }: { detail: ChampDetail | null; dd: Dd }) {
           </div>
         </div>
       ))}
-      <p className="st-muted sm">스킬 설명 · 수치: Riot Data Dragon (한국어). 스킬 순서 통계는 경기 타임라인을 따로 받아야 해서 아직 없어요.</p>
     </section>
   );
 }
@@ -532,7 +531,6 @@ function Tips({ detail, name }: { detail: ChampDetail | null; name: string }) {
             </div>
           ))}
         </div>
-        <p className="st-muted sm">출처: Riot Data Dragon (공식 팁)</p>
       </section>
     </div>
   );

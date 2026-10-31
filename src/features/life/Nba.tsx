@@ -1004,7 +1004,7 @@ function HlStats({ name }: { name: string }) {
   const cats = [...new Set(cur.stats.map((x) => x.category || '기타'))];
   return (
     <>
-      <h3 className="st-h nba-career-h">시즌 기록 (Highlightly)</h3>
+      <h3 className="st-h nba-career-h">시즌 기록</h3>
       <div className="nba-days nba-seasons">
         {data.seasons.slice(0, 8).map((x, i) => (
           <button key={`${x.season}-${i}`} className={`nba-day ${i === open ? 'on' : ''}`} onClick={() => setOpen(i)}>

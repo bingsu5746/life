@@ -1,4 +1,5 @@
 // 취미: 내 취미와 한 시간 기록 · 하고 싶은 것 (책·영화·드라마·게임·장소)
+import { WishPage } from './Games';
 import { useEffect, useState } from 'react';
 import { BarChart } from '../study/charts';
 import { shortDate, weekStart } from '../study/dates';
@@ -29,6 +30,7 @@ const md = (x: string) => shortDate(x).replace(/\(.\)/, '');
 export function Hobby({ sub, sub2 }: { sub?: string; sub2?: string }) {
   if (sub === 'movies') return <MovedToMovies sub={sub2} />;
   if (sub === 'reading') return <ReadingPage />;
+  if (sub === 'wish') return <WishPage />;
   return <HobbyMain sub={sub} view="main" />;
 }
 
@@ -72,100 +74,98 @@ function HobbyMain({ sub, view }: { sub?: string; view: 'main' | 'wish' }) {
       </div>
       {view === 'main' && hobbies.length > 0 && (
         <>
-
-      <section className="st-card">
-        <div className="st-inline between">
-          <h3 className="st-h">내 취미 · 이번 주</h3>
-          <button className="st-link" onClick={() => setHobbyEdit('new')}>
-            ＋ 취미
-          </button>
-        </div>
-        {hobbies.map((x) => (
-          <div key={x.id} className="st-subj-row">
-            <span className="st-tap" {...tap(() => setHobbyEdit(x))}>
-              {x.name}
-            </span>
-            <Bar value={week.get(x.id) ?? 0} max={x.weeklyGoal || Math.max(60, ...hobbies.map((y) => week.get(y.id) ?? 0))} label={`${x.name} 이번 주`} />
-            <small>
-              {minutesText(week.get(x.id) ?? 0)}
-              {x.weeklyGoal ? ` / ${minutesText(x.weeklyGoal)}` : ''}
-            </small>
-          </div>
-        ))}
-        {logs.length > 0 && (
-          <BarChart
-            label="주별 취미 시간"
-            height={130}
-            bars={weeks.map((w, i) => ({
-              label: md(w.start),
-              title: `${shortDate(w.start)} 주`,
-              value: w.min,
-              strong: i === weeks.length - 1,
-            }))}
-            format={h}
-            tickUnit={Math.max(...weeks.map((w) => w.min)) >= 120 ? 60 : 1}
-          />
-        )}
-      </section>
-
-      {logs.length > 0 && (
-        <section className="st-card">
-          <h3 className="st-h">최근 한 것</h3>
-          {logs.slice(0, 15).map((l) => (
-            <div key={l.id} className="st-item st-tap" {...tap(() => setLog(l))}>
-              <small className="st-muted nowrap">{shortDate(l.date)}</small>
-              <div className="st-item-main">
-                <div className="st-item-title">
-                  {d.hobbies[l.hobbyId]?.name ?? '취미'}
-                  {l.minutes ? ` · ${minutesText(l.minutes)}` : ''}
-                </div>
-                {l.memo && <div className="st-item-sub">{l.memo}</div>}
-              </div>
+          <section className="st-card">
+            <div className="st-inline between">
+              <h3 className="st-h">내 취미 · 이번 주</h3>
+              <button className="st-link" onClick={() => setHobbyEdit('new')}>
+                ＋ 취미
+              </button>
             </div>
-          ))}
-        </section>
-      )}
+            {hobbies.map((x) => (
+              <div key={x.id} className="st-subj-row">
+                <span className="st-tap" {...tap(() => setHobbyEdit(x))}>
+                  {x.name}
+                </span>
+                <Bar value={week.get(x.id) ?? 0} max={x.weeklyGoal || Math.max(60, ...hobbies.map((y) => week.get(y.id) ?? 0))} label={`${x.name} 이번 주`} />
+                <small>
+                  {minutesText(week.get(x.id) ?? 0)}
+                  {x.weeklyGoal ? ` / ${minutesText(x.weeklyGoal)}` : ''}
+                </small>
+              </div>
+            ))}
+            {logs.length > 0 && (
+              <BarChart
+                label="주별 취미 시간"
+                height={130}
+                bars={weeks.map((w, i) => ({
+                  label: md(w.start),
+                  title: `${shortDate(w.start)} 주`,
+                  value: w.min,
+                  strong: i === weeks.length - 1,
+                }))}
+                format={h}
+                tickUnit={Math.max(...weeks.map((w) => w.min)) >= 120 ? 60 : 1}
+              />
+            )}
+          </section>
 
+          {logs.length > 0 && (
+            <section className="st-card">
+              <h3 className="st-h">최근 한 것</h3>
+              {logs.slice(0, 15).map((l) => (
+                <div key={l.id} className="st-item st-tap" {...tap(() => setLog(l))}>
+                  <small className="st-muted nowrap">{shortDate(l.date)}</small>
+                  <div className="st-item-main">
+                    <div className="st-item-title">
+                      {d.hobbies[l.hobbyId]?.name ?? '취미'}
+                      {l.minutes ? ` · ${minutesText(l.minutes)}` : ''}
+                    </div>
+                    {l.memo && <div className="st-item-sub">{l.memo}</div>}
+                  </div>
+                </div>
+              ))}
+            </section>
+          )}
         </>
       )}
 
       {view === 'wish' && (
-      <section className="st-card">
-        <div className="st-inline between wrap">
-          <div className="st-seg" aria-label="하고 싶은 것">
-            {(Object.keys(STATUS) as WishItem['status'][]).map((s) => (
-              <button key={s} className={status === s ? 'on' : ''} aria-pressed={status === s} onClick={() => setStatus(s)}>
-                {STATUS[s]} {alive(d.wishes).filter((w) => w.status === s).length || ''}
-              </button>
-            ))}
+        <section className="st-card">
+          <div className="st-inline between wrap">
+            <div className="st-seg" aria-label="하고 싶은 것">
+              {(Object.keys(STATUS) as WishItem['status'][]).map((s) => (
+                <button key={s} className={status === s ? 'on' : ''} aria-pressed={status === s} onClick={() => setStatus(s)}>
+                  {STATUS[s]} {alive(d.wishes).filter((w) => w.status === s).length || ''}
+                </button>
+              ))}
+            </div>
+            <button className="st-link" onClick={() => setWish('new')}>
+              ＋ 넣기
+            </button>
           </div>
-          <button className="st-link" onClick={() => setWish('new')}>
-            ＋ 넣기
-          </button>
-        </div>
-        {!wishes.length ? (
-          <p className="st-hint">{status === 'want' ? '읽고 싶은 책, 보고 싶은 드라마, 가 보고 싶은 곳을 적어 두세요. 영화는 「영화」 칸에서 따로 모아요.' : status === 'doing' ? '하는 중인 것이 없어요.' : '아직 끝낸 것이 없어요.'}</p>
-        ) : (
-          wishes.map((w) => (
-            <div key={w.id} className="st-item">
-              <span className="st-pill">{WISH_KIND[w.kind]}</span>
-              <div className="st-item-main st-tap" {...tap(() => setWish(w))}>
-                <div className="st-item-title">{w.title}</div>
-                {(w.note || w.rating) && (
-                  <div className="st-item-sub">
-                    {w.rating ? '★'.repeat(w.rating) + '☆'.repeat(5 - w.rating) : ''} {w.note}
-                  </div>
+          {!wishes.length ? (
+            <p className="st-hint">{status === 'want' ? '읽고 싶은 책, 보고 싶은 드라마, 가 보고 싶은 곳을 적어 두세요. 영화는 「영화」 칸에서 따로 모아요.' : status === 'doing' ? '하는 중인 것이 없어요.' : '아직 끝낸 것이 없어요.'}</p>
+          ) : (
+            wishes.map((w) => (
+              <div key={w.id} className="st-item">
+                <span className="st-pill">{WISH_KIND[w.kind]}</span>
+                <div className="st-item-main st-tap" {...tap(() => setWish(w))}>
+                  <div className="st-item-title">{w.title}</div>
+                  {(w.note || w.rating) && (
+                    <div className="st-item-sub">
+                      {w.rating ? '★'.repeat(w.rating) + '☆'.repeat(5 - w.rating) : ''} {w.note}
+                    </div>
+                  )}
+                </div>
+                {w.status !== 'done' && (
+                  <button className="btn btn-sm" onClick={() => (w.status === 'want' ? put('wishes', { ...w, status: 'doing' }) : setWish({ ...w, status: 'done', doneDate: today }))}>
+                    {w.status === 'want' ? '시작하기' : '끝냈어요'}
+                  </button>
                 )}
               </div>
-              {w.status !== 'done' && (
-                <button className="btn btn-sm" onClick={() => (w.status === 'want' ? put('wishes', { ...w, status: 'doing' }) : setWish({ ...w, status: 'done', doneDate: today }))}>
-                  {w.status === 'want' ? '시작하기' : '끝냈어요'}
-                </button>
-              )}
-            </div>
-          ))
-        )}
-      </section>
+            ))
+          )}
+        </section>
       )}
 
       {view === 'main' && !hobbies.length && (

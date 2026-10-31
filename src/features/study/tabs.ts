@@ -49,6 +49,7 @@ export const AREA_ITEMS: Record<Exclude<AreaKey, 'home' | 'study'>, AreaItem[]> 
     { key: 'games', label: '게임', icon: 'game', to: '/games' },
     { key: 'music', label: '음악', icon: 'music', to: '/music' },
     { key: 'travel', label: '여행', icon: 'pin', to: '/travel' },
+    { key: 'wish', label: '위시리스트', icon: 'save' },
   ],
   ai: [{ key: '', label: '문제 풀이', icon: 'area-ai' }],
   diary: [
@@ -68,16 +69,15 @@ export const MOVIE_ITEMS: AreaItem[] = [
   { key: 'rec', label: '추천', icon: 'area-hobby', to: '/movies/rec' },
 ];
 
-/** 게임 안에서의 메뉴 (취미로 돌아가기 + 내 게임 · 롤 · Steam · 위시리스트) */
+/** 게임 안에서의 메뉴 (취미로 돌아가기 + 게임 시간 · 롤 전적 · 롤 챔피언 · Steam). 위시리스트는 취미 메뉴로 */
 export const GAME_ITEMS: AreaItem[] = [
   { key: 'hobby', label: '취미', icon: 'area-hobby', to: '/hobby' },
-  { key: 'mine', label: '내 게임', icon: 'game', to: '/games' },
+  { key: 'mine', label: '게임 시간', icon: 'time', to: '/games' },
   { key: 'lol', label: '롤 전적', icon: 'target', to: '/games/lol' },
   { key: 'champs', label: '롤 챔피언', icon: 'search', to: '/games/champs' },
   { key: 'steam', label: 'Steam', icon: 'life', to: '/games/steam' },
-  { key: 'wish', label: '위시리스트', icon: 'save', to: '/games/wish' },
 ];
-export const gameItem = (sub?: string) => (sub === 'lol' || sub === 'steam' || sub === 'wish' || sub === 'champs' ? sub : sub === 'champ' ? 'champs' : 'mine');
+export const gameItem = (sub?: string) => (sub === 'lol' || sub === 'steam' || sub === 'champs' ? sub : sub === 'champ' ? 'champs' : 'mine');
 /** 롤 챔피언 하나 안에서의 메뉴 (챔피언 목록으로 + 빌드 · 룬 · 아이템 · 카운터 · 스킬 · 팁) */
 export const champItems = (id: string, pos: string): AreaItem[] => [
   { key: 'back', label: '챔피언 목록', icon: 'search', to: '/games/champs' },

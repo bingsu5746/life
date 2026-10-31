@@ -2,6 +2,8 @@
 import { useEffect, useState } from 'react';
 import { csMap, gamePrices, gameSearch, gameWatch, isLoggedIn, steamAch, steamMe, steamNames, steamStore, steamThumb, steamWatchGet, steamWatchSet, type SteamHit, type SteamMe, type SteamPrice } from '../auth/api';
 import { LolPage } from './Lol';
+import { SteamImg } from './SteamImg';
+import { GameTimeCard } from './GameTime';
 import { LolChampsPage } from './LolChamps';
 import { LolChampPage } from './LolChamp';
 import { dailyPlay, pickUnplayed } from './steamPlay';
@@ -25,6 +27,7 @@ export function Games({ sub, sub2, sub3 }: { sub?: string; sub2?: string; sub3?:
   if (sub === 'champs') return <LolChampsPage />;
   if (sub === 'champ' && sub2) return <LolChampPage id={sub2} sub={sub3} />;
   if (sub === 'steam') return <SteamPage />;
+  // 예전 주소 /games/wish 는 취미 › 위시리스트로
   if (sub === 'wish') return <WishPage />;
   return <MyGames />;
 }
@@ -44,11 +47,13 @@ function MyGames() {
   return (
     <div className="st-page narrow">
       <div className="st-page-head">
-        <h2>게임</h2>
+        <h2>게임 시간</h2>
         <button className="btn btn-sm btn-primary" onClick={() => setEdit({ status: tab })} aria-label="게임 넣기">
           <Icon name="plus" />
         </button>
       </div>
+      {isLoggedIn() && <GameTimeCard />}
+      <h3 className="st-h">직접 적은 게임</h3>
       {all.length > 0 && (
         <div className="mv-summary">
           <span>
@@ -81,7 +86,7 @@ function MyGames() {
           {list.map((g) => (
             <article key={g.id} className="mv-card st-tap" {...tap(() => setEdit(g))}>
               <div className="mv-top">
-                {g.thumb && <img className="gm-thumb" src={g.thumb} alt="" loading="lazy" />}
+                {g.steamAppId ? <SteamImg className="gm-thumb" appid={g.steamAppId} /> : null}
                 <b>{g.title}</b>
                 {g.platform && <small className="st-muted">{g.platform}</small>}
               </div>
@@ -333,7 +338,7 @@ function MySteam({ have }: { have: Game[] }) {
               <h4 className="ta-h">최근 2주</h4>
               {recent.map((g) => (
                 <div key={g.appid} className="gm-row st-tap" {...tap(() => setPick(g))}>
-                  <img src={steamThumb(g.appid)} alt="" loading="lazy" />
+                  <SteamImg appid={g.appid} icon={g.icon} />
                   <span>{g.name}</span>
                   <small className="st-muted">{h(g.recent)}</small>
                 </div>
@@ -343,7 +348,7 @@ function MySteam({ have }: { have: Game[] }) {
           <h4 className="ta-h">가진 게임 (많이 한 순)</h4>
           {owned.map((g) => (
             <div key={g.appid} className="gm-row st-tap" {...tap(() => setPick(g))}>
-              <img src={steamThumb(g.appid)} alt="" loading="lazy" />
+              <SteamImg appid={g.appid} icon={g.icon} />
               <span>{g.name}</span>
               <small className="st-muted">{g.minutes ? h(g.minutes) : '안 해 봄'}</small>
             </div>
@@ -363,7 +368,7 @@ function MySteam({ have }: { have: Game[] }) {
             .slice(0, 60)
             .map((w) => (
               <div key={w.appid} className="gm-row">
-                <img src={steamThumb(w.appid)} alt="" loading="lazy" />
+                <SteamImg appid={w.appid} />
                 <span>
                   {names[w.appid] ?? `#${w.appid}`}
                   <PriceLine appid={w.appid} p={prices[w.appid]} />
@@ -429,7 +434,7 @@ function AchSheet({ steamid, game, onClose }: { steamid: string; game: { appid: 
     deaths = stat('total_deaths');
   return (
     <Sheet title={game.name} onClose={onClose}>
-      <img className="gm-hero" src={steamThumb(game.appid)} alt="" />
+      <SteamImg className="gm-hero" appid={game.appid} />
       {err && <p className="st-muted">{err}</p>}
       {!a && !err && <p className="st-muted">받는 중…</p>}
       {a && (
@@ -691,7 +696,7 @@ function SteamInsights() {
 
       {pick && (
         <section className="st-card gm-pick">
-          <img src={steamThumb(pick.appid)} alt="" />
+          <SteamImg appid={pick.appid} icon={pick.icon} />
           <div>
             <small className="st-muted">이번 주 해 볼 게임 (가졌는데 한 번도 안 한 것)</small>
             <b>{pick.name}</b>
@@ -745,7 +750,7 @@ function GameLimitEdit() {
 }
 
 /** 게임 › 위시리스트: 사고 싶은 게임 · 음반 · Steam 찜을 한곳에 (한국 값 · 모으기) */
-function WishPage() {
+export function WishPage() {
   const d = useStudy();
   const sid = d.settings.steamId ?? '';
   const games = alive(d.games).filter((g) => g.status === 'want');
@@ -803,7 +808,7 @@ function WishPage() {
             .sort((a, b) => (b.appid ? (prices[b.appid]?.discount ?? 0) : 0) - (a.appid ? (prices[a.appid]?.discount ?? 0) : 0))
             .map((x) => (
               <div key={x.key} className="gm-row">
-                {x.appid ? <img src={steamThumb(x.appid)} alt="" loading="lazy" /> : <span className="dg-noimg" />}
+                {x.appid ? <SteamImg appid={x.appid} /> : <span className="dg-noimg" />}
                 <span>
                   {x.name} {!x.g && <small className="st-muted">· Steam 찜</small>}
                   {x.appid && <PriceLine appid={x.appid} p={prices[x.appid]} watch={x.g?.watchWon} />}

@@ -20,7 +20,7 @@ import { findBooksAladin, findBooksKakao, findGames, findRecords, similarArtists
 import { fetchProviders } from './ott';
 import { relayFetch, type Relay } from './relay';
 import { fetchSpecialDays } from './holidays';
-import { cleanFact } from './fact';
+import { cleanFact, goodKo } from './fact';
 import { fetch2k } from './nba2k';
 import { hcBody, parseHc } from './homecourt';
 import { diaryBody, noteBody, parseDiary, parseNote, parseReceipt, parseTocRead, receiptBody, tocBody } from './aiRead';
@@ -28,7 +28,7 @@ import { seojiSearch, seojiToc, yes24Search } from './books';
 import { cheapShark } from './cheapshark';
 import { lolMetaTables, lolMetaTick, metaChamp, metaPatches, metaTable } from './lolMeta';
 import { lolNewGames, lolOlderGames, lolProfile, RiotError, type LolGame } from './lol';
-import { krPrices, steamAchievements, steamMe, storeNames, storeSearch, wishlist, type KrPrice } from './steam';
+import { krPrices, steamAchievements, steamMe, storeItems, storeNames, storeSearch, wishlist, type KrPrice } from './steam';
 import { hlAverage, fetchHlBox, fetchHlPlayerSeasons, fetchHlStandings, hlMatchId, sameTeam } from './highlightly';
 import { within, fetchGames, fetchNbaAverages, fetchBdlRoster, fetchNbaBox, fetchNbaCareer, fetchNbaRoster, fetchNbaStandings, fetchStandings, nbaGameId, Paid, seasonOf, seasonPage, standingsFrom, type NbaGame } from './nba';
 import { monthOf, R2_FREE, R2_STOP, r2Block, rollMonth, type R2Use } from './r2guard';
@@ -269,6 +269,17 @@ export class Accounts extends DurableObject<Env> {
     if ((path === 'lol/meta' || path === 'lol/champ') && req.method === 'GET') return this.lolMetaRoute(path, new URL(req.url).searchParams);
     if (path === 'lol/profile' && req.method === 'GET') return this.lolProfileRoute(new URL(req.url).searchParams.get('id') ?? '');
     if (path === 'lol/games' && req.method === 'GET') return this.lolGamesRoute(new URL(req.url).searchParams.get('puuid') ?? '', new URL(req.url).searchParams.get('older') === '1');
+    if (path === 'steam/thumbs' && req.method === 'GET') {
+      const ids = (new URL(req.url).searchParams.get('ids') ?? '')
+        .split(',')
+        .map(Number)
+        .filter((x) => Number.isInteger(x) && x > 0)
+        .slice(0, 100);
+      return this.steamThumbs(ids).then(
+        (thumbs) => json({ thumbs }),
+        (e) => fail(`그림을 받지 못했어요. (${(e instanceof Error ? e.message : String(e)).slice(0, 80)})`, 502),
+      );
+    }
     if (path === 'steam/names' && req.method === 'GET') {
       const ids = (new URL(req.url).searchParams.get('ids') ?? '')
         .split(',')
@@ -1569,13 +1580,22 @@ export class Accounts extends DurableObject<Env> {
   private steamWatch(req: Request, user: UserRow, b: Record<string, unknown>): Response {
     const ck = `steamwish:${user.id}`;
     const steamid = typeof b.steamid === 'string' && /^\d{17}$/.test(b.steamid) ? b.steamid : '';
-    if (!steamid || b.on !== true) this.sql.exec('DELETE FROM cache WHERE key = ?', ck);
-    else this.cacheSet(ck, JSON.stringify({ steamid, origin: new URL(req.url).origin, sent: (JSON.parse(this.cacheGet(ck) ?? 'null') as { sent?: Record<string, number> } | null)?.sent ?? {} }));
+    const prev = JSON.parse(this.cacheGet(ck) ?? 'null') as { sent?: Record<string, number>; alert?: boolean } | null;
+    // track: 알림 없이 게임 시간만 서버가 6시간마다 적어 두게 (이미 알림을 켰으면 그대로)
+    if (b.track === true) {
+      if (steamid) this.cacheSet(ck, JSON.stringify({ steamid, origin: new URL(req.url).origin, sent: prev?.sent ?? {}, alert: prev ? prev.alert !== false : false }));
+      void this.scheduleAlarm();
+      return json({ on: !!prev && prev.alert !== false });
+    }
+    // 알림 끄기: 게임 시간 적기는 계속
+    if (steamid) this.cacheSet(ck, JSON.stringify({ steamid, origin: new URL(req.url).origin, sent: prev?.sent ?? {}, alert: b.on === true }));
+    else this.sql.exec('DELETE FROM cache WHERE key = ?', ck);
     void this.scheduleAlarm();
     return json({ on: !!steamid && b.on === true });
   }
   private steamWatchOn(user: UserRow): boolean {
-    return !!this.cacheGet(`steamwish:${user.id}`);
+    const v = JSON.parse(this.cacheGet(`steamwish:${user.id}`) ?? 'null') as { alert?: boolean } | null;
+    return !!v && v.alert !== false;
   }
   /** 찜한 게임이 새로 할인하면 한 번 알림 (같은 값이면 다시 안 보냄) · 한 시간 기록 */
   private async steamWishCheck() {
@@ -1583,9 +1603,10 @@ export class Accounts extends DurableObject<Env> {
     const key = this.steamKey();
     for (const row of rows) {
       const uid = row.key.slice('steamwish:'.length);
-      const v = JSON.parse(row.data) as { steamid: string; origin: string; sent: Record<string, number> };
+      const v = JSON.parse(row.data) as { steamid: string; origin: string; sent: Record<string, number>; alert?: boolean };
       try {
         if (key) this.steamSnap(v.steamid, await steamMe(key, v.steamid));
+        if (v.alert === false) continue;
         const wish = await wishlist(v.steamid);
         const prices = await this.steamPrices(wish.map((w) => w.appid).slice(0, 150));
         const sale = wish.filter((w) => prices[w.appid]?.discount > 0 && v.sent[w.appid] !== prices[w.appid].final);
@@ -1602,6 +1623,24 @@ export class Accounts extends DurableObject<Env> {
         console.error('steam wish check failed', e instanceof Error ? e.message : String(e));
       }
     }
+  }
+  /** 게임 그림 주소 (상점에서 받은 진짜 주소, 7일 기억) */
+  private async steamThumbs(ids: number[]): Promise<Record<number, string>> {
+    const out: Record<number, string> = {};
+    const need: number[] = [];
+    for (const id of ids) {
+      const c = this.cacheGet(`st:thumb:${id}`);
+      if (c !== undefined) out[id] = c;
+      else need.push(id);
+    }
+    if (need.length) {
+      const got = await storeItems(need);
+      for (const id of need) {
+        out[id] = got[id]?.thumb ?? '';
+        this.cacheSet(`st:thumb:${id}`, out[id]);
+      }
+    }
+    return out;
   }
   private async steamAchRoute(steamid: string, appid: number): Promise<Response> {
     const key = this.steamKey();
@@ -2036,7 +2075,13 @@ export class Accounts extends DurableObject<Env> {
     const en = cleanFact(String(((await res.json()) as { text?: unknown })?.text ?? ''));
     if (!en) throw new Error('uselessfacts 빈 답');
     const have = this.sql.exec<{ ko: string; id: number }>('SELECT ko, rowid AS id FROM facts WHERE en = ?', en).toArray()[0];
-    if (have) return { en, ko: have.ko, id: have.id };
+    if (have && goodKo(have.ko)) return { en, ko: have.ko, id: have.id };
+    // 예전에 번역이 깨져(「!!!!!!」 같은 것) 저장된 것이면 다시 번역해서 고친다
+    if (have) {
+      const again = await this.factKo(en);
+      if (again) this.sql.exec('UPDATE facts SET ko = ? WHERE rowid = ?', again, have.id);
+      return { en, ko: again, id: have.id };
+    }
     const ko = await this.factKo(en);
     if (!ko) return { en, ko };
     this.sql.exec('INSERT OR IGNORE INTO facts (en, ko, at) VALUES (?, ?, ?)', en, ko, Date.now());
@@ -2061,7 +2106,8 @@ export class Accounts extends DurableObject<Env> {
     for (const model of [TRANSLATE_MODEL, FAST_MODEL]) {
       try {
         const t = parseTranslation(readOutput(await this.env.AI.run(model as never, modelInput(model, input) as never)), 'text');
-        if (t?.text) return t.text.trim();
+        // 모델이 가끔 「!!!!!!!!」 처럼 깨진 글을 낸다 → 한글이 제대로 있는 것만
+        if (t?.text && goodKo(t.text)) return t.text.trim();
       } catch (e) {
         console.error('fact translate failed', model, e instanceof Error ? e.message : String(e));
       }

@@ -321,7 +321,11 @@ function FactCard() {
       <button className="hm-fact-h" onClick={next} aria-label="다른 쓸모없는 지식 보기">
         <span aria-hidden>💡</span> 쓸모없는 지식 <i aria-hidden>{busy ? '…' : '↻'}</i>
       </button>
-      <p lang={fact.ko ? 'ko' : 'en'}>{fact.ko || fact.en}</p>
+      {/* 번역이 깨져 「!!!!」 처럼 온 것이면 영어로 */}
+      {(() => {
+        const ko = fact.ko && /[가-힣]{2}/.test(fact.ko) && !/(.)\1{5,}/.test(fact.ko) ? fact.ko : '';
+        return <p lang={ko ? 'ko' : 'en'}>{ko || fact.en}</p>;
+      })()}
     </section>
   );
 }

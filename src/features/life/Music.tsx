@@ -175,7 +175,7 @@ function DiscogsFind({ have }: { have: MusicRecord[] }) {
   };
   return (
     <section className="st-card">
-      <h3 className="st-h">음반 찾기 (Discogs)</h3>
+      <h3 className="st-h">음반 찾기</h3>
       <form
         className="st-inline"
         onSubmit={(e) => {
@@ -213,7 +213,6 @@ function DiscogsFind({ have }: { have: MusicRecord[] }) {
         </div>
       )}
       {direct && list && list.length > 0 && <p className="st-muted sm">Discogs 가 잠깐 바빠서 표지 없이 찾았어요. 조금 뒤 다시 찾으면 표지도 나와요.</p>}
-      <p className="st-muted sm">정보 출처: Discogs</p>
     </section>
   );
 }

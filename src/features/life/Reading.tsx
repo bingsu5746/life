@@ -231,7 +231,6 @@ function BookFind({ have }: { have: Reading[] }) {
           ))}
         </div>
       )}
-      <p className="st-muted sm">정보 출처: 예스24 · 국립중앙도서관</p>
     </section>
   );
 }

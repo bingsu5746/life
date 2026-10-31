@@ -587,7 +587,7 @@ export interface SteamPrice {
 export interface SteamMe {
   name: string;
   avatar: string;
-  owned: { appid: number; name: string; minutes: number; recent: number; last: number }[];
+  owned: { appid: number; name: string; minutes: number; recent: number; last: number; icon?: string }[];
   count: number;
 }
 export const gameSearch = (q: string) => call<{ list: SteamHit[] }>(`games/search?q=${encodeURIComponent(q)}`, 'GET', undefined, 25_000);
@@ -597,9 +597,12 @@ export const csMap = (ids: number[]) => call<{ map: Record<string, number> }>(`g
 export const steamMe = (steamid: string) => remember(`steam:${steamid}`, 10 * MIN, () => call<{ me: SteamMe | null; wish: { appid: number; added: number }[]; needKey?: boolean; hist?: Record<string, Record<number, number>> }>(`steam/me?steamid=${steamid}`, 'GET', undefined, 30_000));
 export const steamWatchGet = () => call<{ on: boolean }>('steam/watch');
 export const steamWatchSet = (steamid: string, on: boolean) => call<{ on: boolean }>('steam/watch', 'PUT', { steamid, on });
+/** 알림 없이 Steam 게임 시간만 서버가 6시간마다 적어 두게 */
+export const steamTrack = (steamid: string) => call<{ on: boolean }>('steam/watch', 'PUT', { steamid, track: true });
 export const steamAch = (steamid: string, appid: number) =>
   remember(`ach:${steamid}:${appid}`, 30 * MIN, () => call<{ done: number; total: number; list: { name: string; desc: string; at: number }[]; stats: { name: string; value: number }[] }>(`steam/ach?steamid=${steamid}&appid=${appid}`, 'GET', undefined, 30_000));
 export const steamNames = (ids: number[]) => call<{ names: Record<number, string> }>(`steam/names?ids=${ids.join(',')}`, 'GET', undefined, 25_000).then((r) => r.names);
+export const steamThumbs = (ids: number[]) => call<{ thumbs: Record<number, string> }>(`steam/thumbs?ids=${ids.join(',')}`, 'GET', undefined, 20_000).then((r) => r.thumbs);
 export const steamStore = (appid: number) => `https://store.steampowered.com/app/${appid}/`;
 export const steamThumb = (appid: number) => `https://shared.fastly.steamstatic.com/store_item_assets/steam/apps/${appid}/capsule_231x87.jpg`;
 
