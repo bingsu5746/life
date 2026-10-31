@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { lolGames, lolProfile, type LolProfile } from '../auth/api';
 import { LineChart } from '../study/charts';
 import { setSettings, useStudy } from '../study/store';
-import { Empty, Sheet, tap, toast } from '../study/ui';
+import { Empty, go, Sheet, tap, toast } from '../study/ui';
 import { byChampion, byHour, byPosition, byWeekday, champDetail, kda, POS, queueName, QUEUE_FILTER, streaks, summary, yearRecap, type LolGame, type QueueFilter } from './lolStats';
 
 // ===== Data Dragon (챔피언 · 스펠 이름과 그림, 키 없음). 한 번 받으면 이 기기에 하루 기억 =====
@@ -72,6 +72,8 @@ export function LolPage() {
   const [busy, setBusy] = useState('');
   const [end, setEnd] = useState(false);
   const [q, setQ] = useState<QueueFilter>('all');
+  const [season, setSeason] = useState('all');
+  const [recap, setRecap] = useState(false);
   const [limit, setLimit] = useState(20);
   const [champ, setChamp] = useState<string | null>(null);
   const dd = useDd();
@@ -112,7 +114,9 @@ export function LolPage() {
       setBusy('');
     }
   };
-  const list = useMemo(() => (games ?? []).filter((g) => QUEUE_FILTER[q](g.q)), [games, q]);
+  // 시즌: 롤은 해마다 시즌이 바뀌어서(2024년부터 「시즌 2024」처럼) 경기한 해로 나눈다. 모두 합쳐서도 볼 수 있게
+  const seasons = useMemo(() => [...new Set((games ?? []).map((g) => new Date(g.at + 9 * 3600_000).getUTCFullYear()))].sort((a, b) => b - a), [games]);
+  const list = useMemo(() => (games ?? []).filter((g) => QUEUE_FILTER[q](g.q) && (season === 'all' || new Date(g.at + 9 * 3600_000).getUTCFullYear() === Number(season))), [games, q, season]);
 
   if (!id)
     return (
@@ -144,10 +148,17 @@ export function LolPage() {
   return (
     <div className="st-page">
       <div className="st-page-head">
-        <h2>롤</h2>
-        <button className="st-link" onClick={() => confirm('라이엇 ID 를 바꿀까요?') && setSettings({ lolId: undefined })}>
-          ID 바꾸기
-        </button>
+        <h2>롤 전적</h2>
+        <div className="st-inline">
+          {games && games.length > 0 && (
+            <button className="btn btn-sm lol-recap-btn" onClick={() => setRecap(true)}>
+              🏆 결산
+            </button>
+          )}
+          <button className="st-link" onClick={() => confirm('라이엇 ID 를 바꿀까요? (설정 › 게임 계정에서도 바꿀 수 있어요)') && setSettings({ lolId: undefined })}>
+            ID 바꾸기
+          </button>
+        </div>
       </div>
       {err && <p className="st-muted">{err}</p>}
       {!prof && !err && <p className="st-muted">불러오는 중…</p>}
@@ -189,20 +200,32 @@ export function LolPage() {
       {busy && <p className="st-muted">{busy}</p>}
       {games && (
         <>
-          <div className="st-seg" role="group" aria-label="게임 종류">
-            {(
-              [
-                ['all', '전체'],
-                ['solo', '솔로랭크'],
-                ['flex', '자유랭크'],
-                ['normal', '일반'],
-                ['aram', '칼바람'],
-              ] as const
-            ).map(([k, label]) => (
-              <button key={k} className={q === k ? 'on' : ''} onClick={() => setQ(k)}>
-                {label}
-              </button>
-            ))}
+          <div className="lol-filters">
+            {seasons.length > 0 && (
+              <select className="st-input xs" value={season} onChange={(e) => setSeason(e.target.value)} aria-label="시즌">
+                <option value="all">모든 시즌</option>
+                {seasons.map((y) => (
+                  <option key={y} value={y}>
+                    시즌 {y}
+                  </option>
+                ))}
+              </select>
+            )}
+            <div className="st-seg" role="group" aria-label="게임 종류">
+              {(
+                [
+                  ['all', '전체'],
+                  ['solo', '솔로랭크'],
+                  ['flex', '자유랭크'],
+                  ['normal', '일반'],
+                  ['aram', '칼바람'],
+                ] as const
+              ).map(([k, label]) => (
+                <button key={k} className={q === k ? 'on' : ''} onClick={() => setQ(k)}>
+                  {label}
+                </button>
+              ))}
+            </div>
           </div>
           {!list.length ? (
             <p className="st-muted">이 종류의 경기가 아직 없어요.</p>
@@ -352,7 +375,20 @@ export function LolPage() {
             </section>
           )}
 
-          <YearCard games={games} dd={dd} end={end} busy={!!busy} onOlder={() => void older()} />
+          {recap && (
+            <Sheet title="롤 결산" onClose={() => setRecap(false)} wide>
+              <YearCard games={games} dd={dd} end={end} busy={!!busy} onOlder={() => void older()} />
+            </Sheet>
+          )}
+          {!end && (
+            <p className="st-muted sm">
+              지금까지 모은 경기 {games.length}판.{' '}
+              <button className="st-link" disabled={!!busy} onClick={() => void older()}>
+                예전 경기 40판 더 받기
+              </button>{' '}
+              (많이 받을수록 시즌별 · 결산이 정확해져요)
+            </p>
+          )}
           {champ && <ChampSheet champ={champ} games={list.filter((g) => g.champ === champ)} dd={dd} onClose={() => setChamp(null)} />}
         </>
       )}
@@ -413,11 +449,13 @@ function YearCard({ games, dd, end, busy, onOlder }: { games: LolGame[]; dd: Dd 
       <div className="sh-head">
         <h3>🎮 {year} 롤 결산</h3>
         <select className="st-input xs" value={year} onChange={(e) => setYear(Number(e.target.value))} aria-label="연도">
-          {[now, now - 1].map((x) => (
-            <option key={x} value={x}>
-              {x}
-            </option>
-          ))}
+          {[...new Set([now, now - 1, ...games.map((g) => new Date(g.at + 9 * 3600_000).getUTCFullYear())])]
+            .sort((a, b) => b - a)
+            .map((x) => (
+              <option key={x} value={x}>
+                {x}
+              </option>
+            ))}
         </select>
       </div>
       {!y.games ? (
@@ -586,6 +624,9 @@ function ChampSheet({ champ, games, dd, onClose }: { champ: string; games: LolGa
           <GameRow key={g.id} g={g} dd={dd} />
         ))}
       </div>
+      <button className="btn" onClick={() => (onClose(), go(`/games/champ/${champ}`))}>
+        {name} 빌드 · 룬 · 카운터 보기 ›
+      </button>
     </Sheet>
   );
 }

@@ -1712,7 +1712,14 @@ export class Accounts extends DurableObject<Env> {
     if (this.riotKey() && (alarm === null || alarm > Date.now() + 90_000 || alarm < Date.now() - 120_000)) await this.scheduleAlarm();
     const patches = metaPatches(this.sql);
     const patch = q.get('patch') === 'all' ? 'all' : (patches.find((x) => x.patch === q.get('patch'))?.patch ?? patches[0]?.patch ?? 'all');
-    const status = { matches: patches.reduce((a, x) => a + x.games, 0), last: JSON.parse(this.cacheGet('lolmeta:last') ?? 'null'), err: JSON.parse(this.cacheGet('lolmeta:err') ?? 'null'), alarm: await this.ctx.storage.getAlarm(), alarmErr: JSON.parse(this.cacheGet('alarm:err') ?? 'null'), pushErr: JSON.parse(this.cacheGet('alarm:pusherr') ?? 'null') };
+    const status = {
+      matches: patches.reduce((a, x) => a + x.games, 0),
+      last: JSON.parse(this.cacheGet('lolmeta:last') ?? 'null'),
+      err: JSON.parse(this.cacheGet('lolmeta:err') ?? 'null'),
+      alarm: await this.ctx.storage.getAlarm(),
+      alarmErr: JSON.parse(this.cacheGet('alarm:err') ?? 'null'),
+      pushErr: JSON.parse(this.cacheGet('alarm:pusherr') ?? 'null'),
+    };
     if (path === 'lol/meta') return json({ patch, patches, status, ...metaTable(this.sql, patch) });
     const cid = Number(q.get('cid'));
     if (!Number.isInteger(cid) || cid <= 0) return fail('챔피언을 확인해 주세요.');

@@ -424,9 +424,7 @@ function Counter({ meta, pos, dd, me }: { meta: Meta; pos: string; dd: Dd; me: s
               <b className={b > a ? 'lc-down' : 'st-muted'}>{f(b)}</b>
             </div>
           ))}
-          <p className="st-muted sm">
-            {sel.g.toLocaleString('ko-KR')}판 맞대결 (마스터 이상 솔랭, 같은 포지션끼리)
-          </p>
+          <p className="st-muted sm">{sel.g.toLocaleString('ko-KR')}판 맞대결 (마스터 이상 솔랭, 같은 포지션끼리)</p>
         </section>
       )}
       <section className="st-card">
@@ -458,7 +456,9 @@ function Counter({ meta, pos, dd, me }: { meta: Meta; pos: string; dd: Dd; me: s
             ) : null,
           )}
         </div>
-        <p className="st-muted sm">승률은 {myName} 쪽 기준이에요. 상대마다 {c.min}판 넘게 만난 것만 보여요.</p>
+        <p className="st-muted sm">
+          승률은 {myName} 쪽 기준이에요. 상대마다 {c.min}판 넘게 만난 것만 보여요.
+        </p>
       </section>
     </div>
   );
@@ -466,7 +466,10 @@ function Counter({ meta, pos, dd, me }: { meta: Meta; pos: string; dd: Dd; me: s
 
 function Skills({ detail, dd }: { detail: ChampDetail | null; dd: Dd }) {
   if (!detail) return <p className="st-muted">스킬 정보를 받는 중…</p>;
-  const rows = [{ key: '패시브', name: detail.passive.name, img: `${DD}/${dd.v}/img/passive/${detail.passive.image}`, desc: detail.passive.description, cd: '', cost: '', range: '' }, ...detail.spells.map((s, i) => ({ key: 'QWER'[i], name: s.name, img: `${DD}/${dd.v}/img/spell/${s.image}`, desc: s.description, cd: s.cooldownBurn, cost: s.costBurn, range: s.rangeBurn }))];
+  const rows = [
+    { key: '패시브', name: detail.passive.name, img: `${DD}/${dd.v}/img/passive/${detail.passive.image}`, desc: detail.passive.description, cd: '', cost: '', range: '' },
+    ...detail.spells.map((s, i) => ({ key: 'QWER'[i], name: s.name, img: `${DD}/${dd.v}/img/spell/${s.image}`, desc: s.description, cd: s.cooldownBurn, cost: s.costBurn, range: s.rangeBurn })),
+  ];
   return (
     <section className="st-card lc-skill-list">
       {rows.map((r) => (

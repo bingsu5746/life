@@ -100,9 +100,28 @@ export interface ChampDetail {
 export const loadChamp = (id: string) =>
   cached(`c.${id}`, async (): Promise<ChampDetail> => {
     const v = await version();
-    const j = await getJson<{ data: Record<string, { lore: string; allytips: string[]; enemytips: string[]; info: ChampDetail['info']; passive: { name: string; description: string; image: { full: string } }; spells: { id: string; name: string; description: string; cooldownBurn: string; costBurn: string; rangeBurn: string; image: { full: string } }[] }> }>(`${DD}/${v}/data/ko_KR/champion/${id}.json`);
+    const j = await getJson<{
+      data: Record<
+        string,
+        {
+          lore: string;
+          allytips: string[];
+          enemytips: string[];
+          info: ChampDetail['info'];
+          passive: { name: string; description: string; image: { full: string } };
+          spells: { id: string; name: string; description: string; cooldownBurn: string; costBurn: string; rangeBurn: string; image: { full: string } }[];
+        }
+      >;
+    }>(`${DD}/${v}/data/ko_KR/champion/${id}.json`);
     const c = j.data[id];
-    return { lore: c.lore, allytips: c.allytips, enemytips: c.enemytips, info: c.info, passive: { name: c.passive.name, description: c.passive.description, image: c.passive.image.full }, spells: c.spells.map((s) => ({ id: s.id, name: s.name, description: s.description, cooldownBurn: s.cooldownBurn, costBurn: s.costBurn, rangeBurn: s.rangeBurn, image: s.image.full })) };
+    return {
+      lore: c.lore,
+      allytips: c.allytips,
+      enemytips: c.enemytips,
+      info: c.info,
+      passive: { name: c.passive.name, description: c.passive.description, image: c.passive.image.full },
+      spells: c.spells.map((s) => ({ id: s.id, name: s.name, description: s.description, cooldownBurn: s.cooldownBurn, costBurn: s.costBurn, rangeBurn: s.rangeBurn, image: s.image.full })),
+    };
   });
 
 export const champImg = (v: string, id: string) => `${DD}/${v}/img/champion/${id}.png`;
@@ -117,10 +136,12 @@ export const plain = (html: string) =>
 /** 한글 초성 (「ㄱㄹ」로 「가렌」 찾기) */
 const CHO = 'ㄱㄲㄴㄷㄸㄹㅁㅂㅃㅅㅆㅇㅈㅉㅊㅋㅌㅍㅎ';
 export function chosung(s: string): string {
-  return [...s].map((c) => {
-    const code = c.charCodeAt(0) - 0xac00;
-    return code >= 0 && code < 11172 ? CHO[Math.floor(code / 588)] : c;
-  }).join('');
+  return [...s]
+    .map((c) => {
+      const code = c.charCodeAt(0) - 0xac00;
+      return code >= 0 && code < 11172 ? CHO[Math.floor(code / 588)] : c;
+    })
+    .join('');
 }
 export function champMatch(c: Champ, q: string): boolean {
   const n = q.replace(/\s/g, '').toLowerCase();

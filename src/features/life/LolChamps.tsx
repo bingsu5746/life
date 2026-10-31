@@ -48,7 +48,12 @@ export function LolChampsPage() {
       .sort((a, b) => (sort === 'win' ? b.win - a.win : sort === 'pick' ? b.pick - a.pick : sort === 'ban' ? b.ban - a.ban : b.g - a.g));
   }, [data, dd, pos, q, sort]);
   // 검색했는데 통계가 아직 없는 챔피언도 고를 수 있게
-  const found = dd && q.trim() ? Object.values(dd.champ).filter((c) => champMatch(c, q)).sort((a, b) => a.name.localeCompare(b.name, 'ko')) : [];
+  const found =
+    dd && q.trim()
+      ? Object.values(dd.champ)
+          .filter((c) => champMatch(c, q))
+          .sort((a, b) => a.name.localeCompare(b.name, 'ko'))
+      : [];
   const open = (id: string) => go(`/games/champ/${id}`);
   return (
     <div className="st-page">

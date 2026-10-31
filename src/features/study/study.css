@@ -8474,3 +8474,429 @@ body.focus-on {
   color: var(--muted);
   font-size: 0.75rem;
 }
+
+/* ===== 롤 전적 필터 · 결산 버튼 ===== */
+.lol-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+.lol-recap-btn {
+  font-weight: 600;
+}
+
+/* ===== 롤 챔피언 (목록 · 상세) ===== */
+.lc-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 10px;
+}
+.lc-search {
+  flex: 1 1 240px;
+}
+.lc-pos {
+  margin-bottom: 10px;
+}
+.lc-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(72px, 1fr));
+  gap: 10px;
+  margin-bottom: 14px;
+}
+.lc-pick {
+  display: grid;
+  justify-items: center;
+  gap: 4px;
+  padding: 6px 2px;
+  border: 0;
+  border-radius: 12px;
+  background: none;
+  cursor: pointer;
+  color: var(--text);
+}
+.lc-pick:hover {
+  background: var(--soft);
+}
+.lc-pick img {
+  width: 52px;
+  height: 52px;
+  border-radius: 14px;
+}
+.lc-pick small {
+  font-size: 0.78rem;
+  max-width: 72px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.lc-table-wrap {
+  padding: 0;
+  overflow-x: auto;
+}
+.lc-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-variant-numeric: tabular-nums;
+}
+.lc-table th,
+.lc-table td {
+  padding: 10px 12px;
+  text-align: right;
+  white-space: nowrap;
+  border-bottom: 1px solid var(--line);
+}
+.lc-table th {
+  font-size: 0.78rem;
+  font-weight: 500;
+  color: var(--muted);
+}
+.lc-table th.sortable {
+  cursor: pointer;
+}
+.lc-table th.on {
+  color: var(--text);
+  font-weight: 700;
+}
+.lc-table .l {
+  text-align: left;
+}
+.lc-table tbody tr:hover {
+  background: var(--soft);
+}
+.lc-rank {
+  color: var(--muted);
+  width: 32px;
+}
+.lc-champ {
+  display: inline-flex;
+  gap: 10px;
+  align-items: center;
+}
+.lc-champ img {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+}
+.lc-up {
+  color: #2563eb;
+  font-weight: 600;
+}
+.lc-down {
+  color: #dc2626;
+  font-weight: 600;
+}
+.lc-head {
+  display: grid;
+  grid-template-columns: 88px 1fr auto;
+  gap: 16px;
+  align-items: center;
+}
+.lc-head > img {
+  width: 88px;
+  height: 88px;
+  border-radius: 20px;
+}
+.lc-head h2 {
+  margin: 0;
+}
+.lc-skills {
+  display: flex;
+  gap: 6px;
+  margin-top: 8px;
+}
+.lc-skills img {
+  width: 30px;
+  height: 30px;
+  border-radius: 6px;
+}
+.lc-skills span {
+  position: relative;
+}
+.lc-skills i {
+  position: absolute;
+  right: -2px;
+  bottom: -2px;
+  font-style: normal;
+  font-size: 0.6rem;
+  font-weight: 700;
+  padding: 0 3px;
+  border-radius: 4px;
+  color: #fff;
+  background: #111827;
+}
+.lc-stats {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(80px, 1fr));
+  gap: 6px 16px;
+}
+.lc-stats div {
+  display: grid;
+}
+.lc-stats small {
+  color: var(--muted);
+  font-size: 0.75rem;
+}
+.lc-stats b {
+  font-size: 1.15rem;
+  font-variant-numeric: tabular-nums;
+}
+@media (max-width: 640px) {
+  .lc-head {
+    grid-template-columns: 64px 1fr;
+  }
+  .lc-head > img {
+    width: 64px;
+    height: 64px;
+  }
+  .lc-stats {
+    grid-column: 1 / -1;
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+.lc-cols {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 12px;
+  align-items: start;
+}
+.lc-cols > .st-card {
+  margin: 0;
+}
+.lc-items {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(92px, 1fr));
+  gap: 10px;
+  margin-bottom: 10px;
+}
+.lc-items > div {
+  display: grid;
+  justify-items: center;
+  gap: 2px;
+  text-align: center;
+}
+.lc-items small {
+  font-size: 0.75rem;
+}
+.lc-item {
+  border-radius: 8px;
+  background: var(--soft);
+}
+.lc-rune {
+  display: grid;
+  gap: 4px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--line);
+}
+.lc-rune:last-child {
+  border-bottom: 0;
+}
+.lc-rune-row {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.lc-rune-row img {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: #111827;
+}
+.lc-rune-row img.big {
+  width: 40px;
+  height: 40px;
+}
+.lc-rune-sep {
+  width: 1px;
+  height: 26px;
+  margin: 0 4px;
+  background: var(--line-strong);
+}
+.lc-runes {
+  display: grid;
+}
+.lc-spells {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin: 10px 0;
+}
+.lc-spells div {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+.lc-spells img {
+  width: 30px;
+  height: 30px;
+  border-radius: 6px;
+}
+.lc-strip {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+.lc-strip div {
+  display: grid;
+  justify-items: center;
+  gap: 2px;
+}
+.lc-strip img {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+}
+.lc-counter {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
+  gap: 12px;
+  align-items: start;
+}
+.lc-counter > .st-card {
+  margin: 0;
+}
+@media (max-width: 860px) {
+  .lc-counter {
+    grid-template-columns: 1fr;
+  }
+}
+.lc-vs-head {
+  display: grid;
+  grid-template-columns: 64px 1fr 64px;
+  gap: 14px;
+  align-items: center;
+  margin-bottom: 16px;
+}
+.lc-vs-head > img {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  border: 3px solid #2563eb;
+}
+.lc-vs-head > img:last-child {
+  border-color: #dc2626;
+}
+.lc-vs-bar > div:first-child,
+.lc-vs-bar > div:last-child {
+  display: flex;
+  justify-content: space-between;
+}
+.lc-vs-bar b {
+  font-size: 1.3rem;
+  font-variant-numeric: tabular-nums;
+}
+.lc-vs-bar small {
+  color: var(--muted);
+}
+.lc-vs-track,
+.lc-cmp-track {
+  height: 10px;
+  border-radius: 6px;
+  background: #fca5a5;
+  overflow: hidden;
+  margin: 4px 0;
+}
+.lc-vs-track i,
+.lc-cmp-track i {
+  display: block;
+  height: 100%;
+  background: #2563eb;
+}
+.lc-cmp {
+  display: grid;
+  grid-template-columns: 92px 1fr 92px;
+  gap: 10px;
+  align-items: center;
+  padding: 6px 0;
+  font-variant-numeric: tabular-nums;
+}
+.lc-cmp > b:last-child {
+  text-align: right;
+}
+.lc-cmp small {
+  display: block;
+  text-align: center;
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+.lc-cmp-track {
+  height: 6px;
+  background: color-mix(in srgb, #dc2626 35%, var(--soft));
+}
+.lc-mu-list {
+  display: grid;
+  gap: 2px;
+  max-height: 520px;
+  overflow-y: auto;
+}
+.lc-mu {
+  display: grid;
+  grid-template-columns: 34px 1fr auto 52px;
+  gap: 10px;
+  align-items: center;
+  padding: 6px 8px;
+  border: 0;
+  border-radius: 10px;
+  background: none;
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+  font-variant-numeric: tabular-nums;
+}
+.lc-mu:hover {
+  background: var(--soft);
+}
+.lc-mu.on {
+  background: color-mix(in srgb, #2563eb 12%, var(--surface));
+}
+.lc-mu img {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+}
+.lc-mu small {
+  text-align: right;
+}
+.lc-skill-list {
+  display: grid;
+  gap: 14px;
+}
+.lc-skill {
+  display: grid;
+  grid-template-columns: 48px 1fr;
+  gap: 12px;
+}
+.lc-skill img {
+  width: 48px;
+  height: 48px;
+  border-radius: 10px;
+}
+.lc-skill p {
+  margin: 4px 0 0;
+  white-space: pre-line;
+  line-height: 1.55;
+  font-size: 0.92rem;
+}
+.lc-key {
+  display: inline-grid;
+  place-items: center;
+  min-width: 22px;
+  height: 22px;
+  padding: 0 5px;
+  margin-right: 4px;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  color: #fff;
+  background: #111827;
+}
+.lc-tips {
+  margin: 0;
+  padding-left: 18px;
+  display: grid;
+  gap: 8px;
+  line-height: 1.55;
+}

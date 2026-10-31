@@ -673,5 +673,21 @@ export interface LolMetaStatus {
   last: { at: number; counted: number } | null;
   err: { at: number; msg: string } | null;
 }
-export const lolMeta = (patch = '') => remember(`lolmeta:${patch}`, 5 * MIN, () => call<{ patch: string; patches: { patch: string; games: number }[]; status: LolMetaStatus; total: number; rows: { cid: number; pos: string; g: number; w: number; kk: number; dd: number; aa: number }[]; bans: Record<number, number> }>(`lol/meta${patch ? `?patch=${encodeURIComponent(patch)}` : ''}`, 'GET', undefined, 20_000));
-export const lolChampMeta = (cid: number, patch = '') => remember(`lolchamp:${cid}:${patch}`, 5 * MIN, () => call<{ patch: string; patches: { patch: string; games: number }[]; status: LolMetaStatus; total: number; bans: number; pos: LolAggRow[]; items: LolAggRow[]; runes: LolAggRow[]; spells: LolAggRow[]; mine: LolAggRow[]; theirs: LolAggRow[] }>(`lol/champ?cid=${cid}${patch ? `&patch=${encodeURIComponent(patch)}` : ''}`, 'GET', undefined, 20_000));
+export const lolMeta = (patch = '') =>
+  remember(`lolmeta:${patch}`, 5 * MIN, () =>
+    call<{ patch: string; patches: { patch: string; games: number }[]; status: LolMetaStatus; total: number; rows: { cid: number; pos: string; g: number; w: number; kk: number; dd: number; aa: number }[]; bans: Record<number, number> }>(
+      `lol/meta${patch ? `?patch=${encodeURIComponent(patch)}` : ''}`,
+      'GET',
+      undefined,
+      20_000,
+    ),
+  );
+export const lolChampMeta = (cid: number, patch = '') =>
+  remember(`lolchamp:${cid}:${patch}`, 5 * MIN, () =>
+    call<{ patch: string; patches: { patch: string; games: number }[]; status: LolMetaStatus; total: number; bans: number; pos: LolAggRow[]; items: LolAggRow[]; runes: LolAggRow[]; spells: LolAggRow[]; mine: LolAggRow[]; theirs: LolAggRow[] }>(
+      `lol/champ?cid=${cid}${patch ? `&patch=${encodeURIComponent(patch)}` : ''}`,
+      'GET',
+      undefined,
+      20_000,
+    ),
+  );
