@@ -9482,3 +9482,132 @@ body.focus-on {
   background: var(--soft);
   font-weight: 700;
 }
+
+/* 달력 일정 */
+.cal-ev {
+  display: block;
+  width: calc(100% - 4px);
+  padding: 0 3px;
+  border-radius: 4px;
+  color: #fff;
+  font-size: 0.62rem;
+  line-height: 1.5;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-align: left;
+}
+.cal-ev.cont {
+  opacity: 0.65;
+}
+.cal-more {
+  font-size: 0.62rem;
+  color: var(--muted);
+  line-height: 1;
+}
+.cal-bar {
+  flex: none;
+  align-self: stretch;
+  width: 4px;
+  border-radius: 2px;
+}
+.cal-evt {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+.cal-memo {
+  color: var(--muted);
+  white-space: pre-wrap;
+}
+.ev-form {
+  display: grid;
+  gap: 12px;
+}
+.ev-title {
+  font-size: 1.05rem;
+  font-weight: 600;
+}
+.ev-colors {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.ev-color {
+  width: 28px;
+  height: 28px;
+  border: 0;
+  border-radius: 50%;
+  cursor: pointer;
+  transition: transform 0.12s;
+}
+.ev-color.on {
+  box-shadow:
+    0 0 0 2px var(--surface),
+    0 0 0 4px var(--text);
+  transform: scale(1.05);
+}
+.ev-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-height: 40px;
+  border-bottom: 1px solid var(--line);
+  padding-bottom: 8px;
+}
+.ev-when {
+  display: flex;
+  gap: 6px;
+}
+.ev-when .st-input {
+  width: auto;
+}
+.ev-switch {
+  width: 20px;
+  height: 20px;
+  accent-color: var(--accent);
+}
+.ev-repeat {
+  display: grid;
+  gap: 10px;
+  padding: 10px;
+  border-radius: 10px;
+  background: var(--surface);
+}
+.ev-days {
+  display: flex;
+  gap: 6px;
+}
+.ev-day {
+  flex: 1;
+  height: 34px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--bg);
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+.ev-day.on {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--on-accent);
+}
+.ev-del {
+  display: flex;
+  gap: 8px;
+}
+.ev-del .btn {
+  flex: 1;
+}
+.ev-danger {
+  color: var(--bad);
+}
+.ev-row > span,
+.ev-repeat span {
+  white-space: nowrap;
+}
+.ev-when .st-input {
+  min-width: 0;
+}

@@ -1047,3 +1047,20 @@ describe('쪽 없는 목차 (parseToc 단원 모드)', () => {
     ]);
   });
 });
+
+describe('달력 일정 (events)', () => {
+  it('반복 · 여러 날 · 뺀 날 · 알림', async () => {
+    const { eventsBetween, reminders, repeatText } = await import('../life/events');
+    const ev = (x: object) => ({ id: 'e', title: '수학', date: '2026-11-02', allDay: false, start: '19:00', end: '21:00', color: 'blue', created: 0, updatedAt: 0, ...x });
+    const weekly = { events: { e: ev({ repeat: { freq: 'weekly', every: 1, weekdays: [1, 3] }, skip: ['2026-11-04'] }) } } as never;
+    const m = eventsBetween(weekly, '2026-11-01', '2026-11-14');
+    expect([...m.keys()].sort()).toEqual(['2026-11-02', '2026-11-09', '2026-11-11']);
+    const multi = { events: { e: ev({ allDay: true, date: '2026-10-30', endDate: '2026-11-02' }) } } as never;
+    expect([...eventsBetween(multi, '2026-11-01', '2026-11-30').keys()].sort()).toEqual(['2026-11-01', '2026-11-02']);
+    const monthly = { events: { e: ev({ date: '2026-01-31', repeat: { freq: 'monthly', every: 1 } }) } } as never;
+    expect([...eventsBetween(monthly, '2026-02-01', '2026-03-31').keys()]).toEqual(['2026-03-31']);
+    const r = reminders({ events: { e: ev({ remind: 30 }) } } as never, '2026-11-01', Date.parse('2026-11-01T00:00:00+09:00'));
+    expect(r[0]).toMatchObject({ at: Date.parse('2026-11-02T18:30:00+09:00'), title: '수학' });
+    expect(repeatText(ev({ repeat: { freq: 'weekly', every: 2, weekdays: [1, 3] } }) as never)).toBe('2주마다 월·수');
+  });
+});

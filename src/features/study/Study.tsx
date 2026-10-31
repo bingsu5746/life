@@ -1,7 +1,7 @@
 // 공부 도우미: 탭과 하위 화면 (설계 docs/superpowers/specs/2026-10-23-study-planner-design.md)
 import { dueTodoRules } from './todoRules';
 import { pendingExamLocks } from './examPlan';
-import { lazy, Suspense, useEffect, useState } from 'react';
+import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import './study.css';
 import { AddButton } from './Add';
 import { pendingLocks, reviewCountToday } from './select';
@@ -12,6 +12,8 @@ import { Today } from './Today';
 import { localTimes, uploadDigest } from './notify';
 import { autoSaves, dueRuleTx } from '../life/calc';
 import { tutorSessions } from './tutor';
+import { reminders } from '../life/events';
+import { notifyRemind } from '../auth/api';
 // 시험 화면은 오늘 화면(D-day)과 같이 쓰여 함께 받는다
 import { Exams } from './Exams';
 import { go, Icon, Sheet, Toaster, useToday } from './ui';
@@ -78,6 +80,7 @@ const HIDDEN = ['settings'];
 
 export function Study({ path, loggedIn, syncReady = true, onLogin }: { path: string[]; loggedIn: boolean; syncReady?: boolean; onLogin: () => void }) {
   const d = useStudy();
+  const lastRemind = useRef('');
   const words = useWords();
   const today = useToday();
   const [more, setMore] = useState(false);
@@ -131,6 +134,19 @@ export function Study({ path, loggedIn, syncReady = true, onLogin }: { path: str
     const t = setTimeout(() => void uploadDigest().catch(() => {}), 5000);
     return () => clearTimeout(t);
   }, [d, words, today, loggedIn]);
+  // 달력 일정 알림: 바뀌었을 때만 서버에 다시 올린다
+  useEffect(() => {
+    if (!loggedIn || !localTimes()) return;
+    const t = setTimeout(() => {
+      const items = reminders(d, today);
+      const key = JSON.stringify(items);
+      if (lastRemind.current === key) return;
+      notifyRemind(items)
+        .then(() => (lastRemind.current = key))
+        .catch(() => {});
+    }, 4000);
+    return () => clearTimeout(t);
+  }, [d.events, today, loggedIn]); // eslint-disable-line react-hooks/exhaustive-deps
   // 새 영단어에 예문을 저절로 (로그인했을 때, 단어가 바뀌고 잠시 뒤)
   useEffect(() => {
     if (!loggedIn || !syncReady) return;

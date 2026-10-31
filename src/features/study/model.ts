@@ -924,6 +924,32 @@ export interface StudyData {
   records: Record<Id, MusicRecord>;
   places: Record<Id, TravelPlace>;
   problems: Record<Id, SolvedProblem>;
+  events: Record<Id, CalEvent>;
+}
+
+/** 달력 일정 (내가 넣는 것) */
+export interface CalEvent extends Stamp {
+  id: Id;
+  title: string;
+  /** 시작 날 */
+  date: DateStr;
+  /** 여러 날 일정의 끝 날 (같은 날이면 없음) */
+  endDate?: DateStr;
+  allDay: boolean;
+  /** 시작 · 끝 시각 HH:MM (하루 종일이 아닐 때) */
+  start?: string;
+  end?: string;
+  /** 색 이름 (EVENT_COLORS 의 키) */
+  color: string;
+  /** 반복: 매일 · 매주(요일) · 매달(같은 날) · 매년 */
+  repeat?: { freq: 'daily' | 'weekly' | 'monthly' | 'yearly'; every: number; weekdays?: number[]; until?: DateStr };
+  /** 반복 중 뺀 날 */
+  skip?: DateStr[];
+  /** 몇 분 전에 알림 (없으면 알림 없음, 0 = 정각) */
+  remind?: number;
+  place?: string;
+  memo?: string;
+  created: number;
 }
 
 /** 단어는 많아질 수 있어 따로 묶는다 */
@@ -968,6 +994,7 @@ export const COLLECTIONS = [
   'records',
   'places',
   'problems',
+  'events',
 ] as const;
 export type Collection = (typeof COLLECTIONS)[number];
 
@@ -1026,6 +1053,7 @@ export function emptyStudy(): StudyData {
     records: {},
     places: {},
     problems: {},
+    events: {},
   };
 }
 

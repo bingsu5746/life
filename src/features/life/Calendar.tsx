@@ -7,6 +7,9 @@ import { useStudy } from '../study/store';
 import { go, useToday } from '../study/ui';
 import { daysInMonth, monthLabel, shiftMonth } from './calc';
 import { CAL_KIND, monthItems } from './calendar';
+import { EventSheet } from './EventSheet';
+import { colorOf, eventsBetween, repeatText, timeText } from './events';
+import type { CalEvent } from '../study/model';
 
 export function CalendarPage() {
   const d = useStudy();
@@ -22,6 +25,9 @@ export function CalendarPage() {
   const lead = weekday(from);
   const cells = [...Array(lead).fill(null), ...Array.from({ length: n }, (_, i) => addDays(from, i))];
   const sel = items.get(pick) ?? [];
+  const evs = eventsBetween(d, from, `${month}-${String(n).padStart(2, '0')}`);
+  const selEv = evs.get(pick) ?? [];
+  const [edit, setEdit] = useState<{ ev?: CalEvent; on?: string } | null>(null);
   return (
     <div className="st-page narrow">
       <div className="st-page-head">
@@ -44,6 +50,9 @@ export function CalendarPage() {
           <button className="btn btn-sm" aria-label="다음 달" onClick={() => setMonth(shiftMonth(month, 1))}>
             ›
           </button>
+          <button className="btn btn-sm btn-primary" onClick={() => setEdit({})}>
+            + 일정
+          </button>
         </div>
       </div>
       <div className="cal">
@@ -56,6 +65,12 @@ export function CalendarPage() {
           date ? (
             <button key={date} className={`cal-d ${date === today ? 'today' : ''} ${date === pick ? 'on' : ''} ${weekday(date) === 0 || isHoliday(date) ? 'sun' : ''}`} onClick={() => setPick(date)}>
               <b>{Number(date.slice(8))}</b>
+              {(evs.get(date) ?? []).slice(0, 2).map(({ e, first }) => (
+                <span key={e.id} className={`cal-ev ${first ? '' : 'cont'}`} style={{ background: colorOf(e) }}>
+                  {e.title}
+                </span>
+              ))}
+              {(evs.get(date)?.length ?? 0) > 2 && <small className="cal-more">+{(evs.get(date)?.length ?? 0) - 2}</small>}
               <span className="cal-dots">
                 {[...new Set((items.get(date) ?? []).map((x) => x.kind))].slice(0, 4).map((k) => (
                   <i key={k} className={`cal-k ${k}`} />
@@ -69,7 +84,20 @@ export function CalendarPage() {
       </div>
       <section className="st-card">
         <h3 className="st-h">{longDate(pick)}</h3>
-        {!sel.length ? (
+        {selEv.map(({ e, on }) => (
+          <button key={e.id} className="cal-item" onClick={() => setEdit({ ev: e, on })}>
+            <i className="cal-bar" style={{ background: colorOf(e) }} />
+            <span className="cal-evt">
+              <b>{e.title}</b>
+              <small className="st-muted">
+                {[timeText(e), e.endDate && e.endDate > e.date ? `~${Number(e.endDate.slice(5, 7))}/${Number(e.endDate.slice(8))}` : '', repeatText(e), e.place].filter(Boolean).join(' · ')}
+                {e.remind !== undefined ? ' · 🔔' : ''}
+              </small>
+              {e.memo && <small className="cal-memo">{e.memo}</small>}
+            </span>
+          </button>
+        ))}
+        {!sel.length && !selEv.length ? (
           <p className="st-muted">일정이 없어요.</p>
         ) : (
           sel.map((x, i) => (
@@ -80,6 +108,7 @@ export function CalendarPage() {
           ))
         )}
       </section>
+      {edit && <EventSheet date={pick} ev={edit.ev} on={edit.on} onClose={() => setEdit(null)} />}
     </div>
   );
 }

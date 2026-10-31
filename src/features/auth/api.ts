@@ -200,6 +200,9 @@ export async function notifyOff(endpoint?: string) {
 export async function notifyDigest(entries: { date: string; slot: number; title: string; body: string; url?: string }[]) {
   return call<{ ok: true }>('notify/digest', 'PUT', { entries });
 }
+export async function notifyRemind(items: { at: number; title: string; body: string }[]) {
+  return call<{ ok: true; n: number }>('notify/remind', 'PUT', { items });
+}
 export async function notifyTest() {
   return call<{ ok: true; sent: number }>('notify/test', 'POST', {});
 }

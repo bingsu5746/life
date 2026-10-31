@@ -248,7 +248,7 @@ export class Accounts extends DurableObject<Env> {
     if (req.method === 'POST' || req.method === 'PUT' || req.method === 'DELETE') {
       const big = path.startsWith('store/') || path.startsWith('study-photo/') || path === 'solve' || path === 'solve/img' || path === 'bb/scan' || path === 'ai/note' || path === 'ai/receipt' || path === 'ai/toc' || path === 'ai/stt';
       const text = await req.text();
-      if (text.length > (big ? MAX_STORE + 1000 : path === 'translate' || path === 'notify/digest' || path === 'ai/diary' ? 4 * MAX_SMALL_BODY : MAX_SMALL_BODY)) return fail('보낸 내용이 너무 커요.', 413);
+      if (text.length > (big ? MAX_STORE + 1000 : path === 'translate' || path === 'notify/digest' || path === 'notify/remind' || path === 'ai/diary' ? 4 * MAX_SMALL_BODY : MAX_SMALL_BODY)) return fail('보낸 내용이 너무 커요.', 413);
       try {
         const parsed: unknown = text ? JSON.parse(text) : {};
         if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return fail('잘못된 요청이에요.');
@@ -2435,7 +2435,12 @@ export class Accounts extends DurableObject<Env> {
     const gameAt = games ? Math.max(Date.now() + 5_000, Number(this.cacheGet('games:nextcheck') ?? 0)) : 0;
     // 롤 챔피언 통계 모으기: Riot 키가 있으면 1분마다 (키가 막히면 1시간 쉼)
     const lolAt = this.riotKey() ? Math.max(Date.now() + 5_000, Number(this.cacheGet('lolmeta:next') ?? 0)) : 0;
-    const at = [r?.at ?? 0, nbaAt, gameAt, lolAt].filter((x) => x > 0);
+    // 달력 일정 알림: 가장 이른 시각
+    let remindAt = 0;
+    for (const row of this.sql.exec<{ data: string }>("SELECT data FROM cache WHERE key LIKE 'remind:%'").toArray()) {
+      for (const it of (JSON.parse(row.data) as { items: { at: number }[] }).items) if (!remindAt || it.at < remindAt) remindAt = Math.max(Date.now() + 1_000, it.at);
+    }
+    const at = [r?.at ?? 0, nbaAt, gameAt, lolAt, remindAt].filter((x) => x > 0);
     if (at.length) await this.ctx.storage.setAlarm(Math.min(...at));
     else await this.ctx.storage.deleteAlarm();
   }
@@ -2544,6 +2549,19 @@ export class Accounts extends DurableObject<Env> {
       this.sql.exec('UPDATE notify SET digest = ? WHERE user_id = ?', JSON.stringify(entries), user.id);
       return json({ ok: true });
     }
+    if (path === 'notify/remind' && req.method === 'PUT') {
+      // 달력 일정 알림: 기기가 앞으로 2주 동안 보낼 시각 · 글을 계산해 올린다 (서버는 그 시각에 보내기만)
+      const now = Date.now();
+      const items = (Array.isArray(b.items) ? b.items : [])
+        .filter((e): e is { at: number; title: string; body: string } => !!e && typeof e === 'object' && typeof (e as { at?: unknown }).at === 'number' && typeof (e as { title?: unknown }).title === 'string' && typeof (e as { body?: unknown }).body === 'string')
+        .filter((e) => e.at > now - 60_000 && e.at < now + 15 * DAY)
+        .slice(0, 60)
+        .map((e) => ({ at: Math.round(e.at), title: e.title.slice(0, 60), body: e.body.slice(0, 200) }));
+      if (items.length) this.cacheSet(`remind:${user.id}`, JSON.stringify({ origin, items }));
+      else this.sql.exec('DELETE FROM cache WHERE key = ?', `remind:${user.id}`);
+      await this.scheduleAlarm();
+      return json({ ok: true, n: items.length });
+    }
     if (path === 'notify/test' && req.method === 'POST') {
       const subs = this.sql.exec<PushSub & { [k: string]: SqlStorageValue }>('SELECT endpoint, p256dh, auth FROM push_subs WHERE user_id = ?', user.id).toArray();
       if (!subs.length) return fail('알림을 켠 기기가 없어요.', 404);
@@ -2625,6 +2643,22 @@ export class Accounts extends DurableObject<Env> {
     if (now + 30_000 >= Number(this.cacheGet('nba:nextcheck') ?? 0) && this.sql.exec<{ n: number }>("SELECT COUNT(*) AS n FROM cache WHERE key LIKE 'nbafav:%'").toArray()[0].n) {
       this.cacheSet('nba:nextcheck', String(now + 10 * 60_000));
       await this.nbaFavCheck().catch((e) => console.error('nba fav check failed', e instanceof Error ? e.message : String(e)));
+    }
+    // 달력 일정 알림 (때가 된 것만 보내고 지운다)
+    for (const row of this.sql.exec<{ key: string; data: string }>("SELECT key, data FROM cache WHERE key LIKE 'remind:%'").toArray()) {
+      const uid = row.key.slice(7);
+      const v = JSON.parse(row.data) as { origin: string; items: { at: number; title: string; body: string }[] };
+      const ready = v.items.filter((x) => x.at <= now + 30_000);
+      if (!ready.length) continue;
+      try {
+        const subs = this.sql.exec<PushSub & { [k: string]: SqlStorageValue }>('SELECT endpoint, p256dh, auth FROM push_subs WHERE user_id = ?', uid).toArray();
+        for (const it of ready) if (subs.length && it.at > now - 3600_000) await this.pushTo(subs, { title: it.title, body: it.body, url: '/calendar' }, v.origin);
+      } catch (err) {
+        console.error('remind push failed', err instanceof Error ? err.message : String(err));
+      }
+      const left = v.items.filter((x) => x.at > now + 30_000);
+      if (left.length) this.cacheSet(row.key, JSON.stringify({ ...v, items: left }));
+      else this.sql.exec('DELETE FROM cache WHERE key = ?', row.key);
     }
     const due = this.sql.exec<{ user_id: string; times: string; tz: number; next_at: number; digest: string; origin: string }>('SELECT * FROM notify WHERE next_at IS NOT NULL AND next_at <= ?', now + 30_000).toArray();
     for (const n of due) {
