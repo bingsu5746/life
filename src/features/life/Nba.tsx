@@ -30,6 +30,7 @@ import {
 import { addDays, longDate } from '../study/dates';
 import { go, Sheet, toast } from '../study/ui';
 import { NBA_TEAMS, nbaFace, nbaLogo } from './nbaLogo';
+import { NBA_IDS } from './nbaIds';
 
 const FAV_KEY = 'my-study.nba.fav';
 /** 미국 동부 기준 오늘 (한국보다 13~14시간 늦다: 한국 아침이면 미국은 전날 밤) */
@@ -116,12 +117,14 @@ export function NbaPage({ sub }: { sub?: string }) {
 }
 
 /** 선수 얼굴 (NBA 공식 이미지, 우리 서버를 거쳐). 번호가 없거나 사진이 없으면 사람 모양 */
-function Face({ id, size = 36 }: { id?: number; name?: string; size?: number }) {
+/** 선수 얼굴: NBA 번호가 있으면 그걸로, 없으면(2K · balldontlie · Highlightly 에서 온 선수) 이름으로 NBA 번호를 찾아서 */
+function Face({ id, name, size = 36 }: { id?: number; name?: string; size?: number }) {
   const [bad, setBad] = useState(false);
+  const pid = id || (name ? NBA_IDS[normName(name)] : undefined);
   return (
     <span className="nba-face" style={{ width: size, height: size }}>
-      {id && !bad ? (
-        <img src={nbaFace(id)} alt="" loading="lazy" onError={() => setBad(true)} />
+      {pid && !bad ? (
+        <img src={nbaFace(pid)} alt="" loading="lazy" onError={() => setBad(true)} />
       ) : (
         <svg viewBox="0 0 24 24" aria-hidden>
           <circle cx="12" cy="9" r="4" />
@@ -491,7 +494,7 @@ function GamePage({ id }: { id: number }) {
                     {list.map((l) => (
                       <tr key={l.playerId} className={minutes(l.min) ? '' : 'dnp'}>
                         <td className="l">
-                          {src === 'nba' && <Face id={l.playerId} name={l.name} size={26} />}{' '}
+                          <Face id={src === 'nba' ? l.playerId : undefined} name={l.name} size={26} />{' '}
                           <button className="st-link" onClick={() => setPlayer(l)}>
                             {l.name}
                           </button>
@@ -573,7 +576,7 @@ function PlayerSheet({ who, season, onClose }: { who: PlayerRef; season: number;
   }, [nbaId]);
   return (
     <Sheet title={who.name} onClose={onClose}>
-      {who.src === 'nba' || avg?.id ? <Face id={who.src === 'nba' ? who.id : avg?.id} name={who.name} size={96} /> : null}
+      <Face id={who.src === 'nba' ? who.id : avg?.id} name={who.name} size={96} />
       <p className="st-muted sm nba-trow">
         <Logo abbr={who.team} size={22} />
         {who.team}
