@@ -462,8 +462,8 @@ export interface Found {
   image?: string;
   extra?: string;
 }
-export async function lookup(type: 'game' | 'book' | 'music', q: string) {
-  return call<{ items: Found[] }>('lookup', 'POST', { type, q });
+export function lookup(type: 'game' | 'book' | 'music', q: string) {
+  return remember(`lk:${type}:${q}`, 30 * MIN, () => call<{ items: Found[] }>('lookup', 'POST', { type, q }));
 }
 export async function musicSimilar(artists: string[], have: string[]) {
   return call<{ items: { name: string; because: string[] }[] }>('music/similar', 'POST', { artists, have });

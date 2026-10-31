@@ -160,7 +160,7 @@ export function MovieSheet({ item, today, onClose }: { item: Partial<Movie>; tod
       catalogSearch(q)
         .then((r) => on && setFound(r.items.filter((f) => f.title !== q || f.open.slice(0, 4) !== year)))
         .catch(() => on && setFound([]));
-    }, 250);
+    }, 120);
     return () => {
       on = false;
       clearTimeout(t);

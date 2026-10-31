@@ -20,7 +20,7 @@ export function NameSearch({ type, value, onChange, onPick, placeholder, label, 
             setOff(true);
           }
         });
-    }, 350);
+    }, 180);
     return () => {
       on = false;
       clearTimeout(t);

@@ -180,7 +180,7 @@ function BookFind({ have }: { have: Reading[] }) {
           setNote(r.needKey ? '책 찾기는 예스24 · 국립중앙도서관 키가 있어야 돼요.' : '');
         })
         .catch((e) => on && setNote(e instanceof Error ? e.message : '찾지 못했어요'));
-    }, 450);
+    }, 220);
     return () => {
       on = false;
       clearTimeout(t);

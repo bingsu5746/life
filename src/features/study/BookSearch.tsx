@@ -2,6 +2,8 @@
 import { useEffect, useState } from 'react';
 import { bookSearch, isLoggedIn, type BookHit } from '../auth/api';
 
+let lastList: BookHit[] = [];
+
 export function BookSearch({ value, onChange, onPick, placeholder, label, picked: picked0 }: { value: string; onChange: (v: string) => void; onPick: (b: BookHit) => void; placeholder: string; label: string; picked?: boolean }) {
   const [items, setItems] = useState<BookHit[]>([]);
   const [picked, setPicked] = useState(!!picked0);
@@ -10,15 +12,19 @@ export function BookSearch({ value, onChange, onPick, placeholder, label, picked
     const q = value.trim();
     if (picked || q.length < 2 || !isLoggedIn()) return setItems([]);
     let on = true;
+    // 앞서 받은 목록에 친 말이 들어간 책이 있으면 서버를 기다리지 않고 먼저 보여 준다
+    const quick = lastList.filter((b) => b.title.toLowerCase().includes(q.toLowerCase()));
+    if (quick.length) setItems(quick.slice(0, 8));
     const t = setTimeout(() => {
       bookSearch(q)
         .then((r) => {
           if (!on) return;
+          lastList = r.list;
           setItems(r.list.slice(0, 8));
           setNote(r.needKey ? '책 찾기는 예스24 · 국립중앙도서관 키가 있어야 돼요 (지금은 직접 써 주세요)' : '');
         })
         .catch(() => on && setItems([]));
-    }, 400);
+    }, 200);
     return () => {
       on = false;
       clearTimeout(t);
