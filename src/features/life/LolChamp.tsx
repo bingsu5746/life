@@ -132,7 +132,7 @@ export function LolChampPage({ id, sub }: { id: string; sub?: string }) {
           </select>
         )}
       </div>
-      {tab !== 'skills' && tab !== 'tips' && meta && !here && <p className="st-muted">아직 이 챔피언의 경기를 충분히 모으지 못했어요. 서버가 틈날 때마다 마스터 이상 솔랭을 모으고 있어요. 스킬 · 팁은 지금 볼 수 있어요.</p>}
+      {tab !== 'skills' && tab !== 'tips' && meta && !here && <p className="st-muted">아직 모은 경기가 적어요.</p>}
       {tab === 'build' && here && meta && <Build meta={meta} pos={pos} dd={dd} items={items} runes={runes} onTab={setTab} />}
       {tab === 'runes' && here && meta && <Runes meta={meta} pos={pos} runes={runes} />}
       {tab === 'items' && here && meta && <Items meta={meta} pos={pos} dd={dd} items={items} />}
@@ -383,7 +383,7 @@ function Counter({ meta, pos, dd, me }: { meta: Meta; pos: string; dd: Dd; me: s
   const [pick, setPick] = useState<number | null>(null);
   const list = sort === 'games' ? c.all : sort === 'win' ? c.easy : c.hard;
   const sel = c.all.find((m) => m.opp === (pick ?? list[0]?.opp));
-  if (!c.all.length) return <p className="st-muted">아직 맞대결 판이 적어서 카운터를 보여 드릴 수 없어요 (상대마다 {c.min}판 넘게 모이면 보여요).</p>;
+  if (!c.all.length) return <p className="st-muted">아직 맞대결 판이 적어요.</p>;
   const myName = dd.byId[me] ?? me;
   return (
     <div className="lc-counter">
@@ -424,7 +424,7 @@ function Counter({ meta, pos, dd, me }: { meta: Meta; pos: string; dd: Dd; me: s
               <b className={b > a ? 'lc-down' : 'st-muted'}>{f(b)}</b>
             </div>
           ))}
-          <p className="st-muted sm">{sel.g.toLocaleString('ko-KR')}판 맞대결 (마스터 이상 솔랭, 같은 포지션끼리)</p>
+          <p className="st-muted sm">{sel.g.toLocaleString('ko-KR')}판</p>
         </section>
       )}
       <section className="st-card">
@@ -457,7 +457,7 @@ function Counter({ meta, pos, dd, me }: { meta: Meta; pos: string; dd: Dd; me: s
           )}
         </div>
         <p className="st-muted sm">
-          승률은 {myName} 쪽 기준이에요. 상대마다 {c.min}판 넘게 만난 것만 보여요.
+          {myName} 기준 · {c.min}판 이상
         </p>
       </section>
     </div>

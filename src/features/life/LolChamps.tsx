@@ -93,8 +93,7 @@ export function LolChampsPage() {
       {err && <p className="st-muted">{err}</p>}
       {data && (
         <p className="st-muted sm">
-          마스터 이상 솔로랭크 {data.total.toLocaleString('ko-KR')}판을 이 앱 서버가 직접 모아 센 통계예요 (서버 여유가 있을 때 1분마다 몇 판씩 늘어나요). {data.total < 2000 ? '아직 적어서 숫자가 많이 흔들려요.' : ''}
-          {data.status.err && Date.now() - data.status.err.at < 3600_000 ? ` · 모으기 오류: ${data.status.err.msg}` : ''}
+          마스터+ 솔랭 {data.total.toLocaleString('ko-KR')}판{data.status.err && Date.now() - data.status.err.at < 3600_000 ? ` · 모으기 오류: ${data.status.err.msg}` : ''}
         </p>
       )}
       {data?.status.writes && <WriteUse w={data.status.writes} />}
@@ -145,7 +144,7 @@ export function LolChampsPage() {
           </table>
         </section>
       )}
-      {data && !rows.length && !found.length && <p className="st-muted">{data.total ? '조건에 맞는 챔피언이 없어요.' : '아직 모은 경기가 없어요. 몇 분 뒤 다시 와 주세요. 그동안 위에서 챔피언을 찾아 스킬 · 팁은 볼 수 있어요.'}</p>}
+      {data && !rows.length && !found.length && <p className="st-muted">{data.total ? '조건에 맞는 챔피언이 없어요.' : '아직 모은 경기가 없어요.'}</p>}
     </div>
   );
 }
@@ -157,13 +156,12 @@ function WriteUse({ w }: { w: NonNullable<Awaited<ReturnType<typeof lolMeta>>['s
   return (
     <details className="st-muted sm">
       <summary>
-        서버 저장 쓰기 오늘 {n(w.today.all)}줄 / 한도 {n(w.limit)}줄 (롤 통계 {n(w.today.lol)}줄)
+        서버 쓰기 {n(w.today.all)} / {n(w.limit)}줄
       </summary>
-      <p>롤 통계는 하루 {n(w.cap)}줄 안에서, 다른 기능이 쓰고 남는 만큼만 모아요. 하루는 한국 시간 오전 9시에 바뀌어요.</p>
       <ul>
         {rows.map((r) => (
           <li key={r.day}>
-            {r.day}: 전체 {n(r.all)}줄 · 롤 통계 {n(r.lol)}줄 · 나머지(내가 쓴 것 등) {n(r.all - r.lol)}줄
+            {r.day}: 전체 {n(r.all)} · 롤 통계 {n(r.lol)} · 나머지 {n(r.all - r.lol)}
           </li>
         ))}
       </ul>

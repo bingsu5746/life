@@ -117,21 +117,21 @@ function Waiting({ tries }: { tries: number }) {
   return (
     <section className="st-card">
       <p>
-        <b>게임을 기다리는 중…</b> 롤이 켜진 <b>같은 컴퓨터</b>에서 이 화면을 열고 게임(로딩이 끝난 뒤)에 들어가면 2초마다 새로 나와요.
+        <b>게임을 기다리는 중…</b> 롤이 켜진 컴퓨터에서 열어 주세요.
       </p>
       {tries > 2 && (
         <>
-          <p className="st-muted sm">게임 중인데도 안 나오면, 브라우저가 게임의 자체 인증서를 막고 있는 거예요. 둘 중 하나를 해 주세요.</p>
+          <p className="st-muted sm">안 나오면:</p>
           <ol className="st-muted sm ll-help">
             <li>
               게임 중에{' '}
               <a href={SOURCES[0]} target="_blank" rel="noreferrer">
                 이 주소
               </a>
-              를 한 번 열고, 경고 화면에서 「고급 → 계속 진행」을 누른 뒤 돌아오기. 브라우저가 「로컬 네트워크 접근」을 물으면 허용.
+              를 열어 「계속 진행」 누르기
             </li>
             <li>
-              그래도 안 되면 도우미 실행: 이 앱 코드의 <code>scripts/lol-live-relay.mjs</code> 를 내려받아 <code>node lol-live-relay.mjs</code> (Node 18 이상, 설치할 것 없음). 켜 두면 이 화면이 알아서 붙어요.
+              <code>node scripts/lol-live-relay.mjs</code> 켜 두기
             </li>
           </ol>
         </>
@@ -191,7 +191,6 @@ function Game({ d, dd, items }: { d: Live; dd: Dd; items: Record<number, Item> |
             상대 <b>{kills(enemies)}</b>킬 · {gold(enemies).toLocaleString('ko-KR')}골드
           </span>
         </div>
-        <p className="st-muted sm">골드는 지금 가진 아이템 값의 합이에요 (상대가 들고 있는 돈은 게임이 알려 주지 않아요).</p>
         <div className="ll-teams">
           {[allies, enemies].map((list, i) => (
             <ul key={i} className="ll-team">
@@ -286,16 +285,16 @@ function Advice({ me, opp, myCid, oppCid, oppId, dd, items, gold }: { me: LPlaye
           {mu && mu.g >= 5 ? (
             <>
               {' '}
-              — 마스터 이상에서 이 맞대결 승률 <b className={mu.w / mu.g >= 0.5 ? 'lc-up' : 'lc-down'}>{pct1((mu.w / mu.g) * 100)}</b> ({mu.g}판)
+              — 승률 <b className={mu.w / mu.g >= 0.5 ? 'lc-up' : 'lc-down'}>{pct1((mu.w / mu.g) * 100)}</b> ({mu.g}판)
             </>
           ) : (
-            <span className="st-muted"> — 이 맞대결은 아직 모은 판이 적어요</span>
+            <span className="st-muted"> — 판 수 부족</span>
           )}
         </p>
       )}
       {next.length > 0 && (
         <>
-          <p className="st-muted sm">아직 없는 완성 아이템 중 마스터 이상이 많이 가는 것</p>
+          <p className="st-muted sm">추천 아이템</p>
           <div className="ll-next">
             {next.map((x) => (
               <span key={x.id} className={gold >= (items?.[x.id]?.gold ?? 1e9) ? 'lc-up' : ''}>
@@ -308,7 +307,7 @@ function Advice({ me, opp, myCid, oppCid, oppId, dd, items, gold }: { me: LPlaye
       )}
       {opp && tips && tips.enemytips.length > 0 && (
         <>
-          <p className="st-muted sm">{opp.championName} 상대할 때 (Riot 공식 팁)</p>
+          <p className="st-muted sm">{opp.championName} 상대 팁</p>
           <ul>
             {tips.enemytips.map((x) => (
               <li key={x}>{plain(x)}</li>

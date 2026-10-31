@@ -126,8 +126,31 @@ async function riot(key: string, url: string): Promise<unknown> {
   return res.json();
 }
 
-/** 한 번에: 마스터 이상 한 사람의 최근 솔랭 몇 판을 받아 센다 */
-export async function lolMetaTick(key: string, sql: Sql, cacheGet: (k: string) => string | undefined, cacheSet: (k: string, v: string) => void, perTick = 3): Promise<{ counted: number }> {
+/** 전체 챔피언 번호 (Data Dragon, 하루 한 번 새로) */
+async function allChamps(cacheGet: (k: string) => string | undefined, cacheSet: (k: string, v: string) => void): Promise<number[]> {
+  const c = JSON.parse(cacheGet('lolmeta:champs') ?? 'null') as { at: number; ids: number[] } | null;
+  if (c && Date.now() - c.at < 86_400_000 && c.ids.length) return c.ids;
+  const v = ((await (await within(fetch('https://ddragon.leagueoflegends.com/api/versions.json'), 15_000, 'Data Dragon')).json()) as string[])[0];
+  const j = (await (await within(fetch(`https://ddragon.leagueoflegends.com/cdn/${v}/data/en_US/champion.json`), 15_000, 'Data Dragon')).json()) as { data: Record<string, { key: string }> };
+  const ids = Object.values(j.data)
+    .map((x) => Number(x.key))
+    .filter((x) => x > 0)
+    .sort((a, b) => a - b);
+  cacheSet('lolmeta:champs', JSON.stringify({ at: Date.now(), ids }));
+  return ids;
+}
+
+/** 챔피언 → 그 챔피언을 하는 마스터 이상 사람들 (센 경기 참가자 · 숙련도 상위에서 알게 된 것, 챔피언마다 최근 8명) */
+type Who = Record<string, string[]>;
+const addWho = (who: Who, cid: number, puuid: string) => {
+  const l = (who[cid] ??= []).filter((x) => x !== puuid);
+  l.unshift(puuid);
+  who[cid] = l.slice(0, 8);
+};
+
+/** 한 번에: 모든 챔피언을 차례로 돌며, 이번 차례 챔피언을 하는 사람의 최근 솔랭 몇 판을 받아 센다
+ *  (한 판에 10명이 다 세지니, 인기 챔피언은 저절로 많이 모이고 비인기 챔피언도 차례가 돌아온다) */
+export async function lolMetaTick(key: string, sql: Sql, cacheGet: (k: string) => string | undefined, cacheSet: (k: string, v: string) => void, perTick = 3): Promise<{ counted: number; champ?: number }> {
   let seeds = JSON.parse(cacheGet('lolmeta:seeds') ?? 'null') as { at: number; list: string[] } | null;
   if (!seeds || Date.now() - seeds.at > 24 * 3600_000 || !seeds.list.length) {
     const list: string[] = [];
@@ -140,10 +163,32 @@ export async function lolMetaTick(key: string, sql: Sql, cacheGet: (k: string) =
     seeds = { at: Date.now(), list: list.sort(() => Math.random() - 0.5) };
     cacheSet('lolmeta:seeds', JSON.stringify(seeds));
   }
-  const i = Number(cacheGet('lolmeta:i') ?? 0) % seeds.list.length;
-  cacheSet('lolmeta:i', String(i + 1));
+  const who = JSON.parse(cacheGet('lolmeta:who') ?? '{}') as Who;
+  // 숙련도 상위 3개로 사람 알아 두기 (한 번에 2명씩, 시드 목록을 차례로)
+  const mi = Number(cacheGet('lolmeta:mi') ?? 0);
+  for (let k = 0; k < 2; k++) {
+    const p = seeds.list[(mi + k) % seeds.list.length];
+    const top = (await riot(key, `https://kr.api.riotgames.com/lol/champion-mastery/v4/champion-masteries/by-puuid/${p}/top?count=3`).catch(() => [])) as { championId?: number }[];
+    for (const t of top) if (t.championId) addWho(who, t.championId, p);
+  }
+  cacheSet('lolmeta:mi', String(mi + 2));
+
+  // 이번 차례 챔피언
+  const champs = await allChamps(cacheGet, cacheSet);
+  const ci = Number(cacheGet('lolmeta:ci') ?? 0);
+  cacheSet('lolmeta:ci', String(ci + 1));
+  const champ = champs[ci % champs.length];
+  const players = who[champ] ?? [];
+  let puuid: string;
+  if (players.length) puuid = players[Math.floor(Math.random() * players.length)];
+  else {
+    // 아직 그 챔피언을 하는 사람을 모르면 시드 차례대로
+    const i = Number(cacheGet('lolmeta:i') ?? 0) % seeds.list.length;
+    cacheSet('lolmeta:i', String(i + 1));
+    puuid = seeds.list[i];
+  }
   const since = Math.floor((Date.now() - 14 * 86_400_000) / 1000);
-  const ids = (await riot(key, `https://asia.api.riotgames.com/lol/match/v5/matches/by-puuid/${seeds.list[i]}/ids?queue=420&type=ranked&startTime=${since}&count=10`)) as string[];
+  const ids = (await riot(key, `https://asia.api.riotgames.com/lol/match/v5/matches/by-puuid/${puuid}/ids?queue=420&type=ranked&startTime=${since}&count=20`)) as string[];
   const fresh = ids.filter((x) => !sql.exec('SELECT 1 FROM lolm2 WHERE id = ?', x).toArray().length).slice(0, perTick);
   // 하루 한 번 30일 지난 번호 지우기
   if (Date.now() - Number(cacheGet('lolmeta:gc') ?? 0) > 86_400_000) {
@@ -151,8 +196,15 @@ export async function lolMetaTick(key: string, sql: Sql, cacheGet: (k: string) =
     cacheSet('lolmeta:gc', String(Date.now()));
   }
   const got: { id: string; m: unknown }[] = [];
-  for (const id of fresh) got.push({ id, m: await riot(key, `https://asia.api.riotgames.com/lol/match/v5/matches/${id}`) });
-  return { counted: got.length ? countMatches(sql, got) : 0 };
+  for (const id of fresh) {
+    const m = await riot(key, `https://asia.api.riotgames.com/lol/match/v5/matches/${id}`);
+    got.push({ id, m });
+    // 이 판 참가자들도 그 챔피언을 하는 사람으로 기억
+    for (const p of ((m as { info?: { queueId?: number; participants?: { puuid?: string; championId?: number }[] } }).info?.queueId === 420 ? (m as { info: { participants?: { puuid?: string; championId?: number }[] } }).info.participants : []) ?? [])
+      if (p.puuid && p.championId) addWho(who, p.championId, p.puuid);
+  }
+  cacheSet('lolmeta:who', JSON.stringify(who));
+  return { counted: got.length ? countMatches(sql, got) : 0, champ };
 }
 
 // ===== 읽기 (화면이 쓰는 모양은 예전과 같게: k = '포지션|열쇠') =====

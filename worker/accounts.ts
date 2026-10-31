@@ -2542,7 +2542,7 @@ export class Accounts extends DurableObject<Env> {
         );
         this.rw.lol += this.rw.all - before;
         this.cacheSet('lolmeta:next', String(now + 60_000));
-        this.cacheSet('lolmeta:last', JSON.stringify({ at: now, counted: r.counted }));
+        this.cacheSet('lolmeta:last', JSON.stringify({ at: now, counted: r.counted, champ: r.champ }));
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
         console.error('lol meta tick failed', msg);

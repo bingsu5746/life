@@ -386,7 +386,6 @@ export function LolPage() {
               <button className="st-link" disabled={!!busy} onClick={() => void older()}>
                 예전 경기 40판 더 받기
               </button>{' '}
-              (많이 받을수록 시즌별 · 결산이 정확해져요)
             </p>
           )}
           {champ && <ChampSheet champ={champ} games={list.filter((g) => g.champ === champ)} dd={dd} onClose={() => setChamp(null)} />}

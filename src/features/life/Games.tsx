@@ -221,7 +221,7 @@ function SteamFind({ have }: { have: Game[] }) {
           ))}
         </div>
       )}
-      <p className="st-muted sm">값은 한국 Steam 상점(원) 기준이에요. 「여기서 본 최저」는 이 앱이 값을 본 뒤로 가장 쌌던 값이에요 (Steam 이 역대 최저를 알려 주지 않아요).</p>
+      <p className="st-muted sm">한국 Steam 상점 가격</p>
     </section>
   );
 }
@@ -294,7 +294,7 @@ function MySteam({ have }: { have: Game[] }) {
     return (
       <section className="st-card">
         <h3 className="st-h">내 Steam</h3>
-        <p className="st-muted sm">Steam ID(17자리 숫자)를 넣으면 가진 게임 · 한 시간 · 찜 목록(한국 값)을 보여 줘요. Steam 프로필이 「공개」여야 해요.</p>
+        <p className="st-muted sm">Steam ID(17자리)를 넣어 주세요. 프로필이 공개여야 해요.</p>
         <form
           className="st-inline"
           onSubmit={(e) => {
@@ -323,7 +323,7 @@ function MySteam({ have }: { have: Game[] }) {
       </div>
       {err && <p className="st-muted sm">{err}</p>}
       {!data && !err && <p className="st-muted sm">Steam 정보를 받는 중…</p>}
-      {data?.needKey && <p className="st-muted sm">가진 게임을 보려면 서버에 Steam 키가 필요해요. 찜 목록만 보여 드려요.</p>}
+      {data?.needKey && <p className="st-muted sm">Steam 키가 없어 찜 목록만 보여요.</p>}
       {me && (
         <>
           <div className="gm-me">
@@ -662,7 +662,7 @@ function SteamInsights() {
           </small>
         </div>
         {recordedDays < 2 ? (
-          <p className="st-muted sm">Steam 한 시간은 하루 한 번 적어 두고 그 차이로 날마다 한 시간을 셈해요. 내일부터 보여요 (아래 「찜 할인 알림」을 켜 두면 앱을 안 열어도 서버가 6시간마다 적어 둬요).</p>
+          <p className="st-muted sm">내일부터 보여요.</p>
         ) : (
           <div className="gs-week">
             {days.map((dd) => (
@@ -677,7 +677,7 @@ function SteamInsights() {
           </div>
         )}
         <p className="st-muted sm">
-          <i className="gs-dot g" /> 게임(Steam) <i className="gs-dot s" /> 공부 · Steam 기록은 하루 한 번만 적어서 하루가 밀릴 수 있어요.
+          <i className="gs-dot g" /> 게임(Steam) <i className="gs-dot s" /> 공부
         </p>
       </section>
 

@@ -164,7 +164,6 @@ export function MathRoom() {
           <a className="btn btn-primary" href={info.invite} target="_blank" rel="noreferrer">
             봇 초대하기
           </a>
-          <p className="st-muted sm">초대한 뒤 이 화면을 다시 열어 주세요.</p>
         </section>
       )}
       {info && info.guilds.length > 0 && (

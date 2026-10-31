@@ -43,7 +43,7 @@ export function GameTimeCard() {
     return (
       <section className="st-card">
         <h3 className="st-h">게임 시간</h3>
-        <p className="st-muted sm">설정 › 운동·돈·취미 › 게임 계정에 Steam ID · 라이엇 ID 를 넣으면 날마다 한 게임 시간을 저절로 모아 보여 드려요.</p>
+        <p className="st-muted sm">설정 › 게임 계정에 Steam ID · 라이엇 ID 를 넣어 주세요.</p>
       </section>
     );
   const days = Array.from({ length: 7 }, (_, i) => addDays(today, i - 6));
@@ -98,7 +98,6 @@ export function GameTimeCard() {
             <i className="gs-dot l" /> 롤{' '}
           </>
         )}
-        · 롤은 경기 시간을 그대로, Steam 은 하루 한 번 적어 둔 한 시간의 차이로 세요 (그래서 Steam 은 하루가 밀릴 수 있어요).
       </p>
       {(top.length > 0 || lolWeek > 0) && (
         <div className="sh-dist">
