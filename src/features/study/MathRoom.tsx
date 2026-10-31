@@ -1,7 +1,7 @@
 // 공부 › 수학 방: 부모님과 쓰는 Discord 수학 서버의 채널 글(강의 영상 · 진도 · 답변)을 보고, 앱에서 질문을 보낸다
 import { useEffect, useState } from 'react';
 import { discordChannels, discordInfo, discordMsgs, discordSend, type DcMsg } from '../auth/api';
-import { toast } from './ui';
+import { Sheet, toast } from './ui';
 
 const store = {
   get: (k: string) => {
@@ -81,6 +81,7 @@ export function MathRoom() {
   const [text, setText] = useState('');
   const [sending, setSending] = useState(false);
   const [tick, setTick] = useState(0);
+  const [picking, setPicking] = useState(false);
 
   useEffect(() => {
     discordInfo()
@@ -177,19 +178,37 @@ export function MathRoom() {
               ))}
             </select>
           )}
-          <select className="st-input" value={chan} onChange={(e) => setChan(e.target.value)} aria-label="채널">
-            {cats.map((cat) => (
-              <optgroup key={cat || '-'} label={cat || '채널'}>
-                {chans
-                  .filter((c) => c.cat === cat)
-                  .map((c) => (
-                    <option key={c.id} value={c.id}>
-                      # {c.name}
-                    </option>
-                  ))}
-              </optgroup>
-            ))}
-          </select>
+          <button className="mr-pick" onClick={() => setPicking(true)} aria-label="채널 고르기">
+            <span className="mr-hash">#</span>
+            <b>{chans.find((c) => c.id === chan)?.name ?? '채널 고르기'}</b>
+            <small>{chans.find((c) => c.id === chan)?.cat}</small>
+            <span className="mr-caret" aria-hidden>
+              ⌄
+            </span>
+          </button>
+          {picking && (
+            <Sheet title="채널" onClose={() => setPicking(false)}>
+              {cats.map((cat) => (
+                <div key={cat || '-'} className="mr-group">
+                  <small className="mr-cat">{cat || '채널'}</small>
+                  {chans
+                    .filter((c) => c.cat === cat)
+                    .map((c) => (
+                      <button
+                        key={c.id}
+                        className={`mr-chan ${c.id === chan ? 'on' : ''}`}
+                        onClick={() => {
+                          setChan(c.id);
+                          setPicking(false);
+                        }}
+                      >
+                        <span className="mr-hash">#</span> {c.name}
+                      </button>
+                    ))}
+                </div>
+              ))}
+            </Sheet>
+          )}
         </div>
       )}
       {info && !info.contentIntent && <p className="st-muted sm">개발자 포털 Bot 메뉴에서 MESSAGE CONTENT INTENT 를 켜야 글 내용이 보여요.</p>}
