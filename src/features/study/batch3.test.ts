@@ -1025,3 +1025,25 @@ describe('자세히 보기 (insights)', () => {
     expect(s[1].ranks![0].text).toBe('2시간 · 100% · 2번 · 한 번 1시간');
   });
 });
+
+describe('쪽 없는 목차 (parseToc 단원 모드)', () => {
+  it('쪽이 거의 없으면 줄마다 단원 하나 · 쪽이 있으면 예전처럼', async () => {
+    const { parseToc, isUnitOnly } = await import('./toc');
+    const r = parseToc('1부 교과서 개념 학습\n1강 시의 표현과 형식\n2강 시의 내용\n고전 시가 01~11\n현대시 01~11');
+    expect(isUnitOnly(r)).toBe(true);
+    expect(r.map((x) => [x.name, x.from])).toEqual([
+      ['1부 교과서 개념 학습', 1],
+      ['1강 시의 표현과 형식', 2],
+      ['2강 시의 내용', 3],
+      ['고전 시가 01~11', 4],
+      ['현대시 01~11', 5],
+    ]);
+    const p = parseToc('01 제곱근의 뜻과 성질  008\n02 무리수와 실수  028\n03 근호  040', 50);
+    expect(isUnitOnly(p)).toBe(false);
+    expect(p.map((x) => [x.from, x.to])).toEqual([
+      [8, 27],
+      [28, 39],
+      [40, 50],
+    ]);
+  });
+});

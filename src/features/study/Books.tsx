@@ -9,7 +9,7 @@ import { forecastFor, forecastText } from './forecast';
 import { BookTabs, Papers } from './Papers';
 import { bookDone, planCtx, planViews, reservedPages } from './select';
 import { getStudy, put, remove, useStudy, useWords } from './store';
-import { parseToc, tocText, type TocRow } from './toc';
+import { isUnitOnly, parseToc, tocText, type TocRow } from './toc';
 import { markBook } from './actions';
 import { BookSearch } from './BookSearch';
 import { bookToc, tocScan } from '../auth/api';
@@ -101,7 +101,8 @@ function BookList() {
                 <strong>{b.name}</strong>
                 <Bar value={n} max={all.length} label="푼 쪽" />
                 <small>
-                  {n}/{all.length}쪽 ({all.length ? Math.round((n / all.length) * 100) : 0}%)
+                  {n}/{all.length}
+                  {b.unitOnly ? '단원' : '쪽'} ({all.length ? Math.round((n / all.length) * 100) : 0}%)
                 </small>
                 {v ? (
                   <small className={v.sched.warning ? 'bad' : ''}>
@@ -134,7 +135,7 @@ function unitKeys(units: { name: string }[]): string[] {
 function BookEditor({ book, onDone }: { book?: Book; onDone: (id?: string, plan?: boolean) => void }) {
   const [name, setName] = useState(book?.name ?? '');
   const [subjectId, setSubjectId] = useState(book?.subjectId ?? '');
-  const [text, setText] = useState(book ? tocText(book.units) : '');
+  const [text, setText] = useState(book ? tocText(book.units, book.unitOnly) : '');
   const [last, setLast] = useState('');
   // 계획에서 뺄 단원: 「이름#몇 번째」로 기억한다 (이름이 같은 단원이 여럿이어도 하나만 빠지게)
   const [skips, setSkips] = useState<Set<string>>(() => new Set(unitKeys(book?.units ?? []).filter((_, i) => book!.units[i].skip)));
@@ -165,7 +166,7 @@ function BookEditor({ book, onDone }: { book?: Book; onDone: (id?: string, plan?
       );
       const got = await tocScan(images);
       if (!got.units.length) throw new Error('AI 가 단원을 찾지 못했어요');
-      const lines = got.units.map((u) => `${u.name} ${u.from}${u.to ? `-${u.to}` : ''}`).join('\n');
+      const lines = got.units.map((u) => (u.from ? `${u.name} ${u.from}${u.to ? `-${u.to}` : ''}` : u.name)).join('\n');
       setText((t) => (t.trim() ? t.trim() + '\n' : '') + lines);
       toast(`AI 가 단원 ${got.units.length}개를 읽었어요. 틀린 곳이 있으면 고쳐 주세요`);
       setOcr(null);
@@ -193,7 +194,7 @@ function BookEditor({ book, onDone }: { book?: Book; onDone: (id?: string, plan?
     if (!name.trim() || !subjectId || !good.length) return;
     const units: Unit[] = rows.flatMap((r, i) => (r.problem ? [] : [{ name: r.name, from: r.from, to: r.to, skip: skips.has(keys[i]) || undefined }]));
     const id = book?.id ?? newId();
-    put('books', { ...(book ?? { done: [], undone: [] }), id, name: name.trim(), subjectId, units });
+    put('books', { ...(book ?? { done: [], undone: [] }), id, name: name.trim(), subjectId, units, unitOnly: isUnitOnly(rows) || undefined });
     // 이미 푼 쪽: 「48」이면 첫 쪽부터 48쪽까지, 「1-48, 60-62」처럼 범위도 된다. 계획은 남은 쪽만 나눈다
     const sv = solved.trim();
     if (sv) {
@@ -232,10 +233,13 @@ function BookEditor({ book, onDone }: { book?: Book; onDone: (id?: string, plan?
               if (text.trim()) return;
               if (h.tocText?.trim()) {
                 // 쪽이 붙은 줄이 있으면 쪽 없는 큰 제목(「Ⅰ. 다항식」)은 빼고 넣는다
-                const lines = h.tocText.split('\n').map((l) => l.trim()).filter(Boolean);
+                const lines = h.tocText
+                  .split('\n')
+                  .map((l) => l.trim())
+                  .filter(Boolean);
                 const paged = lines.filter((l) => /\d+\s*(?:쪽|p)?$/i.test(l));
                 setText((paged.length >= 2 ? paged : lines).join('\n'));
-                toast('목차를 불러왔어요. 쪽이 없는 줄은 고쳐 주세요');
+                toast(paged.length >= 2 ? '목차를 불러왔어요. 쪽이 없는 줄은 고쳐 주세요' : '쪽이 없는 목차라 단원(줄)마다 나눴어요. 계획도 단원 수로 짜요');
                 return;
               }
               if (!h.toc) return;
@@ -285,7 +289,7 @@ function BookEditor({ book, onDone }: { book?: Book; onDone: (id?: string, plan?
             <thead>
               <tr>
                 <th>단원</th>
-                <th>쪽</th>
+                <th>{isUnitOnly(rows) ? '순서' : '쪽'}</th>
                 <th>계획에서 빼기</th>
               </tr>
             </thead>
@@ -293,7 +297,7 @@ function BookEditor({ book, onDone }: { book?: Book; onDone: (id?: string, plan?
               {rows.map((r, i) => (
                 <tr key={i} className={r.problem ? 'bad' : ''}>
                   <td>{r.name}</td>
-                  <td>{r.problem ? <span className="bad">{r.problem}</span> : `${r.from}~${r.to}${r.guessedEnd ? '*' : ''}`}</td>
+                  <td>{r.problem ? <span className="bad">{r.problem}</span> : r.unitOnly ? `${r.from}번째` : `${r.from}~${r.to}${r.guessedEnd ? '*' : ''}`}</td>
                   <td>
                     {!r.problem && (
                       <input
@@ -351,6 +355,8 @@ function BookDetail({ id, plan }: { id: string; plan?: boolean }) {
         </button>
       </Empty>
     );
+  const book = b;
+  const W = b.unitOnly ? '단원' : '쪽';
   if (editing) return <BookEditor book={b} onDone={() => setEditing(false)} />;
   const done = bookDone(b);
   const reserved = reservedPages(d, b.id);
@@ -400,7 +406,8 @@ function BookDetail({ id, plan }: { id: string; plan?: boolean }) {
           <div>
             <b>{all.length ? Math.round((n / all.length) * 100) : 0}%</b>
             <span>
-              {n} / {all.length}쪽
+              {n} / {all.length}
+              {W}
             </span>
           </div>
           <Bar value={n} max={all.length} label="푼 쪽" />
@@ -410,18 +417,29 @@ function BookDetail({ id, plan }: { id: string; plan?: boolean }) {
             <p className="st-sub">
               {v.sched.today.length ? (
                 <>
-                  오늘 <b>p.{rangeText(v.sched.today)}</b> ({v.sched.today.length}쪽)
+                  오늘{' '}
+                  <b>
+                    {book.unitOnly
+                      ? book.units
+                          .filter((u) => v.sched.today.includes(u.from))
+                          .map((u) => u.name)
+                          .join(', ')
+                      : `p.${rangeText(v.sched.today)}`}
+                  </b>{' '}
+                  ({v.sched.today.length}
+                  {W})
                 </>
               ) : v.plan.start > today ? (
                 `${shortDate(v.plan.start)}부터 시작`
               ) : (
                 '오늘은 배정 없음'
               )}
-              {v.sched.end && ` · ${longDate(v.sched.end)}까지 남은 ${v.sched.remaining.length}쪽`}
+              {v.sched.end && ` · ${longDate(v.sched.end)}까지 남은 ${v.sched.remaining.length}${W}`}
               {pace !== 0 && (
                 <span className={pace > 0 ? 'ok' : 'bad'}>
                   {' '}
-                  · 계획보다 {Math.abs(pace)}쪽 {pace > 0 ? '앞섬' : '밀림'}
+                  · 계획보다 {Math.abs(pace)}
+                  {W} {pace > 0 ? '앞섬' : '밀림'}
                 </span>
               )}
             </p>

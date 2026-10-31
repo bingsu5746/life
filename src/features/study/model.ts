@@ -301,6 +301,8 @@ export interface Book extends Stamp {
   units: Unit[];
   done: Mark[];
   undone: Mark[];
+  /** 쪽 없는 문제집: 단원 하나가 한 칸 (계획 · 진도를 단원 수로) */
+  unitOnly?: boolean;
 }
 
 /** 오늘 분량: 오늘 처음 볼 때 정해서 오늘 동안은 바꾸지 않는다 (§5.4) */

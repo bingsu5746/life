@@ -6,6 +6,8 @@ export interface TocRow extends Unit {
   line: string;
   /** 끝 페이지를 다음 줄에서 짐작했는지 */
   guessedEnd?: boolean;
+  /** 쪽 없는 목차의 단원 (순번이 쪽 자리에) */
+  unitOnly?: boolean;
   problem?: string;
 }
 
@@ -20,6 +22,8 @@ function parseLine(raw: string): { name: string; from: number; to: number | null
   if (!line) return null;
   // 끝에 「a-b」 범위
   const range = line.match(new RegExp(`^(.*?)\\s*(?:p\\.?|쪽|페이지)?\\s*(\\d{1,4})${DASH.source}(\\d{1,4})\\s*(?:쪽|p)?$`, 'i'));
+  // 「현대시 01~11」 같은 번호 매기기는 쪽이 아니다 (0 으로 시작하는 두 자리 범위)
+  if (range && /^0\d$/.test(range[2]) && /^\d{2}$/.test(range[3])) return null;
   if (range) {
     const name = range[1].replace(/[\s:|,]+$/, '').trim();
     return { name, from: Number(range[2]), to: Number(range[3]) };
@@ -36,6 +40,16 @@ function parseLine(raw: string): { name: string; from: number; to: number | null
  * - 이름 없이 「1-240」만 있으면 단원 없이 전체 범위 하나.
  */
 export function parseToc(text: string, lastPage?: number): TocRow[] {
+  // 쪽 번호만 다음 줄로 떨어진 목차(「01 유리수」 다음 줄 「6」)는 앞 줄에 붙인다
+  const lines: string[] = [];
+  for (const l of text.split(/\r?\n/)) {
+    if (!l.trim()) continue;
+    if (/^\s*(?:p\.?\s*)?\d{1,4}(?:\s*[-~–]\s*\d{1,4})?\s*(?:쪽|p)?\s*$/i.test(l) && lines.length && !parseLine(lines[lines.length - 1])) lines[lines.length - 1] += ` ${l.trim()}`;
+    else lines.push(l);
+  }
+  text = lines.join('\n');
+  // 쪽이 거의 없는 목차(국어 작품별 · 강별 목차 등): 단원(줄)마다 한 칸으로 (쪽 대신 단원 수로 계획)
+  if (lines.length && lines.filter((l) => parseLine(l)).length < Math.max(1, lines.length * 0.5)) return unitRows(lines);
   const rows: (TocRow & { open: boolean })[] = [];
   for (const raw of text.split(/\r?\n/)) {
     const p = parseLine(raw);
@@ -64,9 +78,16 @@ export function parseToc(text: string, lastPage?: number): TocRow[] {
   return rows.map(({ open: _open, ...r }) => r);
 }
 
+/** 쪽 없는 목차: 줄마다 단원 하나 (from = to = 순번). unitOnly 로 표시 */
+export function unitRows(lines: string[]): TocRow[] {
+  return lines.map((l, i) => ({ name: l.trim().replace(/^[·•\-\s]+/, ''), from: i + 1, to: i + 1, line: l, unitOnly: true }));
+}
+/** 쪽 없는 문제집인지 (단원 수로 계획) */
+export const isUnitOnly = (rows: { unitOnly?: boolean }[]) => rows.length > 0 && rows.every((r) => r.unitOnly);
+
 /** 단원 표 → 다시 고칠 수 있는 글 */
-export function tocText(units: Unit[]): string {
-  return units.map((u) => `${u.name} ${u.from}-${u.to}`).join('\n');
+export function tocText(units: Unit[], unitOnly = false): string {
+  return units.map((u) => (unitOnly ? u.name : `${u.name} ${u.from}-${u.to}`)).join('\n');
 }
 
 /** 그 페이지가 속한 단원 */

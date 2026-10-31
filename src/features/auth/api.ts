@@ -625,7 +625,7 @@ export const noteScan = (image: { mime: string; data: string }, subjects: string
 /** 영수증 사진 → 금액 · 날짜 · 가게 */
 export const receiptScan = (image: { mime: string; data: string }) => aiJob<{ amount: number | null; date: string | null; store: string | null; items: string[] }>('ai/receipt', { image });
 /** 목차 사진들 → 단원 · 쪽 */
-export const tocScan = (images: { mime: string; data: string }[]) => aiJob<{ units: { name: string; from: number; to: number | null }[] }>('ai/toc', { images });
+export const tocScan = (images: { mime: string; data: string }[]) => aiJob<{ units: { name: string; from: number | null; to: number | null }[] }>('ai/toc', { images });
 /** 책 찾기 (국립중앙도서관) */
 export interface BookHit {
   src?: 'yes24' | 'nl';

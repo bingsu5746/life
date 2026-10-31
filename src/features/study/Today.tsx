@@ -300,7 +300,7 @@ function BookRow({ p, today }: { p: PlanView; today: string }) {
         <div className="st-item-main" {...tap(() => setOpen(!open))} aria-expanded={open}>
           <div className={`st-item-title ${doneToday ? 'done' : ''}`}>
             <SubjectDot id={book.subjectId} d={d} />
-            {book.name} {sched.today.length > 0 && <span className="st-pages">p.{rangeText(sched.today)}</span>}
+            {book.name} {sched.today.length > 0 && !book.unitOnly && <span className="st-pages">p.{rangeText(sched.today)}</span>}
           </div>
           <div className="st-item-sub">
             {sched.today.length === 0
@@ -311,8 +311,10 @@ function BookRow({ p, today }: { p: PlanView; today: string }) {
                   : plan.start > today
                     ? `${shortDate(plan.start)}부터 시작`
                     : '오늘은 쉬는 날'
-              : `${sched.today.length}쪽${unitNames.length ? ' · ' + unitNames.join(', ') : ''}${unitEnd ? ' · 단원 끝' : ''}`}
-            {sched.end && ` · ${shortDate(sched.end)}까지 ${sched.remaining.length}쪽`}
+              : book.unitOnly
+                ? `${sched.today.length}단원 · ${unitNames.join(', ')}`
+                : `${sched.today.length}쪽${unitNames.length ? ' · ' + unitNames.join(', ') : ''}${unitEnd ? ' · 단원 끝' : ''}`}
+            {sched.end && ` · ${shortDate(sched.end)}까지 ${sched.remaining.length}${book.unitOnly ? '단원' : '쪽'}`}
           </div>
           {(() => {
             // 요즘 속도로는 마감까지 못 끝낼 것 같으면 미리 알린다
