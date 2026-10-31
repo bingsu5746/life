@@ -6,7 +6,6 @@ import { alive, newId, type Book, type Unit } from './model';
 import { compress, expand, parseRanges, rangeText } from './pages';
 import { paceOf } from './plan';
 import { forecastFor, forecastText } from './forecast';
-import { BookTabs, Papers } from './Papers';
 import { bookDone, planCtx, planViews, reservedPages } from './select';
 import { getStudy, put, remove, useStudy, useWords } from './store';
 import { isUnitOnly, parseToc, tocText, type TocRow } from './toc';
@@ -19,7 +18,11 @@ import { PlanWarning } from './Today';
 import { Bar, confirmDelete, Empty, Field, go, Icon, Menu, SubjectDot, SubjectPicker, SubjectTag, toast, useToday } from './ui';
 
 export function Books({ id, sub }: { id?: string; sub?: string }) {
-  if (id === 'papers') return <Papers sub={sub} />;
+  // 기출 · 모의고사 풀이는 저장소로 옮겼다 (예전 주소)
+  if (id === 'papers') {
+    window.location.replace(`#/review/papers${sub ? `-${sub}` : ''}`);
+    return null;
+  }
   if (id === 'new') return <BookEditor onDone={(b, plan) => go(b ? `/books/${b}${plan ? '/plan' : ''}` : '/books')} />;
   if (id) return <BookDetail id={id} plan={sub === 'plan'} />;
   return <BookList />;
@@ -76,7 +79,6 @@ function BookList() {
           </button>
         )}
       </div>
-      <BookTabs on="books" />
       <WeekLoad views={views.filter((v) => v.plan.target === 'book')} today={today} />
       {!books.length && (
         <Empty icon="📖" title="아직 넣은 문제집이 없어요">

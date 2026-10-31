@@ -1,5 +1,6 @@
 // 저장소: 오답 노트 · 암기 카드 · 백지 복습 · 지문 · AI 풀이 (설계 §9.1~9.3)
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { Papers } from './Papers';
 import { shortDate } from './dates';
 import { alive, newId, REASONS, type CardDeck, type MemoCard, type NoteComment, type WrongNote, type WrongReason } from './model';
 import { answer, dueText, dueToday } from './review';
@@ -27,6 +28,7 @@ export function Review({ sub }: { sub?: string }) {
   if (sub?.startsWith('blank-run-')) return <BlankRun id={sub.slice(10)} />;
   if (sub?.startsWith('deck-')) return <DeckView id={sub.slice(5)} />;
   if (sub === 'ai') return <SavedProblems />;
+  if (sub?.startsWith('papers')) return <Papers sub={sub.slice(7) || undefined} />;
   return <ReviewHome tab={sub === 'cards' || sub === 'new-deck' ? 'cards' : sub === 'blank' || sub === 'new-blank' ? 'blank' : sub === 'passages' || sub === 'new-passage' || sub?.startsWith('passage-') ? 'passages' : 'notes'} sub={sub} />;
 }
 

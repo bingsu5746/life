@@ -435,6 +435,8 @@ export interface PastPaper extends Stamp {
   kind: 'csat' | 'kice' | 'edu' | 'other';
   /** 학년 (고2 · 고3 수능) */
   level?: '고1' | '고2' | '고3';
+  /** 수능 · 모의고사 영역 (국어 · 수학 · 영어 · 한국사 · 탐구 …) */
+  section?: string;
   /** 시험 이름 (예: 2025학년도 수능, 2024년 6월 모의평가) */
   title: string;
   /** 모의고사 모음 문제집이면 그 문제집 */

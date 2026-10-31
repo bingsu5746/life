@@ -27,6 +27,25 @@ export function BookTabs({ on }: { on: 'books' | 'papers' }) {
 
 const md = (x: string) => shortDate(x).replace(/\(.\)/, '');
 
+/** 수능 · 모의고사 영역 (과목이 정해져 있다): 이름 · 만점 · 시간(분) */
+export const CSAT_SECTIONS: { name: string; full: number; min: number; match: RegExp }[] = [
+  { name: '국어', full: 100, min: 80, match: /국어/ },
+  { name: '수학', full: 100, min: 100, match: /수학/ },
+  { name: '영어', full: 100, min: 70, match: /영어/ },
+  { name: '한국사', full: 50, min: 30, match: /한국사/ },
+  { name: '사회탐구', full: 50, min: 30, match: /사회|사탐|윤리|지리|정치|경제|역사|법/ },
+  { name: '과학탐구', full: 50, min: 30, match: /과학|과탐|물리|화학|생명|생물|지구/ },
+  { name: '제2외국어·한문', full: 50, min: 40, match: /외국어|한문|일본어|중국어|독일어|프랑스어|스페인어/ },
+];
+/** 영역 → 내 과목 (이름이 맞는 것이 있으면 그 과목, 없으면 영역 이름 그대로 「csat:국어」) */
+export const sectionSubject = (d: { subjects: Record<string, { name: string; deleted?: boolean }> }, section: string) => {
+  const sec = CSAT_SECTIONS.find((s) => s.name === section);
+  const mine = Object.entries(d.subjects).find(([, s]) => !s.deleted && sec?.match.test(s.name));
+  return mine ? mine[0] : `csat:${section}`;
+};
+/** 과목 이름 (영역으로 넣은 것도) */
+export const paperSubjectName = (d: { subjects: Record<string, { name: string }> }, id: string) => (id.startsWith('csat:') ? id.slice(5) : (d.subjects[id]?.name ?? '과목'));
+
 /** sub: 'new' 이면 넣기 창, 풀이 id 면 고치기 창 */
 export function Papers({ sub }: { sub?: string }) {
   const d = useStudy();
@@ -37,7 +56,7 @@ export function Papers({ sub }: { sub?: string }) {
   const ofLv = (p: PastPaper) => !lv || (p.level ?? (p.kind === 'csat' ? '고3' : '')) === lv;
   const all = everything.filter(ofLv);
   const editing = sub === 'new' ? 'new' : sub && d.papers[sub] && !d.papers[sub].deleted ? d.papers[sub] : null;
-  const subjects = subjectsOf(d).filter((s) => all.some((p) => p.subjectId === s.id));
+  const subjects = [...new Set(all.map((p) => p.subjectId))].map((id) => ({ id, name: paperSubjectName(d, id) }));
   // 과목이 하나뿐이면 그 과목으로 (그래프·번호 분석을 바로 보이게)
   const subject = picked || (subjects.length === 1 ? subjects[0].id : '');
   const list = papersOf(d, subject || undefined).filter(ofLv);
@@ -55,16 +74,15 @@ export function Papers({ sub }: { sub?: string }) {
     <div className="st-page">
       <div className="st-page-head">
         <h2>기출·모의고사 풀이</h2>
-        <button className="btn btn-sm btn-primary" onClick={() => go('/books/papers/new')}>
+        <button className="btn btn-sm btn-primary" onClick={() => go('/review/papers-new')}>
           <Icon name="plus" /> 푼 것 넣기
         </button>
       </div>
-      <BookTabs on="papers" />
 
       {!everything.length ? (
         <Empty icon="📄" title="푼 기출·모의고사를 기록해 보세요">
           <p>옛 수능·모의평가·학력평가를 찾아 풀었거나 모의고사 모음집을 풀었으면, 점수·걸린 시간·틀린 번호를 남겨요. 틀린 번호는 오답 노트로 바로 넣을 수 있어요.</p>
-          <button className="btn btn-primary" onClick={() => go('/books/papers/new')}>
+          <button className="btn btn-primary" onClick={() => go('/review/papers-new')}>
             푼 것 넣기
           </button>
         </Empty>
@@ -124,11 +142,11 @@ export function Papers({ sub }: { sub?: string }) {
 
           <section className="st-card">
             {[...list].reverse().map((p) => (
-              <div key={p.id} className="st-item st-tap" {...tap(() => go(`/books/papers/${p.id}`))}>
+              <div key={p.id} className="st-item st-tap" {...tap(() => go(`/review/papers-${p.id}`))}>
                 <SubjectDot id={p.subjectId} d={d} />
                 <div className="st-item-main">
                   <div className="st-item-title">
-                    {p.title} <span className="st-muted">· {d.subjects[p.subjectId]?.name ?? '과목'}</span>
+                    {p.title} <span className="st-muted">· {p.section ?? paperSubjectName(d, p.subjectId)}</span>
                   </div>
                   <div className="st-item-sub">
                     {shortDate(p.date)} 풀이
@@ -144,7 +162,7 @@ export function Papers({ sub }: { sub?: string }) {
           </section>
         </>
       )}
-      {editing && <PaperSheet item={editing === 'new' ? undefined : editing} onClose={() => go('/books/papers')} />}
+      {editing && <PaperSheet item={editing === 'new' ? undefined : editing} onClose={() => go('/review/papers')} />}
     </div>
   );
 }
@@ -153,6 +171,7 @@ function PaperSheet({ item, onClose }: { item?: PastPaper; onClose: () => void }
   const d = useStudy();
   const today = useToday();
   const [subjectId, setSubjectId] = useState(item?.subjectId ?? subjectsOf(d)[0]?.id ?? '');
+  const [section, setSection] = useState(item?.section ?? '');
   const [kind, setKind] = useState<PastPaper['kind']>(item?.kind ?? 'csat');
   const [level, setLevel] = useState<NonNullable<PastPaper['level']>>(item?.level ?? '고3');
   const [year, setYear] = useState('');
@@ -180,12 +199,13 @@ function PaperSheet({ item, onClose }: { item?: PastPaper; onClose: () => void }
   const bad = (score && n(score, 0, 1000) === undefined) || (grade && n(grade, 1, 9) === undefined) || (minutes && n(minutes, 0, 600) === undefined);
 
   function save() {
-    if (!subjectId || !name.trim() || !date || bad) return;
+    if ((kind === 'other' ? !subjectId : !section) || !name.trim() || !date || bad) return;
     const p: PastPaper = {
       ...(item ?? { created: Date.now() }),
       id: item?.id ?? newId(),
       updatedAt: item?.updatedAt ?? 0,
-      subjectId,
+      subjectId: kind !== 'other' && section ? sectionSubject(d, section) : subjectId,
+      section: kind !== 'other' && section ? section : undefined,
       kind,
       level,
       title: name.trim().slice(0, 60),
@@ -216,9 +236,30 @@ function PaperSheet({ item, onClose }: { item?: PastPaper; onClose: () => void }
             </button>
           ))}
         </div>
-        <Field group label="과목">
-          <SubjectPicker value={subjectId} onChange={setSubjectId} />
-        </Field>
+        {kind === 'other' ? (
+          <Field group label="과목">
+            <SubjectPicker value={subjectId} onChange={setSubjectId} />
+          </Field>
+        ) : (
+          <Field group label="영역" hint={section ? `${CSAT_SECTIONS.find((s) => s.name === section)?.min}분 · ${CSAT_SECTIONS.find((s) => s.name === section)?.full}점 만점` : undefined}>
+            <div className="st-chips">
+              {CSAT_SECTIONS.map((s) => (
+                <button
+                  key={s.name}
+                  type="button"
+                  className={`st-chip ${section === s.name ? 'on' : ''}`}
+                  aria-pressed={section === s.name}
+                  onClick={() => {
+                    setSection(s.name);
+                    setFull(String(s.full));
+                  }}
+                >
+                  {s.name}
+                </button>
+              ))}
+            </div>
+          </Field>
+        )}
         <Field group label="종류">
           <div className="st-seg">
             {(Object.keys(PAPER_KIND) as PastPaper['kind'][]).map((k) => (
