@@ -81,10 +81,14 @@ export interface LolGame {
   lvl: number;
   /** 팀에서 딜 순위 (1 = 가장 많이) */
   dmgRank: number;
+  /** 맞라인 상대 챔피언 · 핵심 룬 · 패치(16.21) */
+  opp?: string;
+  ks?: number;
+  ver?: string;
 }
 type P = Record<string, unknown> & { puuid?: string; teamId?: number; championName?: string; championId?: number; kills?: number; deaths?: number; assists?: number; totalDamageDealtToChampions?: number };
 export function toGame(id: string, m: unknown, puuid: string): LolGame | null {
-  const info = (m as { info?: { gameCreation?: number; gameDuration?: number; queueId?: number; participants?: P[] } })?.info;
+  const info = (m as { info?: { gameCreation?: number; gameDuration?: number; queueId?: number; gameVersion?: string; participants?: P[] } })?.info;
   const ps = info?.participants ?? [];
   const me = ps.find((p) => p.puuid === puuid);
   if (!info || !me) return null;
@@ -119,6 +123,9 @@ export function toGame(id: string, m: unknown, puuid: string): LolGame | null {
     first: me.firstBloodKill === true,
     lvl: n('champLevel'),
     dmgRank: 1 + team.filter((p) => (p.totalDamageDealtToChampions ?? 0) > dmg).length,
+    opp: ps.find((p) => p.teamId !== me.teamId && p.teamPosition && p.teamPosition === me.teamPosition)?.championName,
+    ks: (me.perks as { styles?: { selections?: { perk?: number }[] }[] } | undefined)?.styles?.[0]?.selections?.[0]?.perk,
+    ver: (info.gameVersion ?? '').split('.').slice(0, 2).join('.') || undefined,
   };
 }
 

@@ -32,7 +32,7 @@ export default {
     const img = req.method === 'GET' ? url.pathname.match(/^\/api\/nba\/img\/(h|l)\/(\d{3,12})$/) : null;
     if (img) return nbaImage(img[1], img[2], ctx);
     if (
-      /^\/api\/(auth\/(signup|login|logout|logout-all)|me(\/(nickname|password))?|translate|solve(\/job\/[a-z0-9]{6,32}|\/usage|\/img(\/[a-f0-9]{8,64}\/[a-z0-9]+-[a-f0-9]{8}\.(webp|jpg))?)?|movies\/(kobis|catalog(\/sync)?|recommend|ott)|school|holidays|keys|games\/(search|prices|watch|csmap)|steam\/(me|ach|names|watch)|lol\/(profile|games)|music\/discogs|ai\/(note|diary|receipt|toc)|books\/(search|toc)|bb\/scan(\/[a-f0-9]{16})?|fact|nba\/(games|standings|box|avg|roster|career|players|2k|hlplayer|fav)|dict\/ko|lookup|music\/similar|notify(\/(digest|test))?|store\/(study|words)|study-photo\/[a-z0-9]{6,32})$/.test(
+      /^\/api\/(auth\/(signup|login|logout|logout-all)|me(\/(nickname|password))?|translate|solve(\/job\/[a-z0-9]{6,32}|\/usage|\/img(\/[a-f0-9]{8,64}\/[a-z0-9]+-[a-f0-9]{8}\.(webp|jpg))?)?|movies\/(kobis|catalog(\/sync)?|recommend|ott)|school|holidays|keys|games\/(search|prices|watch|csmap)|steam\/(me|ach|names|watch)|lol\/(profile|games|meta|champ)|music\/discogs|ai\/(note|diary|receipt|toc)|books\/(search|toc)|bb\/scan(\/[a-f0-9]{16})?|fact|nba\/(games|standings|box|avg|roster|career|players|2k|hlplayer|fav)|dict\/ko|lookup|music\/similar|notify(\/(digest|test))?|store\/(study|words)|study-photo\/[a-z0-9]{6,32})$/.test(
         url.pathname,
       )
     ) {

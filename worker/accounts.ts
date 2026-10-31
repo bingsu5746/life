@@ -26,6 +26,7 @@ import { hcBody, parseHc } from './homecourt';
 import { diaryBody, noteBody, parseDiary, parseNote, parseReceipt, parseTocRead, receiptBody, tocBody } from './aiRead';
 import { seojiSearch, seojiToc, yes24Search } from './books';
 import { cheapShark } from './cheapshark';
+import { lolMetaTables, lolMetaTick, metaChamp, metaPatches, metaTable } from './lolMeta';
 import { lolNewGames, lolOlderGames, lolProfile, RiotError, type LolGame } from './lol';
 import { krPrices, steamAchievements, steamMe, storeNames, storeSearch, wishlist, type KrPrice } from './steam';
 import { hlAverage, fetchHlBox, fetchHlPlayerSeasons, fetchHlStandings, hlMatchId, sameTeam } from './highlightly';
@@ -164,6 +165,7 @@ export class Accounts extends DurableObject<Env> {
       CREATE TABLE IF NOT EXISTS films (code TEXT PRIMARY KEY, title TEXT NOT NULL, norm TEXT NOT NULL, title_en TEXT, open TEXT NOT NULL, genre TEXT, nation TEXT, director TEXT, type TEXT);
       CREATE INDEX IF NOT EXISTS films_norm ON films (norm);
     `);
+    lolMetaTables(this.sql);
     // 예전에 만든 표에는 type 칸이 없다
     try {
       this.sql.exec('ALTER TABLE films ADD COLUMN type TEXT');
@@ -264,6 +266,7 @@ export class Accounts extends DurableObject<Env> {
           .map(Number)
           .filter((x) => Number.isInteger(x) && x > 0),
       );
+    if ((path === 'lol/meta' || path === 'lol/champ') && req.method === 'GET') return this.lolMetaRoute(path, new URL(req.url).searchParams);
     if (path === 'lol/profile' && req.method === 'GET') return this.lolProfileRoute(new URL(req.url).searchParams.get('id') ?? '');
     if (path === 'lol/games' && req.method === 'GET') return this.lolGamesRoute(new URL(req.url).searchParams.get('puuid') ?? '', new URL(req.url).searchParams.get('older') === '1');
     if (path === 'steam/names' && req.method === 'GET') {
@@ -1700,6 +1703,19 @@ export class Accounts extends DurableObject<Env> {
     return json({ games: cur.games, more, end: !!cur.end, warn });
   }
 
+  /** 롤 챔피언 통계 (서버가 모은 마스터 이상 솔랭): 패치 목록 · 티어표 · 챔피언 하나 · 모은 상태 */
+  private lolMetaRoute(path: string, q: URLSearchParams): Response {
+    // 모으기 알람이 아직 안 돌고 있으면 켠다
+    if (this.riotKey()) this.ctx.waitUntil(this.ctx.storage.getAlarm().then((a) => (a === null ? this.scheduleAlarm() : undefined)));
+    const patches = metaPatches(this.sql);
+    const patch = q.get('patch') === 'all' ? 'all' : (patches.find((x) => x.patch === q.get('patch'))?.patch ?? patches[0]?.patch ?? 'all');
+    const status = { matches: patches.reduce((a, x) => a + x.games, 0), last: JSON.parse(this.cacheGet('lolmeta:last') ?? 'null'), err: JSON.parse(this.cacheGet('lolmeta:err') ?? 'null') };
+    if (path === 'lol/meta') return json({ patch, patches, status, ...metaTable(this.sql, patch) });
+    const cid = Number(q.get('cid'));
+    if (!Number.isInteger(cid) || cid <= 0) return fail('챔피언을 확인해 주세요.');
+    return json({ patch, patches, status, ...metaChamp(this.sql, patch, cid) });
+  }
+
   /** 어떤 서비스 키가 등록돼 있는지만 (값은 보내지 않음) */
   private keysInfo(): Response {
     const used = Number(this.cacheGet(`serp:${new Date().toISOString().slice(0, 7)}`) ?? 0);
@@ -2211,7 +2227,9 @@ export class Accounts extends DurableObject<Env> {
     const nbaAt = favs ? Math.max(Date.now() + 5_000, Number(this.cacheGet('nba:nextcheck') ?? 0)) : 0;
     const games = this.sql.exec<{ n: number }>("SELECT COUNT(*) AS n FROM cache WHERE key LIKE 'gamewatch:%' OR key LIKE 'steamwish:%'").toArray()[0].n;
     const gameAt = games ? Math.max(Date.now() + 5_000, Number(this.cacheGet('games:nextcheck') ?? 0)) : 0;
-    const at = [r?.at ?? 0, nbaAt, gameAt].filter((x) => x > 0);
+    // 롤 챔피언 통계 모으기: Riot 키가 있으면 1분마다 (키가 막히면 1시간 쉼)
+    const lolAt = this.riotKey() ? Math.max(Date.now() + 5_000, Number(this.cacheGet('lolmeta:next') ?? 0)) : 0;
+    const at = [r?.at ?? 0, nbaAt, gameAt, lolAt].filter((x) => x > 0);
     if (at.length) await this.ctx.storage.setAlarm(Math.min(...at));
     else await this.ctx.storage.deleteAlarm();
   }
@@ -2349,6 +2367,25 @@ export class Accounts extends DurableObject<Env> {
   /** 정한 시각: 그 사람이 넣어 둔 그날 그 시각 글을 보낸다 */
   async alarm() {
     const now = Date.now();
+    const rk = this.riotKey();
+    if (rk && now + 5_000 >= Number(this.cacheGet('lolmeta:next') ?? 0)) {
+      try {
+        const r = await lolMetaTick(
+          rk,
+          this.sql,
+          (k) => this.cacheGet(k),
+          (k, v) => this.cacheSet(k, v),
+        );
+        this.cacheSet('lolmeta:next', String(now + 60_000));
+        this.cacheSet('lolmeta:last', JSON.stringify({ at: now, counted: r.counted }));
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e);
+        console.error('lol meta tick failed', msg);
+        // 401/403(키 문제)이면 1시간, 그 밖(429 등)은 5분 쉼
+        this.cacheSet('lolmeta:next', String(now + (/40[13]/.test(msg) ? 3600_000 : 300_000)));
+        this.cacheSet('lolmeta:err', JSON.stringify({ at: now, msg }));
+      }
+    }
     if (now + 30_000 >= Number(this.cacheGet('games:nextcheck') ?? 0) && this.sql.exec<{ n: number }>("SELECT COUNT(*) AS n FROM cache WHERE key LIKE 'gamewatch:%' OR key LIKE 'steamwish:%'").toArray()[0].n) {
       this.cacheSet('games:nextcheck', String(now + 6 * 3600_000));
       await this.gameWatchCheck().catch((e) => console.error('game watch failed', e instanceof Error ? e.message : String(e)));
