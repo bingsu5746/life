@@ -723,6 +723,15 @@ export const discordChannels = (guild: string) => call<{ channels: { id: string;
 export const discordMsgs = (channel: string, before?: string) => call<{ msgs: DcMsg[] }>(`discord/msgs?channel=${channel}${before ? `&before=${before}` : ''}`, 'GET', undefined, 20_000).then((r) => r.msgs);
 export const discordSend = (channel: string, text: string) => call<{ ok: boolean }>('discord/send', 'POST', { channel, text }, 20_000);
 
+export interface InvenSkin {
+  code: number;
+  name: string;
+  num: number | null;
+  price: string;
+  votes: number;
+  avg: number;
+}
+export const lolSkins = (name: string) => remember(`lolskins:${name}`, 60 * MIN, () => call<{ skins: InvenSkin[]; comments: { skin: number; text: string; date: string }[] }>(`lol/skins?name=${encodeURIComponent(name)}`, 'GET', undefined, 40_000));
 export interface LolMatchP {
   puuid: string;
   name: string;

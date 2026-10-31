@@ -26,6 +26,7 @@ import { hcBody, parseHc } from './homecourt';
 import { diaryBody, noteBody, parseDiary, parseNote, parseReceipt, parseTocRead, receiptBody, tocBody } from './aiRead';
 import { seojiSearch, seojiToc, yes24Search } from './books';
 import { cheapShark } from './cheapshark';
+import { invenChamps, invenSkins } from './skins';
 import { discordChannels, discordInfo, discordMessages, discordSend } from './discord';
 import { lolMetaTables, lolMetaTick, metaChamp, metaPatches, metaTable } from './lolMeta';
 import { lolMatch, lolNewGames, lolOlderGames, lolProfile, RiotError, type LolGame } from './lol';
@@ -319,6 +320,7 @@ export class Accounts extends DurableObject<Env> {
       await this.scheduleAlarm();
       return json({ burst: min ? Date.now() + min * 60_000 : 0 });
     }
+    if (path === 'lol/skins' && req.method === 'GET') return this.lolSkinsRoute((new URL(req.url).searchParams.get('name') ?? '').trim().slice(0, 30));
     if (path === 'lol/match' && req.method === 'GET') return this.lolMatchRoute(new URL(req.url).searchParams.get('id') ?? '');
     if (path === 'lol/profile' && req.method === 'GET') return this.lolProfileRoute(new URL(req.url).searchParams.get('id') ?? '');
     if (path === 'lol/games' && req.method === 'GET') return this.lolGamesRoute(new URL(req.url).searchParams.get('puuid') ?? '', new URL(req.url).searchParams.get('older') === '1');
@@ -1753,6 +1755,19 @@ export class Accounts extends DurableObject<Env> {
     return this.secret('riot', 'riotkey', 'riotapikey', 'riotapi', 'lol', 'lolkey');
   }
   /** 롤 프로필: { id: '이름#태그' } → 계정 · 레벨 · 랭크 · 숙련도 (10분 기억) */
+  /** 스킨 평가 (인벤): 챔피언 한국어 이름으로, 하루 기억 */
+  private async lolSkinsRoute(name: string): Promise<Response> {
+    if (!name) return fail('챔피언을 확인해 주세요.');
+    try {
+      const map = (await this.nbaCached('inven:champs', 7 * DAY, () => invenChamps())).v;
+      const code = map[name] ?? map[name.replace(/\s/g, '')] ?? Object.entries(map).find(([k]) => k.replace(/\s/g, '') === name.replace(/\s/g, ''))?.[1];
+      if (!code) return json({ skins: [], comments: [] });
+      return json((await this.nbaCached(`inven:skins:${code}`, DAY, () => invenSkins(code))).v);
+    } catch (e) {
+      return fail(`스킨 평가를 받지 못했어요. (${(e instanceof Error ? e.message : String(e)).slice(0, 80)})`, 502);
+    }
+  }
+
   private async lolMatchRoute(id: string): Promise<Response> {
     const key = this.riotKey();
     if (!key) return fail('Riot 키가 아직 없어요.', 503);

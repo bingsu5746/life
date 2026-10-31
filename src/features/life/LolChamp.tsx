@@ -6,6 +6,7 @@ import { champImg, DD, loadChamp, loadItems, loadRunes, plain, runeImg, SHARD, t
 import { pct1, POS_ORDER, useDd2 } from './LolChamps';
 import { POS } from './lolStats';
 import { opggHard } from './opgg';
+import { Skins } from './LolSkins';
 
 export const CHAMP_TABS = [
   ['build', '빌드'],
@@ -14,6 +15,7 @@ export const CHAMP_TABS = [
   ['counter', '카운터'],
   ['skills', '스킬'],
   ['tips', '팁'],
+  ['skins', '스킨'],
 ] as const;
 export type ChampTab = (typeof CHAMP_TABS)[number][0];
 
@@ -122,12 +124,13 @@ export function LolChampPage({ id, sub }: { id: string; sub?: string }) {
           </select>
         )}
       </div>
-      {tab !== 'skills' && tab !== 'tips' && meta && !here && <p className="st-muted">아직 모은 경기가 적어요.</p>}
+      {tab !== 'skills' && tab !== 'tips' && tab !== 'skins' && meta && !here && <p className="st-muted">아직 모은 경기가 적어요.</p>}
       {tab === 'build' && here && meta && <Build meta={meta} pos={pos} dd={dd} items={items} runes={runes} onTab={setTab} />}
       {tab === 'runes' && here && meta && <Runes meta={meta} pos={pos} runes={runes} />}
       {tab === 'items' && here && meta && <Items meta={meta} pos={pos} dd={dd} items={items} />}
       {tab === 'counter' && here && meta && <Counter meta={meta} pos={pos} dd={dd} me={champ.id} />}
       {tab === 'skills' && <Skills detail={detail} dd={dd} />}
+      {tab === 'skins' && <Skins detail={detail} champ={champ} />}
       {tab === 'tips' && <Tips detail={detail} name={champ.name} meta={here ? meta : null} pos={pos} dd={dd} cid={champ.key} />}
     </div>
   );

@@ -9269,3 +9269,48 @@ body.focus-on {
   height: 26px;
   border-radius: 50%;
 }
+
+/* 롤 챔피언 › 스킨 */
+.sk-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 12px;
+}
+.sk-card {
+  display: grid;
+  gap: 4px;
+  padding: 0 0 8px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface);
+  overflow: hidden;
+  text-align: center;
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
+}
+.sk-card img {
+  width: 100%;
+  aspect-ratio: 308 / 560;
+  object-fit: cover;
+  background: var(--soft);
+}
+.sk-card b {
+  padding: 0 6px;
+  font-size: 0.9rem;
+}
+.sk-card small {
+  color: var(--muted);
+}
+.sk-splash {
+  width: 100%;
+  border-radius: 10px;
+}
+.sk-star {
+  color: #f59e0b;
+}
+.sk-comments {
+  padding-left: 18px;
+  display: grid;
+  gap: 6px;
+}

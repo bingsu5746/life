@@ -68,6 +68,12 @@
   box-sizing: border-box;
 }
 
+/* 스크롤바가 생겼다 없어졌다 하며 화면(왼쪽 메뉴)이 옆으로 밀리지 않게 자리를 늘 비워 둔다 */
+html {
+  overflow-y: scroll;
+  scrollbar-gutter: stable;
+}
+
 html,
 body {
   margin: 0;

@@ -91,6 +91,7 @@ export const champItems = (id: string, pos: string): AreaItem[] => [
       ['counter', '카운터', 'game'],
       ['skills', '스킬', 'books'],
       ['tips', '팁', 'solve'],
+      ['skins', '스킨', 'area-hobby'],
     ] as const
   ).map(([k, label, icon]) => ({ key: k, label, icon, to: `/games/champ/${id}/${k}${pos ? `-${pos}` : ''}` })),
 ];
