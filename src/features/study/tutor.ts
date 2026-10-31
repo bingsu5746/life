@@ -1,6 +1,30 @@
 // 과외: 수업일 · 다음 수업일 · 숙제 마감 (설계 §6)
 import { addDays, weekday } from './dates';
-import type { DateStr, Homework, Tutor } from './model';
+import type { DateStr, Homework, StudyData, StudySession, Tutor } from './model';
+
+/**
+ * 끝난 과외 수업을 공부 기록으로 (최근 14일, 시각 · 길이가 있는 과외만).
+ * 같은 과외 · 같은 날은 늘 같은 id 라 여러 기기에서 만들어도 하나, 이미 있거나 지운 것은 다시 만들지 않는다
+ */
+export function tutorSessions(d: Pick<StudyData, 'tutors' | 'sessions'>, today: DateStr, now = Date.now()): StudySession[] {
+  const out: StudySession[] = [];
+  for (const t of Object.values(d.tutors)) {
+    if (t.deleted || !t.time || !t.minutes) continue;
+    const created = (t as { created?: number }).created ?? 0;
+    for (let i = 0; i < 14; i++) {
+      const date = addDays(today, -i);
+      if (!hasClass(t, date)) continue;
+      const id = `tut-${t.id}-${date}`;
+      if (d.sessions[id]) continue;
+      // 한국 시각 → 기기 시각과 상관없이 같은 값
+      const start = Date.parse(`${date}T${t.time}:00+09:00`);
+      const end = start + t.minutes * 60_000;
+      if (Number.isNaN(start) || end > now || (created && start < created - 86_400_000)) continue;
+      out.push({ id, subjectId: t.subjectId, start, end, minutes: t.minutes, date, kind: 'manual', place: t.place || '과외', memo: `${t.name} 수업` } as StudySession);
+    }
+  }
+  return out;
+}
 
 /** 그날 수업이 있는지 (휴강은 빼고, 보강은 넣음) */
 export function hasClass(t: Pick<Tutor, 'weekdays' | 'cancelled' | 'extra'>, date: DateStr): boolean {

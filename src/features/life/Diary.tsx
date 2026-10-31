@@ -162,12 +162,15 @@ function Write({ date, today }: { date: string; today: string }) {
   const studyLines = studySummary(d, date);
   const sleepLines = sleepSummary(d, date);
   // 새 일기: 「오늘 한 것」 칸을 앱 기록으로 미리 채운다 (끄면 링크로만). 「공부」 칸은 비어 있으면 늘 공부 기록으로 채운다
-  const [parts, setParts] = useState<Record<string, string>>(() => draft0?.parts ?? ({
-    ...(cur?.parts ?? {}),
-    ...(!cur && form.autoFill && form.parts.includes('done') && lines.length ? { done: lines.join('\n') } : {}),
-    ...(form.parts.includes('study') && studyLines.length && !cur?.parts?.study?.trim() ? { study: studyLines.join('\n') } : {}),
-    ...(form.parts.includes('sleep') && sleepLines.length && !cur?.parts?.sleep?.trim() ? { sleep: sleepLines.join('\n') } : {}),
-  }));
+  const [parts, setParts] = useState<Record<string, string>>(
+    () =>
+      draft0?.parts ?? {
+        ...(cur?.parts ?? {}),
+        ...(!cur && form.autoFill && form.parts.includes('done') && lines.length ? { done: lines.join('\n') } : {}),
+        ...(form.parts.includes('study') && studyLines.length && !cur?.parts?.study?.trim() ? { study: studyLines.join('\n') } : {}),
+        ...(form.parts.includes('sleep') && sleepLines.length && !cur?.parts?.sleep?.trim() ? { sleep: sleepLines.join('\n') } : {}),
+      },
+  );
   // 받아쓴 본문을 AI 가 칸마다 나눠 준다 (빈 칸만 채우고, 이미 쓴 칸은 뒤에 붙임). 글에 없는 말은 안 넣게 했다
   const [splitting, setSplitting] = useState(false);
   const split = async () => {
@@ -249,25 +252,31 @@ function Write({ date, today }: { date: string; today: string }) {
     go(`/diary/${monthOf(date)}`);
   }
   const photoBox = (
-      <div className="dy-photos">
-          {photos.map((id) => (
-            <div key={id} className="dy-photo">
-              <Photo id={id} />
-              <button type="button" className="dy-photo-x" aria-label="사진 빼기" onClick={() => setPhotos(photos.filter((x) => x !== id))}>
-                ✕
-              </button>
-            </div>
-          ))}
-          {photos.length < 4 && (
-            <label className="dy-photo-add">
-              {busy ? '넣는 중…' : '＋ 사진'}
-              <input type="file" accept="image/*" multiple hidden disabled={busy} onChange={(e) => e.target.files?.length && void addPhotos(e.target.files)} />
-            </label>
-          )}
+    <div className="dy-photos">
+      {photos.map((id) => (
+        <div key={id} className="dy-photo">
+          <Photo id={id} />
+          <button type="button" className="dy-photo-x" aria-label="사진 빼기" onClick={() => setPhotos(photos.filter((x) => x !== id))}>
+            ✕
+          </button>
         </div>
+      ))}
+      {photos.length < 4 && (
+        <label className="dy-photo-add">
+          {busy ? '넣는 중…' : '＋ 사진'}
+          <input type="file" accept="image/*" multiple hidden disabled={busy} onChange={(e) => e.target.files?.length && void addPhotos(e.target.files)} />
+        </label>
+      )}
+    </div>
   );
   // 글자 수: 제목 · 칸 · 본문을 모두 (자동으로 채운 공부 · 잠 칸과 X 는 빼고)
-  const written = [title, text, ...Object.entries(parts).filter(([k, v]) => k !== 'study' && k !== 'sleep' && v.trim() !== 'X').map(([, v]) => v)].join('');
+  const written = [
+    title,
+    text,
+    ...Object.entries(parts)
+      .filter(([k, v]) => k !== 'study' && k !== 'sleep' && v.trim() !== 'X')
+      .map(([, v]) => v),
+  ].join('');
   const count = written.length;
   const countNoSpace = written.replace(/\s/g, '').length;
   return (

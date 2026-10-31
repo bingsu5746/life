@@ -339,6 +339,10 @@ export interface Tutor extends Stamp {
   weekdays: number[];
   /** 수업 시각 HH:MM (선택) */
   time?: string;
+  /** 수업 길이 (분). 시각과 함께 있으면 수업이 끝난 뒤 공부 기록에 저절로 들어간다 */
+  minutes?: number;
+  /** 수업하는 곳 (집 · 학원 · 카페 …) */
+  place?: string;
   cancelled: DateStr[];
   extra: DateStr[];
 }

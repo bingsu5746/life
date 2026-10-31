@@ -55,6 +55,8 @@ export function Tutors({ sub }: { sub?: string }) {
                 <p className="st-sub">
                   {t.weekdays.length ? t.weekdays.map((w) => WEEKDAYS[w]).join('·') : '요일 없음'}
                   {t.time && ` ${t.time}`}
+                  {t.minutes ? ` · ${t.minutes / 60}시간` : ''}
+                  {t.place ? ` · ${t.place}` : ''}
                   {next && (
                     <>
                       {' '}
@@ -182,13 +184,15 @@ function TutorSheet({ tutor, today, onClose }: { tutor?: Tutor; today: string; o
   const [subjectId, setSubjectId] = useState(tutor?.subjectId ?? '');
   const [weekdays, setWeekdays] = useState<number[]>(tutor?.weekdays ?? []);
   const [time, setTime] = useState(tutor?.time ?? '');
+  const [minutes, setMinutes] = useState(tutor?.minutes ? String(tutor.minutes / 60) : '');
+  const [place, setPlace] = useState(tutor?.place ?? '');
   const [cancelled, setCancelled] = useState<string[]>(tutor?.cancelled ?? []);
   const [extra, setExtra] = useState<string[]>(tutor?.extra ?? []);
   const [pick, setPick] = useState(today);
   const upcoming = Array.from({ length: 28 }, (_, i) => addDays(today, i)).filter((x) => hasClass({ weekdays, cancelled: [], extra }, x));
   function save() {
     if (!name.trim() || !subjectId) return;
-    put('tutors', { id: tutor?.id ?? newId(), name: name.trim(), subjectId, weekdays, time: time || undefined, cancelled, extra });
+    put('tutors', { id: tutor?.id ?? newId(), name: name.trim(), subjectId, weekdays, time: time || undefined, minutes: Number(minutes) > 0 ? Math.round(Number(minutes) * 60) : undefined, place: place.trim() || undefined, cancelled, extra });
     onClose();
   }
   return (
@@ -203,9 +207,18 @@ function TutorSheet({ tutor, today, onClose }: { tutor?: Tutor; today: string; o
         <Field group label="수업 요일">
           <WeekdayPicker value={weekdays} onChange={setWeekdays} label="수업 요일" />
         </Field>
-        <Field label="수업 시각 (선택)">
-          <input className="st-input xs" type="time" value={time} onChange={(e) => setTime(e.target.value)} />
+        <div className="st-inline">
+          <Field label="수업 시각">
+            <input className="st-input xs" type="time" value={time} onChange={(e) => setTime(e.target.value)} />
+          </Field>
+          <Field label="몇 시간">
+            <input className="st-input xs" inputMode="decimal" value={minutes} onChange={(e) => setMinutes(e.target.value.replace(/[^\d.]/g, ''))} placeholder="예: 2" />
+          </Field>
+        </div>
+        <Field label="장소">
+          <input className="st-input" value={place} onChange={(e) => setPlace(e.target.value)} placeholder="예: 집 · 선생님 집 · 학원" />
         </Field>
+        {time && Number(minutes) > 0 && <p className="st-hint">수업이 끝나면 공부 기록에 {minutes}시간이 저절로 들어가요.</p>}
         <Field group label="휴강 · 보강" hint="다가오는 수업을 누르면 휴강, 날짜를 골라 보강을 넣어요">
           <div className="st-chips">
             {upcoming.map((x) => (
