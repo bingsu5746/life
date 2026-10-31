@@ -9260,3 +9260,12 @@ body.focus-on {
   height: 14px;
   background: #ef4444;
 }
+.lc-hard {
+  display: inline-flex;
+  gap: 3px;
+}
+.lc-hard img {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+}

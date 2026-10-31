@@ -5,6 +5,7 @@ import { toast } from '../study/ui';
 import { go } from '../study/ui';
 import { champImg, champMatch, loadDd, type Dd } from './lolDd';
 import { POS } from './lolStats';
+import { OPGG, OPGG_AT, opggHard } from './opgg';
 
 export const POS_ORDER = ['TOP', 'JUNGLE', 'MIDDLE', 'BOTTOM', 'UTILITY'];
 type Sort = 'win' | 'pick' | 'ban' | 'games';
@@ -29,6 +30,7 @@ export function LolChampsPage() {
   const [pos, setPos] = useState('');
   const [patch, setPatch] = useState('');
   const [sort, setSort] = useState<Sort>('win');
+  const [src, setSrc] = useState<'mine' | 'opgg'>('mine');
   const [data, setData] = useState<Awaited<ReturnType<typeof lolMeta>> | null>(null);
   const [err, setErr] = useState('');
   const [tick, setTick] = useState(0);
@@ -49,13 +51,19 @@ export function LolChampsPage() {
     };
   }, [patch, tick]);
   const rows = useMemo(() => {
-    if (!data || !dd) return [];
+    if (!dd) return [];
+    if (src === 'opgg')
+      return Object.entries(OPGG)
+        .flatMap(([p, list]) => list.map((r) => ({ cid: r.c, pos: p, g: 0, w: 0, kk: 0, dd: 0, aa: 0, c: dd.champ[r.c], win: r.w, pick: r.p, ban: r.b, kda: 0 })))
+        .filter((r) => r.c && (!pos || r.pos === pos) && champMatch(r.c, q))
+        .sort((a, b) => (sort === 'win' ? b.win - a.win : sort === 'pick' || sort === 'games' ? b.pick - a.pick : b.ban - a.ban));
+    if (!data) return [];
     const min = minGames(data.total);
     return data.rows
       .filter((r) => dd.champ[r.cid] && (!pos || r.pos === pos) && r.g >= min && champMatch(dd.champ[r.cid], q))
       .map((r) => ({ ...r, c: dd.champ[r.cid], win: (r.w / r.g) * 100, pick: (r.g / Math.max(1, data.total)) * 100, ban: ((data.bans[r.cid] ?? 0) / Math.max(1, data.total)) * 100, kda: r.dd ? (r.kk + r.aa) / r.dd : r.kk + r.aa }))
       .sort((a, b) => (sort === 'win' ? b.win - a.win : sort === 'pick' ? b.pick - a.pick : sort === 'ban' ? b.ban - a.ban : b.g - a.g));
-  }, [data, dd, pos, q, sort]);
+  }, [data, dd, pos, q, sort, src]);
   // 검색했는데 통계가 아직 없는 챔피언도 고를 수 있게
   const found =
     dd && q.trim()
@@ -71,7 +79,11 @@ export function LolChampsPage() {
       </div>
       <div className="lc-bar">
         <input className="st-input lc-search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="챔피언 찾기 (가렌, ㄱㄹ, garen)" aria-label="챔피언 찾기" />
-        {data && data.patches.length > 0 && (
+        <select className="st-input lc-patch" value={src} onChange={(e) => setSrc(e.target.value as 'mine' | 'opgg')} aria-label="통계">
+          <option value="mine">직접 모은 통계</option>
+          <option value="opgg">op.gg ({OPGG_AT.slice(5).replace('-', '/')})</option>
+        </select>
+        {src === 'mine' && data && data.patches.length > 0 && (
           <select className="st-input lc-patch" value={patch || data.patch} onChange={(e) => setPatch(e.target.value)} aria-label="패치">
             {data.patches.map((p) => (
               <option key={p.patch} value={p.patch}>
@@ -120,7 +132,7 @@ export function LolChampsPage() {
         />
       )}
       {!data && !err && <p className="st-muted">받는 중…</p>}
-      {data && rows.length > 0 && (
+      {rows.length > 0 && (
         <section className="st-card lc-table-wrap">
           <table className="lc-table">
             <thead>
@@ -141,7 +153,8 @@ export function LolChampsPage() {
                     {sort === k ? ' ▾' : ''}
                   </th>
                 ))}
-                <th>KDA</th>
+                {src === 'mine' && <th>KDA</th>}
+                <th className="l">상대하기 어려운 챔피언</th>
               </tr>
             </thead>
             <tbody>
@@ -158,8 +171,11 @@ export function LolChampsPage() {
                   <td className={r.win >= 52 ? 'lc-up' : r.win < 48 ? 'lc-down' : ''}>{pct1(r.win)}</td>
                   <td>{pct1(r.pick)}</td>
                   <td>{pct1(r.ban)}</td>
-                  <td>{r.g.toLocaleString('ko-KR')}</td>
-                  <td>{r.kda.toFixed(2)}</td>
+                  <td>{src === 'mine' ? r.g.toLocaleString('ko-KR') : '-'}</td>
+                  {src === 'mine' && <td>{r.kda.toFixed(2)}</td>}
+                  <td className="l">
+                    <span className="lc-hard">{opggHard(r.cid, r.pos).map((h) => (dd?.champ[h] ? <img key={h} src={champImg(dd.v, dd.champ[h].id)} alt={dd.champ[h].name} title={dd.champ[h].name} loading="lazy" /> : null))}</span>
+                  </td>
                 </tr>
               ))}
             </tbody>

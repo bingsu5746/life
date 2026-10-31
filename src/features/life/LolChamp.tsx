@@ -5,6 +5,7 @@ import { Empty, go } from '../study/ui';
 import { champImg, DD, loadChamp, loadItems, loadRunes, plain, runeImg, SHARD, type ChampDetail, type Dd, type Item, type RuneInfo } from './lolDd';
 import { pct1, POS_ORDER, useDd2 } from './LolChamps';
 import { POS } from './lolStats';
+import { opggHard } from './opgg';
 
 export const CHAMP_TABS = [
   ['build', '빌드'],
@@ -127,7 +128,7 @@ export function LolChampPage({ id, sub }: { id: string; sub?: string }) {
       {tab === 'items' && here && meta && <Items meta={meta} pos={pos} dd={dd} items={items} />}
       {tab === 'counter' && here && meta && <Counter meta={meta} pos={pos} dd={dd} me={champ.id} />}
       {tab === 'skills' && <Skills detail={detail} dd={dd} />}
-      {tab === 'tips' && <Tips detail={detail} name={champ.name} meta={here ? meta : null} pos={pos} dd={dd} />}
+      {tab === 'tips' && <Tips detail={detail} name={champ.name} meta={here ? meta : null} pos={pos} dd={dd} cid={champ.key} />}
     </div>
   );
 }
@@ -536,7 +537,7 @@ function Skills({ detail, dd }: { detail: ChampDetail | null; dd: Dd }) {
   );
 }
 
-function Tips({ detail, name, meta, pos, dd }: { detail: ChampDetail | null; name: string; meta: Meta | null; pos: string; dd: Dd }) {
+function Tips({ detail, name, meta, pos, dd, cid }: { detail: ChampDetail | null; name: string; meta: Meta | null; pos: string; dd: Dd; cid: number }) {
   if (!detail) return <p className="st-muted">팁을 받는 중…</p>;
   return (
     <div className="lc-cols">
@@ -552,15 +553,17 @@ function Tips({ detail, name, meta, pos, dd }: { detail: ChampDetail | null; nam
           <p className="st-muted">Riot 이 이 챔피언 팁을 주지 않아요.</p>
         )}
       </section>
-      {meta && <CounterTips meta={meta} pos={pos} dd={dd} />}
+      <CounterTips meta={meta} pos={pos} dd={dd} cid={cid} />
     </div>
   );
 }
 
-/** 대표 카운터 3명 (모은 맞대결에서 승률이 가장 낮은 상대) + 그 챔피언 상대 팁 (Riot) */
-function CounterTips({ meta, pos, dd }: { meta: Meta; pos: string; dd: Dd }) {
-  const c = useCounters(meta, pos);
-  const top = c.hard.slice(0, 3);
+/** 대표 카운터 3명 (op.gg 상대하기 어려운 챔피언, 없으면 모은 맞대결에서 승률이 가장 낮은 상대) + 그 챔피언 상대 팁 (Riot) */
+const EMPTY_META = { pos: [], items: [], runes: [], spells: [], mine: [], theirs: [] } as unknown as Meta;
+function CounterTips({ meta, pos, dd, cid }: { meta: Meta | null; pos: string; dd: Dd; cid: number }) {
+  const c = useCounters(meta ?? EMPTY_META, pos);
+  const og = opggHard(cid, pos);
+  const top = og.length ? og.map((opp) => c.all.find((m) => m.opp === opp) ?? { opp, g: 0, w: 0 }) : c.hard.slice(0, 3);
   const [tips, setTips] = useState<Record<number, string[]>>({});
   useEffect(() => {
     for (const m of top) {
@@ -581,7 +584,7 @@ function CounterTips({ meta, pos, dd }: { meta: Meta; pos: string; dd: Dd }) {
           <div className="lc-champ">
             {dd.champ[m.opp] && <img src={champImg(dd.v, dd.champ[m.opp].id)} alt="" loading="lazy" />}
             <b>{dd.champ[m.opp]?.name}</b>
-            <small className="lc-down">{pct1(wr(m))}</small>
+            {m.g > 0 && <small className="lc-down">{pct1(wr(m))}</small>}
           </div>
           {tips[m.opp]?.length ? (
             <ul className="lc-tips">
