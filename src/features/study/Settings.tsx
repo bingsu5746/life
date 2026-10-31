@@ -234,6 +234,7 @@ export function Settings({ cat: cat0 }: { cat?: string }) {
       )}
       {cat === 'life' && (
         <>
+          <GameAccounts />
           <LifeSettings />
         </>
       )}
@@ -491,5 +492,32 @@ function LifeSettings() {
         </button>
       </section>
     </>
+  );
+}
+
+/** 게임 계정: 롤 라이엇 ID(이름#태그) · Steam ID (한 번 저장하면 게임 화면에서 바로) */
+function GameAccounts() {
+  const d = useStudy();
+  const [lol, setLol] = useState(d.settings.lolId ?? '');
+  const [steam, setSteam] = useState(d.settings.steamId ?? '');
+  const lolOk = !lol.trim() || /^.{2,16}#[^#\s]{2,5}$/.test(lol.trim());
+  const steamOk = !steam.trim() || /^\d{17}$/.test(steam.trim());
+  return (
+    <section className="st-card st-form">
+      <h3 className="st-h">게임 계정</h3>
+      <Field label="롤 라이엇 ID" hint="이름#태그 (예: Hide on bush#KR1)">
+        <input className="st-input" value={lol} onChange={(e) => setLol(e.target.value)} placeholder="이름#태그" aria-label="롤 라이엇 ID" />
+      </Field>
+      <Field label="Steam ID" hint="17자리 숫자 · 프로필이 「공개」여야 가진 게임을 볼 수 있어요">
+        <input className="st-input" inputMode="numeric" value={steam} onChange={(e) => setSteam(e.target.value.replace(/\D/g, '').slice(0, 17))} placeholder="7656119…" aria-label="Steam ID" />
+      </Field>
+      {!lolOk && <p className="bad">라이엇 ID 는 「이름#태그」 처럼 넣어 주세요.</p>}
+      {!steamOk && <p className="bad">Steam ID 는 17자리 숫자예요.</p>}
+      <div className="st-row end">
+        <button className="btn btn-primary btn-sm" disabled={!lolOk || !steamOk} onClick={() => (setSettings({ lolId: lol.trim() || undefined, steamId: steam.trim() || undefined }), toast('게임 계정을 저장했어요'))}>
+          저장
+        </button>
+      </div>
+    </section>
   );
 }

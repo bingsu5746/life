@@ -19,3 +19,13 @@ describe('영수증', () => {
     expect(parseReceipt('{"amount":null,"date":"어제","store":null,"items":null}')).toEqual({ amount: null, date: null, store: null, items: [] });
   });
 });
+
+describe('목차 사진', () => {
+  it('쪽이 없거나 이상한 줄은 뺀다', async () => {
+    const { parseTocRead } = await import('./aiRead');
+    expect(parseTocRead('{"units":[{"name":"1. 집합","from":12,"to":30},{"name":"2. 명제","from":"31","to":null},{"name":"x","from":0},{"name":"3","from":40,"to":20}]}').units).toEqual([
+      { name: '1. 집합', from: 12, to: 30 },
+      { name: '2. 명제', from: 31, to: null },
+    ]);
+  });
+});

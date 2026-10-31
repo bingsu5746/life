@@ -563,7 +563,7 @@ export async function discogsSearch(q: string): Promise<{ list: DiscogsHit[]; di
   return { list, direct: true };
 }
 /** 등록된 서비스 키 (있는지만) */
-export const keysInfo = () => call<{ serpapi: boolean; serpUsed: number; discogs: boolean; datagokr: boolean; gemini: boolean; steam?: boolean }>('keys');
+export const keysInfo = () => call<{ serpapi: boolean; serpUsed: number; discogs: boolean; datagokr: boolean; gemini: boolean; steam?: boolean; riot?: boolean; nl?: boolean; yes24?: boolean }>('keys');
 /** 응원팀 경기 알림 (시작 · 끝). subs: 이 계정에 알림을 받는 기기 수 */
 export const nbaFavGet = () => call<{ team: string; subs: number }>('nba/fav');
 export const nbaFavSet = (team: string) => call<{ team: string; subs: number }>('nba/fav', 'PUT', { team });
@@ -621,6 +621,22 @@ async function aiJob<T>(path: string, body: unknown): Promise<T> {
 export const noteScan = (image: { mime: string; data: string }, subjects: string[]) => aiJob<{ subject: string | null; number: string | null; question: string | null }>('ai/note', { image, subjects });
 /** 영수증 사진 → 금액 · 날짜 · 가게 */
 export const receiptScan = (image: { mime: string; data: string }) => aiJob<{ amount: number | null; date: string | null; store: string | null; items: string[] }>('ai/receipt', { image });
+/** 목차 사진들 → 단원 · 쪽 */
+export const tocScan = (images: { mime: string; data: string }[]) => aiJob<{ units: { name: string; from: number; to: number | null }[] }>('ai/toc', { images });
+/** 책 찾기 (국립중앙도서관) */
+export interface BookHit {
+  title: string;
+  author: string;
+  publisher: string;
+  isbn: string;
+  cover: string;
+  toc: string;
+  price: number;
+  pages: string;
+  date: string;
+}
+export const bookSearch = (q: string) => remember(`bk:${q}`, 60 * MIN, () => call<{ list: BookHit[]; needKey?: boolean }>(`books/search?q=${encodeURIComponent(q)}`, 'GET', undefined, 20_000));
+export const bookToc = (url: string) => call<{ text: string }>(`books/toc?url=${encodeURIComponent(url)}`, 'GET', undefined, 20_000);
 /** 받아쓴 일기 → 칸 나누기 */
 export const diarySplit = (text: string) => aiJob<Partial<Record<'good' | 'hard' | 'thanks' | 'tomorrow' | 'dream', string>>>('ai/diary', { text });
 

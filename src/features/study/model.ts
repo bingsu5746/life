@@ -770,6 +770,11 @@ export interface Reading extends Stamp {
   review?: string;
   /** 밑줄 친 문장 (쪽) */
   quotes?: { text: string; page?: number }[];
+  /** 책 찾기(국립중앙도서관)로 넣었으면: 표지 · ISBN · 출판사 · 정가(원) */
+  cover?: string;
+  isbn?: string;
+  publisher?: string;
+  price?: number;
   started?: DateStr;
   finished?: DateStr;
   created: number;

@@ -8421,3 +8421,36 @@ body.focus-on {
 .mn-receipt {
   justify-self: start;
 }
+.bk-found {
+  display: flex !important;
+  gap: 10px;
+  align-items: center;
+  text-align: left;
+}
+.bk-found img {
+  width: 34px;
+  height: 48px;
+  object-fit: cover;
+  border-radius: 4px;
+  background: var(--soft);
+}
+.bk-found span {
+  display: grid;
+  gap: 2px;
+}
+.rd-cover {
+  width: 40px;
+  height: 56px;
+  object-fit: cover;
+  border-radius: 4px;
+  background: var(--soft);
+}
+.rd-cover.big {
+  width: 96px;
+  height: 136px;
+}
+.rd-item img,
+.rd-item .dg-noimg {
+  width: 48px;
+  height: 68px;
+}

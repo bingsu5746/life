@@ -5,7 +5,9 @@ import { alive, newId, type Reading } from '../study/model';
 import { put, remove, setSettings, useStudy } from '../study/store';
 import { Bar, confirmDelete, Empty, Field, Icon, Sheet, tap, toast, useToday } from '../study/ui';
 import { StarInput, starText } from './MovieParts';
-import { NameSearch } from './NameSearch';
+import { BookSearch } from '../study/BookSearch';
+import { bookSearch, isLoggedIn, type BookHit } from '../auth/api';
+import { BarChart } from '../study/charts';
 import { goalPace, pagesBetween, withProgress } from './readingCalc';
 
 export { goalPace, pagesBetween, withProgress };
@@ -82,6 +84,7 @@ export function ReadingPage() {
           {list.map((b) => (
             <article key={b.id} className="mv-card st-tap" {...tap(() => setEdit(b))}>
               <div className="mv-top">
+                {b.cover && <img className="rd-cover" src={b.cover} alt="" loading="lazy" />}
                 <b>{b.title}</b>
                 {b.author && <small className="st-muted">{b.author}</small>}
               </div>
@@ -95,8 +98,135 @@ export function ReadingPage() {
           ))}
         </div>
       )}
+      <ReadStats all={all} today={today} />
+      {isLoggedIn() && <BookFind have={all} />}
       {edit && <ReadSheet item={edit} today={today} onClose={() => setEdit(null)} />}
     </div>
+  );
+}
+
+/** 독서 통계: 최근 30일 날마다 읽은 쪽 · 올해 달마다 다 읽은 책 · 평균 별점 · 올해 읽은 쪽 */
+function ReadStats({ all, today }: { all: Reading[]; today: string }) {
+  const days = Array.from({ length: 30 }, (_, i) => addDays(today, i - 29));
+  const per = days.map((dd) => pagesBetween(all, dd, dd));
+  const year = today.slice(0, 4);
+  const done = all.filter((b) => b.status === 'done' && b.finished?.startsWith(year));
+  if (!per.some(Boolean) && !done.length) return null;
+  const rated = all.filter((b) => b.rating);
+  const avg = rated.length ? rated.reduce((a, b) => a + b.rating!, 0) / rated.length : 0;
+  const months = Array.from({ length: 12 }, (_, i) => done.filter((b) => Number(b.finished!.slice(5, 7)) === i + 1).length);
+  return (
+    <section className="st-card">
+      <h3 className="st-h">독서 기록</h3>
+      <div className="nba-avg">
+        <div>
+          <small>최근 30일</small>
+          <b>{per.reduce((a, b) => a + b, 0).toLocaleString('ko-KR')}쪽</b>
+        </div>
+        <div>
+          <small>하루 평균</small>
+          <b>{Math.round(per.reduce((a, b) => a + b, 0) / 30)}쪽</b>
+        </div>
+        <div>
+          <small>올해 다 읽음</small>
+          <b>{done.length}권</b>
+        </div>
+        <div>
+          <small>올해 읽은 쪽</small>
+          <b>{pagesBetween(all, `${year}-01-01`, today).toLocaleString('ko-KR')}쪽</b>
+        </div>
+        {avg > 0 && (
+          <div>
+            <small>평균 별점</small>
+            <b>★ {avg.toFixed(1)}</b>
+          </div>
+        )}
+      </div>
+      {per.some(Boolean) && <BarChart label="최근 30일 날마다 읽은 쪽" height={130} bars={days.map((dd, i) => ({ label: dd.slice(8), title: shortDate(dd), value: per[i], strong: dd === today }))} format={(v) => `${v}쪽`} />}
+      {done.length > 0 && <BarChart label={`${year}년 달마다 다 읽은 책`} height={110} bars={months.map((n, i) => ({ label: `${i + 1}`, title: `${i + 1}월`, value: n }))} format={(v) => `${v}권`} />}
+    </section>
+  );
+}
+
+/** 책 찾기 (국립중앙도서관): 표지 · 지은이 · 출판사 · 정가 → 읽고 싶어요 · 읽는 중에 바로 */
+function BookFind({ have }: { have: Reading[] }) {
+  const [q, setQ] = useState('');
+  const [list, setList] = useState<BookHit[] | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [note, setNote] = useState('');
+  const find = async () => {
+    if (q.trim().length < 2 || busy) return;
+    setBusy(true);
+    setNote('');
+    try {
+      const r = await bookSearch(q.trim());
+      setList(r.list);
+      if (r.needKey) setNote('책 찾기는 국립중앙도서관 키가 있어야 돼요. Cloudflare 에 넣어 주시면 바로 돼요.');
+    } catch (e) {
+      setNote(e instanceof Error ? e.message : '찾지 못했어요');
+    } finally {
+      setBusy(false);
+    }
+  };
+  const add = (b: BookHit, status: Reading['status']) => {
+    if (have.some((x) => (b.isbn && x.isbn === b.isbn) || x.title === b.title)) return toast('이미 있어요');
+    const p = Number(b.pages.replace(/[^\d]/g, ''));
+    put('reads', {
+      id: newId(),
+      created: Date.now(),
+      title: b.title.slice(0, 100),
+      author: b.author || undefined,
+      status,
+      pages: p > 0 && p < 20000 ? p : undefined,
+      cover: b.cover || undefined,
+      isbn: b.isbn || undefined,
+      publisher: b.publisher || undefined,
+      price: b.price || undefined,
+      started: status === 'reading' ? new Date(Date.now() + 9 * 3600_000).toISOString().slice(0, 10) : undefined,
+    } as Reading);
+    toast(status === 'want' ? '읽고 싶어요에 넣었어요' : '읽는 중에 넣었어요');
+  };
+  return (
+    <section className="st-card">
+      <h3 className="st-h">책 찾기</h3>
+      <form
+        className="st-inline"
+        onSubmit={(e) => {
+          e.preventDefault();
+          void find();
+        }}
+      >
+        <input className="st-input" value={q} onChange={(e) => setQ(e.target.value)} placeholder="책 제목 · 지은이 · ISBN" aria-label="찾을 책" />
+        <button className="btn btn-sm btn-primary" disabled={busy || q.trim().length < 2}>
+          {busy ? '찾는 중…' : '찾기'}
+        </button>
+      </form>
+      {note && <p className="st-muted sm">{note}</p>}
+      {list && !list.length && !note && <p className="st-muted sm">찾지 못했어요.</p>}
+      {list && list.length > 0 && (
+        <div className="dg-list">
+          {list.map((b, i) => (
+            <div key={`${b.isbn}-${i}`} className="dg-item rd-item">
+              {b.cover ? <img src={b.cover} alt="" loading="lazy" /> : <span className="dg-noimg" aria-hidden />}
+              <div className="dg-info">
+                <b>{b.title}</b>
+                <span>{[b.author, b.publisher].filter(Boolean).join(' · ')}</span>
+                <small className="st-muted">{[b.date.slice(0, 4), b.pages, b.price ? `정가 ${b.price.toLocaleString('ko-KR')}원` : ''].filter(Boolean).join(' · ')}</small>
+              </div>
+              <div className="dg-btns">
+                <button className="btn btn-sm" onClick={() => add(b, 'reading')}>
+                  읽는 중
+                </button>
+                <button className="btn btn-sm" onClick={() => add(b, 'want')}>
+                  읽고 싶어요
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+      <p className="st-muted sm">정보 출처: 국립중앙도서관 ISBN 서지정보</p>
+    </section>
   );
 }
 
@@ -110,22 +240,26 @@ function ReadSheet({ item, today, onClose }: { item: Partial<Reading>; today: st
   const [comment, setComment] = useState(item.comment ?? '');
   const [review, setReview] = useState(item.review ?? '');
   const [quotes, setQuotes] = useState(item.quotes ?? []);
+  const [found, setFound] = useState<BookHit | null>(null);
   const num = (s: string) => (s ? Number(s) : undefined);
   return (
     <Sheet title={item.id ? '책 고치기' : '책 넣기'} onClose={onClose}>
       <div className="st-form">
-        <NameSearch
-          type="book"
+        <BookSearch
           value={title}
           onChange={setTitle}
           picked={!!item.title}
-          onPick={(f) => {
-            setTitle(f.title);
-            if (f.by) setAuthor(f.by);
+          onPick={(b) => {
+            setTitle(b.title);
+            if (b.author) setAuthor(b.author);
+            const p = Number(b.pages.replace(/[^\d]/g, ''));
+            if (p > 0 && p < 20000 && !pages) setPages(String(p));
+            setFound(b);
           }}
-          placeholder="책 제목"
+          placeholder="책 제목 (치면 찾아 줘요)"
           label="책 제목"
         />
+        {(found?.cover || item.cover) && <img className="rd-cover big" src={found?.cover || item.cover} alt="" />}
         <input className="st-input" value={author} onChange={(e) => setAuthor(e.target.value)} placeholder="지은이 (선택)" aria-label="지은이" />
         <div className="st-seg">
           {(Object.keys(TAB_NAME) as Tab[]).map((k) => (
@@ -179,6 +313,7 @@ function ReadSheet({ item, today, onClose }: { item: Partial<Reading>; today: st
                 comment: status === 'done' ? comment.trim() || undefined : undefined,
                 review: status === 'done' ? review.trim() || undefined : undefined,
                 quotes: quotes.length ? quotes : undefined,
+                ...(found ? { cover: found.cover || undefined, isbn: found.isbn || undefined, publisher: found.publisher || undefined, price: found.price || undefined } : {}),
               };
               base.started = status !== 'want' ? (item.started ?? today) : undefined;
               base.finished = status === 'done' ? (item.finished ?? today) : undefined;

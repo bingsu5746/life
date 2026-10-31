@@ -11,6 +11,9 @@ import { bookDone, planCtx, planViews, reservedPages } from './select';
 import { getStudy, put, remove, useStudy, useWords } from './store';
 import { parseToc, tocText, type TocRow } from './toc';
 import { markBook } from './actions';
+import { BookSearch } from './BookSearch';
+import { bookToc, tocScan } from '../auth/api';
+import { compressProblemImage } from '../../lib/imageCompress';
 import { PlanForm } from './PlanForm';
 import { PlanWarning } from './Today';
 import { Bar, confirmDelete, Empty, Field, go, Icon, Menu, SubjectDot, SubjectPicker, SubjectTag, toast, useToday } from './ui';
@@ -67,9 +70,11 @@ function BookList() {
     <div className="st-page">
       <div className="st-page-head">
         <h2>문제집</h2>
-        <button className="btn btn-sm" onClick={() => go('/books/new')}>
-          <Icon name="plus" /> 문제집 넣기
-        </button>
+        {books.length > 0 && (
+          <button className="btn btn-sm" onClick={() => go('/books/new')}>
+            <Icon name="plus" /> 문제집 넣기
+          </button>
+        )}
       </div>
       <BookTabs on="books" />
       <WeekLoad views={views.filter((v) => v.plan.target === 'book')} today={today} />
@@ -134,22 +139,48 @@ function BookEditor({ book, onDone }: { book?: Book; onDone: (id?: string, plan?
   // 계획에서 뺄 단원: 「이름#몇 번째」로 기억한다 (이름이 같은 단원이 여럿이어도 하나만 빠지게)
   const [skips, setSkips] = useState<Set<string>>(() => new Set(unitKeys(book?.units ?? []).filter((_, i) => book!.units[i].skip)));
   const [ocr, setOcr] = useState<string | null>(null);
+  const [solved, setSolved] = useState('');
   const fileRef = useRef<HTMLInputElement>(null);
   const rows: TocRow[] = useMemo(() => parseToc(text, Number(last) || undefined), [text, last]);
   const good = rows.filter((r) => !r.problem);
   const keys = unitKeys(rows);
   const needsLast = rows.some((r) => r.problem === '끝 페이지를 알려 주세요');
 
+  /** 목차 사진 → AI(Gemini)가 단원 · 쪽을 읽는다. 안 되면 기기 안 글자 인식(tesseract)으로 */
   async function readPhotos(files: FileList) {
+    const list = [...files].slice(0, 4);
+    setOcr(`AI 가 목차 ${list.length}장을 읽는 중… (10~40초)`);
+    try {
+      const images = await Promise.all(
+        list.map(async (f) => {
+          const small = await compressProblemImage(f, 1600, 0.85);
+          const data = await new Promise<string>((ok, no) => {
+            const r = new FileReader();
+            r.onload = () => ok(String(r.result).split(',')[1] ?? '');
+            r.onerror = () => no(new Error('사진을 읽지 못했어요'));
+            r.readAsDataURL(small);
+          });
+          return { mime: small.type || 'image/jpeg', data };
+        }),
+      );
+      const got = await tocScan(images);
+      if (!got.units.length) throw new Error('AI 가 단원을 찾지 못했어요');
+      const lines = got.units.map((u) => `${u.name} ${u.from}${u.to ? `-${u.to}` : ''}`).join('\n');
+      setText((t) => (t.trim() ? t.trim() + '\n' : '') + lines);
+      toast(`AI 가 단원 ${got.units.length}개를 읽었어요. 틀린 곳이 있으면 고쳐 주세요`);
+      setOcr(null);
+      return;
+    } catch (e) {
+      toast(`${e instanceof Error ? e.message : 'AI 가 읽지 못했어요'} · 기기 안 글자 인식으로 해 볼게요`);
+    }
     const { readImageText } = await import('../../lib/ocr');
     let all = '';
-    for (const [i, f] of [...files].entries()) {
-      setOcr(`사진 ${i + 1}/${files.length} 읽는 중…`);
+    for (const [i, f] of list.entries()) {
       try {
-        all += (await readImageText(f, (stage, r) => setOcr(`사진 ${i + 1}/${files.length} · ${stage === 'recognizing text' ? '글자 읽는 중' : '준비 중'} ${Math.round(r * 100)}%`))) + '\n';
+        all += (await readImageText(f, (stage, r) => setOcr(`사진 ${i + 1}/${list.length} · ${stage === 'recognizing text' ? '글자 읽는 중' : '준비 중'} ${Math.round(r * 100)}%`))) + '\n';
       } catch {
         setOcr(null);
-        toast('사진을 읽지 못했어요. 인터넷 연결을 확인하거나 직접 입력해 주세요');
+        toast('사진을 읽지 못했어요. 직접 입력해 주세요');
         return;
       }
     }
@@ -163,6 +194,13 @@ function BookEditor({ book, onDone }: { book?: Book; onDone: (id?: string, plan?
     const units: Unit[] = rows.flatMap((r, i) => (r.problem ? [] : [{ name: r.name, from: r.from, to: r.to, skip: skips.has(keys[i]) || undefined }]));
     const id = book?.id ?? newId();
     put('books', { ...(book ?? { done: [], undone: [] }), id, name: name.trim(), subjectId, units });
+    // 이미 푼 쪽: 「48」이면 첫 쪽부터 48쪽까지, 「1-48, 60-62」처럼 범위도 된다. 계획은 남은 쪽만 나눈다
+    const sv = solved.trim();
+    if (sv) {
+      const first = Math.min(...units.map((u) => u.from));
+      const pages = /^\d+$/.test(sv) ? expand([[first, Number(sv)]]) : expand(parseRanges(sv));
+      if (pages.length) markBook(id, pages, true);
+    }
     // 목차를 고치면, 문제집 전체(빼지 않은 단원)를 범위로 한 계획은 새 목차를 따라간다
     if (book) {
       const full = (us: Unit[]) => JSON.stringify(compress(expand(us.filter((u) => !u.skip).map((u) => [u.from, u.to]))));
@@ -182,38 +220,28 @@ function BookEditor({ book, onDone }: { book?: Book; onDone: (id?: string, plan?
         </button>
       </div>
       <div className="st-card st-form">
-        <Field label="이름">
-          <div className="st-inline">
-            <input className="st-input" value={name} onChange={(e) => setName(e.target.value)} placeholder="예: 쎈 수학 상" />
-            <label className="btn btn-sm" title="표지 사진에서 이름 읽기">
-              {ocr === 'title' ? '읽는 중…' : '표지 사진'}
-              <input
-                type="file"
-                accept="image/*"
-                hidden
-                onChange={async (e) => {
-                  const f = e.target.files?.[0];
-                  if (!f) return;
-                  setOcr('title');
-                  try {
-                    const { readImageText } = await import('../../lib/ocr');
-                    const lines = (await readImageText(f, () => {}))
-                      .split(/\n/)
-                      .map((x) => x.trim())
-                      .filter((x) => /[가-힣A-Za-z]{2,}/.test(x) && x.length <= 30);
-                    // 가장 굵게 쓰인 제목은 대개 글자가 많은 짧은 줄
-                    const best = lines.sort((a, b) => b.replace(/[^가-힣A-Za-z]/g, '').length - a.replace(/[^가-힣A-Za-z]/g, '').length)[0];
-                    if (best) setName(best);
-                    else toast('표지에서 이름을 찾지 못했어요');
-                  } catch {
-                    toast('사진을 읽지 못했어요');
-                  } finally {
-                    setOcr(null);
+        <Field label="이름" hint="치면 국립중앙도서관 목록에서 찾아요. 고르면 목차도 있으면 불러와요">
+          <BookSearch
+            value={name}
+            onChange={setName}
+            picked={!!book}
+            placeholder="예: 쎈 수학 상"
+            label="문제집 이름"
+            onPick={(h) => {
+              setName(h.title);
+              if (!h.toc || text.trim()) return;
+              setOcr('목차를 불러오는 중…');
+              bookToc(h.toc)
+                .then((r) => {
+                  if (r.text.trim()) {
+                    setText(r.text.trim());
+                    toast('목차를 불러왔어요. 쪽이 없는 줄은 고쳐 주세요');
                   }
-                }}
-              />
-            </label>
-          </div>
+                })
+                .catch(() => toast('목차를 불러오지 못했어요'))
+                .finally(() => setOcr(null));
+            }}
+          />
         </Field>
         <Field group label="과목">
           <SubjectPicker value={subjectId} onChange={setSubjectId} />
@@ -233,8 +261,11 @@ function BookEditor({ book, onDone }: { book?: Book; onDone: (id?: string, plan?
             목차 사진으로 채우기 (여러 장 가능)
           </button>
           <input ref={fileRef} type="file" accept="image/*" multiple hidden onChange={(e) => e.target.files?.length && void readPhotos(e.target.files)} />
-          {ocr && ocr !== 'title' && <span className="st-muted">{ocr}</span>}
+          {ocr && <span className="st-muted">{ocr}</span>}
         </div>
+        <Field label="이미 푼 곳 (있으면)" hint="예: 48 (첫 쪽부터 48쪽까지) · 1-48, 60-62. 계획은 남은 쪽만 나눠요">
+          <input className="st-input" value={solved} onChange={(e) => setSolved(e.target.value.replace(/[^\d,\- ]/g, ''))} placeholder="어디까지 풀었는지 (쪽)" aria-label="이미 푼 쪽" />
+        </Field>
         {needsLast && (
           <Field label="마지막 단원의 끝 쪽">
             <input className="st-input xs" inputMode="numeric" value={last} onChange={(e) => setLast(e.target.value.replace(/\D/g, ''))} />

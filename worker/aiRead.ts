@@ -86,3 +86,25 @@ export function parseReceipt(text: string): ReceiptRead {
       .slice(0, 5),
   };
 }
+
+/** 목차 사진 → 단원 · 쪽 */
+export interface TocRead {
+  units: { name: string; from: number; to: number | null }[];
+}
+export function tocBody(images: { mime: string; data: string }[]) {
+  const prompt = [
+    'These are photos of the table of contents (목차) of a Korean workbook or textbook. Read ONLY what is printed, exactly as written (Korean text must be copied character by character). Never guess.',
+    'Return JSON: {"units": [{"name": unit title as printed including its number like "1. 집합", "from": start page number, "to": end page number or null if not printed}]} in printed order.',
+    'Skip lines without a page number unless they are chapter headings whose first sub-unit has a page; never invent page numbers.',
+  ].join('\n');
+  return { contents: [{ role: 'user', parts: [...images.map((im) => ({ inlineData: { mimeType: im.mime, data: im.data } })), { text: prompt }] }], generationConfig: json };
+}
+export function parseTocRead(text: string): TocRead {
+  const j = obj(text);
+  const units = (Array.isArray(j.units) ? j.units : [])
+    .map((u) => u as { name?: unknown; from?: unknown; to?: unknown })
+    .map((u) => ({ name: str(u.name, 80) ?? '', from: Number(u.from), to: u.to === null || u.to === undefined || u.to === '' ? null : Number(u.to) }))
+    .filter((u) => u.name && Number.isInteger(u.from) && u.from > 0 && u.from < 5000 && (u.to === null || (Number.isInteger(u.to) && u.to >= u.from && u.to < 5000)))
+    .slice(0, 200);
+  return { units };
+}

@@ -23,7 +23,8 @@ import { fetchSpecialDays } from './holidays';
 import { cleanFact } from './fact';
 import { fetch2k } from './nba2k';
 import { hcBody, parseHc } from './homecourt';
-import { diaryBody, noteBody, parseDiary, parseNote, parseReceipt, receiptBody } from './aiRead';
+import { diaryBody, noteBody, parseDiary, parseNote, parseReceipt, parseTocRead, receiptBody, tocBody } from './aiRead';
+import { seojiSearch, seojiToc } from './books';
 import { cheapShark } from './cheapshark';
 import { lolNewGames, lolOlderGames, lolProfile, RiotError, type LolGame } from './lol';
 import { krPrices, steamAchievements, steamMe, storeNames, storeSearch, wishlist, type KrPrice } from './steam';
@@ -198,7 +199,7 @@ export class Accounts extends DurableObject<Env> {
 
     let body: Record<string, unknown> = {};
     if (req.method === 'POST' || req.method === 'PUT' || req.method === 'DELETE') {
-      const big = path.startsWith('store/') || path.startsWith('study-photo/') || path === 'solve' || path === 'solve/img' || path === 'bb/scan' || path === 'ai/note' || path === 'ai/receipt';
+      const big = path.startsWith('store/') || path.startsWith('study-photo/') || path === 'solve' || path === 'solve/img' || path === 'bb/scan' || path === 'ai/note' || path === 'ai/receipt' || path === 'ai/toc';
       const text = await req.text();
       if (text.length > (big ? MAX_STORE + 1000 : path === 'translate' || path === 'notify/digest' ? 4 * MAX_SMALL_BODY : MAX_SMALL_BODY)) return fail('보낸 내용이 너무 커요.', 413);
       try {
@@ -294,6 +295,9 @@ export class Accounts extends DurableObject<Env> {
     if (path === 'music/discogs' && req.method === 'GET') return this.discogs((new URL(req.url).searchParams.get('q') ?? '').trim().slice(0, 80));
     if (path === 'ai/note' && req.method === 'POST') return this.noteScan(user, body);
     if (path === 'ai/receipt' && req.method === 'POST') return this.receiptScan(user, body);
+    if (path === 'ai/toc' && req.method === 'POST') return this.tocScan(user, body);
+    if (path === 'books/search' && req.method === 'GET') return this.bookSearch((new URL(req.url).searchParams.get('q') ?? '').trim().slice(0, 80));
+    if (path === 'books/toc' && req.method === 'GET') return this.bookToc(new URL(req.url).searchParams.get('url') ?? '');
     if (path === 'ai/diary' && req.method === 'POST') return this.diarySplit(user, body);
     if (path === 'bb/scan' && req.method === 'POST') return this.bbScan(user, body);
     if (path.startsWith('bb/scan/') && req.method === 'GET') return this.bbScanGet(user, path.slice('bb/scan/'.length));
@@ -1710,6 +1714,8 @@ export class Accounts extends DurableObject<Env> {
       gemini: !!this.keyOf('gemini'),
       steam: !!this.steamKey(),
       riot: !!this.riotKey(),
+      nl: !!this.nlKey(),
+      yes24: !!this.secret('yes24', 'yes24key', 'yes24api'),
     });
   }
 
@@ -1779,6 +1785,39 @@ export class Accounts extends DurableObject<Env> {
     const img = this.imageOf(b);
     if (!img) return fail('사진이 너무 크거나 잘못됐어요.', 413);
     return this.aiJob(user, receiptBody(img.mime, img.data), parseReceipt, 'receipt');
+  }
+  /** 목차 사진(여러 장) → 단원 · 쪽 */
+  private async tocScan(user: UserRow, b: Record<string, unknown>): Promise<Response> {
+    const imgs = (Array.isArray(b.images) ? b.images : [])
+      .slice(0, 4)
+      .map((x) => this.imageOf({ image: x }))
+      .filter((x): x is { mime: string; data: string } => !!x);
+    if (!imgs.length) return fail('사진이 너무 크거나 잘못됐어요.', 413);
+    if (imgs.reduce((a, x) => a + x.data.length, 0) > MAX_STORE) return fail('사진이 너무 커요. 장 수를 줄여 주세요.', 413);
+    return this.aiJob(user, tocBody(imgs), parseTocRead, 'toc');
+  }
+  private nlKey() {
+    return this.secret('nl', 'nlkey', 'nlapi', 'nlgokr', 'nlgo', 'seoji', 'seojikey', 'nationallibrary', 'library', 'librarykey', 'kolis', 'nlcertkey', 'certkey');
+  }
+  /** 책 찾기 (국립중앙도서관 ISBN 서지정보, 하루 기억) */
+  private async bookSearch(q: string): Promise<Response> {
+    if (q.length < 2) return json({ list: [] });
+    const key = this.nlKey();
+    if (!key) return json({ list: [], needKey: true });
+    try {
+      const r = await this.nbaCached(`nl:${q.toLowerCase()}`, DAY, () => seojiSearch(key, q));
+      return json({ list: r.v });
+    } catch (e) {
+      return fail(`책을 찾지 못했어요. (${(e instanceof Error ? e.message : String(e)).slice(0, 100)})`, 502);
+    }
+  }
+  private async bookToc(url: string): Promise<Response> {
+    try {
+      const r = await this.nbaCached(`nltoc:${url}`, 30 * DAY, () => seojiToc(url));
+      return json({ text: r.v });
+    } catch (e) {
+      return fail(`목차를 받지 못했어요. (${(e instanceof Error ? e.message : String(e)).slice(0, 100)})`, 502);
+    }
   }
   /** 받아쓴 일기 글 → 칸마다 (좋았던 것 · 힘들었던 것 …). 쓴 말만 옮기고 지어내지 않게 */
   private async diarySplit(user: UserRow, b: Record<string, unknown>): Promise<Response> {
