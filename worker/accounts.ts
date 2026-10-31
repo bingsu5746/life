@@ -1706,7 +1706,8 @@ export class Accounts extends DurableObject<Env> {
   /** 롤 챔피언 통계 (서버가 모은 마스터 이상 솔랭): 패치 목록 · 티어표 · 챔피언 하나 · 모은 상태 */
   private lolMetaRoute(path: string, q: URLSearchParams): Response {
     // 모으기 알람이 아직 안 돌고 있으면 켠다
-    if (this.riotKey()) this.ctx.waitUntil(this.ctx.storage.getAlarm().then((a) => (a === null ? this.scheduleAlarm() : undefined)));
+    // (다른 알림 때문에 더 늦은 알람이 걸려 있어도 1분 안으로 당긴다)
+    if (this.riotKey()) this.ctx.waitUntil(this.ctx.storage.getAlarm().then((a) => (a === null || a > Date.now() + 90_000 ? this.scheduleAlarm() : undefined)));
     const patches = metaPatches(this.sql);
     const patch = q.get('patch') === 'all' ? 'all' : (patches.find((x) => x.patch === q.get('patch'))?.patch ?? patches[0]?.patch ?? 'all');
     const status = { matches: patches.reduce((a, x) => a + x.games, 0), last: JSON.parse(this.cacheGet('lolmeta:last') ?? 'null'), err: JSON.parse(this.cacheGet('lolmeta:err') ?? 'null') };

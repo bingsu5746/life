@@ -656,3 +656,22 @@ export interface LolProfile {
 }
 export const lolProfile = (id: string) => remember(`lolp:${id}`, 5 * MIN, () => call<LolProfile>(`lol/profile?id=${encodeURIComponent(id)}`, 'GET', undefined, 30_000));
 export const lolGames = (puuid: string, older = false) => call<{ games: import('../life/lolStats').LolGame[]; more: boolean; end: boolean; warn: string }>(`lol/games?puuid=${encodeURIComponent(puuid)}${older ? '&older=1' : ''}`, 'GET', undefined, 90_000);
+
+/** 롤 챔피언 통계 (서버가 모은 마스터 이상 솔랭) */
+export interface LolAggRow {
+  k: string;
+  g: number;
+  w: number;
+  kk: number;
+  dd: number;
+  aa: number;
+  dmg: number;
+  kp: number;
+}
+export interface LolMetaStatus {
+  matches: number;
+  last: { at: number; counted: number } | null;
+  err: { at: number; msg: string } | null;
+}
+export const lolMeta = (patch = '') => remember(`lolmeta:${patch}`, 5 * MIN, () => call<{ patch: string; patches: { patch: string; games: number }[]; status: LolMetaStatus; total: number; rows: { cid: number; pos: string; g: number; w: number; kk: number; dd: number; aa: number }[]; bans: Record<number, number> }>(`lol/meta${patch ? `?patch=${encodeURIComponent(patch)}` : ''}`, 'GET', undefined, 20_000));
+export const lolChampMeta = (cid: number, patch = '') => remember(`lolchamp:${cid}:${patch}`, 5 * MIN, () => call<{ patch: string; patches: { patch: string; games: number }[]; status: LolMetaStatus; total: number; bans: number; pos: LolAggRow[]; items: LolAggRow[]; runes: LolAggRow[]; spells: LolAggRow[]; mine: LolAggRow[]; theirs: LolAggRow[] }>(`lol/champ?cid=${cid}${patch ? `&patch=${encodeURIComponent(patch)}` : ''}`, 'GET', undefined, 20_000));
