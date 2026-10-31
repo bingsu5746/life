@@ -127,7 +127,7 @@ export function LolChampPage({ id, sub }: { id: string; sub?: string }) {
       {tab === 'items' && here && meta && <Items meta={meta} pos={pos} dd={dd} items={items} />}
       {tab === 'counter' && here && meta && <Counter meta={meta} pos={pos} dd={dd} me={champ.id} />}
       {tab === 'skills' && <Skills detail={detail} dd={dd} />}
-      {tab === 'tips' && <Tips detail={detail} name={champ.name} />}
+      {tab === 'tips' && <Tips detail={detail} name={champ.name} meta={here ? meta : null} pos={pos} dd={dd} />}
     </div>
   );
 }
@@ -483,44 +483,62 @@ function Skills({ detail, dd }: { detail: ChampDetail | null; dd: Dd }) {
   );
 }
 
-function Tips({ detail, name }: { detail: ChampDetail | null; name: string }) {
+function Tips({ detail, name, meta, pos, dd }: { detail: ChampDetail | null; name: string; meta: Meta | null; pos: string; dd: Dd }) {
   if (!detail) return <p className="st-muted">팁을 받는 중…</p>;
   return (
     <div className="lc-cols">
       <section className="st-card">
-        <h3 className="st-h">{name} 할 때</h3>
-        <ul className="lc-tips">
-          {detail.allytips.map((t, i) => (
-            <li key={i}>{t}</li>
-          ))}
-        </ul>
+        <h3 className="st-h">{name} 팁</h3>
+        {detail.allytips.length ? (
+          <ul className="lc-tips">
+            {detail.allytips.map((t, i) => (
+              <li key={i}>{t}</li>
+            ))}
+          </ul>
+        ) : (
+          <p className="st-muted">Riot 이 이 챔피언 팁을 주지 않아요.</p>
+        )}
       </section>
-      <section className="st-card">
-        <h3 className="st-h">{name} 상대할 때</h3>
-        <ul className="lc-tips">
-          {detail.enemytips.map((t, i) => (
-            <li key={i}>{t}</li>
-          ))}
-        </ul>
-      </section>
-      <section className="st-card">
-        <h3 className="st-h">난이도 · 성향</h3>
-        <div className="nba-avg">
-          {(
-            [
-              ['공격', detail.info.attack],
-              ['방어', detail.info.defense],
-              ['마법', detail.info.magic],
-              ['난이도', detail.info.difficulty],
-            ] as const
-          ).map(([k, v]) => (
-            <div key={k}>
-              <small>{k}</small>
-              <b>{v} / 10</b>
-            </div>
-          ))}
-        </div>
-      </section>
+      {meta && <CounterTips meta={meta} pos={pos} dd={dd} />}
     </div>
+  );
+}
+
+/** 대표 카운터 3명 (모은 맞대결에서 승률이 가장 낮은 상대) + 그 챔피언 상대 팁 (Riot) */
+function CounterTips({ meta, pos, dd }: { meta: Meta; pos: string; dd: Dd }) {
+  const c = useCounters(meta, pos);
+  const top = c.hard.slice(0, 3);
+  const [tips, setTips] = useState<Record<number, string[]>>({});
+  useEffect(() => {
+    for (const m of top) {
+      const ch = dd.champ[m.opp];
+      if (ch && !tips[m.opp])
+        loadChamp(ch.id)
+          .then((d) => setTips((t) => ({ ...t, [m.opp]: d.enemytips })))
+          .catch(() => {});
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [top.map((m) => m.opp).join()]);
+  if (!top.length) return null;
+  return (
+    <section className="st-card">
+      <h3 className="st-h">대표 카운터</h3>
+      {top.map((m) => (
+        <div key={m.opp} className="lc-ctip">
+          <div className="lc-champ">
+            {dd.champ[m.opp] && <img src={champImg(dd.v, dd.champ[m.opp].id)} alt="" loading="lazy" />}
+            <b>{dd.champ[m.opp]?.name}</b>
+            <small className="lc-down">{pct1(wr(m))}</small>
+          </div>
+          {tips[m.opp]?.length ? (
+            <ul className="lc-tips">
+              {tips[m.opp].map((t, i) => (
+                <li key={i}>{t}</li>
+              ))}
+            </ul>
+          ) : null}
+        </div>
+      ))}
+    </section>
   );
 }

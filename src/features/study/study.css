@@ -9197,3 +9197,6 @@ body.focus-on {
     grid-template-columns: 70px 72px 1fr;
   }
 }
+.lc-ctip + .lc-ctip {
+  margin-top: 12px;
+}
