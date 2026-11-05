@@ -208,7 +208,7 @@ export function Bar({ value, max, label = '진행' }: { value: number; max: numb
   const pct = max > 0 ? Math.min(100, (value / max) * 100) : 0;
   return (
     <div className="st-bar" role="progressbar" aria-label={label} aria-valuemin={0} aria-valuenow={value} aria-valuemax={max}>
-      <i style={{ width: `${pct}%` }} />
+      <i style={{ transform: `scaleX(${pct / 100})` }} />
     </div>
   );
 }

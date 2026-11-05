@@ -15,7 +15,6 @@ import { tutorSessions } from './tutor';
 import { reminders } from '../life/events';
 import { notifyRemind } from '../auth/api';
 // 시험 화면은 오늘 화면(D-day)과 같이 쓰여 함께 받는다
-import { Exams } from './Exams';
 import { go, Icon, Sheet, Toaster, useToday } from './ui';
 
 /** 폰 아래 메뉴에 늘 보이는 공부 메뉴 (나머지는 「더 보기」) */
@@ -34,6 +33,7 @@ const BasketballArea = lazy(() => import('../life/BasketballArea').then((m) => (
 const FitnessMoved = lazy(() => import('../life/BasketballArea').then((m) => ({ default: m.FitnessMoved })));
 const Money = lazy(() => import('../life/Money').then((m) => ({ default: m.Money })));
 const Hobby = lazy(() => import('../life/Hobby').then((m) => ({ default: m.Hobby })));
+const Exams = lazy(() => import('./Exams').then((m) => ({ default: m.Exams })));
 const Travel = lazy(() => import('../life/Travel').then((m) => ({ default: m.Travel })));
 const CalendarPage = lazy(() => import('../life/Calendar').then((m) => ({ default: m.CalendarPage })));
 const WeekPlanPage = lazy(() => import('../life/WeekPlan').then((m) => ({ default: m.WeekPlanPage })));

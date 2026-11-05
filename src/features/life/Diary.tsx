@@ -163,7 +163,9 @@ function Write({ date, today }: { date: string; today: string }) {
   const form = formOf(d);
   const lines = daySummary(d, date);
   // 새 일기: 본문 앞에 오늘 앱 기록(운동 · 영화 · 할 일 …)을 미리 채운다 (양식에서 끌 수 있음)
-  const [text, setText] = useState(() => draft0?.text ?? cur?.text ?? (form.autoFill && lines.length ? `${lines.join('\n')}\n\n` : ''));
+  // 미리 채운 글만 있으면 바뀐 것으로 치지 않는다 (임시저장 알림이 괜히 뜨지 않게)
+  const [prefill] = useState(() => (!cur && form.autoFill && lines.length ? `${lines.join('\n')}\n\n` : ''));
+  const [text, setText] = useState(() => draft0?.text ?? cur?.text ?? prefill);
   const [videos, setVideos] = useState<string[]>(draft0?.videos ?? cur?.videos ?? []);
   const [vBusy, setVBusy] = useState('');
   const studyLines = studySummary(d, date);
@@ -247,7 +249,12 @@ function Write({ date, today }: { date: string; today: string }) {
     }
   }
   const changed =
-    JSON.stringify(videos) !== JSON.stringify(cur?.videos ?? []) || JSON.stringify(photos) !== JSON.stringify(cur?.photos ?? []) || mood !== (cur?.mood ?? 0) || title !== (cur?.title ?? '') || text !== (cur?.text ?? '') || JSON.stringify(clean(parts)) !== JSON.stringify(clean(cur?.parts ?? {}));
+    JSON.stringify(videos) !== JSON.stringify(cur?.videos ?? []) ||
+    JSON.stringify(photos) !== JSON.stringify(cur?.photos ?? []) ||
+    mood !== (cur?.mood ?? 0) ||
+    title !== (cur?.title ?? '') ||
+    text !== (cur?.text ?? prefill) ||
+    JSON.stringify(clean(parts)) !== JSON.stringify(clean(cur?.parts ?? {}));
   // 바뀌면 0.5초 뒤 이 기기에 임시저장
   useEffect(() => {
     if (savedRef.current) return;
@@ -262,7 +269,7 @@ function Write({ date, today }: { date: string; today: string }) {
     setFromDraft(false);
     setMood(cur?.mood ?? 0);
     setTitle(cur?.title ?? '');
-    setText(cur?.text ?? '');
+    setText(cur?.text ?? prefill);
     setParts(cur?.parts ?? {});
     setPhotos(cur?.photos ?? []);
   }

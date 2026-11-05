@@ -1,8 +1,11 @@
 // 여행 지도 (카카오맵): 장소 핀 · 이름으로 찾기 · 근처 맛집/카페/관광지/숙소 · 길찾기. 못 불러오면 OpenStreetMap 지도로
-import { useEffect, useRef, useState } from 'react';
+import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import { toast } from '../study/ui';
 import { loadKakao, nearby, routeUrl, searchPlaces, type Kakao, type KPlace } from './kakao';
-import PlaceMap, { type Pin } from './PlaceMap';
+import type { Pin } from './PlaceMap';
+
+// 카카오맵을 못 쓸 때만 OpenStreetMap 지도(leaflet)를 받는다
+const PlaceMap = lazy(() => import('./PlaceMap'));
 
 const HOME = { lat: 37.654, lon: 127.056 };
 const NEAR: ['FD6' | 'CE7' | 'AT4' | 'AD5', string][] = [
@@ -103,7 +106,12 @@ export default function KakaoMap({ pins, onOpen, onAdd }: { pins: Pin[]; onOpen:
       () => toast('위치를 받지 못했어요'),
     );
 
-  if (fail) return <PlaceMap pins={pins} onOpen={onOpen} />;
+  if (fail)
+    return (
+      <Suspense fallback={<div className="pm-map" />}>
+        <PlaceMap pins={pins} onOpen={onOpen} />
+      </Suspense>
+    );
   return (
     <div className="km">
       <form

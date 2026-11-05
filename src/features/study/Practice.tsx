@@ -207,7 +207,7 @@ function Run({ items, mode, dir, onExit, onRetry }: { items: Item[]; mode: PMode
         </small>
       </div>
       <div className="st-bar" role="progressbar" aria-label="진행" aria-valuenow={i} aria-valuemax={items.length}>
-        <i style={{ width: `${(i / items.length) * 100}%` }} />
+        <i style={{ transform: `scaleX(${i / items.length})` }} />
       </div>
 
       {mode === 'card' && (

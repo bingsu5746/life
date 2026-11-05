@@ -5,6 +5,8 @@ import { newId, type CalEvent, type DateStr } from '../study/model';
 import { put, remove } from '../study/store';
 import { Field, Sheet, toast } from '../study/ui';
 import { EVENT_COLORS, REMIND_OPTS } from './events';
+import { localTimes } from '../study/notify';
+import { isLoggedIn } from '../auth/api';
 
 type Freq = '' | 'daily' | 'weekly' | 'monthly' | 'yearly';
 const FREQS: [Freq, string][] = [
@@ -158,6 +160,7 @@ export function EventSheet({ date, ev, on, onClose }: { date: DateStr; ev?: CalE
             ))}
           </select>
         </Field>
+        {remind !== undefined && (!isLoggedIn() || !localTimes()) && <small className="st-hint">{isLoggedIn() ? '설정에서 이 기기 알림을 켜야 휴대폰으로 와요' : '로그인하고 알림을 켜야 휴대폰으로 와요'}</small>}
         <input className="st-input" value={place} onChange={(e) => setPlace(e.target.value)} placeholder="장소" aria-label="장소" />
         <textarea className="st-input" rows={2} value={memo} onChange={(e) => setMemo(e.target.value)} placeholder="메모" aria-label="메모" />
         <button className="btn btn-primary" onClick={save}>
