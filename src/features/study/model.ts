@@ -735,6 +735,9 @@ export interface TravelPlace extends Stamp {
   /** 지도 위치 */
   lat?: number;
   lon?: number;
+  /** 주소 · 카카오맵 장소 페이지 */
+  addr?: string;
+  url?: string;
   created: number;
 }
 

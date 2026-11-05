@@ -649,6 +649,8 @@ export const bookSearch = (q: string) => remember(`bk:${q}`, 60 * MIN, () => cal
 export const bookToc = (url: string) => call<{ text: string }>(`books/toc?url=${encodeURIComponent(url)}`, 'GET', undefined, 20_000);
 /** 받아쓴 일기 → 칸 나누기 */
 export const diarySplit = (text: string) => aiJob<Partial<Record<'done' | 'good' | 'hard' | 'thanks' | 'learned' | 'fix' | 'worry' | 'tomorrow' | 'dream', string>>>('ai/diary', { text });
+/** 카카오맵 JS 키 (브라우저용, 등록한 사이트에서만 동작) */
+export const kakaoKey = () => call<{ key: string }>('kakao/key');
 /** AI 코치: 기록 글 → 다음 주 계획 */
 export interface CoachPlan {
   good: string | null;

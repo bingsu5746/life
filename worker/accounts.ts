@@ -374,7 +374,6 @@ export class Accounts extends DurableObject<Env> {
       const key = this.secret('kakaomap', 'kakaomapkey', 'kakaojs', 'kakaojskey', 'kakaojavascriptkey');
       return key ? json({ key }) : fail('카카오맵 키가 아직 없어요.', 503);
     }
-    if (path === 'kakao/place' && req.method === 'GET') return this.kakaoPlace(new URL(req.url).searchParams);
     if (path === 'music/discogs' && req.method === 'GET') return this.discogs((new URL(req.url).searchParams.get('q') ?? '').trim().slice(0, 80));
     if (path === 'ai/note' && req.method === 'POST') return this.noteScan(user, body);
     if (path === 'ai/receipt' && req.method === 'POST') return this.receiptScan(user, body);
@@ -1520,43 +1519,6 @@ export class Accounts extends DurableObject<Env> {
     if (ab && (ab.answer || ab.snippet)) out.push({ title: ab.title ?? '바로 답', snippet: String(ab.answer ?? ab.snippet).slice(0, 300), link: ab.link ?? '' });
     for (const r of j.organic_results ?? []) if (r.title && r.snippet) out.push({ title: r.title.slice(0, 120), snippet: r.snippet.slice(0, 300), link: r.link ?? '' });
     return out.slice(0, 5);
-  }
-
-  /** 장소 찾기 (카카오 로컬 REST). 맵 키가 REST 키가 아니면 책 찾기 키로 */
-  private async kakaoPlace(sp: URLSearchParams): Promise<Response> {
-    const q = (sp.get('q') ?? '').trim().slice(0, 60);
-    if (q.length < 2) return fail('찾을 곳을 넣어 주세요.');
-    const keys = [this.secret('kakaorest', 'kakaorestkey', 'kakaomap'), this.secret('KAKAO_KEY')].filter((k, i, a): k is string => !!k && a.indexOf(k) === i);
-    if (!keys.length) return fail('카카오 키가 아직 없어요.', 503);
-    const x = Number(sp.get('x'));
-    const y = Number(sp.get('y'));
-    const qs = new URLSearchParams({ query: q, size: '15' });
-    if (Number.isFinite(x) && Number.isFinite(y) && x && y) (qs.set('x', String(x)), qs.set('y', String(y)), qs.set('sort', 'accuracy'));
-    let last = '';
-    for (const key of keys) {
-      const res = await within(fetch(`https://dapi.kakao.com/v2/local/search/keyword.json?${qs}`, { headers: { authorization: `KakaoAK ${key}` } }), 10_000, 'kakao');
-      if (res.status === 401 || res.status === 403) {
-        last = `${res.status}`;
-        continue;
-      }
-      if (!res.ok) return fail(`장소를 찾지 못했어요. (${res.status})`, 502);
-      const j = (await res.json()) as { documents?: Record<string, string>[] };
-      return json({
-        list: (j.documents ?? []).map((d) => ({
-          id: d.id,
-          name: d.place_name,
-          cat: (d.category_name ?? '').split(' > ').slice(-2).join(' · '),
-          group: d.category_group_code ?? '',
-          addr: d.road_address_name || d.address_name || '',
-          region: (d.address_name ?? '').split(' ').slice(0, 2).join(' '),
-          phone: d.phone || '',
-          url: d.place_url || '',
-          lat: Number(d.y),
-          lon: Number(d.x),
-        })),
-      });
-    }
-    return fail(`카카오 키로 장소를 찾지 못했어요. (${last})`, 502);
   }
 
   /** 음반 찾기 (Discogs, 키 · 비밀은 Cloudflare 비밀값). 2000년 이후 · 모은 사람 100명 넘는 것만, 인기 순 */

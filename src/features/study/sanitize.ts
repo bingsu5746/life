@@ -303,7 +303,15 @@ const FIX: Record<Collection, Fix> = {
     start: typeof x.start === 'string' && /^\d{2}:\d{2}$/.test(x.start) ? x.start : undefined,
     end: typeof x.end === 'string' && /^\d{2}:\d{2}$/.test(x.end) ? x.end : undefined,
     color: str(x.color, 'blue').slice(0, 12),
-    repeat: isObj(x.repeat) && ['daily', 'weekly', 'monthly', 'yearly'].includes(x.repeat.freq as string) ? { freq: x.repeat.freq as 'daily', every: Math.max(1, Math.min(99, Math.round(num(x.repeat.every, 1)))), weekdays: Array.isArray(x.repeat.weekdays) ? (x.repeat.weekdays as unknown[]).filter((w): w is number => Number.isInteger(w) && (w as number) >= 0 && (w as number) <= 6) : undefined, until: optDate(x.repeat.until) } : undefined,
+    repeat:
+      isObj(x.repeat) && ['daily', 'weekly', 'monthly', 'yearly'].includes(x.repeat.freq as string)
+        ? {
+            freq: x.repeat.freq as 'daily',
+            every: Math.max(1, Math.min(99, Math.round(num(x.repeat.every, 1)))),
+            weekdays: Array.isArray(x.repeat.weekdays) ? (x.repeat.weekdays as unknown[]).filter((w): w is number => Number.isInteger(w) && (w as number) >= 0 && (w as number) <= 6) : undefined,
+            until: optDate(x.repeat.until),
+          }
+        : undefined,
     skip: Array.isArray(x.skip) ? (x.skip as unknown[]).filter(isDate).slice(0, 500) : undefined,
     remind: typeof x.remind === 'number' && x.remind >= 0 && x.remind <= 7 * 24 * 60 ? Math.round(x.remind) : undefined,
     place: optStr(x.place)?.slice(0, 80),
@@ -321,6 +329,8 @@ const FIX: Record<Collection, Fix> = {
     note: optStr(x.note)?.slice(0, 3000),
     lat: typeof x.lat === 'number' && typeof x.lon === 'number' && Math.abs(x.lat) <= 90 && Math.abs(x.lon) <= 180 ? x.lat : undefined,
     lon: typeof x.lat === 'number' && typeof x.lon === 'number' && Math.abs(x.lat) <= 90 && Math.abs(x.lon) <= 180 ? x.lon : undefined,
+    addr: optStr(x.addr)?.slice(0, 120),
+    url: typeof x.url === 'string' && /^https?:\/\/place\.map\.kakao\.com\/\d+$/.test(x.url) ? x.url : undefined,
     created: num(x.created),
   }),
   records: (x) => ({

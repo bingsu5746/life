@@ -5,8 +5,9 @@ import { alive, newId, type TravelPlace } from '../study/model';
 import { put, remove, useStudy } from '../study/store';
 import { confirmDelete, Empty, Field, Icon, Sheet, tap, toast, useToday } from '../study/ui';
 import { StarInput, starText } from './MovieParts';
+import { routeUrl, searchPlaces, type KPlace } from './kakao';
 
-const PlaceMap = lazy(() => import('./PlaceMap'));
+const KakaoMap = lazy(() => import('./KakaoMap'));
 const PickMap = lazy(() => import('./PlaceMap').then((m) => ({ default: m.PickMap })));
 
 const KIND: Record<TravelPlace['kind'], string> = { food: '맛집', cafe: '카페', sight: '관광지', stay: '숙소', etc: '기타' };
@@ -39,15 +40,13 @@ export function Travel() {
         <button className={tab === 'visited' ? 'on' : ''} onClick={() => setTab('visited')}>
           다녀온 곳{all.filter((p) => p.status === 'visited').length ? ` ${all.filter((p) => p.status === 'visited').length}` : ''}
         </button>
-        {all.some((p) => p.lat !== undefined) && (
-          <button className={map ? 'on' : ''} onClick={() => setMap(!map)}>
-            지도
-          </button>
-        )}
+        <button className={map ? 'on' : ''} onClick={() => setMap(!map)}>
+          지도
+        </button>
       </nav>
       {map && (
         <Suspense fallback={<div className="pm-map" />}>
-          <PlaceMap pins={all.filter((p) => p.lat !== undefined && p.lon !== undefined && (!kind || p.kind === kind)).map((p) => ({ id: p.id, lat: p.lat!, lon: p.lon!, name: p.name, done: p.status === 'visited' }))} onOpen={(id) => setEdit(d.places[id])} />
+          <KakaoMap pins={all.filter((p) => p.lat !== undefined && p.lon !== undefined && (!kind || p.kind === kind)).map((p) => ({ id: p.id, lat: p.lat!, lon: p.lon!, name: p.name, done: p.status === 'visited' }))} onOpen={(id) => setEdit(d.places[id])} onAdd={(k) => setEdit(fromKakao(k, all))} />
         </Suspense>
       )}
       {map
@@ -62,8 +61,7 @@ export function Travel() {
             </div>
           )}
       {map ? null : !list.length ? (
-        <Empty title={tab === 'want' ? '가 보고 싶은 곳을 모아 두세요' : '다녀온 곳을 남겨 보세요'}>
-        </Empty>
+        <Empty title={tab === 'want' ? '가 보고 싶은 곳을 모아 두세요' : '다녀온 곳을 남겨 보세요'}></Empty>
       ) : (
         [...groups].map(([region, ps]) => (
           <section key={region} className="st-card">
@@ -73,8 +71,13 @@ export function Travel() {
                 <span className="st-pill">{KIND[p.kind]}</span>
                 <div className="st-item-main">
                   <div className="st-item-title">{p.name}</div>
-                  {(p.note || p.visited || p.rating) && <div className="st-item-sub">{[p.rating && starText(p.rating), p.visited && shortDate(p.visited), p.note?.split('\n')[0]].filter(Boolean).join(' · ')}</div>}
+                  {(p.note || p.visited || p.rating || p.addr) && <div className="st-item-sub">{[p.rating && starText(p.rating), p.visited && shortDate(p.visited), p.note?.split('\n')[0] || p.addr].filter(Boolean).join(' · ')}</div>}
                 </div>
+                {p.lat !== undefined && p.lon !== undefined && (
+                  <a className="st-link" href={routeUrl(p.name, p.lat, p.lon)} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()}>
+                    길찾기
+                  </a>
+                )}
                 {p.status === 'want' && (
                   <button
                     className="st-link"
@@ -96,6 +99,12 @@ export function Travel() {
   );
 }
 
+/** 카카오에서 찾은 곳 → 장소 칸 (이미 넣은 곳이면 그걸 연다) */
+function fromKakao(k: KPlace, all: TravelPlace[]): Partial<TravelPlace> {
+  const had = all.find((p) => (p.url && p.url === k.url) || (p.name === k.name && p.lat !== undefined && Math.abs(p.lat - k.lat) < 0.0005 && Math.abs((p.lon ?? 0) - k.lon) < 0.0005));
+  return had ?? { status: 'want', name: k.name, kind: k.kind, region: k.region, lat: k.lat, lon: k.lon, addr: k.addr || undefined, url: k.url || undefined };
+}
+
 function PlaceSheet({ item, today, onClose }: { item: Partial<TravelPlace>; today: string; onClose: () => void }) {
   const d = useStudy();
   const [name, setName] = useState(item.name ?? '');
@@ -107,6 +116,26 @@ function PlaceSheet({ item, today, onClose }: { item: Partial<TravelPlace>; toda
   const [note, setNote] = useState(item.note ?? '');
   const [pos, setPos] = useState(item.lat !== undefined && item.lon !== undefined ? { lat: item.lat, lon: item.lon } : undefined);
   const [picking, setPicking] = useState(false);
+  const [addr, setAddr] = useState(item.addr);
+  const [url, setUrl] = useState(item.url);
+  const [found, setFound] = useState<KPlace[] | null>(null);
+  const [finding, setFinding] = useState(false);
+  const find = () => {
+    setFinding(true);
+    searchPlaces(name.trim() + (region.trim() ? ` ${region.trim()}` : ''))
+      .then((r) => (setFound(r), !r.length && toast('찾은 곳이 없어요')))
+      .catch((e) => toast(e instanceof Error ? e.message : '찾지 못했어요'))
+      .finally(() => setFinding(false));
+  };
+  const pick = (k: KPlace) => {
+    setName(k.name);
+    setKind(k.kind);
+    setRegion(k.region);
+    setPos({ lat: k.lat, lon: k.lon });
+    setAddr(k.addr || undefined);
+    setUrl(k.url || undefined);
+    setFound(null);
+  };
   const regions = [
     ...new Set(
       alive(d.places)
@@ -117,7 +146,38 @@ function PlaceSheet({ item, today, onClose }: { item: Partial<TravelPlace>; toda
   return (
     <Sheet title={item.id ? '장소 고치기' : '장소 넣기'} onClose={onClose}>
       <div className="st-form">
-        <input className="st-input" autoFocus={!item.id} value={name} onChange={(e) => setName(e.target.value)} placeholder="이름 (예: ○○ 국밥)" aria-label="이름" />
+        <div className="km-search">
+          <input className="st-input" autoFocus={!item.id} value={name} onChange={(e) => setName(e.target.value)} placeholder="이름 (예: ○○ 국밥)" aria-label="이름" />
+          <button type="button" className="btn" disabled={name.trim().length < 2 || finding} onClick={find}>
+            {finding ? '…' : '찾기'}
+          </button>
+        </div>
+        {found && found.length > 0 && (
+          <ul className="km-list">
+            {found.map((k) => (
+              <li key={k.id}>
+                <button type="button" className="km-row" onClick={() => pick(k)}>
+                  <b>{k.name}</b>
+                  <small className="st-muted">{[k.cat, k.addr].filter(Boolean).join(' · ')}</small>
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+        {addr && (
+          <small className="st-muted">
+            {addr}
+            {url && (
+              <>
+                {' '}
+                ·{' '}
+                <a href={url} target="_blank" rel="noreferrer">
+                  카카오맵
+                </a>
+              </>
+            )}
+          </small>
+        )}
         <div className="st-chips">
           {(Object.keys(KIND) as TravelPlace['kind'][]).map((k) => (
             <button key={k} type="button" className={`st-chip ${kind === k ? 'on' : ''}`} aria-pressed={kind === k} onClick={() => setKind(k)}>
@@ -201,6 +261,8 @@ function PlaceSheet({ item, today, onClose }: { item: Partial<TravelPlace>; toda
                 note: note.trim() || undefined,
                 lat: pos?.lat,
                 lon: pos?.lon,
+                addr,
+                url,
               } as TravelPlace);
               toast('저장했어요');
               onClose();
