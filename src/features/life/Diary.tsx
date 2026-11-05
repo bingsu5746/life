@@ -109,6 +109,7 @@ function List({ month, today }: { month: string; today: string }) {
                 <Mood m={e.mood} /> {e.title || shortDate(e.id)}
               </b>
               {e.title && <small className="st-muted">{shortDate(e.id)}</small>}
+              {e.auto && <small className="dy-auto">기록만</small>}
             </div>
             <p className="dy-preview">{e.text || Object.values(e.parts ?? {})[0]}</p>
             {e.photos?.[0] ? (

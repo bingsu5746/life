@@ -362,7 +362,7 @@ export function yearReview(d: StudyData, year: string): Stat[] {
   if (rc.length) out.push({ label: '들인 음반', value: `${rc.length}장`, sub: `가장 많이: ${top(rc, (r) => r.artist)}` });
   const pl = alive(d.places).filter((p) => p.status === 'visited' && inY(p.visited));
   if (pl.length) out.push({ label: '다녀온 곳', value: `${pl.length}곳`, sub: best(pl, (p) => p.name) });
-  const dy = alive(d.diary).filter((e) => inY(e.id));
+  const dy = alive(d.diary).filter((e) => !e.auto && inY(e.id));
   if (dy.length) out.push({ label: '쓴 일기', value: `${dy.length}편` });
   const tx = alive(d.moneyTx).filter((t) => t.type === 'out' && inY(t.date));
   if (tx.length)

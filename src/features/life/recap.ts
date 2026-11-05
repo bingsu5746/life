@@ -27,7 +27,7 @@ export function recap(d: StudyData, year: number): Recap {
   const bySub = new Map<string, number>();
   for (const s of ses) if (s.subjectId) bySub.set(s.subjectId, (bySub.get(s.subjectId) ?? 0) + s.minutes);
   const top = [...bySub].sort((a, b) => b[1] - a[1])[0];
-  const diary = alive(d.diary).filter((e) => e.id.startsWith(y));
+  const diary = alive(d.diary).filter((e) => !e.auto && e.id.startsWith(y));
   const moods = diary.filter((e) => e.mood).map((e) => e.mood!);
   const movies = alive(d.movies).filter((m) => m.status === 'watched' && m.watched?.startsWith(y));
   const best = movies.filter((m) => m.rating).sort((a, b) => b.rating! - a.rating!)[0];

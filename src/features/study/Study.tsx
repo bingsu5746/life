@@ -12,6 +12,7 @@ import { Today } from './Today';
 import { localTimes, uploadDigest } from './notify';
 import { autoSaves, dueRuleTx } from '../life/calc';
 import { tutorSessions } from './tutor';
+import { autoDiaries } from '../life/diaryForm';
 import { reminders } from '../life/events';
 import { notifyRemind } from '../auth/api';
 // 시험 화면은 오늘 화면(D-day)과 같이 쓰여 함께 받는다
@@ -127,6 +128,9 @@ export function Study({ path, loggedIn, syncReady = true, onLogin }: { path: str
     // 끝난 과외 수업은 공부 기록으로
     const tut = tutorSessions(d, today);
     if (tut.length) putMany(tut.map((x) => ({ c: 'sessions' as const, item: x as never })));
+    // 일기를 안 쓴 지난날은 그날 기록(잠 · 컨디션 · 공부 · 운동)만으로 하나 만든다
+    const auto = autoDiaries(d, today);
+    if (auto.length) putMany(auto.map((x) => ({ c: 'diary' as const, item: x as never })));
   }, [d, today, syncReady]);
   // 알림을 켜 둔 기기: 자료가 바뀌면 잠시 뒤 알림 글을 다시 올린다
   useEffect(() => {

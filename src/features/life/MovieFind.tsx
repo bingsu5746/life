@@ -388,7 +388,10 @@ function TasteCard({ onExplore }: { onExplore: (genre: string) => void }) {
         <>
           {rows('장르', t.genres)}
           {rows('나라', t.nations)}
-          {rows('감독', t.directors.filter((x) => x.count > 1 || t.directors.length < 6))}
+          {rows(
+            '감독',
+            t.directors.filter((x) => x.count > 1 || t.directors.length < 6),
+          )}
         </>
       )}
       {fresh.length > 0 && (

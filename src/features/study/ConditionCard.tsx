@@ -44,3 +44,41 @@ export function ConditionCard({ today }: { today: string }) {
     </section>
   );
 }
+
+/** 메인 맨 위: 잔 시각 · 일어난 시각 · 아침 컨디션을 다 채울 때까지 크게 (다 채우면 사라진다) */
+export function ConditionPrompt({ today }: { today: string }) {
+  const d = useStudy();
+  const c = d.conditions[today]?.deleted ? undefined : d.conditions[today];
+  if (c?.sleep && c.wake && c.mood) return null;
+  const save = (patch: Partial<DayCondition>) => put('conditions', { ...(c ?? {}), ...patch, id: today } as DayCondition);
+  const slept = sleepMinutes(c);
+  return (
+    <section className="cp">
+      <h3 className="cp-title">어젯밤 잠 · 오늘 아침 컨디션</h3>
+      <div className="cp-times">
+        <label className={`cp-time ${c?.sleep ? 'on' : ''}`}>
+          <span>잔 시각</span>
+          <input type="time" value={c?.sleep ?? ''} onChange={(e) => save({ sleep: e.target.value || undefined })} aria-label="잔 시각" />
+        </label>
+        <div className={`cp-time ${c?.wake ? 'on' : ''}`}>
+          <span>일어난 시각</span>
+          <input type="time" value={c?.wake ?? ''} onChange={(e) => save({ wake: e.target.value || undefined })} aria-label="일어난 시각" />
+          {!c?.wake && (
+            <button type="button" className="st-link" onClick={() => save({ wake: `${String(new Date().getHours()).padStart(2, '0')}:${String(new Date().getMinutes()).padStart(2, '0')}` })}>
+              지금 일어났어요
+            </button>
+          )}
+        </div>
+      </div>
+      {slept !== null && <p className="cp-slept">{minutesText(slept)} 잤어요</p>}
+      <div className="cp-moods" role="radiogroup" aria-label="아침 컨디션">
+        {[1, 2, 3, 4, 5].map((m) => (
+          <button key={m} role="radio" aria-checked={c?.mood === m} className={c?.mood === m ? 'on' : ''} onClick={() => save({ mood: m })}>
+            <i className={`dy-mood m${m}`} aria-hidden />
+            {MOOD[m]}
+          </button>
+        ))}
+      </div>
+    </section>
+  );
+}

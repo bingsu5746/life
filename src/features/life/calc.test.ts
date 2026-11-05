@@ -24,7 +24,10 @@ describe('돈', () => {
     d.moneyTx.e = { id: 'e', updatedAt: 1, date: '2026-09-30', type: 'out', amount: 9999, category: '식비', created: 4 };
     const s = monthSummary(d, '2026-10');
     expect([s.out, s.in]).toEqual([8000, 50000]);
-    expect(s.byCategory).toEqual([{ category: '식비', amount: 5000 }, { category: '교통', amount: 3000 }]);
+    expect(s.byCategory).toEqual([
+      { category: '식비', amount: 5000 },
+      { category: '교통', amount: 3000 },
+    ]);
     // 10/25 포함 남은 7일
     expect(budgetView(100000, 8000, '2026-10', '2026-10-25')).toEqual({ left: 92000, perDay: 13142, daysLeft: 7 });
     expect(budgetView(100000, 8000, '2026-09', '2026-10-25').perDay).toBeNull();
@@ -46,10 +49,19 @@ describe('운동·취미', () => {
     const list = [w('2026-10-25', 30), w('2026-10-24', 20), w('2026-10-23', 40), w('2026-10-20', 10)];
     expect(workoutStreak(list, '2026-10-25')).toBe(3);
     expect(workoutStreak(list, '2026-10-26')).toBe(3);
-    expect(weeklyMinutes(list, '2026-10-25', 2)).toEqual([{ start: '2026-10-12', min: 0, count: 0 }, { start: '2026-10-19', min: 100, count: 4 }]);
+    expect(weeklyMinutes(list, '2026-10-25', 2)).toEqual([
+      { start: '2026-10-12', min: 0, count: 0 },
+      { start: '2026-10-19', min: 100, count: 4 },
+    ]);
   });
   it('취미 주별', () => {
-    const m = hobbyWeek([{ id: 'a', updatedAt: 1, hobbyId: 'g', date: '2026-10-20', minutes: 30, created: 1 }, { id: 'b', updatedAt: 1, hobbyId: 'g', date: '2026-10-12', minutes: 99, created: 1 }], '2026-10-19');
+    const m = hobbyWeek(
+      [
+        { id: 'a', updatedAt: 1, hobbyId: 'g', date: '2026-10-20', minutes: 30, created: 1 },
+        { id: 'b', updatedAt: 1, hobbyId: 'g', date: '2026-10-12', minutes: 99, created: 1 },
+      ],
+      '2026-10-19',
+    );
     expect(m.get('g')).toBe(30);
   });
   it('다듬기', () => {
@@ -95,7 +107,12 @@ describe('농구·영화', () => {
     const { bbTotals, ptsFromShots } = await import('./Basketball');
     const { starText } = await import('./Movies');
     expect(ptsFromShots({ mode: 'game', fgm: 4, tpm: 2, ftm: 3 })).toBe(17);
-    expect(bbTotals([{ mode: 'game', fgm: 2, fga: 5 }, { mode: 'practice', fgm: 10, fga: 20, tpm: 3, tpa: 10 }])).toMatchObject({ fgm: 12, fga: 25, tpm: 3, tpa: 10 });
+    expect(
+      bbTotals([
+        { mode: 'game', fgm: 2, fga: 5 },
+        { mode: 'practice', fgm: 10, fga: 20, tpm: 3, tpa: 10 },
+      ]),
+    ).toMatchObject({ fgm: 12, fga: 25, tpm: 3, tpa: 10 });
     expect(starText(3.5)).toBe('★★★½☆');
     expect(starText(5)).toBe('★★★★★');
     expect(starText(0.5)).toBe('½☆☆☆☆');

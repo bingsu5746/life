@@ -1081,3 +1081,21 @@ describe('일기: 「오늘 한 것」 칸을 본문으로 합치기', () => {
     expect(out.diary['2026-10-03'].text).toBe('본문');
   });
 });
+
+describe('기록만으로 만드는 일기 (autoDiaries)', () => {
+  it('일기 없는 지난날만, 잠 · 공부 칸과 하루 기록', async () => {
+    const { autoDiaries } = await import('../life/diaryForm');
+    const { emptyStudy } = await import('./model');
+    const d = {
+      ...emptyStudy(),
+      conditions: { '2026-11-01': { id: '2026-11-01', sleep: '23:30', wake: '07:00', mood: 4, updatedAt: 1 }, '2026-11-05': { id: '2026-11-05', wake: '07:00', updatedAt: 1 } },
+      sessions: { s1: { id: 's1', date: '2026-11-02', minutes: 50, start: 0, end: 0, subjectId: '', updatedAt: 1 } },
+      workouts: { w1: { id: 'w1', date: '2026-11-02', kind: '농구', minutes: 60, created: 0, updatedAt: 1 } },
+      diary: { '2026-11-03': { id: '2026-11-03', text: '', deleted: true, updatedAt: 1 } },
+    } as never;
+    const out = autoDiaries(d, '2026-11-05').sort((a, b) => a.id.localeCompare(b.id));
+    expect(out.map((e) => e.id)).toEqual(['2026-11-01', '2026-11-02']);
+    expect(out[0].parts?.sleep).toContain('23:30 잠 → 07:00 일어남');
+    expect(out[1]).toMatchObject({ auto: true, text: '운동: 농구 60분', parts: { study: '모두 50분' } });
+  });
+});

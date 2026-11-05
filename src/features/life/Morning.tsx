@@ -1,12 +1,9 @@
 // 메인 아침 루틴: 일어난 시각 · 아침 습관 체크 · 오늘 꼭 할 것 3개. 다 하면(또는 오후 2시가 지나면) 숨는다
 import { useState } from 'react';
 import { habitOn, toggleHabit } from '../study/habits';
-import { alive, newId, type DayCondition, type Habit, type Todo } from '../study/model';
+import { alive, newId, type Habit, type Todo } from '../study/model';
 import { put, setSettings, useStudy } from '../study/store';
 import { Sheet, toast } from '../study/ui';
-
-const pad = (n: number) => String(n).padStart(2, '0');
-const nowHHMM = () => `${pad(new Date().getHours())}:${pad(new Date().getMinutes())}`;
 
 export function MorningCard({ today }: { today: string }) {
   const d = useStudy();
@@ -31,11 +28,7 @@ export function MorningCard({ today }: { today: string }) {
           고치기
         </button>
       </div>
-      {!c?.wake ? (
-        <button className="mo-row" onClick={() => (put('conditions', { ...(c ?? {}), id: today, wake: nowHHMM() } as DayCondition), toast(`${nowHHMM()}에 일어났어요`))}>
-          <span className="mo-box" /> 일어났어요
-        </button>
-      ) : (
+      {c?.wake && (
         <div className="mo-row done">
           <span className="mo-box on">✓</span> {c.wake} 기상
         </div>

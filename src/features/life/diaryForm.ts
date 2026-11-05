@@ -1,5 +1,6 @@
 // 일기 양식: 날마다 쓸 칸을 고른다 (본문은 항상). 「공부」는 공부 기록에서 자동으로, 본문에는 나머지 앱 기록(운동 · 영화 …)을 불러올 수 있다.
-import { alive, type StudyData } from '../study/model';
+import { addDays } from '../study/dates';
+import { alive, type DiaryEntry, type StudyData } from '../study/model';
 
 export const DIARY_PARTS: { key: string; label: string; hint: string }[] = [
   { key: 'study', label: '공부', hint: '공부한 시간 · 과목 (공부 기록에서 자동으로 채워요)' },
@@ -93,5 +94,30 @@ export function sleepSummary(d: StudyData, date: string): string[] {
     out.push(`${c.sleep} 잠 → ${c.wake} 일어남 (${Math.floor(min / 60)}시간${min % 60 ? ` ${min % 60}분` : ''})`);
   } else if (c.wake) out.push(`${c.wake} 일어남`);
   if (c.mood) out.push(`일어나서 컨디션: ${MOOD_WORD[c.mood] ?? c.mood} (${c.mood}/5)`);
+  return out;
+}
+
+/**
+ * 일기를 안 쓴 지난날: 그날 남은 기록(잠 · 컨디션 · 공부 · 운동 같은 하루 기록)만으로 일기를 하나 만든다.
+ * 한 번이라도 일기가 있었던 날(지운 날 포함)과 오늘은 건너뛴다. 최근 days 일만
+ */
+export function autoDiaries(d: StudyData, today: string, days = 120): DiaryEntry[] {
+  const out: DiaryEntry[] = [];
+  const from = addDays(today, -days);
+  const dates = new Set<string>();
+  for (const c of alive(d.conditions)) dates.add(c.id);
+  for (const s of alive(d.sessions)) dates.add(s.date);
+  for (const w of alive(d.workouts)) dates.add(w.date);
+  for (const date of dates) {
+    if (date >= today || date < from || d.diary[date]) continue;
+    const sleep = sleepSummary(d, date);
+    const study = studySummary(d, date);
+    const lines = daySummary(d, date);
+    if (!sleep.length && !study.length && !lines.length) continue;
+    const parts: Record<string, string> = {};
+    if (sleep.length) parts.sleep = sleep.join('\n');
+    if (study.length) parts.study = study.join('\n');
+    out.push({ id: date, text: lines.join('\n'), parts, auto: true, updatedAt: 0 } as DiaryEntry);
+  }
   return out;
 }

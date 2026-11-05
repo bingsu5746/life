@@ -102,8 +102,7 @@ export function Movies({ sub }: { sub?: string }) {
 
       {mineSub === 'watched' &&
         (!watched.length ? (
-          <Empty title="본 영화를 기록해 보세요">
-          </Empty>
+          <Empty title="본 영화를 기록해 보세요"></Empty>
         ) : (
           <>
             <div className="mv-summary">
@@ -203,8 +202,7 @@ export function Movies({ sub }: { sub?: string }) {
       )}
       {mineSub === 'want' &&
         (!want.length ? (
-          <Empty title="보고 싶은 영화가 없어요">
-          </Empty>
+          <Empty title="보고 싶은 영화가 없어요"></Empty>
         ) : (
           <div className="mv-list">
             {want.map((m) => (

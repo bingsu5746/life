@@ -54,7 +54,7 @@ export function lifeRange(d: StudyData, from: DateStr, to: DateStr, pf: DateStr,
       if (h.checks.includes(x)) done++;
     }
   }
-  const diary = alive(d.diary).filter((e) => inR(e.id, from, to));
+  const diary = alive(d.diary).filter((e) => !e.auto && inR(e.id, from, to));
   const moods = diary.map((e) => e.mood).filter((m): m is number => !!m);
   return {
     from,

@@ -9780,3 +9780,83 @@ body.focus-on {
 .km-row.on {
   background: var(--soft);
 }
+.dy-auto {
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: var(--soft);
+  color: var(--muted);
+  font-size: 0.72rem;
+}
+
+/* 메인: 잠 · 아침 컨디션 (다 채우면 사라짐) */
+.cp {
+  display: grid;
+  gap: 14px;
+  padding: 20px;
+  border-radius: var(--radius);
+  background: var(--surface);
+  border: 2px solid var(--accent);
+}
+.cp-title {
+  margin: 0;
+  font-size: 1.25rem;
+  line-height: 1.35;
+}
+.cp-times {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+.cp-time {
+  display: grid;
+  gap: 4px;
+  padding: 10px;
+  border-radius: 12px;
+  background: var(--bg);
+  border: 1px solid var(--line);
+}
+.cp-time.on {
+  border-color: var(--accent);
+}
+.cp-time span {
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+.cp-time input {
+  width: 100%;
+  min-width: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--text);
+}
+.cp-slept {
+  margin: 0;
+  color: var(--muted);
+}
+.cp-moods {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 6px;
+}
+.cp-moods button {
+  display: grid;
+  justify-items: center;
+  gap: 6px;
+  padding: 10px 0;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--bg);
+  font: inherit;
+  font-size: 0.85rem;
+  color: inherit;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+.cp-moods button.on {
+  border-color: var(--accent);
+  background: var(--soft);
+  font-weight: 700;
+}

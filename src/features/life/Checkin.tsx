@@ -27,8 +27,8 @@ export function CheckinPage() {
     const parts = { ...(cur?.parts ?? {}) };
     const bits = [feel && `공부 ${feel}`, kind && kind !== '안 했어요' && `운동 ${kind} ${min}분`, kind === '안 했어요' && '운동 안 함', line.trim()].filter(Boolean);
     if (bits.length) parts.checkin = bits.join(' · ');
-    if (!parts.done?.trim() && lines.length) parts.done = lines.join('\n');
-    put('diary', { ...(cur ?? { id: today, text: '' }), id: today, mood: mood || cur?.mood, parts } as DiaryEntry);
+    const text = cur?.text?.trim() ? cur.text : lines.join('\n');
+    put('diary', { ...(cur ?? { id: today }), id: today, text, mood: mood || cur?.mood, parts, auto: undefined } as DiaryEntry);
     if (kind && kind !== '안 했어요' && Number(min) > 0) put('workouts', { id: newId(), date: today, kind, minutes: Math.min(600, Number(min)), created: Date.now() } as Workout);
     toast('오늘을 마감했어요');
     go(`/diary/${today}`);

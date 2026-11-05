@@ -19,7 +19,10 @@ export function weekWorkouts(d: StudyData, from: DateStr): Workout[] {
 
 /** 오늘(오늘 안 했으면 어제)까지 연속으로 운동한 날 */
 export function workoutStreak(list: Workout[], today: DateStr): number {
-  return dayStreak(list.map((w) => w.date), today);
+  return dayStreak(
+    list.map((w) => w.date),
+    today,
+  );
 }
 
 /** 오늘(또는 아직 안 했으면 어제)까지 끊기지 않고 이어진 날 수 */
@@ -189,7 +192,10 @@ export function compareMonths(d: StudyData, month: string, today: DateStr): Mont
   for (const t of prev) p.set(t.category, (p.get(t.category) ?? 0) + t.amount);
   const prevOut = prev.reduce((a, t) => a + t.amount, 0);
   const cats = new Set([...p.keys(), ...cur.byCategory.map((c) => c.category)]);
-  const byCategory = [...cats].map((category) => ({ category, diff: (cur.byCategory.find((c) => c.category === category)?.amount ?? 0) - (p.get(category) ?? 0) })).filter((c) => c.diff !== 0).sort((a, b) => Math.abs(b.diff) - Math.abs(a.diff));
+  const byCategory = [...cats]
+    .map((category) => ({ category, diff: (cur.byCategory.find((c) => c.category === category)?.amount ?? 0) - (p.get(category) ?? 0) }))
+    .filter((c) => c.diff !== 0)
+    .sort((a, b) => Math.abs(b.diff) - Math.abs(a.diff));
   return { prevOut, diff: cur.out - prevOut, byCategory, partial };
 }
 
@@ -241,7 +247,12 @@ export function autoSaves(d: StudyData, cat = '용돈'): SavingGoal[] {
     const want = new Map(ins.filter((t) => t.date >= g.autoSince!).map((t) => [`auto-${t.id}`, t]));
     const kept = g.deposits.filter((x) => !x.id.startsWith('auto-') || want.has(x.id));
     const have = new Set(kept.map((x) => x.id));
-    const add = g.done ? [] : [...want].filter(([id]) => !have.has(id)).map(([id, t]) => ({ id, date: t.date, amount: Math.round((t.amount * g.autoPct!) / 100) })).filter((x) => x.amount > 0);
+    const add = g.done
+      ? []
+      : [...want]
+          .filter(([id]) => !have.has(id))
+          .map(([id, t]) => ({ id, date: t.date, amount: Math.round((t.amount * g.autoPct!) / 100) }))
+          .filter((x) => x.amount > 0);
     if (!add.length && kept.length === g.deposits.length) continue;
     const deposits = [...kept, ...add];
     const sum = deposits.reduce((a, x) => a + x.amount, 0);

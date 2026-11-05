@@ -75,8 +75,7 @@ export function ReadingPage() {
           ))}
         </div>
       ) : !list.length ? (
-        <Empty title={all.length ? '이 칸에는 책이 없어요' : '읽는 책을 넣어 보세요'}>
-        </Empty>
+        <Empty title={all.length ? '이 칸에는 책이 없어요' : '읽는 책을 넣어 보세요'}></Empty>
       ) : (
         <div className="mv-list">
           {list.map((b) => (

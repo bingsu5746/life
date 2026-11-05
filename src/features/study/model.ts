@@ -650,6 +650,8 @@ export interface DiaryEntry extends Stamp {
   photos?: Id[];
   /** 짧은 영상 (10초까지, 최대 2개) */
   videos?: Id[];
+  /** 일기를 안 쓴 날 기록만으로 저절로 만든 것 (직접 저장하면 사라짐) */
+  auto?: boolean;
 }
 
 /** 국어·영어 지문 (헷갈리는 지문을 다시 보려고 모아 둔다) */

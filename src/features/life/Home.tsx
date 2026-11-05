@@ -6,6 +6,7 @@ import { upcomingExams } from '../study/exams';
 import { SchoolHome } from '../study/SchoolPanel';
 import { EveBanner } from '../study/Eve';
 import { MorningCard } from './Morning';
+import { ConditionPrompt } from '../study/ConditionCard';
 import { alive } from '../study/model';
 import { todaySummary } from '../study/select';
 import { put, setSettings, useStudy, useWords } from '../study/store';
@@ -66,7 +67,7 @@ export function Home(_: { loggedIn: boolean; onLogin: () => void }) {
   })();
   // 일기
   const diaryToday = d.diary[today] && !d.diary[today].deleted;
-  const diaryMonth = alive(d.diary).filter((e) => monthOf(e.id) === monthOf(today)).length;
+  const diaryMonth = alive(d.diary).filter((e) => !e.auto && monthOf(e.id) === monthOf(today)).length;
 
   const cards: Record<string, { lines: string[]; action?: { label: string; to: string }; badge?: { big: string; small: string }; streak?: number }> = {
     study: {
@@ -113,7 +114,9 @@ export function Home(_: { loggedIn: boolean; onLogin: () => void }) {
     diary: {
       lines: [diaryToday ? '오늘 일기를 썼어요' : '오늘 일기를 아직 안 썼어요', `이번 달 ${diaryMonth}편`],
       streak: dayStreak(
-        alive(d.diary).map((e) => e.id),
+        alive(d.diary)
+          .filter((e) => !e.auto)
+          .map((e) => e.id),
         today,
       ),
       action: { label: diaryToday ? '오늘 일기 보기' : '오늘 일기 쓰기', to: `/diary/${today}` },
@@ -145,6 +148,7 @@ export function Home(_: { loggedIn: boolean; onLogin: () => void }) {
           ))}
         </nav>
       )}
+      <ConditionPrompt today={today} />
       {!studyMode && <ChangeBanner today={today} />}
       {!studyMode && <EveBanner today={today} />}
       {weekday(today) === 0 && !d.settings.weekTargets?.[addDays(weekStart(today), 7)] && (
