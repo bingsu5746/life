@@ -6,7 +6,8 @@ import { BarChart, LineChart, TableView } from './charts';
 import { shortDate } from './dates';
 import { parseWrongNums } from './grades';
 import { alive, newId, type PastPaper } from './model';
-import { notesFromPaper, numberFrequency, PAPER_KIND, paperTitle, papersOf, percent } from './papers';
+import { CSAT_SECTIONS, notesFromPaper, numberFrequency, PAPER_KIND, paperTitle, papersOf, percent, sectionSubject } from './papers';
+export { CSAT_SECTIONS, sectionSubject };
 import { getStudy, put, putMany, remove, useStudy } from './store';
 import { minutesText } from './timer';
 import { confirmDelete, Empty, Field, go, Icon, Sheet, SubjectDot, SubjectPicker, subjectsOf, tap, toast, useToday } from './ui';
@@ -27,22 +28,6 @@ export function BookTabs({ on }: { on: 'books' | 'papers' }) {
 
 const md = (x: string) => shortDate(x).replace(/\(.\)/, '');
 
-/** 수능 · 모의고사 영역 (과목이 정해져 있다): 이름 · 만점 · 시간(분) */
-export const CSAT_SECTIONS: { name: string; full: number; min: number; match: RegExp }[] = [
-  { name: '국어', full: 100, min: 80, match: /국어/ },
-  { name: '수학', full: 100, min: 100, match: /수학/ },
-  { name: '영어', full: 100, min: 70, match: /영어/ },
-  { name: '한국사', full: 50, min: 30, match: /한국사/ },
-  { name: '사회탐구', full: 50, min: 30, match: /사회|사탐|윤리|지리|정치|경제|역사|법/ },
-  { name: '과학탐구', full: 50, min: 30, match: /과학|과탐|물리|화학|생명|생물|지구/ },
-  { name: '제2외국어·한문', full: 50, min: 40, match: /외국어|한문|일본어|중국어|독일어|프랑스어|스페인어/ },
-];
-/** 영역 → 내 과목 (이름이 맞는 것이 있으면 그 과목, 없으면 영역 이름 그대로 「csat:국어」) */
-export const sectionSubject = (d: { subjects: Record<string, { name: string; deleted?: boolean }> }, section: string) => {
-  const sec = CSAT_SECTIONS.find((s) => s.name === section);
-  const mine = Object.entries(d.subjects).find(([, s]) => !s.deleted && sec?.match.test(s.name));
-  return mine ? mine[0] : `csat:${section}`;
-};
 /** 과목 이름 (영역으로 넣은 것도) */
 export const paperSubjectName = (d: { subjects: Record<string, { name: string }> }, id: string) => (id.startsWith('csat:') ? id.slice(5) : (d.subjects[id]?.name ?? '과목'));
 
@@ -56,7 +41,8 @@ export function Papers({ sub }: { sub?: string }) {
   const ofLv = (p: PastPaper) => !lv || (p.level ?? (p.kind === 'csat' ? '고3' : '')) === lv;
   const all = everything.filter(ofLv);
   const editing = sub === 'new' ? 'new' : sub && d.papers[sub] && !d.papers[sub].deleted ? d.papers[sub] : null;
-  const subjects = [...new Set(all.map((p) => p.subjectId))].map((id) => ({ id, name: paperSubjectName(d, id) }));
+  // 수능 · 모의고사는 정해진 영역 이름으로 (내 과목 이름이 아니라)
+  const subjects = [...new Set(all.map((p) => p.subjectId))].map((id) => ({ id, name: all.find((p) => p.subjectId === id && p.section)?.section ?? paperSubjectName(d, id) }));
   // 과목이 하나뿐이면 그 과목으로 (그래프·번호 분석을 바로 보이게)
   const subject = picked || (subjects.length === 1 ? subjects[0].id : '');
   const list = papersOf(d, subject || undefined).filter(ofLv);
@@ -191,7 +177,10 @@ function PaperSheet({ item, onClose }: { item?: PastPaper; onClose: () => void }
   const nums = parseWrongNums(wrong);
   const autoTitle = paperTitle(kind, year, month);
   const name = touched ? title : autoTitle;
-  const books = alive(d.books).filter((b) => !subjectId || b.subjectId === subjectId);
+  // 수능 · 모의고사: 고른 영역에 맞는 내 과목 (없으면 「csat:영역」)
+  const realSubject = kind !== 'other' ? (section ? sectionSubject(d, section) : '') : subjectId;
+  const timeOk = !!realSubject && !!d.subjects[realSubject] && !d.subjects[realSubject].deleted;
+  const books = alive(d.books).filter((b) => (kind !== 'other' ? !realSubject.startsWith('csat:') && (!realSubject || b.subjectId === realSubject) : !subjectId || b.subjectId === subjectId));
   const n = (v: string, lo: number, hi: number) => {
     const x = Number(v.replace(',', '.'));
     return v.trim() && Number.isFinite(x) && x >= lo && x <= hi ? x : undefined;
@@ -221,8 +210,8 @@ function PaperSheet({ item, onClose }: { item?: PastPaper; onClose: () => void }
     put('papers', p);
     const notes = toNotes ? notesFromPaper(getStudy(), p, today) : [];
     if (notes.length) putMany(notes.map((x) => ({ c: 'notes' as const, item: x as never })));
-    if (toTime && p.minutes) addSession({ subjectId, start: new Date(`${date}T12:00:00`).getTime(), end: new Date(`${date}T12:00:00`).getTime() + p.minutes * 60_000, minutes: p.minutes, date, kind: 'manual' });
-    toast(`기록했어요${notes.length ? ` · 오답 노트에 ${notes.length}문제` : ''}${toTime && p.minutes ? ' · 공부 시간에도 넣었어요' : ''}`);
+    if (toTime && timeOk && p.minutes) addSession({ subjectId: p.subjectId, start: new Date(`${date}T12:00:00`).getTime(), end: new Date(`${date}T12:00:00`).getTime() + p.minutes * 60_000, minutes: p.minutes, date, kind: 'manual' });
+    toast(`기록했어요${notes.length ? ` · 오답 노트에 ${notes.length}문제` : ''}${toTime && timeOk && p.minutes ? ' · 공부 시간에도 넣었어요' : ''}`);
     onClose();
   }
 
@@ -330,7 +319,7 @@ function PaperSheet({ item, onClose }: { item?: PastPaper; onClose: () => void }
         </label>
         {!item && (
           <label className="st-toggle">
-            <input type="checkbox" checked={toTime} onChange={(e) => setToTime(e.target.checked)} /> 걸린 시간을 공부 기록에도 넣기
+            <input type="checkbox" checked={toTime && timeOk} disabled={!timeOk} onChange={(e) => setToTime(e.target.checked)} /> 걸린 시간을 공부 기록에도 넣기{!timeOk && kind !== 'other' && section ? ` (내 과목에 「${section}」 과목이 없어 못 넣어요)` : ''}
           </label>
         )}
         <div className="st-row end">
@@ -346,7 +335,7 @@ function PaperSheet({ item, onClose }: { item?: PastPaper; onClose: () => void }
               지우기
             </button>
           )}
-          <button className="btn btn-primary" disabled={!subjectId || !name.trim() || !date || !!bad} onClick={save}>
+          <button className="btn btn-primary" disabled={(kind === 'other' ? !subjectId : !section) || !name.trim() || !date || !!bad} onClick={save}>
             {item ? '저장' : '넣기'}
           </button>
         </div>

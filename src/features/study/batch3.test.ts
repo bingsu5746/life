@@ -1099,3 +1099,33 @@ describe('기록만으로 만드는 일기 (autoDiaries)', () => {
     expect(out[1]).toMatchObject({ auto: true, text: '운동: 농구 60분', parts: { study: '모두 50분' } });
   });
 });
+
+describe('목차 쪽 읽기 (먼 오른쪽 쪽 · 큰 제목 · 괄호)', () => {
+  it('큰 제목이 많아도 쪽으로 읽고 · 큰 제목은 뺀다', async () => {
+    const { parseToc, isUnitOnly } = await import('./toc');
+    const r = parseToc(['Ⅰ. 수와 연산', '01 소인수분해', '8', 'Ⅱ. 정수와 유리수', '02 정수와 유리수 · · · · · · 24', 'Ⅲ. 문자와 식', '03 문자의 사용\t\t\t\t\t40', 'Ⅳ. 좌표평면', '04 좌표 p.56'].join('\n'), 70);
+    expect(isUnitOnly(r)).toBe(false);
+    expect(r.filter((x) => !x.problem).map((x) => [x.name, x.from, x.to])).toEqual([
+      ['01 소인수분해', 8, 23],
+      ['02 정수와 유리수', 24, 39],
+      ['03 문자의 사용', 40, 55],
+      ['04 좌표', 56, 70],
+    ]);
+    expect(r.filter((x) => x.header).length).toBe(4);
+  });
+  it('괄호 · 쪽 · 띄어 쓴 점선', async () => {
+    const { parseToc } = await import('./toc');
+    const r = parseToc('작품 1 진달래꽃 (12)\n작품 2 님의 침묵 [18]\n작품 3 서시 . . . . . 24쪽', 30);
+    expect(r.map((x) => [x.name, x.from, x.to])).toEqual([
+      ['작품 1 진달래꽃', 12, 17],
+      ['작품 2 님의 침묵', 18, 23],
+      ['작품 3 서시', 24, 30],
+    ]);
+  });
+  it('쪽이 없는 국어 작품 목차는 작품마다 단원', async () => {
+    const { parseToc, isUnitOnly } = await import('./toc');
+    const r = parseToc('[현대시]\n진달래꽃 - 김소월\n님의 침묵 - 한용운\n[고전 시가]\n관동별곡 - 정철');
+    expect(isUnitOnly(r)).toBe(true);
+    expect(r.length).toBe(5);
+  });
+});

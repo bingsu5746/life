@@ -161,7 +161,7 @@ export function FindTab({ onWatched, onOpen }: Common) {
     let on = true;
     setBusy(true);
     const t = setTimeout(() => {
-      catalogSearch({ ...f, facets: !facets })
+      catalogSearch({ ...f, facets: !facets }, true)
         .then((r) => {
           if (!on) return;
           setItems(r.items);
@@ -172,7 +172,7 @@ export function FindTab({ onWatched, onOpen }: Common) {
         })
         .catch((e: Error) => on && setErr(e.message))
         .finally(() => on && setBusy(false));
-    }, 250);
+    }, 120);
     return () => {
       on = false;
       clearTimeout(t);

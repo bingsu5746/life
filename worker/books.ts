@@ -59,12 +59,36 @@ export async function seojiToc(url: string): Promise<string> {
   const res = await within(fetch(u.toString()), 15_000, '목차');
   if (!res.ok) throw new Error(`목차 ${res.status}`);
   const t = await res.text();
-  return t
-    .replace(/<[^>]+>/g, '\n')
-    .replace(/&nbsp;/g, ' ')
+  // 칸(<td>)마다 줄을 나누면 제목과 쪽이 다른 줄이 된다 → 칸은 띄어쓰기로 (tocClean)
+  return tocClean(t.replace(/<\s*(script|style)[^>]*>[\s\S]*?<\/\s*\1\s*>/gi, ''));
+}
+
+/** ISBN 으로 국립중앙도서관 목차 (예스24 목차에 쪽이 없을 때 한 번 더 찾아보기) */
+export async function seojiTocByIsbn(key: string, isbn: string): Promise<string> {
+  const hit = (await seojiSearch(key, isbn)).find((b) => b.toc);
+  return hit ? seojiToc(hit.toc) : '';
+}
+
+/** 목차 HTML → 글. 줄 바꿈 태그(<br> · </p> · </tr> · </li> · </div>)는 줄로, 칸(<td>)·글자 태그(<B>)는 띄어쓰기로
+ *  (태그를 그냥 지우면 오른쪽 칸의 쪽 번호가 제목에 붙어 「순환소수8」처럼 돼 쪽을 못 읽는다) */
+export function tocClean(html: string): string {
+  return html
     .replace(/\r/g, '')
-    .replace(/\n{2,}/g, '\n')
-    .trim()
+    .replace(/<\s*br\s*\/?>/gi, '\n')
+    .replace(/<\/\s*(p|tr|li|div|h\d|dt|dd)\s*>/gi, '\n')
+    .replace(/<\/?\s*(td|th)\b[^>]*>/gi, '  ')
+    .replace(/<[^>]+>/g, '')
+    .replace(/&nbsp;|&#160;/gi, ' ')
+    .replace(/&middot;|&#183;/gi, '·')
+    .replace(/&amp;/gi, '&')
+    .replace(/&lt;/gi, '<')
+    .replace(/&gt;/gi, '>')
+    .replace(/&quot;/gi, '"')
+    .replace(/&#(\d{2,5});/g, (_, n) => String.fromCharCode(Number(n)))
+    .split('\n')
+    .map((l) => l.replace(/\s+$/, ''))
+    .filter((l) => l.trim())
+    .join('\n')
     .slice(0, 8000);
 }
 
@@ -82,8 +106,7 @@ export function parseYes24(j: unknown): BookHit[] {
         isbn: s(x.isbn13) || s(x.isbn10),
         cover: /^https:\/\/image\.yes24\.com\//.test(s(x.cover)) ? s(x.cover) : '',
         toc: '',
-        // 목차 글에 <B> 같은 태그 · \r 이 섞여 온다 → 글만, 빈 줄 없이
-        tocText: s(cd.tableOfContents).replace(/<[^>]+>/g, '').replace(/&nbsp;/g, ' ').replace(/\r/g, '').split('\n').map((l) => l.replace(/\s+$/, '')).filter((l) => l.trim()).join('\n').slice(0, 8000),
+        tocText: tocClean(s(cd.tableOfContents)),
         price: n(x.shopPrice),
         sale: n(x.salePrice),
         pages: x.pages ? `${n(x.pages)}쪽` : '',

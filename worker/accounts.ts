@@ -24,7 +24,7 @@ import { cleanFact, goodKo } from './fact';
 import { fetch2k } from './nba2k';
 import { hcBody, parseHc } from './homecourt';
 import { coachBody, diaryBody, noteBody, parseCoach, parseDiary, parseNote, parseReceipt, parseTocRead, receiptBody, tocBody } from './aiRead';
-import { seojiSearch, seojiToc, yes24Search } from './books';
+import { seojiSearch, seojiToc, seojiTocByIsbn, yes24Search } from './books';
 import { cheapShark } from './cheapshark';
 import { invenChamps, invenSkins, invenSkinVideo } from './skins';
 import { discordChannels, discordInfo, discordMessages, discordSend } from './discord';
@@ -382,7 +382,7 @@ export class Accounts extends DurableObject<Env> {
     if (path === 'ai/receipt' && req.method === 'POST') return this.receiptScan(user, body);
     if (path === 'ai/toc' && req.method === 'POST') return this.tocScan(user, body);
     if (path === 'books/search' && req.method === 'GET') return this.bookSearch((new URL(req.url).searchParams.get('q') ?? '').trim().slice(0, 80));
-    if (path === 'books/toc' && req.method === 'GET') return this.bookToc(new URL(req.url).searchParams.get('url') ?? '');
+    if (path === 'books/toc' && req.method === 'GET') return this.bookToc(new URL(req.url).searchParams.get('url') ?? '', (new URL(req.url).searchParams.get('isbn') ?? '').replace(/[^\dXx]/g, ''));
     if (path === 'ai/diary' && req.method === 'POST') return this.diarySplit(user, body);
     if (path === 'ai/coach' && req.method === 'POST') {
       const text = typeof body.text === 'string' ? body.text.trim().slice(0, 6000) : '';
@@ -1954,6 +1954,7 @@ export class Accounts extends DurableObject<Env> {
       riot: !!this.riotKey(),
       nl: !!this.nlKey(),
       yes24: !!this.secret('yes24', 'yes24key', 'yes24api'),
+      kakaomap: !!this.secret('kakaomap', 'kakaomapkey', 'kakaojs', 'kakaojskey', 'kakaojavascriptkey'),
     });
   }
 
@@ -2047,7 +2048,7 @@ export class Accounts extends DurableObject<Env> {
     // 1) 예스24 (표지 · 값 · 쪽수 · 목차) → 2) 국립중앙도서관
     if (yk) {
       try {
-        const r = await this.nbaCached(`y24b:${q.toLowerCase()}`, DAY, () => yes24Search(yk, q));
+        const r = await this.nbaCached(`y24b2:${q.toLowerCase()}`, DAY, () => yes24Search(yk, q));
         if (r.v.length) return json({ list: r.v });
       } catch (e) {
         why = e instanceof Error ? e.message : String(e);
@@ -2064,9 +2065,15 @@ export class Accounts extends DurableObject<Env> {
     }
     return why ? fail(`책을 찾지 못했어요. (${why.slice(0, 120)})`, 502) : json({ list: [] });
   }
-  private async bookToc(url: string): Promise<Response> {
+  private async bookToc(url: string, isbn = ''): Promise<Response> {
     try {
-      const r = await this.nbaCached(`nltoc:${url}`, 30 * DAY, () => seojiToc(url));
+      if (isbn) {
+        const key = this.nlKey();
+        if (!key || !/^(\d{9}[\dXx]|\d{13})$/.test(isbn)) return json({ text: '' });
+        const r = await this.nbaCached(`nltocisbn:${isbn}`, 30 * DAY, () => seojiTocByIsbn(key, isbn));
+        return json({ text: r.v });
+      }
+      const r = await this.nbaCached(`nltoc2:${url}`, 30 * DAY, () => seojiToc(url));
       return json({ text: r.v });
     } catch (e) {
       return fail(`목차를 받지 못했어요. (${(e instanceof Error ? e.message : String(e)).slice(0, 100)})`, 502);
@@ -2372,7 +2379,7 @@ export class Accounts extends DurableObject<Env> {
     const type = b.type === 'game' || b.type === 'book' || b.type === 'music' ? b.type : null;
     const q = typeof b.q === 'string' ? b.q.normalize('NFC').trim().slice(0, 60) : '';
     if (!type || !q) return fail('찾을 이름을 써 주세요.');
-    const need = type === 'game' ? env.RAWG_KEY : type === 'book' ? env.KAKAO_KEY || env.ALADIN_KEY : env.DISCOGS_TOKEN;
+    const need = type === 'game' ? env.RAWG_KEY : type === 'book' ? env.KAKAO_KEY || env.ALADIN_KEY : env.DISCOGS_TOKEN || this.secret('discogs', 'discogstoken', 'discogsusertoken', 'discogspersonaltoken', 'discogsaccesstoken');
     if (!need) return fail(type === 'game' ? '게임 찾기에는 RAWG 키(RAWG_KEY)가 필요해요.' : type === 'book' ? '책 찾기에는 카카오 키(KAKAO_KEY)나 알라딘 키(ALADIN_KEY)가 필요해요.' : '음반 찾기에는 Discogs 토큰(DISCOGS_TOKEN)이 필요해요.', 503);
     const ck = `lookup:${type}:${q.toLowerCase()}`;
     const c = this.sql.exec<{ data: string; at: number }>('SELECT data, at FROM cache WHERE key = ?', ck).toArray()[0];

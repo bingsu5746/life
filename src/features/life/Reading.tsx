@@ -166,7 +166,7 @@ function BookFind({ have }: { have: Reading[] }) {
   const [list, setList] = useState<BookHit[] | null>(null);
   const [busy, setBusy] = useState(false);
   const [note, setNote] = useState('');
-  // 치는 대로 찾기 (0.45초 쉬면): 제목이 친 말과 비슷한 순서로
+  // 치는 대로 찾기 (0.12초 쉬면): 제목이 친 말과 비슷한 순서로
   useEffect(() => {
     const k = q.trim();
     if (k.length < 2) return setList(null);
@@ -179,7 +179,7 @@ function BookFind({ have }: { have: Reading[] }) {
           setNote(r.needKey ? '책 찾기는 예스24 · 국립중앙도서관 키가 있어야 돼요.' : '');
         })
         .catch((e) => on && setNote(e instanceof Error ? e.message : '찾지 못했어요'));
-    }, 220);
+    }, 120);
     return () => {
       on = false;
       clearTimeout(t);

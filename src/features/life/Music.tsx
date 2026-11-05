@@ -1,9 +1,9 @@
 // 음악: 가진 음반(LP 중심) · 사고 싶은 음반 · 들은 기록
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { shortDate } from '../study/dates';
 import { alive, newId, type MusicRecord } from '../study/model';
 import { put, remove, useStudy } from '../study/store';
-import { confirmDelete, Empty, Field, Icon, Sheet, tap, toast, useToday } from '../study/ui';
+import { confirmDelete, Empty, Field, Sheet, tap, toast, useToday } from '../study/ui';
 import { won } from './calc';
 import { discogsSearch, isLoggedIn, musicSimilar, type DiscogsHit } from '../auth/api';
 import { StarInput, starText } from './MovieParts';
@@ -41,10 +41,9 @@ export function Music(_: { sub?: string }) {
     <div className="st-page narrow">
       <div className="st-page-head">
         <h2>음악</h2>
-        <button className="btn btn-sm btn-primary" onClick={() => setEdit({ status: tab, format: 'lp' })} aria-label="음반 넣기">
-          <Icon name="plus" />
-        </button>
       </div>
+      {/* 음반 넣기는 여기 한 곳: 찾아서 바로 넣거나, 못 찾으면 직접 적기 */}
+      <DiscogsFind have={all} onManual={(title) => setEdit({ status: tab, format: 'lp', title })} />
       {have.length > 0 && (
         <div className="mv-summary">
           <span>
@@ -136,7 +135,6 @@ export function Music(_: { sub?: string }) {
           ))}
         </div>
       )}
-      {isLoggedIn() && <DiscogsFind have={all} />}
       {tab === 'have' && have.length > 0 && <MusicRec onPick={(artist) => setEdit({ status: 'want', format: 'lp', artist })} />}
       {edit && <RecordSheet item={edit} today={today} onClose={() => setEdit(null)} />}
     </div>
@@ -144,26 +142,41 @@ export function Music(_: { sub?: string }) {
 }
 
 /** Discogs 에서 음반 찾기 → 가진 음반 · 사고 싶어요에 바로 넣기 (2000년 이후, 모은 사람이 많은 순) */
-function DiscogsFind({ have }: { have: MusicRecord[] }) {
+function DiscogsFind({ have, onManual }: { have: MusicRecord[]; onManual: (title: string) => void }) {
   const [q, setQ] = useState('');
   const [list, setList] = useState<DiscogsHit[] | null>(null);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
   const [direct, setDirect] = useState(false);
-  const find = async () => {
-    if (q.trim().length < 2 || busy) return;
+  const seq = useRef(0);
+  const cache = useRef(new Map<string, { list: DiscogsHit[]; direct?: boolean }>());
+  const find = async (k = q.trim()) => {
+    if (k.length < 2 || !isLoggedIn()) return;
+    const hit = cache.current.get(k.toLowerCase());
+    if (hit) return void (setList(hit.list), setDirect(!!hit.direct), setErr(''));
+    const n = ++seq.current;
     setBusy(true);
-    setErr('');
     try {
-      const r = await discogsSearch(q.trim());
+      const r = await discogsSearch(k);
+      cache.current.set(k.toLowerCase(), r);
+      if (n !== seq.current) return;
       setList(r.list);
       setDirect(!!r.direct);
+      setErr('');
     } catch (e) {
-      setErr(e instanceof Error ? e.message : '찾지 못했어요');
+      if (n === seq.current) setErr(e instanceof Error ? e.message : '찾지 못했어요');
     } finally {
-      setBusy(false);
+      if (n === seq.current) setBusy(false);
     }
   };
+  // 치는 대로 찾기 (0.3초 쉬면). Discogs 는 1분 횟수가 정해져 있어 조금 더 기다린다
+  useEffect(() => {
+    const k = q.trim();
+    if (k.length < 2) return void (seq.current++, setList(null), setBusy(false));
+    const t = setTimeout(() => void find(k), 300);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [q]);
   const add = (h: DiscogsHit, status: MusicRecord['status']) => {
     const same = have.find((r) => r.discogsId === h.id || (r.title.toLowerCase() === h.title.toLowerCase() && r.artist.toLowerCase() === h.artist.toLowerCase()));
     if (same) return toast(`이미 ${same.status === 'have' ? '내 음반' : '사고 싶어요'}에 있어요`);
@@ -172,7 +185,12 @@ function DiscogsFind({ have }: { have: MusicRecord[] }) {
   };
   return (
     <section className="st-card">
-      <h3 className="st-h">음반 찾기</h3>
+      <div className="st-inline between">
+        <h3 className="st-h">음반 넣기</h3>
+        <button type="button" className="st-link" onClick={() => onManual(q.trim())}>
+          직접 적기
+        </button>
+      </div>
       <form
         className="st-inline"
         onSubmit={(e) => {
@@ -180,13 +198,18 @@ function DiscogsFind({ have }: { have: MusicRecord[] }) {
           void find();
         }}
       >
-        <input className="st-input" value={q} onChange={(e) => setQ(e.target.value)} placeholder="가수나 앨범 이름 (영어가 잘 찾아져요)" aria-label="찾을 음반" />
-        <button className="btn btn-sm btn-primary" disabled={busy || q.trim().length < 2}>
-          {busy ? '찾는 중…' : '찾기'}
-        </button>
+        <input className="st-input" type="search" value={q} onChange={(e) => setQ(e.target.value)} placeholder={isLoggedIn() ? '가수나 앨범 이름 (영어가 잘 찾아져요)' : '로그인하면 찾아서 넣을 수 있어요'} aria-label="찾을 음반" disabled={!isLoggedIn()} />
       </form>
+      {busy && <p className="st-muted sm">찾는 중…</p>}
       {err && <p className="st-muted sm">{err}</p>}
-      {list && !list.length && <p className="st-muted sm">2000년 이후에 나온, 많이 모은 음반 중에는 없어요.</p>}
+      {list && !list.length && (
+        <p className="st-muted sm">
+          2000년 이후에 나온, 많이 모은 음반 중에는 없어요.{' '}
+          <button type="button" className="st-link" onClick={() => onManual(q.trim())}>
+            「{q.trim()}」 직접 적기
+          </button>
+        </p>
+      )}
       {list && list.length > 0 && (
         <div className="dg-list">
           {list.map((h) => (

@@ -9,28 +9,38 @@ export interface TocRow extends Unit {
   /** 쪽 없는 목차의 단원 (순번이 쪽 자리에) */
   unitOnly?: boolean;
   problem?: string;
+  /** 쪽이 붙은 목차 속 쪽 없는 큰 제목 (「Ⅰ. 다항식」): 단원으로 넣지 않는다 */
+  header?: boolean;
 }
+
+/** 쪽 없는 큰 제목에 붙는 표시 */
+export const HEADER_NOTE = '쪽 없는 큰 제목 (빼요)';
+
+/** 쪽 번호 앞뒤에 붙는 말 · 괄호 (「p.12」 「12쪽」 「(12)」 「[12]」) */
+const PRE = String.raw`(?:p\.?|pp\.?|page)?\s*[(\[〈<]?\s*`;
+const POST = String.raw`\s*[)\]〉>]?\s*(?:쪽|p\.?|페이지)?`;
 
 const DASH = /\s*[-~–—―〜～‐]\s*/;
 
 /** 한 줄 → 이름 + 페이지 (못 읽으면 null) */
 function parseLine(raw: string): { name: string; from: number; to: number | null } | null {
   const line = raw
-    .replace(/[.·•…‥・_]{2,}/g, ' ') // 점선
+    .replace(/[.·•…‥・_─━-]{2,}/g, ' ') // 점선
+    .replace(/(?:[.·•…‥・]\s+){2,}/g, ' ') // 띄어 쓴 점선 (「. . . .」)
     .replace(/\s+/g, ' ')
     .trim();
   if (!line) return null;
   // 끝에 「a-b」 범위
-  const range = line.match(new RegExp(`^(.*?)\\s*(?:p\\.?|쪽|페이지)?\\s*(\\d{1,4})${DASH.source}(\\d{1,4})\\s*(?:쪽|p)?$`, 'i'));
+  const range = line.match(new RegExp(`^(.*?)\\s*${PRE}(\\d{1,4})${DASH.source}(\\d{1,4})${POST}$`, 'i'));
   // 「현대시 01~11」 같은 번호 매기기는 쪽이 아니다 (0 으로 시작하는 두 자리 범위)
   if (range && /^0\d$/.test(range[2]) && /^\d{2}$/.test(range[3])) return null;
   if (range) {
-    const name = range[1].replace(/[\s:|,]+$/, '').trim();
+    const name = range[1].replace(/[\s:|,.·•…]+$/, '').trim();
     return { name, from: Number(range[2]), to: Number(range[3]) };
   }
   // 끝에 숫자 하나 (시작 페이지). 이름에 붙은 단원 번호(「1. 집합」)와 헷갈리지 않게 앞에 띄어쓰기나 점선이 있어야 한다
-  const single = line.match(/^(.*\S)\s+(?:p\.?\s*)?(\d{1,4})\s*(?:쪽|p)?$/i);
-  if (single) return { name: single[1].replace(/[\s:|,]+$/, '').trim(), from: Number(single[2]), to: null };
+  const single = line.match(new RegExp(`^(.*\\S)\\s+${PRE}(\\d{1,4})${POST}$`, 'i'));
+  if (single) return { name: single[1].replace(/[\s:|,.·•…]+$/, '').trim(), from: Number(single[2]), to: null };
   return null;
 }
 
@@ -44,17 +54,19 @@ export function parseToc(text: string, lastPage?: number): TocRow[] {
   const lines: string[] = [];
   for (const l of text.split(/\r?\n/)) {
     if (!l.trim()) continue;
-    if (/^\s*(?:p\.?\s*)?\d{1,4}(?:\s*[-~–]\s*\d{1,4})?\s*(?:쪽|p)?\s*$/i.test(l) && lines.length && !parseLine(lines[lines.length - 1])) lines[lines.length - 1] += ` ${l.trim()}`;
+    if (new RegExp(`^\\s*${PRE}\\d{1,4}(?:\\s*[-~–]\\s*\\d{1,4})?${POST}\\s*$`, 'i').test(l) && lines.length && !parseLine(lines[lines.length - 1])) lines[lines.length - 1] += ` ${l.trim()}`;
     else lines.push(l);
   }
   text = lines.join('\n');
-  // 쪽이 거의 없는 목차(국어 작품별 · 강별 목차 등): 단원(줄)마다 한 칸으로 (쪽 대신 단원 수로 계획)
-  if (lines.length && lines.filter((l) => parseLine(l)).length < Math.max(1, lines.length * 0.5)) return unitRows(lines);
+  // 쪽이 거의 없는 목차(국어 작품별 · 강별 목차 등): 단원(줄)마다 한 칸으로 (쪽 대신 단원 수로 계획).
+  // 쪽 붙은 줄이 조금이라도 모여 있으면(두 줄 넘게 · 네 줄에 한 줄 넘게) 쪽으로 읽고, 쪽 없는 줄은 큰 제목으로 뺀다
+  const paged = lines.filter((l) => parseLine(l)).length;
+  if (lines.length && (paged === 0 || (paged < 2 && lines.length > 2) || paged < lines.length * 0.25)) return unitRows(lines);
   const rows: (TocRow & { open: boolean })[] = [];
   for (const raw of text.split(/\r?\n/)) {
     const p = parseLine(raw);
     if (!p) {
-      if (raw.trim()) rows.push({ name: raw.trim(), from: 0, to: 0, line: raw, open: false, problem: '페이지를 못 찾았어요' });
+      if (raw.trim()) rows.push({ name: raw.trim(), from: 0, to: 0, line: raw, open: false, problem: HEADER_NOTE, header: true });
       continue;
     }
     rows.push({ name: p.name || '전체', from: p.from, to: p.to ?? 0, line: raw, open: p.to === null });

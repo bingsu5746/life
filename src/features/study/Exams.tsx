@@ -9,6 +9,7 @@ import { ExamPlanPage } from './ExamPlan';
 import { SchoolExams } from './SchoolPanel';
 import { Bar, Check, confirmDelete, Empty, Field, go, Icon, Menu, Sheet, SubjectDot, SubjectPicker, subjectsOf, toast, useToday, tap } from './ui';
 import { askAiLater } from './solveJob';
+import { CSAT_SECTIONS, sectionSubject } from './papers';
 import { useSpecialDays } from '../life/Calendar';
 
 // 성적 화면은 그래프가 있어 열 때 받는다
@@ -251,7 +252,9 @@ function ExamSheet({ exam, today, onClose }: { exam?: Exam; today: string; onClo
   const d = useStudy();
   const [name, setName] = useState(exam?.name ?? '');
   const [kind, setKind] = useState<ExamKind>(exam?.kind ?? 'school');
-  const [multi, setMulti] = useState(!!exam?.end);
+  const [multi0, setMulti] = useState(!!exam?.end);
+  // 모의고사 · 수능은 하루
+  const multi = multi0 && kind !== 'mock';
   const [date, setDate] = useState(exam?.date ?? addDays(today, 30));
   const [end, setEnd] = useState(exam?.end ?? addDays(exam?.date ?? addDays(today, 30), 3));
   const [days, setDays] = useState<ExamDay[]>(exam?.days ?? []);
@@ -314,7 +317,8 @@ function ExamSheet({ exam, today, onClose }: { exam?: Exam; today: string; onClo
             ))}
           </div>
         </Field>
-        <Field group label="시험 보는 날">
+        {kind === 'mock' && <p className="st-hint">모의고사 · 수능은 하루에 정해진 영역(국어 · 수학 · 영어 · 한국사 · 탐구 · 제2외국어/한문)을 봐요.</p>}
+        {kind !== 'mock' && <Field group label="시험 보는 날">
           <div className="st-seg">
             <button type="button" className={!multi ? 'on' : ''} aria-pressed={!multi} onClick={() => setMulti(false)}>
               하루
@@ -323,7 +327,7 @@ function ExamSheet({ exam, today, onClose }: { exam?: Exam; today: string; onClo
               여러 날 (시험 기간)
             </button>
           </div>
-        </Field>
+        </Field>}
         <div className="st-inline wrap">
           <input
             className="st-input sm"
@@ -625,12 +629,39 @@ function ScopeSheet({ exam, scope, onClose, onSave, onDelete }: { exam: Exam; sc
   const [text, setText] = useState(scope ? scopeText(scope.lines) : '');
   const [note, setNote] = useState(scope?.note ?? '');
   const lines = scopeLines(text, scope?.lines);
+  // 모의고사 · 수능: 과목 대신 정해진 영역에서 고른다 (같은 이름의 내 과목이 없으면 저장할 때 만든다)
+  const mock = exam.kind === 'mock';
+  const [section, setSection] = useState(() => (mock && subjectId ? (CSAT_SECTIONS.find((x) => x.match.test(d.subjects[subjectId]?.name ?? ''))?.name ?? '') : ''));
+  const pickSection = (name: string) => {
+    setSection(name);
+    const id = sectionSubject(d, name);
+    setSubjectId(id.startsWith('csat:') ? '' : id);
+  };
+  const ensureSubject = () => {
+    if (!mock || subjectId || !section) return subjectId;
+    const id = newId();
+    const n = subjectsOf(d).length;
+    put('subjects', { id, name: section, color: SUBJECT_COLORS[n % SUBJECT_COLORS.length], order: n });
+    return id;
+  };
   return (
-    <Sheet title={scope ? '시험 범위 고치기' : '과목 시험 범위'} onClose={onClose} wide>
+    <Sheet title={scope ? '시험 범위 고치기' : mock ? '영역 시험 범위' : '과목 시험 범위'} onClose={onClose} wide>
       <div className="st-form">
-        <Field group label="과목">
-          <SubjectPicker value={subjectId} onChange={setSubjectId} />
-        </Field>
+        {mock ? (
+          <Field group label="영역">
+            <div className="st-chips">
+              {CSAT_SECTIONS.map((x) => (
+                <button key={x.name} type="button" className={`st-chip ${section === x.name ? 'on' : ''}`} aria-pressed={section === x.name} onClick={() => pickSection(x.name)}>
+                  {x.name}
+                </button>
+              ))}
+            </div>
+          </Field>
+        ) : (
+          <Field group label="과목">
+            <SubjectPicker value={subjectId} onChange={setSubjectId} />
+          </Field>
+        )}
         {used.has(subjectId) && <p className="bad">이 과목 범위는 이미 있어요. 그 과목을 눌러 고쳐 주세요.</p>}
         {timetableDate(exam, subjectId) ? (
           <p className="st-hint">이 과목 시험 날: {longDate(timetableDate(exam, subjectId)!)} (날짜별 시험 과목에서 정했어요)</p>
@@ -653,8 +684,8 @@ function ScopeSheet({ exam, scope, onClose, onSave, onDelete }: { exam: Exam; sc
           )}
           <button
             className="btn btn-primary"
-            disabled={!subjectId || !lines.length || used.has(subjectId)}
-            onClick={() => onSave({ id: scope?.id ?? newId(), subjectId, date: !timetableDate(exam, subjectId) && date && date !== exam.date ? date : undefined, lines, note: note.trim() || undefined, at: Date.now() })}
+            disabled={(mock ? !section : !subjectId) || !lines.length || used.has(subjectId)}
+            onClick={() => onSave({ id: scope?.id ?? newId(), subjectId: ensureSubject(), date: !timetableDate(exam, subjectId) && date && date !== exam.date ? date : undefined, lines, note: note.trim() || undefined, at: Date.now() })}
           >
             저장 ({lines.length}줄)
           </button>
