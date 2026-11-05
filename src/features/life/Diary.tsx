@@ -2,6 +2,7 @@
 import { canListen, listen } from '../../lib/listen';
 import { useEffect, useRef, useState } from 'react';
 import { addPhoto, photoUrl, removePhoto } from '../study/photos';
+import { addVideo, MAX_SEC, removeVideo, shrinkVideo, videoUrl } from '../study/videos';
 import { addDays, longDate, shortDate } from '../study/dates';
 import { alive, type DiaryEntry } from '../study/model';
 import { getStudy, put, putMany, remove, setSettings, useStudy } from '../study/store';
@@ -110,10 +111,12 @@ function List({ month, today }: { month: string; today: string }) {
               {e.title && <small className="st-muted">{shortDate(e.id)}</small>}
             </div>
             <p className="dy-preview">{e.text || Object.values(e.parts ?? {})[0]}</p>
-            {e.photos?.[0] && (
+            {e.photos?.[0] ? (
               <div className="dy-thumb">
                 <Photo id={e.photos[0]} />
               </div>
+            ) : (
+              !!e.videos?.length && <small className="st-muted">🎬 영상 {e.videos.length}개</small>
             )}
           </section>
         ))
@@ -129,6 +132,7 @@ interface Draft {
   text: string;
   parts: Record<string, string>;
   photos: string[];
+  videos?: string[];
   at: number;
 }
 const draftKey = (date: string) => `my-study.diary.draft.${date}`;
@@ -156,17 +160,19 @@ function Write({ date, today }: { date: string; today: string }) {
   const [mood, setMood] = useState(draft0?.mood ?? cur?.mood ?? 0);
   const [photos, setPhotos] = useState<string[]>(draft0?.photos ?? cur?.photos ?? []);
   const [title, setTitle] = useState(draft0?.title ?? cur?.title ?? '');
-  const [text, setText] = useState(draft0?.text ?? cur?.text ?? '');
   const form = formOf(d);
   const lines = daySummary(d, date);
+  // 새 일기: 본문 앞에 오늘 앱 기록(운동 · 영화 · 할 일 …)을 미리 채운다 (양식에서 끌 수 있음)
+  const [text, setText] = useState(() => draft0?.text ?? cur?.text ?? (form.autoFill && lines.length ? `${lines.join('\n')}\n\n` : ''));
+  const [videos, setVideos] = useState<string[]>(draft0?.videos ?? cur?.videos ?? []);
+  const [vBusy, setVBusy] = useState('');
   const studyLines = studySummary(d, date);
   const sleepLines = sleepSummary(d, date);
-  // 새 일기: 「오늘 한 것」 칸을 앱 기록으로 미리 채운다 (끄면 링크로만). 「공부」 칸은 비어 있으면 늘 공부 기록으로 채운다
+  // 「공부」 · 「잠」 칸은 비어 있으면 늘 기록으로 채운다
   const [parts, setParts] = useState<Record<string, string>>(
     () =>
       draft0?.parts ?? {
         ...(cur?.parts ?? {}),
-        ...(!cur && form.autoFill && form.parts.includes('done') && lines.length ? { done: lines.join('\n') } : {}),
         ...(form.parts.includes('study') && studyLines.length && !cur?.parts?.study?.trim() ? { study: studyLines.join('\n') } : {}),
         ...(form.parts.includes('sleep') && sleepLines.length && !cur?.parts?.sleep?.trim() ? { sleep: sleepLines.join('\n') } : {}),
       },
@@ -197,11 +203,15 @@ function Write({ date, today }: { date: string; today: string }) {
   const [busy, setBusy] = useState(false);
   // 이 화면에서 넣은 사진: 저장하지 않고 나가면 지운다
   const added = useRef<string[]>([]);
+  const addedV = useRef<string[]>([]);
   const savedRef = useRef(false);
   // 저장도 임시저장도 없이 나가면 넣은 사진을 지운다 (임시저장이 있으면 그대로 둔다)
   useEffect(
     () => () => {
-      if (!savedRef.current && !loadDraft(date)) for (const p of added.current) void removePhoto(p);
+      if (!savedRef.current && !loadDraft(date)) {
+        for (const p of added.current) void removePhoto(p);
+        for (const v of addedV.current) void removeVideo(v);
+      }
     },
     [date],
   );
@@ -221,15 +231,33 @@ function Write({ date, today }: { date: string; today: string }) {
     setPhotos((x) => [...x, ...ids].slice(0, 4));
     setBusy(false);
   }
-  const changed = JSON.stringify(photos) !== JSON.stringify(cur?.photos ?? []) || mood !== (cur?.mood ?? 0) || title !== (cur?.title ?? '') || text !== (cur?.text ?? '') || JSON.stringify(clean(parts)) !== JSON.stringify(clean(cur?.parts ?? {}));
+  async function addVideos(f: File) {
+    setVBusy('줄이는 중…');
+    try {
+      const { blob, cut } = await shrinkVideo(f, (sec) => setVBusy(`줄이는 중… ${Math.floor(sec)}/${MAX_SEC}초`));
+      const r = await addVideo(blob);
+      addedV.current.push(r.id);
+      setVideos((x) => [...x, r.id].slice(0, 2));
+      if (cut) toast(`앞 ${MAX_SEC}초만 넣었어요`);
+      if (r.error) toast(`이 기기에는 저장했어요. 서버에는 나중에 올려요 (${r.error})`);
+    } catch (e) {
+      toast(e instanceof Error ? e.message : '영상을 넣지 못했어요');
+    } finally {
+      setVBusy('');
+    }
+  }
+  const changed =
+    JSON.stringify(videos) !== JSON.stringify(cur?.videos ?? []) || JSON.stringify(photos) !== JSON.stringify(cur?.photos ?? []) || mood !== (cur?.mood ?? 0) || title !== (cur?.title ?? '') || text !== (cur?.text ?? '') || JSON.stringify(clean(parts)) !== JSON.stringify(clean(cur?.parts ?? {}));
   // 바뀌면 0.5초 뒤 이 기기에 임시저장
   useEffect(() => {
     if (savedRef.current) return;
-    const t = setTimeout(() => setDraft(date, changed ? { mood, title, text, parts, photos, at: Date.now() } : null), 500);
+    const t = setTimeout(() => setDraft(date, changed ? { mood, title, text, parts, photos, videos, at: Date.now() } : null), 500);
     return () => clearTimeout(t);
-  }, [date, changed, mood, title, text, parts, photos]);
+  }, [date, changed, mood, title, text, parts, photos, videos]);
   function discardDraft() {
     for (const p of photos) if (!(cur?.photos ?? []).includes(p)) void removePhoto(p);
+    for (const v of videos) if (!(cur?.videos ?? []).includes(v)) void removeVideo(v);
+    setVideos(cur?.videos ?? []);
     setDraft(date, null);
     setFromDraft(false);
     setMood(cur?.mood ?? 0);
@@ -243,11 +271,12 @@ function Write({ date, today }: { date: string; today: string }) {
     const filled = { ...parts };
     for (const k of form.parts) if (!filled[k]?.trim()) filled[k] = 'X';
     const p = clean(filled);
-    if (!text.trim() && !mood && !Object.keys(p).length && !photos.length) return toast('한 줄이라도 써 주세요');
+    if (!text.trim() && !mood && !Object.keys(p).length && !photos.length && !videos.length) return toast('한 줄이라도 써 주세요');
     savedRef.current = true;
     setDraft(date, null);
     for (const old of cur?.photos ?? []) if (!photos.includes(old)) void removePhoto(old);
-    put('diary', { id: date, mood: mood || undefined, title: title.trim() || undefined, text, parts: Object.keys(p).length ? p : undefined, photos: photos.length ? photos : undefined } as DiaryEntry);
+    for (const old of cur?.videos ?? []) if (!videos.includes(old)) void removeVideo(old);
+    put('diary', { id: date, mood: mood || undefined, title: title.trim() || undefined, text: text.trim() ? text.replace(/\s+$/, '') : '', parts: Object.keys(p).length ? p : undefined, photos: photos.length ? photos : undefined, videos: videos.length ? videos : undefined } as DiaryEntry);
     toast('일기를 저장했어요');
     go(`/diary/${monthOf(date)}`);
   }
@@ -261,10 +290,34 @@ function Write({ date, today }: { date: string; today: string }) {
           </button>
         </div>
       ))}
+      {videos.map((id) => (
+        <div key={id} className="dy-photo">
+          <Video id={id} />
+          <button type="button" className="dy-photo-x" aria-label="영상 빼기" onClick={() => setVideos(videos.filter((x) => x !== id))}>
+            ✕
+          </button>
+        </div>
+      ))}
       {photos.length < 4 && (
         <label className="dy-photo-add">
           {busy ? '넣는 중…' : '＋ 사진'}
           <input type="file" accept="image/*" multiple hidden disabled={busy} onChange={(e) => e.target.files?.length && void addPhotos(e.target.files)} />
+        </label>
+      )}
+      {videos.length < 2 && (
+        <label className="dy-photo-add">
+          {vBusy || `＋ 영상 (${MAX_SEC}초)`}
+          <input
+            type="file"
+            accept="video/*"
+            hidden
+            disabled={!!vBusy}
+            onChange={(e) => {
+              const f = e.target.files?.[0];
+              e.target.value = '';
+              if (f) void addVideos(f);
+            }}
+          />
         </label>
       )}
     </div>
@@ -317,9 +370,9 @@ function Write({ date, today }: { date: string; today: string }) {
           <label key={p.key} className="st-field">
             <span className="st-label">
               {p.label}
-              {(p.key === 'done' || p.key === 'study') && (p.key === 'done' ? lines : studyLines).length > 0 && parts[p.key]?.trim() !== (p.key === 'done' ? lines : studyLines).join('\n') && (
-                <button type="button" className="st-link dy-load" onClick={() => setParts({ ...parts, [p.key]: (p.key === 'done' ? lines : studyLines).join('\n') })}>
-                  {p.key === 'study' ? '공부 기록으로 다시 채우기' : '기록에서 불러오기'}
+              {p.key === 'study' && studyLines.length > 0 && parts.study?.trim() !== studyLines.join('\n') && (
+                <button type="button" className="st-link dy-load" onClick={() => setParts({ ...parts, study: studyLines.join('\n') })}>
+                  공부 기록으로 다시 채우기
                 </button>
               )}
             </span>
@@ -327,7 +380,14 @@ function Write({ date, today }: { date: string; today: string }) {
             {p.key === 'photo' && photoBox}
           </label>
         ))}
-        <span className="st-label">일기</span>
+        <span className="st-label">
+          일기
+          {lines.length > 0 && !text.includes(lines.join('\n')) && (
+            <button type="button" className="st-link dy-load" onClick={() => setText((x) => `${lines.join('\n')}${x.trim() ? `\n\n${x}` : '\n\n'}`)}>
+              오늘 기록 불러오기
+            </button>
+          )}
+        </span>
         <AutoText className="dy-text" rows={shownParts.length ? 6 : 10} value={text} onChange={setText} placeholder="하고 싶은 말을 자유롭게…" label="일기" />
         <Dictate onText={(t) => setText((x) => (x.trim() ? `${x.replace(/\s+$/, '')} ${t}` : t))} />
         {text.trim().length >= 20 && (
@@ -346,6 +406,7 @@ function Write({ date, today }: { date: string; today: string }) {
               onClick={() => {
                 if (!confirmDelete(`${shortDate(date)} 일기`)) return;
                 for (const ph of cur.photos ?? []) void removePhoto(ph);
+                for (const v of cur.videos ?? []) void removeVideo(v);
                 remove('diary', date);
                 go(`/diary/${monthOf(date)}`);
               }}
@@ -412,11 +473,9 @@ function Form() {
           );
         })}
         <NotifyTime k="diaryTime" label="일기 알림" fallback="22:30" />
-        {form.parts.includes('done') && (
-          <label className="st-toggle">
-            <input type="checkbox" checked={form.autoFill} onChange={(e) => set(form.parts, e.target.checked)} /> 새 일기를 열면 「오늘 한 것」을 앱 기록으로 미리 채우기
-          </label>
-        )}
+        <label className="st-toggle">
+          <input type="checkbox" checked={form.autoFill} onChange={(e) => set(form.parts, e.target.checked)} /> 새 일기를 열면 본문에 오늘 기록(운동 · 영화 · 할 일)을 미리 채우기
+        </label>
       </section>
     </div>
   );
@@ -434,6 +493,20 @@ function Photo({ id }: { id: string }) {
   if (url === undefined) return <div className="dy-img loading" />;
   if (!url) return <div className="dy-img missing">사진 없음</div>;
   return <img className="dy-img" src={url} alt="일기 사진" />;
+}
+
+function Video({ id }: { id: string }) {
+  const [url, setUrl] = useState<string | null | undefined>(undefined);
+  useEffect(() => {
+    let on = true;
+    void videoUrl(id).then((u) => on && setUrl(u));
+    return () => {
+      on = false;
+    };
+  }, [id]);
+  if (url === undefined) return <div className="dy-img loading" />;
+  if (!url) return <div className="dy-img missing">영상 없음</div>;
+  return <video className="dy-img" src={url} controls playsInline preload="metadata" />;
 }
 
 /** 말로 쓰기 버튼 (음성 인식을 지원하는 브라우저에서만) */

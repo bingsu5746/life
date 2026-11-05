@@ -320,10 +320,10 @@ describe('일기 양식 (diaryForm)', () => {
     expect(daySummary(d, '2026-10-28')).toEqual(['운동: 농구 60분', '영화: 존 윅 ★5', '책: 「데미안」 다 읽음 — 좋았다']);
     expect(studySummary(d, '2026-10-28')).toEqual(['모두 1시간 30분']);
     expect(dreamDates(d)).toEqual(['2026-10-27']);
-    expect(formOf(d).parts).toEqual(['sleep', 'study', 'done', 'good', 'dream', 'photo']);
+    expect(formOf(d).parts).toEqual(['sleep', 'study', 'good', 'dream', 'photo']);
     // 예전에 저장한 양식(공부 칸이 없던 때)에도 공부 칸은 켜진다. 새로 저장한 양식에서 끈 것은 꺼진 채로
-    expect(formOf({ settings: { diaryForm: { parts: ['done'], autoFill: true } } } as never).parts).toEqual(['study', 'done', 'sleep', 'photo']);
-    expect(formOf({ settings: { diaryForm: { parts: ['done'], autoFill: true, known: ['study', 'done', 'sleep', 'photo'] } } } as never).parts).toEqual(['done']);
+    expect(formOf({ settings: { diaryForm: { parts: ['good'], autoFill: true } } } as never).parts).toEqual(['study', 'good', 'sleep', 'photo']);
+    expect(formOf({ settings: { diaryForm: { parts: ['good'], autoFill: true, known: ['study', 'good', 'sleep', 'photo'] } } } as never).parts).toEqual(['good']);
   });
 });
 
@@ -1062,5 +1062,22 @@ describe('달력 일정 (events)', () => {
     const r = reminders({ events: { e: ev({ remind: 30 }) } } as never, '2026-11-01', Date.parse('2026-11-01T00:00:00+09:00'));
     expect(r[0]).toMatchObject({ at: Date.parse('2026-11-02T18:30:00+09:00'), title: '수학' });
     expect(repeatText(ev({ repeat: { freq: 'weekly', every: 2, weekdays: [1, 3] } }) as never)).toBe('2주마다 월·수');
+  });
+});
+
+describe('일기: 「오늘 한 것」 칸을 본문으로 합치기', () => {
+  it('한 줄 띄고 본문 앞에, X 는 버린다', async () => {
+    const { sanitizeCollections } = await import('./sanitize');
+    const out = sanitizeCollections({
+      diary: {
+        '2026-10-01': { id: '2026-10-01', text: '오늘 재밌었다', parts: { done: '농구', good: '좋음' }, updatedAt: 1 },
+        '2026-10-02': { id: '2026-10-02', text: '', parts: { done: '영화' }, updatedAt: 1 },
+        '2026-10-03': { id: '2026-10-03', text: '본문', parts: { done: 'X' }, updatedAt: 1 },
+      },
+    } as never) as { diary: Record<string, { text: string; parts?: Record<string, string> }> };
+    expect(out.diary['2026-10-01'].text).toBe('농구\n\n오늘 재밌었다');
+    expect(out.diary['2026-10-01'].parts).toEqual({ good: '좋음' });
+    expect(out.diary['2026-10-02'].text).toBe('영화');
+    expect(out.diary['2026-10-03'].text).toBe('본문');
   });
 });

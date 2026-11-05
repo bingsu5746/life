@@ -1,9 +1,8 @@
-// 일기 양식: 날마다 쓸 칸을 고른다 (본문은 항상). 「공부」는 공부 기록에서 자동으로, 「오늘 한 것」은 나머지 앱 기록에서 불러올 수 있다.
+// 일기 양식: 날마다 쓸 칸을 고른다 (본문은 항상). 「공부」는 공부 기록에서 자동으로, 본문에는 나머지 앱 기록(운동 · 영화 …)을 불러올 수 있다.
 import { alive, type StudyData } from '../study/model';
 
 export const DIARY_PARTS: { key: string; label: string; hint: string }[] = [
   { key: 'study', label: '공부', hint: '공부한 시간 · 과목 (공부 기록에서 자동으로 채워요)' },
-  { key: 'done', label: '오늘 한 것', hint: '운동 · 영화 · 할 일 같은 것 (기록에서 불러올 수 있어요)' },
   { key: 'good', label: '좋았던 것', hint: '오늘 좋았던 일' },
   { key: 'hard', label: '힘들었던 것', hint: '속상하거나 어려웠던 일' },
   { key: 'thanks', label: '고마운 것', hint: '고마운 사람이나 일' },
@@ -17,7 +16,7 @@ export const DIARY_PARTS: { key: string; label: string; hint: string }[] = [
   { key: 'photo', label: '오늘의 사진', hint: '오늘의 사진 · 영상 이야기' },
 ];
 
-export const DEFAULT_FORM = { parts: ['sleep', 'study', 'done', 'good', 'dream', 'photo'], autoFill: true };
+export const DEFAULT_FORM = { parts: ['sleep', 'study', 'good', 'dream', 'photo'], autoFill: true };
 /** 양식을 저장한 뒤에 새로 생긴 칸 중 처음부터 켜 둘 것 */
 const NEW_ON = ['study', 'sleep', 'photo'];
 

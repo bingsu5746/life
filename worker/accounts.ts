@@ -49,6 +49,9 @@ const MAX_STORE = 1_800_000;
 /** 사진: 한 장(base64) 최대 크기, 사람마다 최대 장 수 */
 const MAX_PHOTO = 700_000;
 const MAX_PHOTOS = 300;
+/** 일기 짧은 영상 (10초, 기기에서 줄여 보냄): base64 길이 · 사람마다 개수 */
+const MAX_VIDEO = 1_750_000;
+const MAX_VIDEOS = 80;
 const MAX_SMALL_BODY = 4_096;
 const USERNAME = /^[A-Za-z0-9_가-힣]{3,16}$/;
 const COOKIE = COOKIE_NAME;
@@ -246,7 +249,7 @@ export class Accounts extends DurableObject<Env> {
 
     let body: Record<string, unknown> = {};
     if (req.method === 'POST' || req.method === 'PUT' || req.method === 'DELETE') {
-      const big = path.startsWith('store/') || path.startsWith('study-photo/') || path === 'solve' || path === 'solve/img' || path === 'bb/scan' || path === 'ai/note' || path === 'ai/receipt' || path === 'ai/toc' || path === 'ai/stt';
+      const big = path.startsWith('store/') || path.startsWith('study-photo/') || path.startsWith('study-video/') || path === 'solve' || path === 'solve/img' || path === 'bb/scan' || path === 'ai/note' || path === 'ai/receipt' || path === 'ai/toc' || path === 'ai/stt';
       const text = await req.text();
       if (text.length > (big ? MAX_STORE + 1000 : path === 'translate' || path === 'notify/digest' || path === 'notify/remind' || path === 'ai/diary' || path === 'ai/coach' ? 4 * MAX_SMALL_BODY : MAX_SMALL_BODY)) return fail('보낸 내용이 너무 커요.', 413);
       try {
@@ -462,6 +465,31 @@ export class Accounts extends DurableObject<Env> {
         const had = this.sql.exec('SELECT 1 FROM blobs WHERE user_id = ? AND name = ?', user.id, name).toArray().length > 0;
         const n = this.sql.exec<{ n: number }>("SELECT COUNT(*) AS n FROM blobs WHERE user_id = ? AND name LIKE 'photo:%'", user.id).toArray()[0].n;
         if (!had && n >= MAX_PHOTOS) return fail(`사진은 ${MAX_PHOTOS}장까지 올릴 수 있어요. 해결한 오답의 사진을 지워 주세요.`, 413);
+        this.sql.exec('INSERT OR REPLACE INTO blobs (user_id, name, data, updated) VALUES (?, ?, ?, ?)', user.id, name, data, Date.now());
+        return json({ ok: true });
+      }
+    }
+    // 일기 영상: 기기에서 줄여 보낸 MP4 · WebM (base64)
+    const vd = path.match(/^study-video\/([a-z0-9]{6,32})$/);
+    if (vd) {
+      const name = `video:${vd[1]}`;
+      if (req.method === 'GET') {
+        const r = this.sql.exec<{ data: string }>('SELECT data FROM blobs WHERE user_id = ? AND name = ?', user.id, name).toArray()[0];
+        return r ? json({ data: r.data }) : fail('영상이 없어요.', 404);
+      }
+      if (req.method === 'DELETE') {
+        this.sql.exec('DELETE FROM blobs WHERE user_id = ? AND name = ?', user.id, name);
+        return json({ ok: true });
+      }
+      if (req.method === 'PUT') {
+        const data = typeof body.data === 'string' ? body.data : '';
+        if (!data || data.length > MAX_VIDEO || !/^[A-Za-z0-9+/=]+$/.test(data)) return fail('영상이 너무 크거나 잘못됐어요.', 413);
+        // WebM (1A 45 DF A3) 이나 MP4 (4~8번째 바이트 ftyp)
+        const head = atob(data.slice(0, 16));
+        if (!head.startsWith('\x1a\x45\xdf\xa3') && head.slice(4, 8) !== 'ftyp') return fail('MP4 · WebM 영상만 올릴 수 있어요.', 415);
+        const had = this.sql.exec('SELECT 1 FROM blobs WHERE user_id = ? AND name = ?', user.id, name).toArray().length > 0;
+        const n = this.sql.exec<{ n: number }>("SELECT COUNT(*) AS n FROM blobs WHERE user_id = ? AND name LIKE 'video:%'", user.id).toArray()[0].n;
+        if (!had && n >= MAX_VIDEOS) return fail(`영상은 ${MAX_VIDEOS}개까지 올릴 수 있어요.`, 413);
         this.sql.exec('INSERT OR REPLACE INTO blobs (user_id, name, data, updated) VALUES (?, ?, ?, ?)', user.id, name, data, Date.now());
         return json({ ok: true });
       }

@@ -472,24 +472,30 @@ const FIX: Record<Collection, Fix> = {
     doneDate: optDate(x.doneDate),
     created: num(x.created),
   }),
-  diary: (x) =>
-    isDate(x.id)
-      ? {
-          ...x,
-          mood: score(x.mood, 1, 5),
-          title: optStr(x.title)?.slice(0, 60),
-          text: str(x.text).slice(0, 20000),
-          parts: isObj(x.parts)
-            ? Object.fromEntries(
-                Object.entries(x.parts)
-                  .filter(([k, v]) => /^[a-z]{2,12}$/.test(k) && typeof v === 'string' && v.trim())
-                  .slice(0, 12)
-                  .map(([k, v]) => [k, (v as string).slice(0, 5000)]),
-              )
-            : undefined,
-          photos: Array.isArray(x.photos) ? x.photos.filter((p): p is string => typeof p === 'string').slice(0, 4) : undefined,
-        }
-      : null,
+  diary: (x) => {
+    if (!isDate(x.id)) return null;
+    // 「오늘 한 것」 칸은 일기 본문으로 합쳤다: 예전 일기는 그 칸을 본문 앞에 한 줄 띄고 붙인다
+    const parts0 = isObj(x.parts) ? (x.parts as Record<string, unknown>) : undefined;
+    const done = typeof parts0?.done === 'string' && parts0.done.trim() && parts0.done.trim() !== 'X' ? parts0.done.trim() : '';
+    const text0 = str(x.text);
+    const text = done ? (text0.trim() ? `${done}\n\n${text0}` : done) : text0;
+    return {
+      ...x,
+      mood: score(x.mood, 1, 5),
+      title: optStr(x.title)?.slice(0, 60),
+      text: text.slice(0, 20000),
+      parts: parts0
+        ? Object.fromEntries(
+            Object.entries(parts0)
+              .filter(([k, v]) => k !== 'done' && /^[a-z]{2,12}$/.test(k) && typeof v === 'string' && v.trim())
+              .slice(0, 12)
+              .map(([k, v]) => [k, (v as string).slice(0, 5000)]),
+          )
+        : undefined,
+      photos: Array.isArray(x.photos) ? x.photos.filter((p): p is string => typeof p === 'string').slice(0, 4) : undefined,
+      videos: Array.isArray(x.videos) ? x.videos.filter((p): p is string => typeof p === 'string' && /^[a-z0-9]{6,32}$/.test(p)).slice(0, 2) : undefined,
+    };
+  },
   decks: (x) => ({ ...x, name: str(x.name, '카드 묶음'), subjectId: str(x.subjectId) }),
   cards: (x) => ({ ...x, ...review(x), deckId: str(x.deckId), front: str(x.front), back: str(x.back), created: optNum(x.created), firstSeen: optDate(x.firstSeen) }),
   wordLists: (x) => ({

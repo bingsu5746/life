@@ -4,6 +4,7 @@ import { exportBackup } from '../study/backup';
 import { mergeStudy, mergeWords, sameJson } from '../study/merge';
 import { COLLECTIONS, type StudyData } from '../study/model';
 import { uploadPendingPhotos } from '../study/photos';
+import { uploadPendingVideos } from '../study/videos';
 import { sanitizeWords } from '../study/sanitize';
 import { getStudy, getWords, normalize, replaceStudy, replaceWords, resetLocal } from '../study/store';
 import { getStore, isLoggedIn, loggedInUserId, putStore } from './api';
@@ -161,6 +162,7 @@ async function doRun(names: SyncName[], pushOnly = false) {
     set('saved');
     // 올리지 못한 오답 사진 (로그인 전에 넣었거나 올리다 실패한 것)
     void uploadPendingPhotos();
+    void uploadPendingVideos();
   } catch (e) {
     info.error = e instanceof Error ? e.message : String(e);
     if (!isLoggedIn()) return set('local');

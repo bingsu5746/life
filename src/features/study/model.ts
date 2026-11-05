@@ -648,6 +648,8 @@ export interface DiaryEntry extends Stamp {
   parts?: Record<string, string>;
   /** 사진 (오답 사진처럼 기기에 저장, 최대 4장) */
   photos?: Id[];
+  /** 짧은 영상 (10초까지, 최대 2개) */
+  videos?: Id[];
 }
 
 /** 국어·영어 지문 (헷갈리는 지문을 다시 보려고 모아 둔다) */

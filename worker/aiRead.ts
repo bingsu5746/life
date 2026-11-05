@@ -33,17 +33,16 @@ export function parseNote(text: string, subjects: string[]): NoteRead {
   return { subject: subject && subjects.includes(subject) ? subject : null, number: str(j.number, 20), question: q };
 }
 
-export const DIARY_KEYS = ['done', 'good', 'hard', 'thanks', 'learned', 'fix', 'worry', 'tomorrow', 'dream'] as const;
+export const DIARY_KEYS = ['good', 'hard', 'thanks', 'learned', 'fix', 'worry', 'tomorrow', 'dream'] as const;
 export type DiaryRead = Partial<Record<(typeof DIARY_KEYS)[number], string>>;
 export function diaryBody(text: string) {
   const prompt = [
     '아래는 한국 고등학생이 쓰거나 말로 한 일기예요 (받아쓰기라서 띄어쓰기 · 맞춤법 · 비슷한 소리 오타가 있을 수 있어요).',
     '1) 받아쓰기 오타는 문맥에 맞게 바로잡되, 뜻은 바꾸지 마세요.',
-    '2) 글에 실제로 있는 내용만 알맞은 칸에 나눠 넣으세요. 없는 내용은 절대 지어내지 말고, 해당하는 말이 없으면 그 칸은 null.',
+    '2) 글에 실제로 있는 내용 중 아래 칸에 맞는 것만 골라 넣으세요 (일과 자체는 본문에 남으니 넣지 마세요). 없는 내용은 절대 지어내지 말고, 해당하는 말이 없으면 그 칸은 null.',
     '3) 한 문장이 여러 칸에 맞으면 가장 알맞은 한 칸에만 넣으세요. 칸마다 여러 줄이면 줄바꿈으로 나누세요.',
     '4) 말투는 원래 글 그대로 (반말이면 반말). 요약하지 말고 다듬기만 하세요.',
     'JSON 칸 (모두 문자열 또는 null):',
-    '"done": 오늘 한 일 · 일과 (학교 · 학원 · 공부 · 운동 · 게임 · 만난 사람 · 먹은 것)',
     '"good": 좋았던 일 · 기뻤던 순간',
     '"hard": 힘들었던 일 · 속상했던 일',
     '"thanks": 고마운 사람 · 일',
