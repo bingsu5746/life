@@ -16,11 +16,13 @@ const NEAR: ['FD6' | 'CE7' | 'AT4' | 'AD5', string][] = [
 ];
 const dist = (m?: number) => (m === undefined ? '' : m >= 1000 ? `${(m / 1000).toFixed(1)}km` : `${m}m`);
 
-export default function KakaoMap({ pins, onOpen, onAdd }: { pins: Pin[]; onOpen: (id: string) => void; onAdd: (p: KPlace) => void }) {
+/** path: 이 순서로 선을 잇는다 (다녀온 곳을 날짜순으로) */
+export default function KakaoMap({ pins, onOpen, onAdd, path }: { pins: Pin[]; onOpen: (id: string) => void; onAdd: (p: KPlace) => void; path?: { lat: number; lon: number }[] }) {
   const el = useRef<HTMLDivElement>(null);
   const map = useRef<Kakao>(null);
   const pinOv = useRef<Kakao[]>([]);
   const foundOv = useRef<Kakao[]>([]);
+  const line = useRef<Kakao>(null);
   const [ready, setReady] = useState(false);
   const [fail, setFail] = useState(false);
   const [q, setQ] = useState('');
@@ -74,6 +76,21 @@ export default function KakaoMap({ pins, onOpen, onAdd }: { pins: Pin[]; onOpen:
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ready, pins.map((p) => `${p.id}${p.lat}${p.lon}${p.done}${p.name}`).join()]);
 
+  // 다녀온 길 (날짜순 선)
+  const pathKey = (path ?? []).map((p) => `${p.lat},${p.lon}`).join(';');
+  useEffect(() => {
+    if (!ready) return;
+    const k = window.kakao;
+    line.current?.setMap(null);
+    line.current = null;
+    if (path && path.length > 1) {
+      line.current = new k.maps.Polyline({ path: path.map((p) => new k.maps.LatLng(p.lat, p.lon)), strokeWeight: 4, strokeColor: '#c2410c', strokeOpacity: 0.8, strokeStyle: 'solid' });
+      line.current.setMap(map.current);
+      fit(k, path);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ready, pathKey]);
+
   // 찾은 곳 핀
   useEffect(() => {
     if (!ready) return;
@@ -109,7 +126,7 @@ export default function KakaoMap({ pins, onOpen, onAdd }: { pins: Pin[]; onOpen:
   if (fail)
     return (
       <Suspense fallback={<div className="pm-map" />}>
-        <PlaceMap pins={pins} onOpen={onOpen} />
+        <PlaceMap pins={pins} onOpen={onOpen} path={path} />
       </Suspense>
     );
   return (

@@ -71,6 +71,12 @@ export function parseToc(text: string, lastPage?: number): TocRow[] {
     }
     rows.push({ name: p.name || '전체', from: p.from, to: p.to ?? 0, line: raw, open: p.to === null });
   }
+  // 쪽이 붙은 대단원(「Ⅰ. 수와 식 8」 다음 줄 「01 유리수 8」): 작은 단원과 쪽이 겹치면 대단원은 한 칸으로 세지 않는다
+  const paged0 = rows.filter((r) => !r.problem);
+  paged0.forEach((r, i) => {
+    const next = paged0[i + 1];
+    if (next && BIG.test(r.name) && !BIG.test(next.name) && next.from >= r.from && next.from <= (r.open ? r.from : r.to) + 1) Object.assign(r, { header: true, problem: HEADER_NOTE });
+  });
   const ok = rows.filter((r) => !r.problem);
   ok.forEach((r, i) => {
     if (!r.open) return;
@@ -92,8 +98,18 @@ export function parseToc(text: string, lastPage?: number): TocRow[] {
 
 /** 쪽 없는 목차: 줄마다 단원 하나 (from = to = 순번). unitOnly 로 표시 */
 export function unitRows(lines: string[]): TocRow[] {
-  return lines.map((l, i) => ({ name: l.trim().replace(/^[·•\-\s]+/, ''), from: i + 1, to: i + 1, line: l, unitOnly: true }));
+  // 대단원 이름(「Ⅰ. 문학」 「[현대시]」 「1부」 「PART 2」 「제1장」)은 아래에 작은 단원이 있으면 한 칸으로 세지 않는다
+  const head = lines.map((l) => BIG.test(l.trim()));
+  let n = 0;
+  return lines.map((l, i) => {
+    const name = l.trim().replace(/^[·•\-\s]+/, '');
+    if (head[i] && i + 1 < lines.length && !head[i + 1]) return { name, from: 0, to: 0, line: l, unitOnly: true, header: true, problem: HEADER_NOTE };
+    n++;
+    return { name, from: n, to: n, line: l, unitOnly: true };
+  });
 }
+/** 대단원처럼 보이는 줄 */
+const BIG = /^(?:[ⅠⅡⅢⅣⅤⅥⅦⅧⅨⅩ]+\s*[.)]?|[IVX]{1,4}\s*[.)]|\[[^\]]+\]$|【[^】]+】$|〔[^〕]+〕$|<[^>]+>$|《[^》]+》$|제?\s*\d+\s*(?:부|편|장|단원|파트)(?:\s|[.:]|$)|part\s*\d+|chapter\s*\d+|대단원)/i;
 /** 쪽 없는 문제집인지 (단원 수로 계획) */
 export const isUnitOnly = (rows: { unitOnly?: boolean }[]) => rows.length > 0 && rows.every((r) => r.unitOnly);
 

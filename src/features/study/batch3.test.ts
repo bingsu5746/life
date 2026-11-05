@@ -1031,12 +1031,13 @@ describe('쪽 없는 목차 (parseToc 단원 모드)', () => {
     const { parseToc, isUnitOnly } = await import('./toc');
     const r = parseToc('1부 교과서 개념 학습\n1강 시의 표현과 형식\n2강 시의 내용\n고전 시가 01~11\n현대시 01~11');
     expect(isUnitOnly(r)).toBe(true);
-    expect(r.map((x) => [x.name, x.from])).toEqual([
-      ['1부 교과서 개념 학습', 1],
-      ['1강 시의 표현과 형식', 2],
-      ['2강 시의 내용', 3],
-      ['고전 시가 01~11', 4],
-      ['현대시 01~11', 5],
+    // 「1부」는 대단원이라 빼고, 아래 단원부터 1번째
+    expect(r.map((x) => [x.name, x.from, !!x.header])).toEqual([
+      ['1부 교과서 개념 학습', 0, true],
+      ['1강 시의 표현과 형식', 1, false],
+      ['2강 시의 내용', 2, false],
+      ['고전 시가 01~11', 3, false],
+      ['현대시 01~11', 4, false],
     ]);
     const p = parseToc('01 제곱근의 뜻과 성질  008\n02 무리수와 실수  028\n03 근호  040', 50);
     expect(isUnitOnly(p)).toBe(false);
@@ -1126,6 +1127,49 @@ describe('목차 쪽 읽기 (먼 오른쪽 쪽 · 큰 제목 · 괄호)', () => 
     const { parseToc, isUnitOnly } = await import('./toc');
     const r = parseToc('[현대시]\n진달래꽃 - 김소월\n님의 침묵 - 한용운\n[고전 시가]\n관동별곡 - 정철');
     expect(isUnitOnly(r)).toBe(true);
-    expect(r.length).toBe(5);
+    expect(r.filter((x) => !x.header).map((x) => [x.name, x.from])).toEqual([
+      ['진달래꽃 - 김소월', 1],
+      ['님의 침묵 - 한용운', 2],
+      ['관동별곡 - 정철', 3],
+    ]);
+  });
+});
+
+describe('쪽 붙은 대단원', () => {
+  it('작은 단원과 쪽이 겹치는 대단원은 뺀다', async () => {
+    const { parseToc } = await import('./toc');
+    const r = parseToc('Ⅰ. 수와 식 8\n01 다항식 8\n02 나머지정리 20\nⅡ. 방정식 32-60\n03 복소수 33\n04 이차방정식 45', 60);
+    expect(r.filter((x) => !x.problem).map((x) => [x.name, x.from, x.to])).toEqual([
+      ['01 다항식', 8, 19],
+      ['02 나머지정리', 20, 32],
+      ['03 복소수', 33, 44],
+      ['04 이차방정식', 45, 60],
+    ]);
+  });
+});
+
+describe('AI 코치: 바쁜 날 줄이기 · 일정 → 공부 기록', () => {
+  it('일정 · 시험이 있는 날은 공부 시간을 줄인다', async () => {
+    const { busyDays, fitToBusy } = await import('./coach');
+    const { emptyStudy } = await import('./model');
+    const d = {
+      ...emptyStudy(),
+      events: { a: { id: 'a', title: '학원', date: '2026-11-09', allDay: false, start: '18:00', end: '22:00', color: 'blue', created: 0, updatedAt: 1 } },
+    } as never;
+    const b = busyDays(d, '2026-11-09');
+    expect(b[0]).toMatchObject({ busy: 240, keep: 0.5 });
+    expect(b[1].keep).toBe(1);
+    const plan = ['월', '화', '수'].map((day) => ({ day, items: [{ subject: '수학', minutes: 120, what: '쎈' }] }));
+    const out = fitToBusy(plan, b);
+    expect(out[0].items[0].minutes).toBe(60);
+    expect(out[0].cut).toBe(60);
+    expect(out[1].items[0].minutes).toBe(120);
+  });
+  it('끝난 「공부로 기록」 일정만 · 그날만 지운 날은 빼고', async () => {
+    const { eventSessions } = await import('../life/events');
+    const ev = { id: 'e', title: '영어 학원', date: '2026-11-02', allDay: false, start: '18:00', end: '19:30', color: 'blue', study: true, subjectId: 'eng', repeat: { freq: 'weekly', every: 1 }, skip: ['2026-11-09'], created: 0, updatedAt: 1 };
+    const out = eventSessions({ events: { e: ev }, sessions: {} } as never, '2026-11-16', Date.parse('2026-11-16T20:00:00+09:00'));
+    // 최근 14일(11/3~) 안: 11/9 는 그날만 지워서 빠지고 11/16 만
+    expect(out.map((s) => [s.date, s.minutes, s.subjectId])).toEqual([['2026-11-16', 90, 'eng']]);
   });
 });

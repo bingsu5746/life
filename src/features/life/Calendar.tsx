@@ -1,10 +1,10 @@
 // 한 달 달력: 날마다 시험 · 수행 · 예습 · 할 일 · 개봉 · 결제 · 학교 일정 · 공휴일 · 기념일
 import { useEffect, useState } from 'react';
 import { isLoggedIn, specialDays, type SpecialDay } from '../auth/api';
-import { addDays, longDate, weekday, WEEKDAYS } from '../study/dates';
+import { addDays, longDate, shortDate, weekday, WEEKDAYS } from '../study/dates';
 import { useSchoolData } from '../study/SchoolPanel';
-import { useStudy } from '../study/store';
-import { go, useToday } from '../study/ui';
+import { put, remove, useStudy } from '../study/store';
+import { go, toast, useToday } from '../study/ui';
 import { daysInMonth, monthLabel, shiftMonth } from './calc';
 import { CAL_KIND, monthItems } from './calendar';
 import { EventSheet } from './EventSheet';
@@ -28,6 +28,15 @@ export function CalendarPage() {
   const evs = eventsBetween(d, from, `${month}-${String(n).padStart(2, '0')}`);
   const selEv = evs.get(pick) ?? [];
   const [edit, setEdit] = useState<{ ev?: CalEvent; on?: string } | null>(null);
+  /** 과외 그날만 쉬기 (휴강) · 되돌리기. 쉬면 그날 저절로 들어간 공부 기록도 뺀다 */
+  const toggleClass = (tutorId: string, day: string, off: boolean) => {
+    const t = d.tutors[tutorId];
+    if (!t) return;
+    put('tutors', { ...t, cancelled: off ? [...new Set([...t.cancelled, day])] : t.cancelled.filter((x) => x !== day) });
+    const sid = `tut-${t.id}-${day}`;
+    if (off && d.sessions[sid] && !d.sessions[sid].deleted) remove('sessions', sid);
+    toast(off ? `${shortDate(day)} ${t.name} 수업을 뺐어요` : '수업을 되돌렸어요');
+  };
   return (
     <div className="st-page narrow">
       <div className="st-page-head">
@@ -100,12 +109,22 @@ export function CalendarPage() {
         {!sel.length && !selEv.length ? (
           <p className="st-muted">일정이 없어요.</p>
         ) : (
-          sel.map((x, i) => (
-            <button key={i} className="cal-item" disabled={!x.to} onClick={() => x.to && go(x.to)}>
-              <span className={`cal-tag ${x.kind}`}>{CAL_KIND[x.kind]}</span>
-              <span>{x.label}</span>
-            </button>
-          ))
+          sel.map((x, i) =>
+            x.tutorId ? (
+              <div key={i} className={`cal-item cal-tutor ${x.cancelled ? 'off' : ''}`}>
+                <span className={`cal-tag ${x.kind}`}>{CAL_KIND[x.kind]}</span>
+                <span>{x.label}</span>
+                <button className="st-link" onClick={() => toggleClass(x.tutorId!, pick, !x.cancelled)}>
+                  {x.cancelled ? '되돌리기' : '이날 수업 없음'}
+                </button>
+              </div>
+            ) : (
+              <button key={i} className="cal-item" disabled={!x.to} onClick={() => x.to && go(x.to)}>
+                <span className={`cal-tag ${x.kind}`}>{CAL_KIND[x.kind]}</span>
+                <span>{x.label}</span>
+              </button>
+            ),
+          )
         )}
       </section>
       {edit && <EventSheet date={pick} ev={edit.ev} on={edit.on} onClose={() => setEdit(null)} />}

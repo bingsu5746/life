@@ -10,16 +10,30 @@ import { routeUrl, searchPlaces, type KPlace } from './kakao';
 const KakaoMap = lazy(() => import('./KakaoMap'));
 const PickMap = lazy(() => import('./PlaceMap').then((m) => ({ default: m.PickMap })));
 
+/** 두 곳 사이 곧은 거리 (km) */
+const km = (a: { lat?: number; lon?: number }, b: { lat?: number; lon?: number }) => {
+  const r = Math.PI / 180;
+  const h = Math.sin(((b.lat! - a.lat!) * r) / 2) ** 2 + Math.cos(a.lat! * r) * Math.cos(b.lat! * r) * Math.sin(((b.lon! - a.lon!) * r) / 2) ** 2;
+  return 2 * 6371 * Math.asin(Math.sqrt(h));
+};
+
 const KIND: Record<TravelPlace['kind'], string> = { food: '맛집', cafe: '카페', sight: '관광지', stay: '숙소', etc: '기타' };
 
-export function Travel() {
+/** sub: 'visited' 다녀온 곳 · 'map' 지도 · 'trail' 여행 기록(다녀온 곳을 날짜순 선으로). 칸은 왼쪽(폰은 아래) 메뉴 */
+export function Travel({ sub }: { sub?: string }) {
   const d = useStudy();
   const today = useToday();
-  const [tab, setTab] = useState<TravelPlace['status']>('want');
+  const trail = sub === 'trail';
+  const map = sub === 'map' || trail;
+  const tab: TravelPlace['status'] = sub === 'visited' || trail ? 'visited' : 'want';
   const [kind, setKind] = useState<TravelPlace['kind'] | ''>('');
   const [edit, setEdit] = useState<Partial<TravelPlace> | null>(null);
-  const [map, setMap] = useState(false);
+  const [year, setYear] = useState('');
   const all = alive(d.places);
+  // 여행 기록: 위치 · 다녀온 날이 있는 곳을 날짜순으로
+  const visitedPos = all.filter((p) => p.status === 'visited' && p.visited && p.lat !== undefined && p.lon !== undefined);
+  const years = [...new Set(visitedPos.map((p) => p.visited!.slice(0, 4)))].sort().reverse();
+  const steps = visitedPos.filter((p) => !year || p.visited!.startsWith(year)).sort((a, b) => a.visited!.localeCompare(b.visited!) || a.created - b.created);
   const list = all.filter((p) => p.status === tab && (!kind || p.kind === kind)).sort((a, b) => (tab === 'visited' ? (b.visited ?? '').localeCompare(a.visited ?? '') : (a.region ?? '').localeCompare(b.region ?? '', 'ko')) || b.created - a.created);
   const kinds = [...new Set(all.filter((p) => p.status === tab).map((p) => p.kind))];
   // 지역별로 묶어서
@@ -28,23 +42,44 @@ export function Travel() {
   return (
     <div className="st-page narrow">
       <div className="st-page-head">
-        <h2>여행</h2>
+        <h2>{trail ? '여행 기록' : map ? '여행 지도' : tab === 'want' ? '가 볼 곳' : '다녀온 곳'}</h2>
         <button className="btn btn-sm btn-primary" onClick={() => setEdit({ status: tab, kind: kind || 'food' })} aria-label="장소 넣기">
           <Icon name="plus" />
         </button>
       </div>
-      <nav className="mv-sub" aria-label="여행">
-        <button className={tab === 'want' ? 'on' : ''} onClick={() => setTab('want')}>
-          가 볼 곳{all.filter((p) => p.status === 'want').length ? ` ${all.filter((p) => p.status === 'want').length}` : ''}
-        </button>
-        <button className={tab === 'visited' ? 'on' : ''} onClick={() => setTab('visited')}>
-          다녀온 곳{all.filter((p) => p.status === 'visited').length ? ` ${all.filter((p) => p.status === 'visited').length}` : ''}
-        </button>
-        <button className={map ? 'on' : ''} onClick={() => setMap(!map)}>
-          지도
-        </button>
-      </nav>
-      {map && (
+      {trail && years.length > 1 && (
+        <div className="st-chips">
+          {['', ...years].map((y) => (
+            <button key={y || 'all'} className={`st-chip ${year === y ? 'on' : ''}`} aria-pressed={year === y} onClick={() => setYear(y)}>
+              {y ? `${y}년` : '전부'}
+            </button>
+          ))}
+        </div>
+      )}
+      {trail && (
+        <Suspense fallback={<div className="pm-map" />}>
+          <KakaoMap pins={steps.map((p, i) => ({ id: p.id, lat: p.lat!, lon: p.lon!, name: `${i + 1}. ${p.name}`, done: true }))} path={steps.map((p) => ({ lat: p.lat!, lon: p.lon! }))} onOpen={(id) => setEdit(d.places[id])} onAdd={(k) => setEdit(fromKakao(k, all))} />
+        </Suspense>
+      )}
+      {trail &&
+        (steps.length < 2 ? (
+          <Empty title="다녀온 곳이 두 곳 넘게 있어야 길을 이어요">다녀온 곳에 다녀온 날과 위치를 넣으면 날짜순으로 선을 이어 보여 줘요.</Empty>
+        ) : (
+          <section className="st-card">
+            <small className="aw-label">
+              {steps.length}곳 · 모두 {Math.round(steps.slice(1).reduce((a, p, i) => a + km(steps[i], p), 0)).toLocaleString('ko-KR')}km
+            </small>
+            <ol className="tr-steps">
+              {steps.map((p, i) => (
+                <li key={p.id} className="st-tap" {...tap(() => setEdit(p))}>
+                  <b>{p.name}</b>
+                  <small className="st-muted">{[shortDate(p.visited!), p.region, i > 0 && `앞 곳에서 ${km(steps[i - 1], p).toFixed(1)}km`].filter(Boolean).join(' · ')}</small>
+                </li>
+              ))}
+            </ol>
+          </section>
+        ))}
+      {map && !trail && (
         <Suspense fallback={<div className="pm-map" />}>
           <KakaoMap pins={all.filter((p) => p.lat !== undefined && p.lon !== undefined && (!kind || p.kind === kind)).map((p) => ({ id: p.id, lat: p.lat!, lon: p.lon!, name: p.name, done: p.status === 'visited' }))} onOpen={(id) => setEdit(d.places[id])} onAdd={(k) => setEdit(fromKakao(k, all))} />
         </Suspense>

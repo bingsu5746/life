@@ -57,6 +57,7 @@ export const AREA_ITEMS: Record<Exclude<AreaKey, 'home' | 'study'>, AreaItem[]> 
     { key: '', label: '일기', icon: 'area-diary' },
     { key: 'dream', label: '꿈', icon: 'moon' },
     { key: 'form', label: '양식', icon: 'settings' },
+    { key: 'highlight', label: '이번 달 하이라이트', icon: 'review' },
     { key: 'recap', label: '한 해 결산', icon: 'target' },
   ],
 };
@@ -96,6 +97,16 @@ export const champItems = (id: string, pos: string): AreaItem[] => [
   ).map(([k, label, icon]) => ({ key: k, label, icon, to: `/games/champ/${id}/${k}${pos ? `-${pos}` : ''}` })),
 ];
 export const champItem = (sub?: string) => (sub ?? 'build').split('-')[0];
+
+/** 여행 안에서의 메뉴 (취미로 돌아가기 + 가 볼 곳 · 다녀온 곳 · 지도 · 여행 기록) */
+export const TRAVEL_ITEMS: AreaItem[] = [
+  { key: 'hobby', label: '취미', icon: 'area-hobby', to: '/hobby' },
+  { key: 'want', label: '가 볼 곳', icon: 'target', to: '/travel' },
+  { key: 'visited', label: '다녀온 곳', icon: 'life', to: '/travel/visited' },
+  { key: 'map', label: '지도', icon: 'pin', to: '/travel/map' },
+  { key: 'trail', label: '여행 기록', icon: 'time', to: '/travel/trail' },
+];
+export const travelItem = (sub?: string) => (sub === 'visited' || sub === 'map' || sub === 'trail' ? sub : 'want');
 
 /** 농구 안에서의 메뉴 (취미로 돌아가기 + 농구 연습 · 농구 기록 · NBA) */
 export const BASKETBALL_ITEMS: AreaItem[] = [
@@ -137,7 +148,7 @@ export const movieItem = (sub?: string) => (sub === 'watched' || sub === 'want' 
 /** 지금 주소에서 어느 메뉴가 켜져 있는지 */
 export function activeItem(area: keyof typeof AREA_ITEMS, sub?: string, p0?: string): string {
   if (area === 'hobby' && (HOBBY_PARTS as readonly string[]).includes(p0 ?? '')) return p0!;
-  if (area === 'diary') return sub === 'dream' || sub === 'form' || sub === 'recap' ? sub : '';
+  if (area === 'diary') return sub === 'dream' || sub === 'form' || sub === 'recap' ? sub : sub?.startsWith('highlight') ? 'highlight' : '';
   if (area === 'money') return sub === 'fixed' || sub === 'saving' ? sub : '';
   if (area === 'hobby') return sub === 'wish' || sub === 'reading' ? sub : '';
   return '';

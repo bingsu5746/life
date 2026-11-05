@@ -313,6 +313,8 @@ const FIX: Record<Collection, Fix> = {
           }
         : undefined,
     skip: Array.isArray(x.skip) ? (x.skip as unknown[]).filter(isDate).slice(0, 500) : undefined,
+    study: x.study === true ? true : undefined,
+    subjectId: optStr(x.subjectId)?.slice(0, 40),
     remind: typeof x.remind === 'number' && x.remind >= 0 && x.remind <= 7 * 24 * 60 ? Math.round(x.remind) : undefined,
     place: optStr(x.place)?.slice(0, 80),
     memo: optStr(x.memo)?.slice(0, 2000),
@@ -661,6 +663,23 @@ export function sanitizeSettings(s: unknown): StudySettings & { updatedAt: numbe
             .sort(([a], [b]) => a.localeCompare(b))
             .slice(-20)
             .map(([k, v]) => [k, Array.from({ length: 7 }, (_, i) => Math.round(cl((v as unknown[])[i], 0, 1440, 0)))]),
+        )
+      : undefined,
+    weekItems: isObj(x.weekItems)
+      ? Object.fromEntries(
+          Object.entries(x.weekItems)
+            .filter(([k, v]) => isDate(k) && Array.isArray(v))
+            .sort(([a], [b]) => a.localeCompare(b))
+            .slice(-8)
+            .map(([k, v]) => [
+              k,
+              Array.from({ length: 7 }, (_, i) =>
+                (Array.isArray((v as unknown[])[i]) ? ((v as unknown[])[i] as unknown[]) : [])
+                  .filter(isObj)
+                  .slice(0, 8)
+                  .map((it) => ({ subject: str((it as Obj).subject).slice(0, 20), what: str((it as Obj).what).slice(0, 80), minutes: Math.round(cl((it as Obj).minutes, 0, 600, 0)) })),
+              ),
+            ]),
         )
       : undefined,
     morningOff: x.morningOff === true ? true : undefined,

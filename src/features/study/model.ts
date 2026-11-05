@@ -38,6 +38,8 @@ export interface StudySettings {
   hiddenTabs?: string[];
   /** 주마다 요일별 공부 시간 목표(분): 그 주 월요일 → [월 … 일] */
   weekTargets?: Record<DateStr, number[]>;
+  /** AI 코치가 짠 요일별 할 일 (주간 계획에 넣었을 때): 그 주 월요일 → [월 … 일][] */
+  weekItems?: Record<DateStr, { subject: string; what: string; minutes: number }[][]>;
   /** 풀이 AI 하루 한도 (서비스 화면에서 본 숫자를 직접 넣음) */
   solveLimits?: Record<string, number>;
   /** 메인 아침 루틴 숨기기 */
@@ -956,6 +958,9 @@ export interface CalEvent extends Stamp {
   remind?: number;
   place?: string;
   memo?: string;
+  /** 끝나면 공부 기록으로 넣기 (학원 · 과외처럼 시각이 있는 일정). 그 과목 */
+  study?: boolean;
+  subjectId?: Id;
   created: number;
 }
 

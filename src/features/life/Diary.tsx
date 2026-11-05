@@ -1,4 +1,5 @@
 // 일기: 하루에 하나, 기분과 글. 달별로 모아 보고 찾기
+import { Highlight } from './Highlight';
 import { canListen, listen } from '../../lib/listen';
 import { useEffect, useRef, useState } from 'react';
 import { addPhoto, photoUrl, removePhoto } from '../study/photos';
@@ -24,6 +25,7 @@ export function Diary({ sub }: { sub?: string }) {
   if (sub === 'dream') return <Dreams />;
   if (sub === 'form') return <Form />;
   if (sub === 'recap') return <RecapPage />;
+  if (sub === 'highlight' || sub?.startsWith('highlight-')) return <Highlight month={sub.slice(10)} />;
   if (sub && /^\d{4}-\d{2}-\d{2}$/.test(sub)) return <Write key={sub > today ? today : sub} date={sub > today ? today : sub} today={today} />;
   return <List month={sub && /^\d{4}-\d{2}$/.test(sub) ? sub : monthOf(today)} today={today} />;
 }

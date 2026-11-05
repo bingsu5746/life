@@ -1,10 +1,10 @@
 // AI 코치: 열면 저절로 지난 7일 기록을 보내 다음 주 계획을 받는다 (주마다 한 번, 이 기기에 기억)
 import { useEffect, useRef, useState } from 'react';
 import { coachPlan, isLoggedIn, type CoachPlan } from '../auth/api';
-import { coachRecord } from '../study/coach';
-import { weekStart } from '../study/dates';
-import { useStudy } from '../study/store';
-import { useToday } from '../study/ui';
+import { busyDays, coachRecord, coachWeek, fitToBusy } from '../study/coach';
+import { addDays, shortDate, weekday, WEEKDAYS } from '../study/dates';
+import { setSettings, useStudy } from '../study/store';
+import { go, toast, useToday } from '../study/ui';
 
 const KEY = 'my-study.coach.v1';
 type Saved = { week: string; at: number; plan: CoachPlan };
@@ -20,7 +20,9 @@ const h = (m: number) => (m >= 60 ? `${Math.floor(m / 60)}시간${m % 60 ? ` ${m
 export function Coach() {
   const d = useStudy();
   const today = useToday();
-  const week = weekStart(today);
+  // 금 · 토 · 일에는 다음 주, 아니면 이번 주를 계획한다
+  const week = coachWeek(today);
+  const busyWeek = busyDays(d, week);
   const [saved, setSaved] = useState<Saved | null>(load);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
@@ -52,6 +54,23 @@ export function Coach() {
 
   if (!isLoggedIn()) return <p className="st-muted">로그인하면 AI 코치가 기록을 보고 다음 주 계획을 짜 줘요.</p>;
   const p = saved?.plan;
+  // 일정 · 시험이 겹친 날은 공부 시간을 알아서 줄인다 (AI 가 덜 줄였어도)
+  const plan = p ? fitToBusy(p.plan, saved?.week === week ? busyWeek : busyDays(d, saved?.week ?? week)) : [];
+  const planWeek = saved?.week ?? week;
+  const dayIdx = (day: string) => (WEEKDAYS.indexOf(day) + 6) % 7;
+  const inserted = !!d.settings.weekItems?.[planWeek];
+  const toWeekPlan = () => {
+    const targets = [0, 0, 0, 0, 0, 0, 0];
+    const items: { subject: string; what: string; minutes: number }[][] = [[], [], [], [], [], [], []];
+    for (const day of plan) {
+      const i = dayIdx(day.day);
+      if (i < 0) continue;
+      targets[i] = total(day.items);
+      items[i] = day.items.map((x) => ({ subject: x.subject, what: x.what, minutes: x.minutes }));
+    }
+    setSettings({ weekTargets: { ...(d.settings.weekTargets ?? {}), [planWeek]: targets }, weekItems: { ...(d.settings.weekItems ?? {}), [planWeek]: items } });
+    toast(`${shortDate(planWeek)} 주 계획에 넣었어요`);
+  };
   const total = (items: { minutes: number }[]) => items.reduce((a, x) => a + x.minutes, 0);
   return (
     <>
@@ -89,14 +108,36 @@ export function Coach() {
               </ol>
             </section>
           )}
-          {p.plan.length > 0 && (
+          {plan.length > 0 && (
             <section className="st-card">
-              <h3 className="st-h">다음 주 계획</h3>
+              <div className="st-inline between">
+                <h3 className="st-h">
+                  {shortDate(planWeek)} ~ {shortDate(addDays(planWeek, 6))} 계획
+                </h3>
+                <div className="st-inline">
+                  {inserted && (
+                    <button className="st-link" onClick={() => go('/plan')}>
+                      주간 계획 보기
+                    </button>
+                  )}
+                  <button className="btn btn-sm btn-primary" onClick={toWeekPlan}>
+                    {inserted ? '다시 넣기' : '주간 계획에 넣기'}
+                  </button>
+                </div>
+              </div>
               <div className="co-plan">
-                {p.plan.map((day) => (
+                {plan.map((day) => {
+                  const b = (planWeek === week ? busyWeek : busyDays(d, planWeek)).find((x) => WEEKDAYS[weekday(x.date)] === day.day);
+                  return (
                   <div key={day.day} className="co-day">
                     <b className={day.day === '토' || day.day === '일' ? 'we' : ''}>{day.day}</b>
                     <div className="co-items">
+                      {b && b.labels.length > 0 && (
+                        <small className="co-busy">
+                          📅 {b.labels.join(' · ')}
+                          {day.cut ? ` → ${h(day.cut)} 줄였어요` : ''}
+                        </small>
+                      )}
                       {day.items.length ? (
                         day.items.map((x, i) => (
                           <span key={i} className="co-item">
@@ -111,7 +152,8 @@ export function Coach() {
                     </div>
                     <small className="co-total">{total(day.items) ? h(total(day.items)) : ''}</small>
                   </div>
-                ))}
+                  );
+                })}
               </div>
             </section>
           )}

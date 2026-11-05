@@ -103,7 +103,8 @@ export function FocusTimer({ timer, update, onStop, onExit }: { timer: TimerStat
               </button>
               <button aria-label="집중 화면 닫기 (타이머는 계속)" onClick={onExit}>
                 <svg viewBox="0 0 24 24" aria-hidden className="line">
-                  <path d="M9 4H4v5M15 20h5v-5M4 4l6 6M20 20l-6-6" />
+                  {/* 축소(안쪽으로 모이는 화살표): 전체 화면에서 나가기 */}
+                  <path d="M4 10h6V4M20 14h-6v6M4 4l6 6M20 20l-6-6" />
                 </svg>
               </button>
             </div>

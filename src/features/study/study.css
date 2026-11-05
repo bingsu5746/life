@@ -9860,3 +9860,109 @@ body.focus-on {
   background: var(--soft);
   font-weight: 700;
 }
+
+/* 달력: 과외 수업 (이날 수업 없음) */
+.cal-k.tutor,
+.cal-tag.tutor {
+  background: #db2777;
+}
+.cal-item.cal-tutor {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.cal-item.cal-tutor .st-link {
+  margin-left: auto;
+}
+.cal-item.cal-tutor.off > span:not(.cal-tag) {
+  text-decoration: line-through;
+  color: var(--muted);
+}
+
+/* AI 코치: 그날 일정 (바쁜 날 줄임) */
+.co-busy {
+  display: block;
+  width: 100%;
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
+/* 여행 기록 (날짜순) */
+.tr-steps {
+  margin: 6px 0 0;
+  padding-left: 22px;
+  display: grid;
+  gap: 8px;
+}
+.tr-steps li {
+  display: grid;
+  gap: 2px;
+}
+
+/* 이번 달 하이라이트 */
+.hl-bars {
+  display: flex;
+  gap: 3px;
+  margin-bottom: 8px;
+}
+.hl-bars i {
+  flex: 1;
+  height: 3px;
+  border-radius: 2px;
+  background: var(--line-strong);
+  overflow: hidden;
+}
+.hl-bars b {
+  display: block;
+  height: 100%;
+  background: var(--text);
+}
+.hl-stage {
+  position: relative;
+  aspect-ratio: 9 / 16;
+  max-height: 70vh;
+  margin: 0 auto;
+  width: 100%;
+  border-radius: var(--radius);
+  overflow: hidden;
+  background: #000;
+  cursor: pointer;
+}
+.hl-stage img,
+.hl-stage video {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  animation: hl-in 0.4s ease;
+}
+@keyframes hl-in {
+  from {
+    opacity: 0;
+  }
+}
+.hl-wait,
+.hl-paused {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  color: #fff;
+}
+.hl-paused {
+  font-size: 2.5rem;
+  background: rgb(0 0 0 / 0.3);
+}
+.hl-cap {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: grid;
+  gap: 2px;
+  padding: 24px 14px 12px;
+  color: #fff;
+  background: linear-gradient(transparent, rgb(0 0 0 / 0.6));
+}
+.hl-ctl {
+  margin: 10px 0;
+}
