@@ -148,6 +148,36 @@ export function parseTocRead(text: string): TocRead {
   return { units };
 }
 
+/** 시험 범위 공지 사진 → 과목별 범위 줄 (적힌 것만) */
+export interface ScopeRead {
+  scopes: { subject: string; date: string | null; lines: string[] }[];
+}
+export function scopeBody(images: { mime: string; data: string }[], subjects: string[]) {
+  const prompt = [
+    'These are photos of a Korean high school exam scope notice (시험 범위 공지 / 출제 범위표). Read ONLY what is printed. Copy Korean text exactly. Never guess or add.',
+    `The student's subjects are: ${subjects.join(', ') || '(unknown)'}. When a printed subject clearly matches one of these (e.g. 수학Ⅰ ≈ 수학), use the student's name; otherwise use the printed name.`,
+    'Return JSON: {"scopes": [{"subject": subject name, "date": exam date as YYYY-MM-DD if printed else null, "lines": [each scope item as printed, one per line, e.g. "교과서 12~80쪽", "1단원 ~ 3단원", "학습지 1~5"]}]}',
+    'Split a subject\'s scope into separate lines at commas, slashes or line breaks. Keep page numbers and unit names exactly. If the year is not printed, assume the nearest upcoming year.',
+  ].join('\n');
+  return { contents: [{ role: 'user', parts: [...images.map((im) => ({ inlineData: { mimeType: im.mime, data: im.data } })), { text: prompt }] }], generationConfig: json };
+}
+export function parseScopeRead(text: string): ScopeRead {
+  const j = obj(text);
+  const scopes = (Array.isArray(j.scopes) ? j.scopes : [])
+    .map((x) => x as { subject?: unknown; date?: unknown; lines?: unknown })
+    .map((x) => ({
+      subject: str(x.subject, 30) ?? '',
+      date: typeof x.date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(x.date) ? x.date : null,
+      lines: (Array.isArray(x.lines) ? x.lines : [])
+        .map((l) => str(l, 120))
+        .filter((l): l is string => !!l)
+        .slice(0, 30),
+    }))
+    .filter((x) => x.subject && x.lines.length)
+    .slice(0, 20);
+  return { scopes };
+}
+
 /** AI 코치: 기록 글 → 잘한 점 · 고칠 점 · 먼저 할 것 · 요일별 계획 */
 export interface CoachRead {
   good: string | null;

@@ -1,5 +1,6 @@
 // 달력 일정: 반복 펼치기 · 그날 일정 · 알림 시각
 import { addDays, daysBetween, diffDays, weekday, weekStart } from '../study/dates';
+import { nextBirthday } from './birthdays';
 import { alive, type CalEvent, type DateStr, type StudyData, type StudySession } from '../study/model';
 
 /** 일정 색 (이름 → 색) */
@@ -90,8 +91,19 @@ export function repeatText(e: CalEvent): string {
 }
 
 /** 앞으로 days 일 동안의 알림 (서버에 올려 두면 그 시각에 휴대폰으로). 빚 갚을 날도 (전날 · 당일 아침 9시, 남은 빚이 있을 때) */
-export function reminders(d: Pick<StudyData, 'events'> & Partial<Pick<StudyData, 'moneyTx'>>, today: DateStr, now = Date.now(), days = 14): { at: number; title: string; body: string }[] {
-  const out: { at: number; title: string; body: string }[] = [];
+export function reminders(d: Pick<StudyData, 'events'> & Partial<Pick<StudyData, 'moneyTx' | 'settings'>>, today: DateStr, now = Date.now(), days = 14): { at: number; title: string; body: string; url?: string }[] {
+  const out: { at: number; title: string; body: string; url?: string }[] = [];
+  // 생일: 일주일 전 · 당일 아침 9시
+  for (const b of d.settings?.birthdays ?? []) {
+    const day = nextBirthday(b.md, today);
+    for (const [at0, when] of [
+      [addDays(day, -7), '일주일 뒤'],
+      [day, '오늘'],
+    ] as const) {
+      const at = Date.parse(`${at0}T09:00:00+09:00`);
+      if (at > now && at0 <= addDays(today, days)) out.push({ at, title: `🎂 ${when} ${b.name} 생일`, body: [b.idea && `선물 생각: ${b.idea}`, b.budget && `예산 ${b.budget.toLocaleString('ko-KR')}원`].filter(Boolean).join(' · ') || '축하 한마디 잊지 말기', url: '/money/saving' });
+    }
+  }
   const tx = alive(d.moneyTx ?? {});
   const owe = tx.filter((t) => t.type === 'in' && t.category === '빚').reduce((a, t) => a + t.amount, 0) - tx.filter((t) => t.type === 'out' && t.category === '빚 갚기').reduce((a, t) => a + t.amount, 0);
   if (owe > 0)

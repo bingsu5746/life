@@ -41,3 +41,12 @@ describe('AI 코치 답 읽기', () => {
     expect(r.tip).toBe('자기 전 단어');
   });
 });
+
+describe('시험 범위 사진 읽기 결과', () => {
+  it('과목 · 날짜 · 줄만 남긴다', async () => {
+    const { parseScopeRead } = await import('./aiRead');
+    expect(parseScopeRead(JSON.stringify({ scopes: [{ subject: '수학', date: '2026-12-01', lines: ['교과서 12~80쪽', '', '학습지 1~5'] }, { subject: '', lines: ['x'] }, { subject: '영어', date: '12월 2일', lines: [] }] }))).toEqual({
+      scopes: [{ subject: '수학', date: '2026-12-01', lines: ['교과서 12~80쪽', '학습지 1~5'] }],
+    });
+  });
+});

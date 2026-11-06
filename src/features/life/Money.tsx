@@ -10,6 +10,7 @@ import { WEEKDAYS } from '../study/dates';
 import { guessCategory, topCategory } from './moneyGuess';
 import { receiptScan } from '../auth/api';
 import { compressProblemImage } from '../../lib/imageCompress';
+import { daysToBirthday, nextBirthday } from './birthdays';
 
 const OUT = ['식비', '간식·카페', '교통', '쇼핑', '문화·여가', '교육·책', '통신', '선물', '빚 갚기', '기타'];
 /** 빚: 빌린 돈 (들어온 돈으로 적고, 갚으면 쓴 돈 「빚 갚기」로) */
@@ -257,6 +258,7 @@ export function Money({ sub }: { sub?: string }) {
           ))}
         </section>
       )}
+      {view === 'saving' && <Birthdays today={today} />}
 
       {edit && <TxSheet item={edit === 'new' ? undefined : edit} today={today} onClose={close} />}
       {budgetOpen && <BudgetSheet onClose={() => setBudgetOpen(false)} />}
@@ -756,5 +758,99 @@ function MonthReport({ month }: { month: string }) {
         </>
       )}
     </section>
+  );
+}
+
+/** 생일 · 선물 계획: 다가오는 순, 선물 예산이 있으면 모으기 목표로 */
+function Birthdays({ today }: { today: string }) {
+  const d = useStudy();
+  const [edit, setEdit] = useState<NonNullable<typeof d.settings.birthdays>[number] | 'new' | null>(null);
+  const list = [...(d.settings.birthdays ?? [])].sort((a, b) => daysToBirthday(a.md, today) - daysToBirthday(b.md, today));
+  const goals = alive(d.savings);
+  return (
+    <section className="st-card">
+      <div className="st-inline between">
+        <h3 className="st-h">🎂 생일 · 선물</h3>
+        <button className="st-link" onClick={() => setEdit('new')}>
+          ＋ 생일 넣기
+        </button>
+      </div>
+      {!list.length && <p className="st-hint">가족 · 친구 생일을 넣으면 달력에 보이고, 일주일 전 · 당일 아침에 알려 드려요. 선물 예산을 적으면 모으기 목표로 만들 수 있어요.</p>}
+      {list.map((b) => {
+        const left = daysToBirthday(b.md, today);
+        const day = nextBirthday(b.md, today);
+        const goalName = `${b.name} 생일 선물`;
+        const has = goals.some((g) => g.name === goalName && !g.done);
+        return (
+          <div key={b.id} className="st-item st-tap" {...tap(() => setEdit(b))}>
+            <span className="st-pill">{left === 0 ? '오늘!' : `D-${left}`}</span>
+            <div className="st-item-main">
+              <div className="st-item-title">{b.name}</div>
+              <div className="st-item-sub">{[shortDate(day), b.budget && `예산 ${won(b.budget)}`, b.idea].filter(Boolean).join(' · ')}</div>
+            </div>
+            {b.budget && !has && left > 0 && (
+              <button
+                className="st-link"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  put('savings', { id: newId(), name: goalName, target: b.budget!, deposits: [], due: day, created: Date.now() } as unknown as SavingGoal);
+                  toast(`「${goalName}」 모으기를 만들었어요`);
+                }}
+              >
+                모으기 만들기
+              </button>
+            )}
+          </div>
+        );
+      })}
+      {edit && <BirthdaySheet item={edit === 'new' ? undefined : edit} onClose={() => setEdit(null)} />}
+    </section>
+  );
+}
+
+function BirthdaySheet({ item, onClose }: { item?: { id: string; name: string; md: string; budget?: number; idea?: string }; onClose: () => void }) {
+  const d = useStudy();
+  const [name, setName] = useState(item?.name ?? '');
+  const [m, setM] = useState(item ? String(Number(item.md.slice(0, 2))) : '');
+  const [day, setDay] = useState(item ? String(Number(item.md.slice(3))) : '');
+  const [budget, setBudget] = useState(item?.budget ? item.budget.toLocaleString('ko-KR') : '');
+  const [idea, setIdea] = useState(item?.idea ?? '');
+  const mm = Number(m);
+  const dd = Number(day);
+  const ok = name.trim() && mm >= 1 && mm <= 12 && dd >= 1 && dd <= [31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31][mm - 1];
+  const all = d.settings.birthdays ?? [];
+  const save = () => {
+    if (!ok) return;
+    const b = { id: item?.id ?? newId(), name: name.trim().slice(0, 30), md: `${String(mm).padStart(2, '0')}-${String(dd).padStart(2, '0')}`, budget: readWon(budget) || undefined, idea: idea.trim() || undefined };
+    setSettings({ birthdays: item ? all.map((x) => (x.id === item.id ? b : x)) : [...all, b] });
+    toast('저장했어요');
+    onClose();
+  };
+  return (
+    <Sheet title={item ? '생일 고치기' : '생일 넣기'} onClose={onClose}>
+      <div className="st-form">
+        <input className="st-input" autoFocus={!item} value={name} onChange={(e) => setName(e.target.value)} placeholder="이름 (예: 엄마, 민수)" aria-label="이름" />
+        <div className="st-inline">
+          <input className="st-input xs" inputMode="numeric" value={m} onChange={(e) => setM(e.target.value.replace(/\D/g, '').slice(0, 2))} placeholder="월" aria-label="월" />
+          월
+          <input className="st-input xs" inputMode="numeric" value={day} onChange={(e) => setDay(e.target.value.replace(/\D/g, '').slice(0, 2))} placeholder="일" aria-label="일" />
+          일
+        </div>
+        <div className="st-inline">
+          <input className="st-input sm" inputMode="numeric" value={budget} onChange={(e) => setBudget(e.target.value.replace(/\D/g, '') ? Number(e.target.value.replace(/\D/g, '')).toLocaleString('ko-KR') : '')} placeholder="선물 예산 (선택)" aria-label="선물 예산" />원
+        </div>
+        <input className="st-input" value={idea} onChange={(e) => setIdea(e.target.value)} placeholder="선물 생각 (예: 핸드크림, 같이 영화)" aria-label="선물 생각" />
+        <div className="st-row end">
+          {item && (
+            <button className="btn btn-sm st-danger" onClick={() => confirmDelete(`「${item.name}」 생일`) && (setSettings({ birthdays: all.filter((x) => x.id !== item.id) }), onClose())}>
+              지우기
+            </button>
+          )}
+          <button className="btn btn-primary" disabled={!ok} onClick={save}>
+            저장
+          </button>
+        </div>
+      </div>
+    </Sheet>
   );
 }

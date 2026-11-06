@@ -58,6 +58,12 @@ export interface StudySettings {
   diaryTime?: string;
   /** 단어 퀴즈 알림 시각 (자주 틀린 단어 3개) */
   wordQuizTime?: string;
+  /** 내일 챙길 것: 늘 챙길 것 · 과목별 준비물 (예: 체육 → 체육복) · 체크한 것 (그 날짜 → id) */
+  /** 생일 · 선물 계획: 이름 · 월-일 · 선물 예산(원) · 선물 생각 */
+  birthdays?: { id: Id; name: string; md: string; budget?: number; idea?: string }[];
+  packAlways?: string[];
+  packBySubject?: Record<Id, string>;
+  packChecks?: { date: DateStr; ids: string[] };
   /** 쉬는 시간 단어 알림: 1교시 시작 · 수업 길이(분) · 쉬는 시간(분) · 하루 몇 번 */
   breakWords?: { start: string; len: number; rest: number; per: number };
   /** 하루 마감 체크인 알림 시각 HH:MM */

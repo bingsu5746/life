@@ -1278,3 +1278,36 @@ describe('쉬는 시간 단어 알림 · 수행평가 단계 · 월말 돈 리�
     expect(r.changes[0]).toEqual({ category: '식비', now: 50000, prev: 30000 });
   });
 });
+
+describe('내일 챙길 것 · 생일 · 시험 범위 사진 읽기', () => {
+  it('시간표 · 과목 준비물 · 수행평가 · 늘 챙길 것', async () => {
+    const { packList } = await import('./pack');
+    const { emptyStudy } = await import('./model');
+    const d = emptyStudy();
+    d.subjects = { pe: { id: 'pe', name: '체육', color: '#000', order: 0, updatedAt: 1 }, ko: { id: 'ko', name: '국어', color: '#000', order: 1, updatedAt: 1 } } as never;
+    d.settings.schoolTimetable = { '2': ['ko', 'pe', 'ko'] };
+    d.settings.packBySubject = { pe: '체육복' };
+    d.settings.packAlways = ['학생증'];
+    d.assessments = { a: { id: 'a', subjectId: 'ko', title: '독서 감상문', due: '2026-11-10', steps: [], done: false, created: 0, updatedAt: 1 } } as never;
+    // 2026-11-10 은 화요일
+    expect(packList(d, '2026-11-10').map((x) => x.text)).toEqual(['국어 교과서 · 노트', '체육 교과서 · 노트 · 체육복', '「독서 감상문」 낼 것', '학생증']);
+    expect(packList(d, '2026-11-11')).toEqual([]);
+  });
+  it('다가오는 생일 (2월 29일은 평년 28일) · 달력 · 알림', async () => {
+    const { nextBirthday } = await import('../life/birthdays');
+    expect(nextBirthday('11-20', '2026-11-06')).toBe('2026-11-20');
+    expect(nextBirthday('03-01', '2026-11-06')).toBe('2027-03-01');
+    expect(nextBirthday('02-29', '2026-11-06')).toBe('2027-02-28');
+    const { reminders } = await import('../life/events');
+    const { emptyStudy } = await import('./model');
+    const d = emptyStudy();
+    d.settings.birthdays = [{ id: 'b', name: '엄마', md: '11-14', budget: 30000, idea: '핸드크림' }];
+    const r = reminders(d, '2026-11-06', Date.parse('2026-11-06T00:00:00+09:00'));
+    expect(r.map((x) => [x.title, new Date(x.at + 9 * 3600_000).toISOString().slice(0, 16)])).toEqual([
+      ['🎂 일주일 뒤 엄마 생일', '2026-11-07T09:00'],
+      ['🎂 오늘 엄마 생일', '2026-11-14T09:00'],
+    ]);
+    const { monthItems } = await import('../life/calendar');
+    expect(monthItems(d, '2026-11').get('2026-11-14')?.[0]).toMatchObject({ kind: 'bday', label: '엄마 생일 · 선물 30,000원' });
+  });
+});

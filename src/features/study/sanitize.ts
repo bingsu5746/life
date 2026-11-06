@@ -714,6 +714,26 @@ export function sanitizeSettings(s: unknown): StudySettings & { updatedAt: numbe
     breakWords: isObj(x.breakWords) && typeof (x.breakWords as Obj).start === 'string' && /^([01]\d|2[0-3]):[0-5]\d$/.test((x.breakWords as Obj).start as string)
       ? { start: (x.breakWords as Obj).start as string, len: Math.round(cl((x.breakWords as Obj).len, 30, 120, 50)), rest: Math.round(cl((x.breakWords as Obj).rest, 5, 30, 10)), per: Math.round(cl((x.breakWords as Obj).per, 1, 7, 3)) }
       : undefined,
+    birthdays: Array.isArray(x.birthdays)
+      ? (x.birthdays as unknown[])
+          .filter(isObj)
+          .filter((b) => typeof (b as Obj).name === 'string' && typeof (b as Obj).md === 'string' && /^(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/.test((b as Obj).md as string))
+          .slice(0, 100)
+          .map((b) => {
+            const o = b as Obj;
+            return { id: str(o.id, `b${Math.random().toString(36).slice(2, 10)}`).slice(0, 40), name: (o.name as string).trim().slice(0, 30) || '이름', md: o.md as string, budget: score(o.budget, 1, 1e9), idea: optStr(o.idea)?.slice(0, 200) };
+          })
+      : undefined,
+    packAlways: Array.isArray(x.packAlways) ? (x.packAlways as unknown[]).filter((v): v is string => typeof v === 'string' && !!v.trim()).map((v) => v.trim().slice(0, 30)).slice(0, 20) : undefined,
+    packBySubject: isObj(x.packBySubject)
+      ? Object.fromEntries(
+          Object.entries(x.packBySubject)
+            .filter(([k, v]) => k.length <= 40 && typeof v === 'string' && v.trim())
+            .map(([k, v]) => [k, (v as string).trim().slice(0, 40)])
+            .slice(0, 40),
+        )
+      : undefined,
+    packChecks: isObj(x.packChecks) && isDate((x.packChecks as Obj).date) && Array.isArray((x.packChecks as Obj).ids) ? { date: (x.packChecks as Obj).date as string, ids: ((x.packChecks as Obj).ids as unknown[]).filter((v): v is string => typeof v === 'string').slice(0, 60) } : undefined,
     wordQuizTime: typeof x.wordQuizTime === 'string' && /^([01]\d|2[0-3]):[0-5]\d$/.test(x.wordQuizTime) ? x.wordQuizTime : undefined,
     checkinTime: typeof x.checkinTime === 'string' && /^([01]\d|2[0-3]):[0-5]\d$/.test(x.checkinTime) ? x.checkinTime : undefined,
     semesterGoals: isObj(x.semesterGoals)

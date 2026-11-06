@@ -14,6 +14,7 @@ import { ExamTabs } from './ExamHero';
 export { examPeriodText, ExamTabs };
 import { CSAT_SECTIONS, sectionSubject } from './papers';
 import { examRetro } from './examRetro';
+import { ScopePhotoButton } from './ScopePhoto';
 import { useSpecialDays } from '../life/specialDays';
 
 // 성적 화면은 그래프가 있어 열 때 받는다
@@ -506,6 +507,7 @@ function ExamDetail({ id }: { id: string }) {
         </button>
       )}
 
+      {examEnd(exam) >= today && <ScopePhotoButton exam={exam} />}
       {examEnd(exam) < today && <ExamRetroCard exam={exam} />}
       {examEnd(exam) < today && exam.plan && (
         <button className="st-addline" onClick={() => go(`/exams/${exam.id}/plan`)}>

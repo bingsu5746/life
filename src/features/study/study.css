@@ -10098,3 +10098,24 @@ body.focus-on {
   border-top: 1px solid var(--line);
   font-size: 0.9rem;
 }
+
+/* 시험 범위 사진 읽기 */
+.sp-row {
+  display: grid;
+  gap: 6px;
+  padding: 10px 0;
+  border-top: 1px solid var(--line);
+}
+.sp-row.off {
+  opacity: 0.5;
+}
+
+.pk-sub {
+  min-width: 64px;
+  font-size: 0.9rem;
+}
+
+.cal-k.bday,
+.cal-tag.bday {
+  background: #f59e0b;
+}
