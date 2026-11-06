@@ -24,7 +24,7 @@ export function BookSearch({ value, onChange, onPick, placeholder, label, picked
           setNote(r.needKey ? '책 찾기는 예스24 · 국립중앙도서관 키가 있어야 돼요 (지금은 직접 써 주세요)' : '');
         })
         .catch(() => on && setItems([]));
-    }, 200);
+    }, 120);
     return () => {
       on = false;
       clearTimeout(t);

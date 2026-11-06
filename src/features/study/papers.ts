@@ -58,3 +58,20 @@ export function notesFromPaper(d: StudyData, p: PastPaper, today: DateStr, now =
       wrong: 1,
     }));
 }
+
+/** 수능 · 모의고사 영역 (과목이 정해져 있다): 이름 · 만점 · 시간(분) */
+export const CSAT_SECTIONS: { name: string; full: number; min: number; match: RegExp }[] = [
+  { name: '국어', full: 100, min: 80, match: /국어/ },
+  { name: '수학', full: 100, min: 100, match: /수학/ },
+  { name: '영어', full: 100, min: 70, match: /영어/ },
+  { name: '한국사', full: 50, min: 30, match: /한국사/ },
+  { name: '사회탐구', full: 50, min: 30, match: /사회|사탐|윤리|지리|정치|경제|역사|법/ },
+  { name: '과학탐구', full: 50, min: 30, match: /과학|과탐|물리|화학|생명|생물|지구/ },
+  { name: '제2외국어·한문', full: 50, min: 40, match: /외국어|한문|일본어|중국어|독일어|프랑스어|스페인어/ },
+];
+/** 영역 → 내 과목 (이름이 맞는 것이 있으면 그 과목, 없으면 영역 이름 그대로 「csat:국어」) */
+export const sectionSubject = (d: { subjects: Record<string, { name: string; deleted?: boolean }> }, section: string) => {
+  const sec = CSAT_SECTIONS.find((s) => s.name === section);
+  const mine = Object.entries(d.subjects).find(([, s]) => !s.deleted && sec?.match.test(s.name));
+  return mine ? mine[0] : `csat:${section}`;
+};

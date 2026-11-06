@@ -137,7 +137,7 @@ export function Home(_: { loggedIn: boolean; onLogin: () => void }) {
           {[
             { to: '/calendar', icon: 'exams', label: '달력' },
             { to: '/plan', icon: 'target', label: '주간 계획' },
-            { to: '/week', icon: 'review', label: '돌아보기' },
+            { to: '/week', icon: 'review', label: '통계' },
             { to: '/checkin', icon: 'moon', label: '하루 마감', on: new Date().getHours() >= 20 },
             { to: '/insights/coach', icon: 'area-ai', label: 'AI 코치' },
           ].map((x) => (

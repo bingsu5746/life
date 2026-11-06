@@ -203,7 +203,7 @@ export async function notifyOff(endpoint?: string) {
 export async function notifyDigest(entries: { date: string; slot: number; title: string; body: string; url?: string }[]) {
   return call<{ ok: true }>('notify/digest', 'PUT', { entries });
 }
-export async function notifyRemind(items: { at: number; title: string; body: string }[]) {
+export async function notifyRemind(items: { at: number; title: string; body: string; url?: string }[]) {
   return call<{ ok: true; n: number }>('notify/remind', 'PUT', { items });
 }
 export async function notifyTest() {
@@ -253,7 +253,8 @@ export interface CatalogQuery {
   facets?: boolean;
 }
 /** 서버에 쌓아 둔 영화 목록(1990년~)에서 제목·감독으로 찾고 장르·나라·연도·유형으로 거르기 */
-export async function catalogSearch(q: string | CatalogQuery) {
+/** quick: 같은 찾기는 1분 동안 다시 묻지 않는다 (치는 대로 찾기에서 지웠다 다시 칠 때 바로) */
+export async function catalogSearch(q: string | CatalogQuery, quick = false) {
   const o: CatalogQuery = typeof q === 'string' ? { q } : q;
   const sp = new URLSearchParams();
   if (o.q) sp.set('q', o.q);
@@ -265,7 +266,8 @@ export async function catalogSearch(q: string | CatalogQuery) {
   if (o.adult) sp.set('adult', '1');
   if (o.offset) sp.set('offset', String(o.offset));
   if (o.facets) sp.set('facets', '1');
-  return call<{ items: CatalogFilm[]; more?: boolean; state: CatalogState; facets?: { genres: string[]; nations: string[] } }>(`movies/catalog?${sp}`);
+  const get = () => call<{ items: CatalogFilm[]; more?: boolean; state: CatalogState; facets?: { genres: string[]; nations: string[] } }>(`movies/catalog?${sp}`);
+  return quick ? remember(`cat:${sp}`, MIN, get) : get();
 }
 /** 영화 목록을 몇 쪽 더 받는다 (done 이 될 때까지 되풀이) */
 export async function catalogSync(recent = false) {
@@ -569,7 +571,7 @@ export async function discogsSearch(q: string): Promise<{ list: DiscogsHit[]; di
   return { list, direct: true };
 }
 /** 등록된 서비스 키 (있는지만) */
-export const keysInfo = () => call<{ serpapi: boolean; serpUsed: number; discogs: boolean; datagokr: boolean; gemini: boolean; steam?: boolean; riot?: boolean; nl?: boolean; yes24?: boolean }>('keys');
+export const keysInfo = () => call<{ serpapi: boolean; serpUsed: number; discogs: boolean; datagokr: boolean; gemini: boolean; steam?: boolean; riot?: boolean; nl?: boolean; yes24?: boolean; kakaomap?: boolean }>('keys');
 /** 응원팀 경기 알림 (시작 · 끝). subs: 이 계정에 알림을 받는 기기 수 */
 export const nbaFavGet = () => call<{ team: string; subs: number }>('nba/fav');
 export const nbaFavSet = (team: string) => call<{ team: string; subs: number }>('nba/fav', 'PUT', { team });
@@ -630,6 +632,8 @@ async function aiJob<T>(path: string, body: unknown): Promise<T> {
 export const noteScan = (image: { mime: string; data: string }, subjects: string[]) => aiJob<{ subject: string | null; number: string | null; question: string | null }>('ai/note', { image, subjects });
 /** 영수증 사진 → 금액 · 날짜 · 가게 */
 export const receiptScan = (image: { mime: string; data: string }) => aiJob<{ amount: number | null; date: string | null; store: string | null; items: string[] }>('ai/receipt', { image });
+/** 시험 범위 공지 사진들 → 과목별 범위 줄 */
+export const scopeScan = (images: { mime: string; data: string }[], subjects: string[]) => aiJob<{ scopes: { subject: string; date: string | null; lines: string[] }[] }>('ai/scope', { images, subjects });
 /** 목차 사진들 → 단원 · 쪽 */
 export const tocScan = (images: { mime: string; data: string }[]) => aiJob<{ units: { name: string; from: number | null; to: number | null }[] }>('ai/toc', { images });
 /** 책 찾기 (국립중앙도서관) */
@@ -650,7 +654,11 @@ export interface BookHit {
 }
 export const bookSearch = (q: string) => remember(`bk:${q}`, 60 * MIN, () => call<{ list: BookHit[]; needKey?: boolean }>(`books/search?q=${encodeURIComponent(q)}`, 'GET', undefined, 20_000));
 export const bookToc = (url: string) => call<{ text: string }>(`books/toc?url=${encodeURIComponent(url)}`, 'GET', undefined, 20_000);
+/** ISBN 으로 국립중앙도서관 목차 (예스24 목차에 쪽이 없을 때) */
+export const bookTocIsbn = (isbn: string) => remember(`tocisbn:${isbn}`, 60 * MIN, () => call<{ text: string }>(`books/toc?isbn=${encodeURIComponent(isbn)}`, 'GET', undefined, 25_000));
 /** 받아쓴 일기 → 칸 나누기 */
+/** 일기 → 제목 추천 3개 (지금까지 쓴 제목 느낌으로) */
+export const diaryTitles = (text: string, past: string[]) => aiJob<{ titles: string[] }>('ai/title', { text, past });
 export const diarySplit = (text: string) => aiJob<Partial<Record<'good' | 'hard' | 'thanks' | 'learned' | 'fix' | 'worry' | 'tomorrow' | 'dream', string>>>('ai/diary', { text });
 /** 카카오맵 JS 키 (브라우저용, 등록한 사이트에서만 동작) */
 export const kakaoKey = () => call<{ key: string }>('kakao/key');
@@ -783,3 +791,4 @@ export interface LolMatch {
   teams: { id: number; win: boolean; obj: Record<string, number> }[];
 }
 export const lolMatch = (id: string) => remember(`lolm:${id}`, 60 * MIN, () => call<LolMatch>(`lol/match?id=${encodeURIComponent(id)}`, 'GET', undefined, 20_000));
+

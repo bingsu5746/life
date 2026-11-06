@@ -43,10 +43,17 @@ export function weakQuiz(words: WordsData, date: DateStr, n = 3): string[] {
 export function weekBody(d: StudyData, date: DateStr, today: DateStr): string {
   const w = lifeWeek(d, date, today);
   const hm = (m: number) => (m >= 60 ? `${Math.round((m / 60) * 10) / 10}시간` : `${m}분`);
-  const parts = [`공부 ${hm(w.study.now)}`, `운동 ${w.workout.days}일`, `쓴 돈 ${w.spent.now.toLocaleString('ko-KR')}원`];
+  // 지난주와 비교 (▲ 늘었음 · ▼ 줄었음)
+  const cmp = (now: number, prev: number, f: (n: number) => string) => (prev ? ` (${now >= prev ? '▲' : '▼'}${f(Math.abs(now - prev))})` : '');
+  const parts = [`공부 ${hm(w.study.now)}${cmp(w.study.now, w.study.prev, hm)}`, `운동 ${w.workout.days}일${cmp(w.workout.days, w.workout.prevDays, (n) => `${n}일`)}`, `쓴 돈 ${w.spent.now.toLocaleString('ko-KR')}원${cmp(w.spent.now, w.spent.prev, (n) => `${n.toLocaleString('ko-KR')}원`)}`];
   if (w.movies.length) parts.push(`영화 ${w.movies.length}편`);
   if (w.pages) parts.push(`책 ${w.pages}쪽`);
-  return `이번 주 ${parts.join(' · ')} (눌러서 돌아보기)`;
+  // 공부 가장 많이 한 날
+  const by = new Map<string, number>();
+  for (const x of alive(d.sessions)) if (x.date >= w.from && x.date <= w.to) by.set(x.date, (by.get(x.date) ?? 0) + x.minutes);
+  const best = [...by].sort((a, b) => b[1] - a[1])[0];
+  if (best) parts.push(`최고 ${['일', '월', '화', '수', '목', '금', '토'][weekday(best[0])]}요일 ${hm(best[1])}`);
+  return `📊 이번 주 ${parts.join(' · ')} (눌러서 통계)`;
 }
 
 /** 1월 1일이면 지난해 (본 영화가 있을 때만) */
@@ -169,11 +176,45 @@ export function buildDigest(d: StudyData, words: WordsData, today: DateStr, time
       out.push({
         date,
         slot,
-        title: y ? '🏆 영화 시상식' : sunday ? '내일 준비 · 이번 주 돌아보기' : am ? '오늘 할 것' : '내일 준비',
+        title: y ? '🏆 영화 시상식' : sunday ? '이번 주 통계 · 내일 준비' : am ? '오늘 할 것' : '내일 준비',
         body: sunday ? `${evening(d, today, date)} · ${weekBody(d, date, today)}` : am ? morning(d, words, today, date) : evening(d, today, date),
         url: y ? '/movies/ceremony' : sunday ? '/week' : wk ? `/exams/weak-${wk.subjectId}` : weak ? '/words/practice' : undefined,
       });
     });
   }
   return out.slice(0, 24);
+}
+
+/**
+ * 쉬는 시간 단어 알림: 학교 시간표가 있는 날(빼는 날 · 주말 빼고), n교시가 끝나는 시각에 자주 틀린 단어 3개.
+ * 하루 per 번 (쉬는 시간을 고르게 골라서), 앞으로 days 일.
+ */
+export function breakWordReminders(d: StudyData, words: WordsData, today: DateStr, now = Date.now(), days = 10): { at: number; title: string; body: string; url: string }[] {
+  const bw = d.settings.breakWords;
+  if (!bw) return [];
+  const weak = alive(words)
+    .filter((w) => w.wrong > 0 && w.meaning)
+    .sort((a, b) => b.wrong - a.wrong || a.term.localeCompare(b.term))
+    .slice(0, 30);
+  if (weak.length < 3) return [];
+  const [h, m] = bw.start.split(':').map(Number);
+  const out: { at: number; title: string; body: string; url: string }[] = [];
+  for (let i = 0; i <= days; i++) {
+    const date = addDays(today, i);
+    const periods = d.settings.schoolTimetable?.[String(weekday(date))]?.length ?? 0;
+    if (periods < 2 || d.settings.offDates.includes(date)) continue;
+    // 쉬는 시간은 1~(교시-1) 교시 뒤. per 개를 고르게
+    const breaks = Array.from({ length: periods - 1 }, (_, k) => k + 1);
+    const pick = breaks.length <= bw.per ? breaks : Array.from({ length: bw.per }, (_, j) => breaks[Math.floor(((j + 0.5) * breaks.length) / bw.per)]);
+    pick.forEach((k, j) => {
+      const min = h * 60 + m + k * bw.len + (k - 1) * bw.rest;
+      const at = Date.parse(`${date}T${String(Math.floor(min / 60)).padStart(2, '0')}:${String(min % 60).padStart(2, '0')}:00+09:00`);
+      if (at <= now) return;
+      const day = Math.floor(Date.parse(`${date}T00:00:00Z`) / 86_400_000);
+      const start = ((day * 7 + j) * 3) % weak.length;
+      const ws = [0, 1, 2].map((x) => weak[(start + x) % weak.length]);
+      out.push({ at, title: `☕ ${k}교시 끝 · 단어 3개`, body: `${ws.map((w) => w.term).join(' · ')} — 뜻이 떠오르나요?`, url: '/words/practice' });
+    });
+  }
+  return out;
 }

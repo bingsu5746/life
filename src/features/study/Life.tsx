@@ -1,4 +1,6 @@
 // 할 일 · 습관 (4단계)
+import { Dictate } from './Dictate';
+import { parseVoiceTodos } from './voiceTodo';
 import { useState } from 'react';
 import { addDays, shortDate, WEEKDAYS } from './dates';
 import { bestStreak, habitOn, streak, toggleHabit, weekdayRates } from './habits';
@@ -63,6 +65,17 @@ function Todos({ today }: { today: string }) {
         }}
       >
         <input className="st-input" placeholder="할 일 추가 · Enter" value={title} onChange={(e) => setTitle(e.target.value)} />
+        <Dictate
+          label="말로"
+          onText={(t) => {
+            // 「내일까지 수학 숙제 그리고 금요일까지 영어 단어」 → 할 일 둘, 마감도
+            const list = parseVoiceTodos(t, today);
+            if (!list.length) return toast('알아들은 할 일이 없어요');
+            const now = Date.now();
+            list.forEach((x, i) => put('todos', { id: newId(), title: x.title.slice(0, 80), due: x.due, done: false, created: now + i }));
+            toast(`${list.map((x) => `「${x.title}」${x.due ? ` ${shortDate(x.due)}까지` : ''}`).join(' · ')} 넣었어요`);
+          }}
+        />
         {/* 마감 고르기는 글을 쓰기 시작해야 나타난다 */}
         {title.trim() && (
           <select className="st-input xs" value={due} onChange={(e) => setDue(e.target.value)} aria-label="마감">

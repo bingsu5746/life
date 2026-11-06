@@ -1,4 +1,6 @@
 // 「오늘」 화면 (설계 §7): 과외 숙제 → 문제집 오늘 분량 → 영단어 → 복습 → 할 일·습관 → 공부 시간
+import { PackCard } from './Pack';
+import { unitWord } from './toc';
 import { ExamToday } from './ExamPlan';
 import { SchoolToday } from './SchoolPanel';
 import { todayExamItems } from './examPlan';
@@ -12,7 +14,7 @@ import { cardsToday, homeworkViews, planViews, wordListViews, type HomeworkView,
 import { put, useStudy, useWords } from './store';
 import { doneUpTo, finishPlan, markBook, markDays, markHwPages, patchHwItem, parseWrong, quickWrongNotes } from './actions';
 import { minutesText } from './timer';
-import { DdayHero } from './Exams';
+import { DdayHero } from './ExamHero';
 import { EveBanner } from './Eve';
 import { forecastFor } from './forecast';
 import { TaskCard, upcomingTasks } from './Assessments';
@@ -73,6 +75,7 @@ export function Today() {
     <div className="st-today">
       <EveBanner today={today} />
       <DdayHero today={today} />
+      <PackCard today={today} />
       <header className="st-today-head">
         <div>
           <h2>{longDate(today)}</h2>
@@ -314,7 +317,7 @@ function BookRow({ p, today }: { p: PlanView; today: string }) {
               : book.unitOnly
                 ? `${sched.today.length}단원 · ${unitNames.join(', ')}`
                 : `${sched.today.length}쪽${unitNames.length ? ' · ' + unitNames.join(', ') : ''}${unitEnd ? ' · 단원 끝' : ''}`}
-            {sched.end && ` · ${shortDate(sched.end)}까지 ${sched.remaining.length}${book.unitOnly ? '단원' : '쪽'}`}
+            {sched.end && ` · ${shortDate(sched.end)}까지 ${sched.remaining.length}${book.unitOnly ? unitWord(book.units) : '쪽'}`}
           </div>
           {(() => {
             // 요즘 속도로는 마감까지 못 끝낼 것 같으면 미리 알린다

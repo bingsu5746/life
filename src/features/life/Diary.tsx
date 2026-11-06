@@ -1,5 +1,6 @@
 // 일기: 하루에 하나, 기분과 글. 달별로 모아 보고 찾기
-import { canListen, listen } from '../../lib/listen';
+import { Highlight } from './Highlight';
+import { Dictate } from '../study/Dictate';
 import { useEffect, useRef, useState } from 'react';
 import { addPhoto, photoUrl, removePhoto } from '../study/photos';
 import { addVideo, MAX_SEC, removeVideo, shrinkVideo, videoUrl } from '../study/videos';
@@ -9,7 +10,7 @@ import { getStudy, put, putMany, remove, setSettings, useStudy } from '../study/
 import { confirmDelete, go, tap, toast, useToday } from '../study/ui';
 import { monthLabel, monthOf, shiftMonth } from './calc';
 import { daySummary, DIARY_PARTS, dreamDates, formOf, sleepSummary, studySummary } from './diaryForm';
-import { diarySplit, isLoggedIn, speechToText } from '../auth/api';
+import { diarySplit, diaryTitles, isLoggedIn } from '../auth/api';
 import { LineChart } from '../study/charts';
 import { RecapPage } from './Recap';
 import { NotifyTime } from './NotifyTime';
@@ -24,6 +25,7 @@ export function Diary({ sub }: { sub?: string }) {
   if (sub === 'dream') return <Dreams />;
   if (sub === 'form') return <Form />;
   if (sub === 'recap') return <RecapPage />;
+  if (sub === 'highlight' || sub?.startsWith('highlight-')) return <Highlight month={sub.slice(10)} />;
   if (sub && /^\d{4}-\d{2}-\d{2}$/.test(sub)) return <Write key={sub > today ? today : sub} date={sub > today ? today : sub} today={today} />;
   return <List month={sub && /^\d{4}-\d{2}$/.test(sub) ? sub : monthOf(today)} today={today} />;
 }
@@ -373,7 +375,7 @@ function Write({ date, today }: { date: string; today: string }) {
             </button>
           ))}
         </div>
-        <input className="st-input" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="제목 (선택)" aria-label="제목" />
+        <TitleSuggest date={date} title={title} body={[text, ...Object.values(parts)].filter((x) => x?.trim()).join('\n')} onPick={setTitle} />
         {shownParts.map((p) => (
           <label key={p.key} className="st-field">
             <span className="st-label">
@@ -396,6 +398,7 @@ function Write({ date, today }: { date: string; today: string }) {
             </button>
           )}
         </span>
+        <DayQuestion date={date} onPick={(q) => setText((x) => (x.includes(q) ? x : `${x.trim() ? `${x.replace(/\s+$/, '')}\n\n` : ''}Q. ${q}\n`))} />
         <AutoText className="dy-text" rows={shownParts.length ? 6 : 10} value={text} onChange={setText} placeholder="하고 싶은 말을 자유롭게…" label="일기" />
         <Dictate onText={(t) => setText((x) => (x.trim() ? `${x.replace(/\s+$/, '')} ${t}` : t))} />
         {text.trim().length >= 20 && (
@@ -518,70 +521,6 @@ function Video({ id }: { id: string }) {
 }
 
 /** 말로 쓰기 버튼 (음성 인식을 지원하는 브라우저에서만) */
-function Dictate({ onText }: { onText: (t: string) => void }) {
-  const [state, setState] = useState<'idle' | 'rec' | 'busy'>('idle');
-  const rec = useRef<{ stop: () => void } | null>(null);
-  const [stopListen, setStopListen] = useState<(() => void) | null>(null);
-  const canRecord = typeof MediaRecorder !== 'undefined' && !!navigator.mediaDevices?.getUserMedia && isLoggedIn();
-  // 녹음 → 서버 Whisper 받아쓰기 (브라우저 음성 인식보다 훨씬 정확). 녹음이 안 되면 브라우저 음성 인식
-  async function start() {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const mr = new MediaRecorder(stream);
-      const chunks: Blob[] = [];
-      mr.ondataavailable = (e) => e.data.size && chunks.push(e.data);
-      mr.onstop = async () => {
-        stream.getTracks().forEach((t) => t.stop());
-        setState('busy');
-        try {
-          const blob = new Blob(chunks, { type: mr.mimeType || 'audio/webm' });
-          const b64 = await new Promise<string>((ok, no) => {
-            const r = new FileReader();
-            r.onload = () => ok(String(r.result).split(',')[1] ?? '');
-            r.onerror = () => no(new Error('녹음을 읽지 못했어요'));
-            r.readAsDataURL(blob);
-          });
-          const t = await speechToText(b64);
-          if (t) onText(t);
-          else toast('알아들은 말이 없어요');
-        } catch (e) {
-          toast(e instanceof Error ? e.message : '받아쓰지 못했어요');
-        } finally {
-          setState('idle');
-        }
-      };
-      mr.start();
-      const timer = setTimeout(() => mr.state === 'recording' && mr.stop(), 150_000);
-      rec.current = { stop: () => (clearTimeout(timer), mr.state === 'recording' && mr.stop()) };
-      setState('rec');
-    } catch {
-      toast('마이크를 쓸 수 있게 허용해 주세요');
-    }
-  }
-  if (canRecord)
-    return (
-      <button type="button" className={`btn btn-sm dy-mic ${state === 'rec' ? 'on' : ''}`} disabled={state === 'busy'} onClick={() => (state === 'rec' ? rec.current?.stop() : void start())}>
-        {state === 'rec' ? '■ 그만 (2분 30초까지)' : state === 'busy' ? '받아쓰는 중…' : '🎙 말로 쓰기'}
-      </button>
-    );
-  if (!canListen()) return null;
-  return (
-    <button
-      type="button"
-      className={`btn btn-sm dy-mic ${stopListen ? 'on' : ''}`}
-      onClick={() => {
-        if (stopListen) return stopListen();
-        const st = listen(onText, (e) => {
-          setStopListen(null);
-          if (e && e !== 'no-speech' && e !== 'aborted') toast(e === 'not-allowed' ? '마이크를 쓸 수 있게 허용해 주세요' : '음성 인식이 멈췄어요');
-        });
-        setStopListen(() => st);
-      }}
-    >
-      {stopListen ? '■ 그만 듣기' : '🎙 말로 쓰기'}
-    </button>
-  );
-}
 
 /** 글이 길어지면 칸이 스스로 늘어나는 입력칸 (안에서 스크롤 없이) */
 function AutoText({ value, onChange, placeholder, label, rows = 2, className = '' }: { value: string; onChange: (v: string) => void; placeholder?: string; label: string; rows?: number; className?: string }) {
@@ -682,5 +621,119 @@ function YearShift() {
         </button>
       </div>
     </section>
+  );
+}
+
+/** 제목 칸 + AI 제목 추천: 제목이 비었고 일기가 조금 쓰였으면, 제목 칸을 누를 때 지금까지 쓴 제목 느낌으로 3개를 잠깐 띄운다 */
+function TitleSuggest({ date, title, body, onPick }: { date: string; title: string; body: string; onPick: (t: string) => void }) {
+  const d = useStudy();
+  const [list, setList] = useState<string[] | null>(null);
+  const [busy, setBusy] = useState(false);
+  const asked = useRef('');
+  const hide = useRef<ReturnType<typeof setTimeout>>(undefined);
+  const can = isLoggedIn() && body.trim().length >= 20;
+  const ask = (force = false) => {
+    if (!can || busy || (!force && (title.trim() || asked.current === body))) return;
+    asked.current = body;
+    setBusy(true);
+    const past = alive(d.diary)
+      .filter((e) => e.id !== date && e.title?.trim())
+      .sort((a, b) => b.id.localeCompare(a.id))
+      .slice(0, 30)
+      .map((e) => e.title!.trim());
+    diaryTitles(body.slice(0, 3000), past)
+      .then((r) => {
+        if (!r.titles.length) return;
+        setList(r.titles);
+        clearTimeout(hide.current);
+        // 잠깐 띄웠다가 닫는다
+        hide.current = setTimeout(() => setList(null), 20_000);
+      })
+      .catch((e) => force && toast(e instanceof Error ? e.message : '제목을 받지 못했어요'))
+      .finally(() => setBusy(false));
+  };
+  useEffect(() => () => clearTimeout(hide.current), []);
+  return (
+    <div className="dy-title">
+      <div className="dy-title-row">
+        <input className="st-input" value={title} onChange={(e) => onPick(e.target.value)} onFocus={() => ask()} placeholder="제목 (선택)" aria-label="제목" />
+        {can && (
+          <button type="button" className="btn btn-sm" disabled={busy} onClick={() => ask(true)} aria-label="제목 추천">
+            {busy ? '…' : '✨ 추천'}
+          </button>
+        )}
+      </div>
+      {list && (
+        <div className="dy-title-pop" role="listbox" aria-label="추천 제목">
+          {list.map((t) => (
+            <button
+              key={t}
+              type="button"
+              role="option"
+              aria-selected={title === t}
+              className="st-chip"
+              onClick={() => {
+                onPick(t);
+                setList(null);
+              }}
+            >
+              {t}
+            </button>
+          ))}
+          <button type="button" className="st-link" onClick={() => setList(null)}>
+            닫기
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** 쓰기 막힐 때: 날마다 다른 질문 하나 (같은 날엔 같은 질문, 「다른 질문」으로 넘김). 누르면 본문에 질문을 넣는다 */
+const DAY_QUESTIONS = [
+  '오늘 제일 웃겼던 순간은?',
+  '오늘 나를 조금 귀찮게 한 일은?',
+  '오늘 먹은 것 중 제일 맛있었던 건?',
+  '오늘 누구와 가장 많이 이야기했어?',
+  '오늘 새로 알게 된 것 하나',
+  '오늘 내가 잘한 일 하나',
+  '오늘 다시 할 수 있다면 바꾸고 싶은 순간은?',
+  '요즘 계속 생각나는 노래 · 영상은?',
+  '오늘 가장 집중이 잘 된 때는 언제였어?',
+  '오늘 고마웠던 사람은?',
+  '내일 꼭 하고 싶은 일 하나',
+  '오늘 기분을 날씨로 말하면?',
+  '오늘 들은 말 중 기억에 남는 말은?',
+  '요즘 가장 기대되는 일은?',
+  '요즘 가장 걱정되는 일은? 정말 걱정할 만한 일일까?',
+  '오늘 공부하면서 막혔던 부분은?',
+  '오늘 몸 상태는 어땠어? 잠은 잘 잤어?',
+  '1년 전의 나에게 해 주고 싶은 말',
+  '오늘 쓴 돈 중 가장 잘 쓴 돈은?',
+  '오늘 하루를 한 단어로 말하면?',
+  '최근에 본 것(영화 · 책 · 경기) 중 남은 장면은?',
+  '오늘 나를 웃게 한 사람은?',
+  '오늘 미룬 일이 있다면 왜 미뤘을까?',
+  '요즘 나를 가장 힘나게 하는 건?',
+  '오늘 처음 해 본 일이 있어?',
+  '이번 주에 가장 잘한 선택은?',
+  '지금 가장 갖고 싶은 것과 그 이유',
+  '오늘 들은 수업 중 제일 재밌던 건?',
+  '만약 내일 하루가 자유라면 뭘 할래?',
+  '오늘 나에게 점수를 준다면 몇 점? 왜?',
+];
+function DayQuestion({ date, onPick }: { date: string; onPick: (q: string) => void }) {
+  const base = Math.floor(Date.parse(`${date}T00:00:00Z`) / 86_400_000);
+  const [k, setK] = useState(0);
+  const q = DAY_QUESTIONS[(((base + k * 7) % DAY_QUESTIONS.length) + DAY_QUESTIONS.length) % DAY_QUESTIONS.length];
+  return (
+    <div className="dy-q">
+      <button type="button" className="dy-q-main" onClick={() => onPick(q)} title="본문에 넣기">
+        💭 <span>{q}</span>
+      </button>
+      <button type="button" className="st-link" onClick={() => setK(k + 1)}>
+        다른 질문
+      </button>
+    </div>
   );
 }

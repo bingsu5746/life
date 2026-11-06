@@ -4,7 +4,7 @@ import { neededScore } from './grades';
 import { type Id, type SemesterGoal } from './model';
 import { setSettings, useStudy } from './store';
 import { Empty, go, SubjectDot, subjectsOf } from './ui';
-import { ExamTabs } from './Exams';
+import { ExamTabs } from './ExamHero';
 
 const DEFAULT_PARTS: SemesterGoal['parts'] = [
   { name: '중간고사', weight: 30 },

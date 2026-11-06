@@ -6,10 +6,12 @@ import { alive } from '../study/model';
 import { useState } from 'react';
 import { Coach } from './Coach';
 import { Bar, Empty, toast, useToday } from '../study/ui';
+import { funInsights } from './funStats';
 import { fitnessInsights, gradeInsights, hobbyInsights, moneyInsights, studyInsights, yearReview, type Section, type Stat } from './insights';
 
 const TABS = [
   { key: 'coach', label: 'AI 코치' },
+  { key: 'fun', label: '이것저것' },
   { key: 'study', label: '공부' },
   { key: 'grades', label: '성적' },
   { key: 'fitness', label: '운동' },
@@ -24,7 +26,7 @@ export function InsightsPage({ tab: t0 }: { tab?: string }) {
   const d = useStudy();
   const today = useToday();
   const tab = TABS.some((t) => t.key === t0) ? t0! : 'study';
-  const sections = tab === 'year' || tab === 'coach' ? [] : tab === 'study' ? studyInsights(d, today) : tab === 'grades' ? gradeInsights(d) : tab === 'fitness' ? fitnessInsights(d, today) : tab === 'hobby' ? hobbyInsights(d, today) : moneyInsights(d, today);
+  const sections = tab === 'year' || tab === 'coach' ? [] : tab === 'fun' ? funInsights(d, today) : tab === 'study' ? studyInsights(d, today) : tab === 'grades' ? gradeInsights(d) : tab === 'fitness' ? fitnessInsights(d, today) : tab === 'hobby' ? hobbyInsights(d, today) : moneyInsights(d, today);
   return (
     <div className="st-page narrow">
       <div className="st-page-head">
@@ -59,6 +61,7 @@ export function InsightsPage({ tab: t0 }: { tab?: string }) {
               ))}
             </div>
           )}
+          {s.note && <small className="st-muted">{s.note}</small>}
           {s.bars && s.bars.some((b) => b.value > 0) && <BarChart label={s.title} height={140} bars={s.bars} format={fmt(s.barFormat)} />}
         </section>
       ))}

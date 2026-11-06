@@ -9860,3 +9860,262 @@ body.focus-on {
   background: var(--soft);
   font-weight: 700;
 }
+
+/* 달력: 과외 수업 (이날 수업 없음) */
+.cal-k.tutor,
+.cal-tag.tutor {
+  background: #db2777;
+}
+.cal-item.cal-tutor {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.cal-item.cal-tutor .st-link {
+  margin-left: auto;
+}
+.cal-item.cal-tutor.off > span:not(.cal-tag) {
+  text-decoration: line-through;
+  color: var(--muted);
+}
+
+/* AI 코치: 그날 일정 (바쁜 날 줄임) */
+.co-busy {
+  display: block;
+  width: 100%;
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
+/* 여행 기록 (날짜순) */
+.tr-steps {
+  margin: 6px 0 0;
+  padding-left: 22px;
+  display: grid;
+  gap: 8px;
+}
+.tr-steps li {
+  display: grid;
+  gap: 2px;
+}
+
+/* 이번 달 하이라이트 */
+.hl-bars {
+  display: flex;
+  gap: 3px;
+  margin-bottom: 8px;
+}
+.hl-bars i {
+  flex: 1;
+  height: 3px;
+  border-radius: 2px;
+  background: var(--line-strong);
+  overflow: hidden;
+}
+.hl-bars b {
+  display: block;
+  height: 100%;
+  background: var(--text);
+}
+.hl-stage {
+  position: relative;
+  aspect-ratio: 9 / 16;
+  max-height: 70vh;
+  margin: 0 auto;
+  width: 100%;
+  border-radius: var(--radius);
+  overflow: hidden;
+  background: #000;
+  cursor: pointer;
+}
+.hl-stage img,
+.hl-stage video {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  animation: hl-in 0.4s ease;
+}
+@keyframes hl-in {
+  from {
+    opacity: 0;
+  }
+}
+.hl-wait,
+.hl-paused {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  color: #fff;
+}
+.hl-paused {
+  font-size: 2.5rem;
+  background: rgb(0 0 0 / 0.3);
+}
+.hl-cap {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: grid;
+  gap: 2px;
+  padding: 24px 14px 12px;
+  color: #fff;
+  background: linear-gradient(transparent, rgb(0 0 0 / 0.6));
+}
+.hl-ctl {
+  margin: 10px 0;
+}
+
+.km-search.one {
+  grid-template-columns: 1fr;
+  display: grid;
+}
+
+.tr-addr {
+  display: grid;
+  gap: 6px;
+}
+
+/* 일기 제목 추천 */
+.dy-title {
+  position: relative;
+}
+.dy-title-row {
+  display: flex;
+  gap: 8px;
+}
+.dy-title-row .st-input {
+  flex: 1;
+}
+.dy-title-pop {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-top: 6px;
+  padding: 8px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+  box-shadow: 0 4px 14px rgb(0 0 0 / 0.08);
+  animation: hl-in 0.25s ease;
+}
+
+/* 오답 미니 모의고사 */
+.mk-mini {
+  display: grid;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+}
+
+.dy-img.tr-thumb {
+  width: 44px;
+  height: 44px;
+  border-radius: 8px;
+  flex: none;
+}
+
+.tr-steps li .dy-img {
+  width: 100%;
+  max-width: 240px;
+  height: 130px;
+}
+
+/* 과목 고르기: 새 과목 칸이 좁은 화면을 넘지 않게 */
+.st-inline.sp-add {
+  min-width: 0;
+  max-width: 100%;
+}
+.st-inline.sp-add {
+  flex: 1 1 100%;
+}
+.st-inline.sp-add .st-input {
+  flex: 1;
+  min-width: 0;
+  width: 0;
+}
+
+/* 수행평가 단계 나누기 미리 보기 */
+.as-plan {
+  display: grid;
+  gap: 4px;
+  padding: 10px;
+  border-radius: var(--radius);
+  background: var(--soft);
+}
+.as-plan-row {
+  display: flex;
+  gap: 10px;
+  font-size: 0.88rem;
+}
+.as-plan-row b {
+  min-width: 64px;
+}
+.as-plan-row .done {
+  text-decoration: line-through;
+  color: var(--muted);
+}
+
+/* 일기: 오늘의 질문 */
+.dy-q {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.dy-q-main {
+  flex: 1;
+  display: flex;
+  gap: 6px;
+  padding: 8px 12px;
+  border: 1px dashed var(--line-strong);
+  border-radius: var(--radius);
+  background: none;
+  color: inherit;
+  font: inherit;
+  font-size: 0.9rem;
+  text-align: left;
+  cursor: pointer;
+}
+
+/* 월말 돈 리포트 */
+.mn-report-head {
+  display: grid;
+  gap: 2px;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.mn-report-row {
+  padding: 6px 0;
+  border-top: 1px solid var(--line);
+  font-size: 0.9rem;
+}
+
+/* 시험 범위 사진 읽기 */
+.sp-row {
+  display: grid;
+  gap: 6px;
+  padding: 10px 0;
+  border-top: 1px solid var(--line);
+}
+.sp-row.off {
+  opacity: 0.5;
+}
+
+.pk-sub {
+  min-width: 64px;
+  font-size: 0.9rem;
+}
+
+.cal-k.bday,
+.cal-tag.bday {
+  background: #f59e0b;
+}

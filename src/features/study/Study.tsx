@@ -1,4 +1,5 @@
 // 공부 도우미: 탭과 하위 화면 (설계 docs/superpowers/specs/2026-10-23-study-planner-design.md)
+import { breakWordReminders } from './notifyDigest';
 import { dueTodoRules } from './todoRules';
 import { pendingExamLocks } from './examPlan';
 import { lazy, Suspense, useEffect, useRef, useState } from 'react';
@@ -12,6 +13,7 @@ import { Today } from './Today';
 import { localTimes, uploadDigest } from './notify';
 import { autoSaves, dueRuleTx } from '../life/calc';
 import { tutorSessions } from './tutor';
+import { eventSessions } from '../life/events';
 import { autoDiaries } from '../life/diaryForm';
 import { reminders } from '../life/events';
 import { notifyRemind } from '../auth/api';
@@ -74,7 +76,7 @@ const PRELOAD = [
 ];
 
 import { STUDY_MODE_AREAS, useStudyMode } from '../../lib/studyMode';
-import { activeItem, AREA_ITEMS, AREAS, BASKETBALL_ITEMS, basketballItem, GAME_ITEMS, gameItem, champItems, champItem, HOBBY_PARTS, MOVIE_ITEMS, movieItem, NBA_ITEMS, nbaItem, REVIEW_ITEMS, reviewItem, SETTING_CATS, TABS, type AreaKey } from './tabs';
+import { activeItem, AREA_ITEMS, AREAS, BASKETBALL_ITEMS, basketballItem, GAME_ITEMS, gameItem, champItems, champItem, HOBBY_PARTS, MOVIE_ITEMS, movieItem, NBA_ITEMS, nbaItem, REVIEW_ITEMS, reviewItem, SETTING_CATS, TABS, TRAVEL_ITEMS, travelItem, type AreaKey } from './tabs';
 export { TABS };
 /** 메뉴에는 없지만 열 수 있는 화면 (설정은 맨 위 막대의 톱니) */
 const HIDDEN = ['settings'];
@@ -126,7 +128,8 @@ export function Study({ path, loggedIn, syncReady = true, onLogin }: { path: str
     const saves = autoSaves(d);
     if (saves.length) putMany(saves.map((g) => ({ c: 'savings' as const, item: g as never })));
     // 끝난 과외 수업은 공부 기록으로
-    const tut = tutorSessions(d, today);
+    // 「공부로 기록」 일정(학원 · 과외)도 끝나면 공부 기록으로
+    const tut = [...tutorSessions(d, today), ...eventSessions(d, today)];
     if (tut.length) putMany(tut.map((x) => ({ c: 'sessions' as const, item: x as never })));
     // 일기를 안 쓴 지난날은 그날 기록(잠 · 컨디션 · 공부 · 운동)만으로 하나 만든다
     const auto = autoDiaries(d, today);
@@ -142,7 +145,8 @@ export function Study({ path, loggedIn, syncReady = true, onLogin }: { path: str
   useEffect(() => {
     if (!loggedIn || !localTimes()) return;
     const t = setTimeout(() => {
-      const items = reminders(d, today);
+      // 일정 · 빚 갚을 날 · 쉬는 시간 단어 (서버는 60개까지라 가까운 것부터)
+      const items = [...reminders(d, today), ...breakWordReminders(d, words, today)].sort((a, b) => a.at - b.at).slice(0, 60);
       const key = JSON.stringify(items);
       if (lastRemind.current === key) return;
       notifyRemind(items)
@@ -150,7 +154,7 @@ export function Study({ path, loggedIn, syncReady = true, onLogin }: { path: str
         .catch(() => {});
     }, 4000);
     return () => clearTimeout(t);
-  }, [d.events, today, loggedIn]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [d.events, d.moneyTx, d.settings.breakWords, d.settings.schoolTimetable, d.settings.birthdays, words, today, loggedIn]); // eslint-disable-line react-hooks/exhaustive-deps
   // 새 영단어에 예문을 저절로 (로그인했을 때, 단어가 바뀌고 잠시 뒤)
   useEffect(() => {
     if (!loggedIn || !syncReady) return;
@@ -184,7 +188,7 @@ export function Study({ path, loggedIn, syncReady = true, onLogin }: { path: str
   else if (p0 === 'movies') content = <Movies sub={path[1]} />;
   else if (p0 === 'games') content = <Games sub={path[1]} sub2={path[2]} sub3={path[3]} />;
   else if (p0 === 'music') content = <Music sub={path[1]} />;
-  else if (p0 === 'travel') content = <Travel />;
+  else if (p0 === 'travel') content = <Travel sub={path[1]} />;
   else if (area === 'hobby') content = <Hobby sub={path[1]} sub2={path[2]} />;
   else if (area === 'diary') content = <Diary sub={path[1]} />;
   else if (area === 'ai' && path[1] === 's' && path[2]) content = <SubjectProblems subject={path[2]} />;
@@ -218,7 +222,7 @@ export function Study({ path, loggedIn, syncReady = true, onLogin }: { path: str
       )}
       {!running && area === 'ai' && <AiNav path={path} />}
       {!running && (isWeek || isInsights) && (
-        <nav className="st-nav" aria-label="돌아보기 메뉴">
+        <nav className="st-nav" aria-label="통계 메뉴">
           <button className="st-tab st-tab-home" onClick={() => go('/')}>
             <Icon name="area-home" />
             <span className="st-tab-label">메인으로</span>
@@ -243,8 +247,8 @@ export function Study({ path, loggedIn, syncReady = true, onLogin }: { path: str
             <span className="st-tab-label">메인으로</span>
             <span className="st-tab-short">메인</span>
           </button>
-          {(p0 === 'movies' ? MOVIE_ITEMS : isChamp ? champItems(path[2] ?? '', (path[3] ?? '').split('-')[1] ?? '') : p0 === 'games' ? GAME_ITEMS : isNba ? NBA_ITEMS : p0 === 'basketball' ? BASKETBALL_ITEMS : AREA_ITEMS[area]).map((it) => {
-            const on = (p0 === 'movies' ? movieItem(path[1]) : isChamp ? champItem(path[3]) : p0 === 'games' ? gameItem(path[1]) : isNba ? nbaItem(path[2]) : p0 === 'basketball' ? basketballItem(path[1]) : activeItem(area, path[1], p0)) === it.key;
+          {(p0 === 'movies' ? MOVIE_ITEMS : isChamp ? champItems(path[2] ?? '', (path[3] ?? '').split('-')[1] ?? '') : p0 === 'games' ? GAME_ITEMS : p0 === 'travel' ? TRAVEL_ITEMS : isNba ? NBA_ITEMS : p0 === 'basketball' ? BASKETBALL_ITEMS : AREA_ITEMS[area]).map((it) => {
+            const on = (p0 === 'movies' ? movieItem(path[1]) : isChamp ? champItem(path[3]) : p0 === 'games' ? gameItem(path[1]) : p0 === 'travel' ? travelItem(path[1]) : isNba ? nbaItem(path[2]) : p0 === 'basketball' ? basketballItem(path[1]) : activeItem(area, path[1], p0)) === it.key;
             return (
               <button key={it.key} className={`st-tab ${on ? 'on' : ''}`} aria-current={on ? 'page' : undefined} onClick={() => go(it.to ?? (it.key ? `/${area}/${it.key}` : `/${area}`))}>
                 <Icon name={it.icon} />

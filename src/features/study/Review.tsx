@@ -5,12 +5,13 @@ import { shortDate } from './dates';
 import { alive, newId, REASONS, type CardDeck, type MemoCard, type NoteComment, type WrongNote, type WrongReason } from './model';
 import { answer, dueText, dueToday } from './review';
 import { cardsToday } from './select';
-import { getStudy, put, putMany, remove, useStudy } from './store';
+import { getStudy, put, putMany, remove, setSettings, useStudy } from './store';
 import { addPhoto, photoBlob, photoUrl, removePhoto } from './photos';
 import { BlankRun, Blanks } from './Blanks';
 import { requeue } from './wordSession';
 import { Bar, confirmDelete, Empty, Field, go, Menu, Sheet, SubjectDot, SubjectPicker, SubjectTag, subjectsOf, toast, useToday, tap } from './ui';
 import { SwipeCard } from './SwipeCard';
+import { LineChart } from './charts';
 import { Passages } from './Passages';
 import { GRADUATE, guessNoteSubject, isCareless, mistakePatterns, redoAnswer } from './mistakes';
 import { loadTimer } from './timerStore';
@@ -22,7 +23,7 @@ import { compressProblemImage } from '../../lib/imageCompress';
 import { askAiLater } from './solveJob';
 
 export function Review({ sub }: { sub?: string }) {
-  if (sub === 'redo' || sub?.startsWith('redo?')) return <NoteRun />;
+  if (sub === 'redo' || sub?.startsWith('redo?')) return <NoteRun key={sub} />;
   if (sub === 'retest') return <RetestSheet />;
   if (sub?.startsWith('cards-run')) return <CardRun />;
   if (sub?.startsWith('blank-run-')) return <BlankRun id={sub.slice(10)} />;
@@ -106,6 +107,7 @@ function Notes({ today, adding }: { today: string; adding?: boolean }) {
             다시 풀기 ({due.length})
           </button>
         )}
+        {alive(d.notes).some((n) => !n.learned) && <MiniStart subject={subject} />}
         {alive(d.notes).some((n) => !n.learned) && (
           <button className="st-link" onClick={() => go('/review/retest')}>
             재시험지 만들기
@@ -548,9 +550,29 @@ function NoteRun() {
   const d = useStudy();
   const today = useToday();
   // ?subject=과목 이면 그 과목의 아직 못 익힌 오답 전부 (시험 공부 계획에서 열 때)
-  const subject = new URLSearchParams(window.location.hash.split('?')[1] ?? '').get('subject');
+  const qs = new URLSearchParams(window.location.hash.split('?')[1] ?? '');
+  const subject = qs.get('subject');
+  // 미니 모의고사: 못 익힌 오답에서 무작위 n 문제 · min 분 (시험 전날이 아니어도)
+  const mini = qs.get('mini') === '1';
+  const miniN = Math.max(3, Math.min(50, Number(qs.get('n')) || 10));
+  const miniMin = Math.max(5, Math.min(120, Number(qs.get('min')) || 20));
+  const [startAt] = useState(() => Date.now());
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    if (!mini) return;
+    const t = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(t);
+  }, [mini]);
+  const leftSec = mini ? Math.max(0, miniMin * 60 - Math.floor((now - startAt) / 1000)) : 0;
   const [queue, setQueue] = useState<string[]>(() =>
-    subject
+    mini
+      ? alive(getStudy().notes)
+          .filter((x) => !x.learned && (!subject || x.subjectId === subject))
+          .map((x) => ({ id: x.id, r: Math.random() }))
+          .sort((a, b) => a.r - b.r)
+          .slice(0, miniN)
+          .map((x) => x.id)
+      : subject
       ? alive(getStudy().notes)
           .filter((x) => x.subjectId === subject && !x.learned)
           .sort((a, b) => b.wrong - a.wrong || a.created - b.created)
@@ -560,15 +582,32 @@ function NoteRun() {
   const [total] = useState(queue.length);
   const [revealed, setRevealed] = useState(false);
   const [first, setFirst] = useState<Map<string, boolean>>(new Map());
-  const n = queue.length ? d.notes[queue[0]] : null;
+  const timeUp = mini && leftSec === 0;
+  const n = queue.length && !timeUp ? d.notes[queue[0]] : null;
+  // 미니 모의고사가 끝나면 기록을 한 번 남긴다 (점수 흐름)
+  const savedRun = useRef(false);
+  useEffect(() => {
+    if (!mini || n || savedRun.current || !total) return;
+    savedRun.current = true;
+    const s = getStudy().settings;
+    const minutes = Math.max(1, Math.round((Math.min(Date.now(), startAt + miniMin * 60_000) - startAt) / 60_000));
+    setSettings({ miniTests: [...(s.miniTests ?? []), { at: Date.now(), date: today, subjectId: subject || undefined, n: total, solved: first.size, right: [...first.values()].filter(Boolean).length, minutes }].slice(-100) });
+  }, [mini, n, total]); // eslint-disable-line react-hooks/exhaustive-deps
   if (!n)
     return (
       <div className="st-page narrow">
         <div className="st-card st-done-card">
-          <h2>{subject ? `${d.subjects[subject]?.name ?? ''} 오답 다시 풀기 끝!` : '오늘 다시 풀기 끝!'}</h2>
+          <h2>{mini ? (timeUp ? '시간 끝! 미니 모의고사' : '미니 모의고사 끝!') : subject ? `${d.subjects[subject]?.name ?? ''} 오답 다시 풀기 끝!` : '오늘 다시 풀기 끝!'}</h2>
           <p>
-            {total}문제 중 {[...first.values()].filter(Boolean).length}문제를 맞혔어요
+            {mini ? `${first.size}/${total}문제를 풀었고 ` : `${total}문제 중 `}
+            {[...first.values()].filter(Boolean).length}문제를 맞혔어요
+            {mini ? ` · ${Math.max(1, Math.round((Math.min(now, startAt + miniMin * 60_000) - startAt) / 60_000))}분 걸림` : ''}
           </p>
+          {mini && (
+            <button className="btn" onClick={() => (window.location.hash = `/review/redo?mini=1&n=${miniN}&min=${miniMin}${subject ? `&subject=${subject}` : ''}&r=${Date.now()}`)}>
+              한 번 더 (새 문제)
+            </button>
+          )}
           <button className="btn btn-primary" onClick={() => go('/study')}>
             오늘 화면으로
           </button>
@@ -597,6 +636,7 @@ function NoteRun() {
         <Bar value={total - queue.length} max={total} label="푼 문제" />
         <span className="st-muted">
           {total - queue.length + 1}/{total}
+          {mini && <b className={leftSec < 60 ? 'bad' : ''}> · {Math.floor(leftSec / 60)}:{String(leftSec % 60).padStart(2, '0')}</b>}
         </span>
       </div>
       <div className="st-runcard">
@@ -936,6 +976,73 @@ function CardRun() {
         </label>
       </div>
       <SwipeCard key={`${c.id}:${queue.length}`} front={flip ? c.back : c.front} back={(flip ? c.front : c.back) || '(내용 없음)'} sub={d.decks[c.deckId]?.name} onAnswer={reply} />
+    </div>
+  );
+}
+
+/** 오답 미니 모의고사 시작: 과목 · 문제 수 · 시간 고르기 (시험 전날이 아니어도 언제든) */
+function MiniStart({ subject: s0 }: { subject?: string }) {
+  const d = useStudy();
+  const [open, setOpen] = useState(false);
+  const [subject, setSubject] = useState(s0 ?? '');
+  const [n, setN] = useState(10);
+  const [min, setMin] = useState(20);
+  const left = alive(d.notes).filter((x) => !x.learned);
+  const subs = subjectsOf(d).filter((s) => left.some((x) => x.subjectId === s.id));
+  const have = left.filter((x) => !subject || x.subjectId === subject).length;
+  const runs = (d.settings.miniTests ?? []).filter((t) => !subject || t.subjectId === subject);
+  if (!open)
+    return (
+      <button className="btn" onClick={() => setOpen(true)}>
+        ⏱ 오답 미니 모의고사{d.settings.miniTests?.length ? ` · ${d.settings.miniTests.length}번 봄` : ''}
+      </button>
+    );
+  return (
+    <div className="mk-mini">
+      <div className="st-chips">
+        <button className={`st-chip ${!subject ? 'on' : ''}`} onClick={() => setSubject('')}>
+          모든 과목
+        </button>
+        {subs.map((s) => (
+          <button key={s.id} className={`st-chip ${subject === s.id ? 'on' : ''}`} onClick={() => setSubject(s.id)}>
+            {s.name}
+          </button>
+        ))}
+      </div>
+      <div className="st-inline wrap">
+        <span className="st-muted">문제</span>
+        <div className="st-seg sm">
+          {[5, 10, 20].map((x) => (
+            <button key={x} className={n === x ? 'on' : ''} onClick={() => setN(x)}>
+              {x}
+            </button>
+          ))}
+        </div>
+        <span className="st-muted">시간</span>
+        <div className="st-seg sm">
+          {[10, 20, 30].map((x) => (
+            <button key={x} className={min === x ? 'on' : ''} onClick={() => setMin(x)}>
+              {x}분
+            </button>
+          ))}
+        </div>
+      </div>
+      <button className="btn btn-primary" disabled={!have} onClick={() => go(`/review/redo?mini=1&n=${n}&min=${min}${subject ? `&subject=${subject}` : ''}`)}>
+        시작 ({Math.min(n, have)}문제 · {min}분)
+      </button>
+      {runs.length > 0 && (
+        <>
+          {runs.length > 1 && <LineChart label="맞힌 비율 (%)" height={140} points={runs.slice(-20).map((t) => ({ label: t.date.slice(5).replace('-', '/'), title: `${t.right}/${t.n} · ${t.minutes}분`, y: Math.round((t.right / t.n) * 100) }))} domain={[0, 100]} format={(v) => `${Math.round(v)}%`} />}
+          <small className="st-muted">
+            지난 기록:{' '}
+            {runs
+              .slice(-5)
+              .reverse()
+              .map((t) => `${t.date.slice(5).replace('-', '/')} ${t.right}/${t.n}문제 ${t.minutes}분${t.subjectId ? ` (${d.subjects[t.subjectId]?.name ?? '과목'})` : ''}`)
+              .join(' · ')}
+          </small>
+        </>
+      )}
     </div>
   );
 }

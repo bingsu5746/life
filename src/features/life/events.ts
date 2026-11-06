@@ -1,6 +1,7 @@
 // 달력 일정: 반복 펼치기 · 그날 일정 · 알림 시각
 import { addDays, daysBetween, diffDays, weekday, weekStart } from '../study/dates';
-import { alive, type CalEvent, type DateStr, type StudyData } from '../study/model';
+import { nextBirthday } from './birthdays';
+import { alive, type CalEvent, type DateStr, type StudyData, type StudySession } from '../study/model';
 
 /** 일정 색 (이름 → 색) */
 export const EVENT_COLORS: Record<string, { label: string; c: string }> = {
@@ -89,9 +90,32 @@ export function repeatText(e: CalEvent): string {
   return r.until ? `${base} · ${r.until}까지` : base;
 }
 
-/** 앞으로 days 일 동안의 알림 (서버에 올려 두면 그 시각에 휴대폰으로) */
-export function reminders(d: Pick<StudyData, 'events'>, today: DateStr, now = Date.now(), days = 14): { at: number; title: string; body: string }[] {
-  const out: { at: number; title: string; body: string }[] = [];
+/** 앞으로 days 일 동안의 알림 (서버에 올려 두면 그 시각에 휴대폰으로). 빚 갚을 날도 (전날 · 당일 아침 9시, 남은 빚이 있을 때) */
+export function reminders(d: Pick<StudyData, 'events'> & Partial<Pick<StudyData, 'moneyTx' | 'settings'>>, today: DateStr, now = Date.now(), days = 14): { at: number; title: string; body: string; url?: string }[] {
+  const out: { at: number; title: string; body: string; url?: string }[] = [];
+  // 생일: 일주일 전 · 당일 아침 9시
+  for (const b of d.settings?.birthdays ?? []) {
+    const day = nextBirthday(b.md, today);
+    for (const [at0, when] of [
+      [addDays(day, -7), '일주일 뒤'],
+      [day, '오늘'],
+    ] as const) {
+      const at = Date.parse(`${at0}T09:00:00+09:00`);
+      if (at > now && at0 <= addDays(today, days)) out.push({ at, title: `🎂 ${when} ${b.name} 생일`, body: [b.idea && `선물 생각: ${b.idea}`, b.budget && `예산 ${b.budget.toLocaleString('ko-KR')}원`].filter(Boolean).join(' · ') || '축하 한마디 잊지 말기', url: '/money/saving' });
+    }
+  }
+  const tx = alive(d.moneyTx ?? {});
+  const owe = tx.filter((t) => t.type === 'in' && t.category === '빚').reduce((a, t) => a + t.amount, 0) - tx.filter((t) => t.type === 'out' && t.category === '빚 갚기').reduce((a, t) => a + t.amount, 0);
+  if (owe > 0)
+    for (const t of tx)
+      if (t.type === 'in' && t.category === '빚' && t.due && t.due >= today && t.due <= addDays(today, days))
+        for (const [day, when] of [
+          [addDays(t.due, -1), '내일'],
+          [t.due, '오늘'],
+        ] as const) {
+          const at = Date.parse(`${day}T09:00:00+09:00`);
+          if (at > now) out.push({ at, title: `💸 ${when} 빚 갚는 날`, body: `${t.memo ? `${t.memo} · ` : ''}빌린 돈 ${t.amount.toLocaleString('ko-KR')}원 (남은 빚 ${owe.toLocaleString('ko-KR')}원)` });
+        }
   const map = eventsBetween(d, today, addDays(today, days));
   for (const list of map.values())
     for (const { e, first, on } of list) {
@@ -108,4 +132,28 @@ export function reminders(d: Pick<StudyData, 'events'>, today: DateStr, now = Da
       });
     }
   return out.sort((a, b) => a.at - b.at).slice(0, 60);
+}
+
+/** 일정 한 번의 id (공부 기록) */
+export const eventSessionId = (e: Pick<CalEvent, 'id'>, on: DateStr) => `ev-${e.id}-${on}`;
+
+/**
+ * 끝난 「공부로 기록」 일정(학원 · 과외)을 공부 기록으로 (최근 14일, 시각이 있는 하루 일정만).
+ * 같은 일정 · 같은 날은 늘 같은 id 라 여러 기기에서 만들어도 하나, 이미 있거나 지운 것은 다시 만들지 않는다.
+ * 달력에서 그날만 지운 일정(skip)은 안 생긴다
+ */
+export function eventSessions(d: Pick<StudyData, 'events' | 'sessions'>, today: DateStr, now = Date.now()): StudySession[] {
+  const out: StudySession[] = [];
+  const map = eventsBetween({ events: Object.fromEntries(Object.entries(d.events ?? {}).filter(([, e]) => e.study && !e.allDay && e.start && e.end && !(e.endDate && e.endDate > e.date))) }, addDays(today, -13), today);
+  for (const [day, list] of map)
+    for (const { e } of list) {
+      const id = eventSessionId(e, day);
+      if (d.sessions[id]) continue;
+      const start = Date.parse(`${day}T${e.start}:00+09:00`);
+      const end = Date.parse(`${day}T${e.end}:00+09:00`);
+      const minutes = Math.round((end - start) / 60_000);
+      if (Number.isNaN(start) || minutes <= 0 || end > now || start < e.created - 86_400_000) continue;
+      out.push({ id, subjectId: e.subjectId || undefined, start, end, minutes, date: day, kind: 'manual', place: e.place || e.title, memo: e.title } as StudySession);
+    }
+  return out;
 }

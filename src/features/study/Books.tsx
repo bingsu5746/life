@@ -8,10 +8,10 @@ import { paceOf } from './plan';
 import { forecastFor, forecastText } from './forecast';
 import { bookDone, planCtx, planViews, reservedPages } from './select';
 import { getStudy, put, remove, useStudy, useWords } from './store';
-import { isUnitOnly, parseToc, tocText, type TocRow } from './toc';
+import { headerUnits, isUnitOnly, unitWord, parseToc, tocText, type TocRow } from './toc';
 import { markBook } from './actions';
 import { BookSearch } from './BookSearch';
-import { bookToc, tocScan } from '../auth/api';
+import { bookToc, bookTocIsbn, tocScan, type BookHit } from '../auth/api';
 import { compressProblemImage } from '../../lib/imageCompress';
 import { PlanForm } from './PlanForm';
 import { PlanWarning } from './Today';
@@ -104,7 +104,7 @@ function BookList() {
                 <Bar value={n} max={all.length} label="푼 쪽" />
                 <small>
                   {n}/{all.length}
-                  {b.unitOnly ? '단원' : '쪽'} ({all.length ? Math.round((n / all.length) * 100) : 0}%)
+                  {b.unitOnly ? unitWord(b.units) : '쪽'} ({all.length ? Math.round((n / all.length) * 100) : 0}%)
                 </small>
                 {v ? (
                   <small className={v.sched.warning ? 'bad' : ''}>
@@ -192,6 +192,36 @@ function BookEditor({ book, onDone }: { book?: Book; onDone: (id?: string, plan?
     toast('읽은 글을 넣었어요. 틀린 곳을 고쳐 주세요');
   }
 
+  /** 고른 책의 목차: 예스24 목차 → 쪽이 없으면 국립중앙도서관(ISBN · 목차 주소)에서 한 번 더 찾아 쪽 있는 것을 쓴다 */
+  async function loadToc(h: BookHit) {
+    const pagedRows = (t: string) => parseToc(t).filter((r) => !r.problem && !r.unitOnly).length;
+    const y24 = h.tocText?.trim() ?? '';
+    if (y24 && pagedRows(y24) >= 2) {
+      setText(y24);
+      toast('목차를 쪽까지 불러왔어요. 쪽 없는 큰 제목은 빼요');
+      return;
+    }
+    setOcr('쪽 번호가 있는 목차를 찾는 중…');
+    const more: string[] = [];
+    try {
+      if (h.link) more.push((await bookToc(h.link).catch(() => ({ text: '' }))).text.trim());
+      if (h.isbn && !more.some((t) => t && pagedRows(t) >= 2)) more.push((await bookTocIsbn(h.isbn).catch(() => ({ text: '' }))).text.trim());
+      if (h.toc) more.push((await bookToc(h.toc).catch(() => ({ text: '' }))).text.trim());
+    } finally {
+      setOcr(null);
+    }
+    const paged = more.find((t) => t && pagedRows(t) >= 2);
+    if (paged) {
+      setText(paged);
+      toast(y24 ? '예스24 목차에 쪽이 없어 국립중앙도서관 목차로 쪽까지 불러왔어요' : '목차를 쪽까지 불러왔어요');
+      return;
+    }
+    const any = y24 || more.find(Boolean) || '';
+    if (!any) return toast('이 책은 불러올 목차가 없어요. 목차 사진으로 채우거나 직접 써 주세요');
+    setText(any);
+    toast(isUnitOnly(parseToc(any)) ? '여러 곳을 찾아봐도 쪽이 없는 목차라 단원(줄)마다 나눴어요. 계획도 단원 수로 짜요' : '목차를 불러왔어요. 쪽이 없는 줄은 고쳐 주세요');
+  }
+
   function save(plan = false) {
     if (!name.trim() || !subjectId || !good.length) return;
     const units: Unit[] = rows.flatMap((r, i) => (r.problem ? [] : [{ name: r.name, from: r.from, to: r.to, skip: skips.has(keys[i]) || undefined }]));
@@ -232,29 +262,7 @@ function BookEditor({ book, onDone }: { book?: Book; onDone: (id?: string, plan?
             label="문제집 이름"
             onPick={(h) => {
               setName(h.title);
-              if (text.trim()) return;
-              if (h.tocText?.trim()) {
-                // 쪽이 붙은 줄이 있으면 쪽 없는 큰 제목(「Ⅰ. 다항식」)은 빼고 넣는다
-                const lines = h.tocText
-                  .split('\n')
-                  .map((l) => l.trim())
-                  .filter(Boolean);
-                const paged = lines.filter((l) => /\d+\s*(?:쪽|p)?$/i.test(l));
-                setText((paged.length >= 2 ? paged : lines).join('\n'));
-                toast(paged.length >= 2 ? '목차를 불러왔어요. 쪽이 없는 줄은 고쳐 주세요' : '쪽이 없는 목차라 단원(줄)마다 나눴어요. 계획도 단원 수로 짜요');
-                return;
-              }
-              if (!h.toc) return;
-              setOcr('목차를 불러오는 중…');
-              bookToc(h.toc)
-                .then((r) => {
-                  if (r.text.trim()) {
-                    setText(r.text.trim());
-                    toast('목차를 불러왔어요. 쪽이 없는 줄은 고쳐 주세요');
-                  }
-                })
-                .catch(() => toast('목차를 불러오지 못했어요'))
-                .finally(() => setOcr(null));
+              if (!text.trim()) void loadToc(h);
             }}
           />
         </Field>
@@ -266,6 +274,8 @@ function BookEditor({ book, onDone }: { book?: Book; onDone: (id?: string, plan?
           hint={
             <>
               한 줄에 단원 하나: <code>1. 집합 12-30</code> · 시작 쪽만 있어도 돼요 <code>2. 명제 31</code> · 단원 없이 <code>1-240</code>
+              <br />
+              쪽이 없으면 단원 · 작품 이름만 한 줄에 하나씩 써도 돼요 <code>진달래꽃 - 김소월</code> → 단원 수로 계획해요
             </>
           }
         >
@@ -297,9 +307,9 @@ function BookEditor({ book, onDone }: { book?: Book; onDone: (id?: string, plan?
             </thead>
             <tbody>
               {rows.map((r, i) => (
-                <tr key={i} className={r.problem ? 'bad' : ''}>
+                <tr key={i} className={r.problem && !r.header ? 'bad' : r.header ? 'st-muted' : ''}>
                   <td>{r.name}</td>
-                  <td>{r.problem ? <span className="bad">{r.problem}</span> : r.unitOnly ? `${r.from}번째` : `${r.from}~${r.to}${r.guessedEnd ? '*' : ''}`}</td>
+                  <td>{r.header ? <small className="st-muted">{r.problem}</small> : r.problem ? <span className="bad">{r.problem}</span> : r.unitOnly ? `${r.from}번째` : `${r.from}~${r.to}${r.guessedEnd ? '*' : ''}`}</td>
                   <td>
                     {!r.problem && (
                       <input
@@ -358,7 +368,7 @@ function BookDetail({ id, plan }: { id: string; plan?: boolean }) {
       </Empty>
     );
   const book = b;
-  const W = b.unitOnly ? '단원' : '쪽';
+  const W = b.unitOnly ? unitWord(b.units) : '쪽';
   if (editing) return <BookEditor book={b} onDone={() => setEditing(false)} />;
   const done = bookDone(b);
   const reserved = reservedPages(d, b.id);
@@ -367,6 +377,18 @@ function BookDetail({ id, plan }: { id: string; plan?: boolean }) {
   const n = all.filter((p) => done.has(p)).length;
   const pace = v ? paceOf(v.plan, v.target, planCtx(d, today)) : 0;
   const showPlan = planning;
+  // 예전에 대단원 이름도 단원으로 들어간 문제집: 계획에서 빼기
+  const heads = headerUnits(b.units, b.unitOnly);
+  function skipHeads() {
+    const full = (us: Unit[]) => compress(expand(us.filter((u) => !u.skip).map((u) => [u.from, u.to])));
+    const before = JSON.stringify(full(b.units));
+    const units = b.units.map((u, i) => (heads.includes(i) ? { ...u, skip: true } : u));
+    put('books', { ...b, units });
+    const after = full(units);
+    // 문제집 전체를 범위로 한 계획은 대단원을 빼고 다시 나눈다
+    for (const p of alive(d.plans)) if (p.target === 'book' && p.targetId === b.id && !p.finished && JSON.stringify(compress(expand(p.range))) === before) put('plans', { ...p, range: after, todayLock: undefined });
+    toast(`대단원 ${heads.length}개를 계획에서 뺐어요`);
+  }
 
   function markPages(on: boolean) {
     const r = expand(parseRanges(pages));
@@ -402,6 +424,18 @@ function BookDetail({ id, plan }: { id: string; plan?: boolean }) {
           ]}
         />
       </div>
+
+      {heads.length > 0 && (
+        <div className="st-banner">
+          <span>
+            대단원 이름 {heads.length}개({heads.slice(0, 3).map((i) => `「${b.units[i].name}」`).join(' ')}
+            {heads.length > 3 ? ' …' : ''})가 단원으로 들어가 있어요.
+          </span>
+          <button className="btn btn-sm btn-primary" onClick={skipHeads}>
+            계획에서 빼기
+          </button>
+        </div>
+      )}
 
       <section className="st-card">
         <div className="st-big-progress">

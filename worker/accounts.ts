@@ -23,8 +23,8 @@ import { fetchSpecialDays } from './holidays';
 import { cleanFact, goodKo } from './fact';
 import { fetch2k } from './nba2k';
 import { hcBody, parseHc } from './homecourt';
-import { coachBody, diaryBody, noteBody, parseCoach, parseDiary, parseNote, parseReceipt, parseTocRead, receiptBody, tocBody } from './aiRead';
-import { seojiSearch, seojiToc, yes24Search } from './books';
+import { coachBody, diaryBody, noteBody, parseCoach, parseDiary, parseNote, parseReceipt, parseTocRead, receiptBody, tocBody, titleBody, parseTitles, scopeBody, parseScopeRead } from './aiRead';
+import { seojiSearch, seojiToc, seojiTocByIsbn, yes24Search, yes24Toc } from './books';
 import { cheapShark } from './cheapshark';
 import { invenChamps, invenSkins, invenSkinVideo } from './skins';
 import { discordChannels, discordInfo, discordMessages, discordSend } from './discord';
@@ -381,13 +381,29 @@ export class Accounts extends DurableObject<Env> {
     if (path === 'ai/note' && req.method === 'POST') return this.noteScan(user, body);
     if (path === 'ai/receipt' && req.method === 'POST') return this.receiptScan(user, body);
     if (path === 'ai/toc' && req.method === 'POST') return this.tocScan(user, body);
+    if (path === 'ai/scope' && req.method === 'POST') {
+      const imgs = (Array.isArray(body.images) ? body.images : [])
+        .slice(0, 4)
+        .map((x) => this.imageOf({ image: x }))
+        .filter((x): x is { mime: string; data: string } => !!x);
+      if (!imgs.length) return fail('사진이 너무 크거나 잘못됐어요.', 413);
+      if (imgs.reduce((a, x) => a + x.data.length, 0) > MAX_STORE) return fail('사진이 너무 커요. 장 수를 줄여 주세요.', 413);
+      const subjects = (Array.isArray(body.subjects) ? body.subjects : []).filter((x): x is string => typeof x === 'string').map((x) => x.slice(0, 20)).slice(0, 30);
+      return this.aiJob(user, scopeBody(imgs, subjects), parseScopeRead, 'scope');
+    }
     if (path === 'books/search' && req.method === 'GET') return this.bookSearch((new URL(req.url).searchParams.get('q') ?? '').trim().slice(0, 80));
-    if (path === 'books/toc' && req.method === 'GET') return this.bookToc(new URL(req.url).searchParams.get('url') ?? '');
+    if (path === 'books/toc' && req.method === 'GET') return this.bookToc(new URL(req.url).searchParams.get('url') ?? '', (new URL(req.url).searchParams.get('isbn') ?? '').replace(/[^\dXx]/g, ''));
     if (path === 'ai/diary' && req.method === 'POST') return this.diarySplit(user, body);
     if (path === 'ai/coach' && req.method === 'POST') {
       const text = typeof body.text === 'string' ? body.text.trim().slice(0, 6000) : '';
       if (text.length < 20) return fail('기록이 너무 적어요.');
       return this.aiJob(user, coachBody(text), parseCoach, 'coach');
+    }
+    if (path === 'ai/title' && req.method === 'POST') {
+      const text = typeof body.text === 'string' ? body.text.trim().slice(0, 3000) : '';
+      if (text.length < 10) return fail('일기가 너무 짧아요.');
+      const past = (Array.isArray(body.past) ? body.past : []).filter((x): x is string => typeof x === 'string' && !!x.trim()).map((x) => x.trim().slice(0, 40)).slice(0, 30);
+      return this.aiJob(user, titleBody(text, past), parseTitles, 'title');
     }
     if (path === 'ai/stt' && req.method === 'POST') return this.stt(user, body);
     if (path === 'bb/scan' && req.method === 'POST') return this.bbScan(user, body);
@@ -1954,6 +1970,7 @@ export class Accounts extends DurableObject<Env> {
       riot: !!this.riotKey(),
       nl: !!this.nlKey(),
       yes24: !!this.secret('yes24', 'yes24key', 'yes24api'),
+      kakaomap: !!this.secret('kakaomap', 'kakaomapkey', 'kakaojs', 'kakaojskey', 'kakaojavascriptkey'),
     });
   }
 
@@ -2047,7 +2064,7 @@ export class Accounts extends DurableObject<Env> {
     // 1) 예스24 (표지 · 값 · 쪽수 · 목차) → 2) 국립중앙도서관
     if (yk) {
       try {
-        const r = await this.nbaCached(`y24b:${q.toLowerCase()}`, DAY, () => yes24Search(yk, q));
+        const r = await this.nbaCached(`y24b2:${q.toLowerCase()}`, DAY, () => yes24Search(yk, q));
         if (r.v.length) return json({ list: r.v });
       } catch (e) {
         why = e instanceof Error ? e.message : String(e);
@@ -2064,9 +2081,20 @@ export class Accounts extends DurableObject<Env> {
     }
     return why ? fail(`책을 찾지 못했어요. (${why.slice(0, 120)})`, 502) : json({ list: [] });
   }
-  private async bookToc(url: string): Promise<Response> {
+  private async bookToc(url: string, isbn = ''): Promise<Response> {
     try {
-      const r = await this.nbaCached(`nltoc:${url}`, 30 * DAY, () => seojiToc(url));
+      // 예스24 상품 페이지 목차 (API 목차에 쪽이 없을 때)
+      if (/^https:\/\/(www|m)\.yes24\.com\//.test(url)) {
+        const r = await this.nbaCached(`y24toc:${url}`, 30 * DAY, () => yes24Toc(url));
+        return json({ text: r.v });
+      }
+      if (isbn) {
+        const key = this.nlKey();
+        if (!key || !/^(\d{9}[\dXx]|\d{13})$/.test(isbn)) return json({ text: '' });
+        const r = await this.nbaCached(`nltocisbn:${isbn}`, 30 * DAY, () => seojiTocByIsbn(key, isbn));
+        return json({ text: r.v });
+      }
+      const r = await this.nbaCached(`nltoc2:${url}`, 30 * DAY, () => seojiToc(url));
       return json({ text: r.v });
     } catch (e) {
       return fail(`목차를 받지 못했어요. (${(e instanceof Error ? e.message : String(e)).slice(0, 100)})`, 502);
@@ -2372,7 +2400,7 @@ export class Accounts extends DurableObject<Env> {
     const type = b.type === 'game' || b.type === 'book' || b.type === 'music' ? b.type : null;
     const q = typeof b.q === 'string' ? b.q.normalize('NFC').trim().slice(0, 60) : '';
     if (!type || !q) return fail('찾을 이름을 써 주세요.');
-    const need = type === 'game' ? env.RAWG_KEY : type === 'book' ? env.KAKAO_KEY || env.ALADIN_KEY : env.DISCOGS_TOKEN;
+    const need = type === 'game' ? env.RAWG_KEY : type === 'book' ? env.KAKAO_KEY || env.ALADIN_KEY : env.DISCOGS_TOKEN || this.secret('discogs', 'discogstoken', 'discogsusertoken', 'discogspersonaltoken', 'discogsaccesstoken');
     if (!need) return fail(type === 'game' ? '게임 찾기에는 RAWG 키(RAWG_KEY)가 필요해요.' : type === 'book' ? '책 찾기에는 카카오 키(KAKAO_KEY)나 알라딘 키(ALADIN_KEY)가 필요해요.' : '음반 찾기에는 Discogs 토큰(DISCOGS_TOKEN)이 필요해요.', 503);
     const ck = `lookup:${type}:${q.toLowerCase()}`;
     const c = this.sql.exec<{ data: string; at: number }>('SELECT data, at FROM cache WHERE key = ?', ck).toArray()[0];
@@ -2594,7 +2622,11 @@ export class Accounts extends DurableObject<Env> {
         .filter((e): e is { at: number; title: string; body: string } => !!e && typeof e === 'object' && typeof (e as { at?: unknown }).at === 'number' && typeof (e as { title?: unknown }).title === 'string' && typeof (e as { body?: unknown }).body === 'string')
         .filter((e) => e.at > now - 60_000 && e.at < now + 15 * DAY)
         .slice(0, 60)
-        .map((e) => ({ at: Math.round(e.at), title: e.title.slice(0, 60), body: e.body.slice(0, 200) }));
+        .map((e) => {
+          // 누르면 열 화면 (없으면 달력)
+          const url = (e as { url?: unknown }).url;
+          return { at: Math.round(e.at), title: e.title.slice(0, 60), body: e.body.slice(0, 200), ...(typeof url === 'string' && /^\/[a-z0-9/_-]{0,60}$/i.test(url) ? { url } : {}) };
+        });
       if (items.length) this.cacheSet(`remind:${user.id}`, JSON.stringify({ origin, items }));
       else this.sql.exec('DELETE FROM cache WHERE key = ?', `remind:${user.id}`);
       await this.scheduleAlarm();
@@ -2685,12 +2717,12 @@ export class Accounts extends DurableObject<Env> {
     // 달력 일정 알림 (때가 된 것만 보내고 지운다)
     for (const row of this.sql.exec<{ key: string; data: string }>("SELECT key, data FROM cache WHERE key LIKE 'remind:%'").toArray()) {
       const uid = row.key.slice(7);
-      const v = JSON.parse(row.data) as { origin: string; items: { at: number; title: string; body: string }[] };
+      const v = JSON.parse(row.data) as { origin: string; items: { at: number; title: string; body: string; url?: string }[] };
       const ready = v.items.filter((x) => x.at <= now + 30_000);
       if (!ready.length) continue;
       try {
         const subs = this.sql.exec<PushSub & { [k: string]: SqlStorageValue }>('SELECT endpoint, p256dh, auth FROM push_subs WHERE user_id = ?', uid).toArray();
-        for (const it of ready) if (subs.length && it.at > now - 3600_000) await this.pushTo(subs, { title: it.title, body: it.body, url: '/calendar' }, v.origin);
+        for (const it of ready) if (subs.length && it.at > now - 3600_000) await this.pushTo(subs, { title: it.title, body: it.body, url: it.url ?? '/calendar' }, v.origin);
       } catch (err) {
         console.error('remind push failed', err instanceof Error ? err.message : String(err));
       }

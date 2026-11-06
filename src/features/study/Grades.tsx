@@ -2,7 +2,7 @@
 import { useState } from 'react';
 import { shortDate } from './dates';
 import { examEnd, examSubjectIds } from './exams';
-import { ExamTabs } from './Exams';
+import { ExamTabs } from './ExamHero';
 import { parseWrongNums, wrongFrequency, change, changeText, findScore, METRIC_NAME, metricsFor, MOCK_SUBJECTS, readNum, prepBefore, recordAverage, recordsOf, scoreValue, series, studyBefore, subjectNames, type Metric } from './grades';
 import { GRADE_NAME } from './mockExam';
 import { BarChart, LineChart, TableView } from './charts';
@@ -348,11 +348,13 @@ function GradeSheet({
   const [lv, setLv] = useState<GradeRecord['level']>(record?.level ?? level0 ?? '고2');
   const startNames = (k: GradeRecord['kind']) => {
     if (selfKey && GRADE_NAME[selfKey]) return selfKey === 'inquiry2' ? ['탐구1', '탐구2'] : [GRADE_NAME[selfKey]];
+    // 모의고사 · 수능은 과목이 정해져 있다 (내가 만든 과목이 아니라)
+    if (k === 'mock' || exam?.kind === 'mock') return MOCK_SUBJECTS;
     if (exam) {
       const ids = examSubjectIds(exam);
       if (ids.length) return ids.map((id) => d.subjects[id]?.name ?? '과목');
     }
-    return k === 'mock' ? MOCK_SUBJECTS : subjectsOf(d).map((s) => s.name);
+    return subjectsOf(d).map((s) => s.name);
   };
   const [rows, setRows] = useState<Row[]>(() => (record ? record.scores.map(toRow) : startNames(kind).map(emptyRow)));
   const [touched, setTouched] = useState(!!record);
@@ -393,9 +395,11 @@ function GradeSheet({
       at: r.at ?? now,
     }));
     put('grades', { ...(record ?? {}), id: record?.id ?? newId(), kind, level: kind === 'mock' ? lv : undefined, name: name.trim().slice(0, 40), date, examId: record?.examId ?? exam?.id, scores, memo: memo.trim() || undefined });
-    toast(record ? '성적을 고쳤어요' : '성적을 넣었어요');
+    toast(record ? '성적을 고쳤어요' : '성적을 넣었어요 · 시험 회고를 보여 드릴게요');
     onSaved(kind);
     onClose();
+    // 시험에서 넣은 성적이면 그 시험 회고로
+    if (!record && exam) setTimeout(() => go(`/exams/${exam.id}`), 0);
   }
 
   return (

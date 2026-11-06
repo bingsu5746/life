@@ -56,6 +56,32 @@ export function diaryBody(text: string) {
   ].join('\n');
   return { contents: [{ role: 'user', parts: [{ text: prompt }] }], generationConfig: json };
 }
+/** 일기 제목 추천: 지금까지 쓴 제목들의 느낌(길이 · 말투 · 기호)을 따라 3개 */
+export function titleBody(text: string, past: string[]) {
+  const prompt = [
+    '아래 [오늘 일기]에 어울리는 제목을 3개 지어 줘.',
+    '- [지금까지 쓴 제목]의 느낌을 따라 해: 길이, 말투(반말 · 명사형 · 문장형), 이모지나 기호를 쓰는지, 유머 정도.',
+    '- 지금까지 쓴 제목이 없으면 짧고 담백하게 (15자 안).',
+    '- 일기에 없는 일은 지어내지 마. 세 개는 서로 느낌이 조금씩 다르게.',
+    'JSON: {"titles": [문자열 3개]}',
+    '',
+    '[지금까지 쓴 제목]',
+    ...(past.length ? past.map((t) => `- ${t}`) : ['- (없음)']),
+    '',
+    '[오늘 일기]',
+    text,
+  ].join('\n');
+  return { contents: [{ role: 'user', parts: [{ text: prompt }] }], generationConfig: { responseMimeType: 'application/json', temperature: 0.8 } };
+}
+export function parseTitles(text: string): { titles: string[] } {
+  const j = obj(text);
+  const titles = (Array.isArray(j.titles) ? j.titles : [])
+    .map((x) => str(x, 40))
+    .filter((x): x is string => !!x)
+    .slice(0, 3);
+  return { titles };
+}
+
 export function parseDiary(text: string): DiaryRead {
   const j = obj(text);
   const out: DiaryRead = {};
@@ -122,6 +148,36 @@ export function parseTocRead(text: string): TocRead {
   return { units };
 }
 
+/** 시험 범위 공지 사진 → 과목별 범위 줄 (적힌 것만) */
+export interface ScopeRead {
+  scopes: { subject: string; date: string | null; lines: string[] }[];
+}
+export function scopeBody(images: { mime: string; data: string }[], subjects: string[]) {
+  const prompt = [
+    'These are photos of a Korean high school exam scope notice (시험 범위 공지 / 출제 범위표). Read ONLY what is printed. Copy Korean text exactly. Never guess or add.',
+    `The student's subjects are: ${subjects.join(', ') || '(unknown)'}. When a printed subject clearly matches one of these (e.g. 수학Ⅰ ≈ 수학), use the student's name; otherwise use the printed name.`,
+    'Return JSON: {"scopes": [{"subject": subject name, "date": exam date as YYYY-MM-DD if printed else null, "lines": [each scope item as printed, one per line, e.g. "교과서 12~80쪽", "1단원 ~ 3단원", "학습지 1~5"]}]}',
+    'Split a subject\'s scope into separate lines at commas, slashes or line breaks. Keep page numbers and unit names exactly. If the year is not printed, assume the nearest upcoming year.',
+  ].join('\n');
+  return { contents: [{ role: 'user', parts: [...images.map((im) => ({ inlineData: { mimeType: im.mime, data: im.data } })), { text: prompt }] }], generationConfig: json };
+}
+export function parseScopeRead(text: string): ScopeRead {
+  const j = obj(text);
+  const scopes = (Array.isArray(j.scopes) ? j.scopes : [])
+    .map((x) => x as { subject?: unknown; date?: unknown; lines?: unknown })
+    .map((x) => ({
+      subject: str(x.subject, 30) ?? '',
+      date: typeof x.date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(x.date) ? x.date : null,
+      lines: (Array.isArray(x.lines) ? x.lines : [])
+        .map((l) => str(l, 120))
+        .filter((l): l is string => !!l)
+        .slice(0, 30),
+    }))
+    .filter((x) => x.subject && x.lines.length)
+    .slice(0, 20);
+  return { scopes };
+}
+
 /** AI 코치: 기록 글 → 잘한 점 · 고칠 점 · 먼저 할 것 · 요일별 계획 */
 export interface CoachRead {
   good: string | null;
@@ -133,7 +189,8 @@ export interface CoachRead {
 const DAYS = ['월', '화', '수', '목', '금', '토', '일'];
 export function coachBody(record: string) {
   const prompt = [
-    '너는 한국 고등학생의 공부 코치야. 아래 기록만 보고 다음 주(월~일) 공부 계획을 짜 줘. 기록에 없는 사실은 지어내지 마.',
+    '너는 한국 고등학생의 공부 코치야. 아래 기록만 보고 [계획할 주](월~일) 공부 계획을 짜 줘. 기록에 없는 사실은 지어내지 마.',
+    '- [그 주 일정 · 시험]에 일정 · 과외 · 시험이 있는 날은 공부 시간을 줄여 (적힌 % 만큼). 시험 날은 그 시험 과목을 짧게 복습만',
     '- 요일마다 할 과목 · 분 · 할 일 (실제로 공부한 양에서 크게 벗어나지 않게, 평일은 학교가 있으니 적게)',
     '- 시험이 가까운 과목과 오답이 많은 과목을 먼저',
     '- 숙제 · 시험 과목처럼 기록에 없는 정보는 추측하지 마 (과목을 모르면 subject 를 "숙제" 처럼 적기)',

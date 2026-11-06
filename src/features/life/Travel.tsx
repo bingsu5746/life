@@ -1,25 +1,40 @@
 // 여행: 가 볼 곳 · 다녀온 곳 (맛집 · 카페 · 관광지 · 숙소)
-import { lazy, Suspense, useState } from 'react';
+import { addPhoto, photoUrl, removePhoto } from '../study/photos';
+import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import { shortDate } from '../study/dates';
 import { alive, newId, type TravelPlace } from '../study/model';
 import { put, remove, useStudy } from '../study/store';
 import { confirmDelete, Empty, Field, Icon, Sheet, tap, toast, useToday } from '../study/ui';
 import { StarInput, starText } from './MovieParts';
-import { routeUrl, searchPlaces, type KPlace } from './kakao';
+import { routeUrl, searchAddress, suggestPlaces, type KPlace } from './kakao';
 
 const KakaoMap = lazy(() => import('./KakaoMap'));
 const PickMap = lazy(() => import('./PlaceMap').then((m) => ({ default: m.PickMap })));
 
+/** 두 곳 사이 곧은 거리 (km) */
+const km = (a: { lat?: number; lon?: number }, b: { lat?: number; lon?: number }) => {
+  const r = Math.PI / 180;
+  const h = Math.sin(((b.lat! - a.lat!) * r) / 2) ** 2 + Math.cos(a.lat! * r) * Math.cos(b.lat! * r) * Math.sin(((b.lon! - a.lon!) * r) / 2) ** 2;
+  return 2 * 6371 * Math.asin(Math.sqrt(h));
+};
+
 const KIND: Record<TravelPlace['kind'], string> = { food: '맛집', cafe: '카페', sight: '관광지', stay: '숙소', etc: '기타' };
 
-export function Travel() {
+/** sub: 'visited' 다녀온 곳 · 'map' 지도 · 'trail' 여행 기록(다녀온 곳을 날짜순 선으로). 칸은 왼쪽(폰은 아래) 메뉴 */
+export function Travel({ sub }: { sub?: string }) {
   const d = useStudy();
   const today = useToday();
-  const [tab, setTab] = useState<TravelPlace['status']>('want');
+  const trail = sub === 'trail';
+  const map = sub === 'map' || trail;
+  const tab: TravelPlace['status'] = sub === 'visited' || trail ? 'visited' : 'want';
   const [kind, setKind] = useState<TravelPlace['kind'] | ''>('');
   const [edit, setEdit] = useState<Partial<TravelPlace> | null>(null);
-  const [map, setMap] = useState(false);
+  const [year, setYear] = useState('');
   const all = alive(d.places);
+  // 여행 기록: 위치 · 다녀온 날이 있는 곳을 날짜순으로
+  const visitedPos = all.filter((p) => p.status === 'visited' && p.visited && p.lat !== undefined && p.lon !== undefined);
+  const years = [...new Set(visitedPos.map((p) => p.visited!.slice(0, 4)))].sort().reverse();
+  const steps = visitedPos.filter((p) => !year || p.visited!.startsWith(year)).sort((a, b) => a.visited!.localeCompare(b.visited!) || a.created - b.created);
   const list = all.filter((p) => p.status === tab && (!kind || p.kind === kind)).sort((a, b) => (tab === 'visited' ? (b.visited ?? '').localeCompare(a.visited ?? '') : (a.region ?? '').localeCompare(b.region ?? '', 'ko')) || b.created - a.created);
   const kinds = [...new Set(all.filter((p) => p.status === tab).map((p) => p.kind))];
   // 지역별로 묶어서
@@ -28,23 +43,45 @@ export function Travel() {
   return (
     <div className="st-page narrow">
       <div className="st-page-head">
-        <h2>여행</h2>
+        <h2>{trail ? '여행 기록' : map ? '여행 지도' : tab === 'want' ? '가 볼 곳' : '다녀온 곳'}</h2>
         <button className="btn btn-sm btn-primary" onClick={() => setEdit({ status: tab, kind: kind || 'food' })} aria-label="장소 넣기">
           <Icon name="plus" />
         </button>
       </div>
-      <nav className="mv-sub" aria-label="여행">
-        <button className={tab === 'want' ? 'on' : ''} onClick={() => setTab('want')}>
-          가 볼 곳{all.filter((p) => p.status === 'want').length ? ` ${all.filter((p) => p.status === 'want').length}` : ''}
-        </button>
-        <button className={tab === 'visited' ? 'on' : ''} onClick={() => setTab('visited')}>
-          다녀온 곳{all.filter((p) => p.status === 'visited').length ? ` ${all.filter((p) => p.status === 'visited').length}` : ''}
-        </button>
-        <button className={map ? 'on' : ''} onClick={() => setMap(!map)}>
-          지도
-        </button>
-      </nav>
-      {map && (
+      {trail && years.length > 1 && (
+        <div className="st-chips">
+          {['', ...years].map((y) => (
+            <button key={y || 'all'} className={`st-chip ${year === y ? 'on' : ''}`} aria-pressed={year === y} onClick={() => setYear(y)}>
+              {y ? `${y}년` : '전부'}
+            </button>
+          ))}
+        </div>
+      )}
+      {trail && (
+        <Suspense fallback={<div className="pm-map" />}>
+          <KakaoMap pins={steps.map((p, i) => ({ id: p.id, lat: p.lat!, lon: p.lon!, name: `${i + 1}. ${p.name}`, done: true }))} path={steps.map((p) => ({ lat: p.lat!, lon: p.lon! }))} onOpen={(id) => setEdit(d.places[id])} onAdd={(k) => setEdit(fromKakao(k, all))} />
+        </Suspense>
+      )}
+      {trail &&
+        (steps.length < 2 ? (
+          <Empty title="다녀온 곳이 두 곳 넘게 있어야 길을 이어요">다녀온 곳에 다녀온 날과 위치를 넣으면 날짜순으로 선을 이어 보여 줘요.</Empty>
+        ) : (
+          <section className="st-card">
+            <small className="aw-label">
+              {steps.length}곳 · 모두 {Math.round(steps.slice(1).reduce((a, p, i) => a + km(steps[i], p), 0)).toLocaleString('ko-KR')}km
+            </small>
+            <ol className="tr-steps">
+              {steps.map((p, i) => (
+                <li key={p.id} className="st-tap" {...tap(() => setEdit(p))}>
+                  {p.photos?.[0] && <PlacePhoto id={p.photos[0]} />}
+                  <b>{p.name}</b>
+                  <small className="st-muted">{[shortDate(p.visited!), p.region, i > 0 && `앞 곳에서 ${km(steps[i - 1], p).toFixed(1)}km`].filter(Boolean).join(' · ')}</small>
+                </li>
+              ))}
+            </ol>
+          </section>
+        ))}
+      {map && !trail && (
         <Suspense fallback={<div className="pm-map" />}>
           <KakaoMap pins={all.filter((p) => p.lat !== undefined && p.lon !== undefined && (!kind || p.kind === kind)).map((p) => ({ id: p.id, lat: p.lat!, lon: p.lon!, name: p.name, done: p.status === 'visited' }))} onOpen={(id) => setEdit(d.places[id])} onAdd={(k) => setEdit(fromKakao(k, all))} />
         </Suspense>
@@ -68,7 +105,7 @@ export function Travel() {
             <small className="aw-label">{region}</small>
             {ps.map((p) => (
               <div key={p.id} className="st-item st-tap" {...tap(() => setEdit(p))}>
-                <span className="st-pill">{KIND[p.kind]}</span>
+                {p.photos?.[0] ? <PlacePhoto id={p.photos[0]} small /> : <span className="st-pill">{KIND[p.kind]}</span>}
                 <div className="st-item-main">
                   <div className="st-item-title">{p.name}</div>
                   {(p.note || p.visited || p.rating || p.addr) && <div className="st-item-sub">{[p.rating && starText(p.rating), p.visited && shortDate(p.visited), p.note?.split('\n')[0] || p.addr].filter(Boolean).join(' · ')}</div>}
@@ -115,26 +152,38 @@ function PlaceSheet({ item, today, onClose }: { item: Partial<TravelPlace>; toda
   const [rating, setRating] = useState(item.rating ?? 0);
   const [note, setNote] = useState(item.note ?? '');
   const [pos, setPos] = useState(item.lat !== undefined && item.lon !== undefined ? { lat: item.lat, lon: item.lon } : undefined);
+  const [photos, setPhotos] = useState<string[]>(item.photos ?? []);
+  const [pBusy, setPBusy] = useState(false);
+  const addPhotos = async (files: FileList) => {
+    setPBusy(true);
+    const ids: string[] = [];
+    for (const f of [...files].slice(0, 4 - photos.length)) {
+      try {
+        ids.push((await addPhoto(f)).id);
+      } catch {
+        toast('사진을 넣지 못했어요');
+      }
+    }
+    setPhotos((x) => [...x, ...ids].slice(0, 4));
+    setPBusy(false);
+  };
   const [picking, setPicking] = useState(false);
   const [addr, setAddr] = useState(item.addr);
   const [url, setUrl] = useState(item.url);
-  const [found, setFound] = useState<KPlace[] | null>(null);
-  const [finding, setFinding] = useState(false);
-  const find = () => {
-    setFinding(true);
-    searchPlaces(name.trim() + (region.trim() ? ` ${region.trim()}` : ''))
-      .then((r) => (setFound(r), !r.length && toast('찾은 곳이 없어요')))
-      .catch((e) => toast(e instanceof Error ? e.message : '찾지 못했어요'))
-      .finally(() => setFinding(false));
-  };
-  const pick = (k: KPlace) => {
-    setName(k.name);
-    setKind(k.kind);
-    setRegion(k.region);
+  // 이름을 치는 대로 카카오맵 추천 (고르면 다시 칠 때까지 닫음). 못 찾으면 주소를 직접 넣는다
+  const found = useSuggest(name, !!item.id);
+  const [addrQ, setAddrQ] = useState<string | null>(null);
+  const addrFound = useSuggest(addrQ ?? '', false, true);
+  const pick = (k: KPlace, keepName = false) => {
+    if (!keepName) setName(k.name);
+    if (k.kind !== 'etc') setKind(k.kind);
+    if (k.region) setRegion(k.region);
     setPos({ lat: k.lat, lon: k.lon });
     setAddr(k.addr || undefined);
     setUrl(k.url || undefined);
-    setFound(null);
+    found.close();
+    addrFound.close();
+    setAddrQ(null);
   };
   const regions = [
     ...new Set(
@@ -146,15 +195,20 @@ function PlaceSheet({ item, today, onClose }: { item: Partial<TravelPlace>; toda
   return (
     <Sheet title={item.id ? '장소 고치기' : '장소 넣기'} onClose={onClose}>
       <div className="st-form">
-        <div className="km-search">
-          <input className="st-input" autoFocus={!item.id} value={name} onChange={(e) => setName(e.target.value)} placeholder="이름 (예: ○○ 국밥)" aria-label="이름" />
-          <button type="button" className="btn" disabled={name.trim().length < 2 || finding} onClick={find}>
-            {finding ? '…' : '찾기'}
-          </button>
-        </div>
-        {found && found.length > 0 && (
+        <input
+          className="st-input"
+          autoFocus={!item.id}
+          value={name}
+          onChange={(e) => {
+            setName(e.target.value);
+            found.open();
+          }}
+          placeholder="이름 (치면 카카오맵에서 찾아요)"
+          aria-label="이름"
+        />
+        {found.list && found.list.length > 0 && (
           <ul className="km-list">
-            {found.map((k) => (
+            {found.list.map((k) => (
               <li key={k.id}>
                 <button type="button" className="km-row" onClick={() => pick(k)}>
                   <b>{k.name}</b>
@@ -163,6 +217,33 @@ function PlaceSheet({ item, today, onClose }: { item: Partial<TravelPlace>; toda
               </li>
             ))}
           </ul>
+        )}
+        {(found.list?.length === 0 || addrQ !== null) && !pos && (
+          <div className="tr-addr">
+            {addrQ === null ? (
+              <button type="button" className="st-link" onClick={() => setAddrQ('')}>
+                못 찾았나요? 주소를 직접 넣기
+              </button>
+            ) : (
+              <>
+                <input className="st-input" autoFocus value={addrQ} onChange={(e) => (setAddrQ(e.target.value), addrFound.open())} placeholder="주소 (예: 부산 해운대구 우동 1394)" aria-label="주소" />
+                {addrFound.list?.map((k) => (
+                  <button key={k.id} type="button" className="km-row" onClick={() => pick(k, true)}>
+                    <b>{k.addr}</b>
+                    <small className="st-muted">{k.region}</small>
+                  </button>
+                ))}
+                {addrFound.list?.length === 0 && (
+                  <small className="st-muted">
+                    주소를 못 찾았어요.{' '}
+                    <button type="button" className="st-link" onClick={() => (setAddr(addrQ.trim() || undefined), setAddrQ(null), setPicking(true))}>
+                      이 주소로 적고 지도에서 위치 찍기
+                    </button>
+                  </small>
+                )}
+              </>
+            )}
+          </div>
         )}
         {addr && (
           <small className="st-muted">
@@ -238,9 +319,25 @@ function PlaceSheet({ item, today, onClose }: { item: Partial<TravelPlace>; toda
             </button>
           )}
         </div>
+        <div className="dy-photos">
+          {photos.map((id) => (
+            <div key={id} className="dy-photo">
+              <PlacePhoto id={id} />
+              <button type="button" className="dy-photo-x" aria-label="사진 빼기" onClick={() => setPhotos(photos.filter((x) => x !== id))}>
+                ✕
+              </button>
+            </div>
+          ))}
+          {photos.length < 4 && (
+            <label className="dy-photo-add">
+              {pBusy ? '넣는 중…' : '+ 사진'}
+              <input type="file" accept="image/*" multiple hidden disabled={pBusy} onChange={(e) => e.target.files?.length && void addPhotos(e.target.files)} />
+            </label>
+          )}
+        </div>
         <div className="st-row end">
           {item.id && (
-            <button className="btn btn-sm st-danger" onClick={() => confirmDelete(`「${item.name}」`) && (remove('places', item.id!), onClose())}>
+            <button className="btn btn-sm st-danger" onClick={() => confirmDelete(`「${item.name}」`) && (remove('places', item.id!), (item.photos ?? []).forEach((p) => void removePhoto(p)), onClose())}>
               지우기
             </button>
           )}
@@ -248,6 +345,8 @@ function PlaceSheet({ item, today, onClose }: { item: Partial<TravelPlace>; toda
             className="btn btn-primary"
             disabled={!name.trim()}
             onClick={() => {
+              // 뺀 사진은 저장소에서도 지운다
+              for (const p of item.photos ?? []) if (!photos.includes(p)) void removePhoto(p);
               put('places', {
                 ...item,
                 id: item.id ?? newId(),
@@ -259,6 +358,7 @@ function PlaceSheet({ item, today, onClose }: { item: Partial<TravelPlace>; toda
                 visited: status === 'visited' ? visited || undefined : undefined,
                 rating: status === 'visited' && rating ? rating : undefined,
                 note: note.trim() || undefined,
+                photos: photos.length ? photos : undefined,
                 lat: pos?.lat,
                 lon: pos?.lon,
                 addr,
@@ -274,4 +374,37 @@ function PlaceSheet({ item, today, onClose }: { item: Partial<TravelPlace>; toda
       </div>
     </Sheet>
   );
+}
+
+/** 치는 대로 카카오맵 추천 (0.25초 쉬면). 고른 뒤에는 다시 칠 때까지 닫는다. onlyAddr: 주소로만 */
+function useSuggest(q: string, closed0: boolean, onlyAddr = false) {
+  const [list, setList] = useState<KPlace[] | null>(null);
+  const [closed, setClosed] = useState(closed0);
+  const seq = useRef(0);
+  useEffect(() => {
+    const t = q.trim();
+    const n = ++seq.current;
+    if (closed || t.length < 2) return void setList(null);
+    const timer = setTimeout(() => {
+      (onlyAddr ? searchAddress(t) : suggestPlaces(t))
+        .then((r) => n === seq.current && setList(r))
+        .catch(() => n === seq.current && setList([]));
+    }, 250);
+    return () => clearTimeout(timer);
+  }, [q, closed, onlyAddr]);
+  return { list, open: () => setClosed(false), close: () => (setClosed(true), setList(null)) };
+}
+
+/** 장소 사진 (small: 목록의 작은 그림) */
+function PlacePhoto({ id, small }: { id: string; small?: boolean }) {
+  const [url, setUrl] = useState<string | null | undefined>(undefined);
+  useEffect(() => {
+    let on = true;
+    void photoUrl(id).then((u) => on && setUrl(u));
+    return () => {
+      on = false;
+    };
+  }, [id]);
+  if (!url) return <div className={`dy-img ${small ? 'tr-thumb' : ''}`} />;
+  return <img className={`dy-img ${small ? 'tr-thumb' : ''}`} src={url} alt="장소 사진" loading="lazy" />;
 }

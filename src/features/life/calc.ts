@@ -281,3 +281,24 @@ export function weekAllowance(d: StudyData, today: DateStr): { amount: number; f
   if (lim) amount = Math.min(amount, Math.max(0, lim - weekSpent(d, today)));
   return { amount, fixed, perDay };
 }
+
+/**
+ * 월말 돈 리포트: 그달(month)을 지난달과 분류별로 비교하고, 최근 3달(그달 포함) 쓴 돈 평균으로 다음 달 예산을 추천 (1만 원 단위 올림).
+ * 「빚 갚기」는 쓴 돈 비교 · 예산에서 뺀다
+ */
+export function monthReport(d: StudyData, month: string): { out: number; prevOut: number; inn: number; changes: { category: string; now: number; prev: number }[]; budget: number | null; months: number } {
+  const cut = (m: string) => {
+    const s = monthSummary(d, m);
+    const by = s.byCategory.filter((c) => c.category !== '빚 갚기');
+    return { out: by.reduce((a, c) => a + c.amount, 0), inn: s.in, by };
+  };
+  const now = cut(month);
+  const prev = cut(shiftMonth(month, -1));
+  const cats = [...new Set([...now.by.map((c) => c.category), ...prev.by.map((c) => c.category)])];
+  const changes = cats
+    .map((category) => ({ category, now: now.by.find((c) => c.category === category)?.amount ?? 0, prev: prev.by.find((c) => c.category === category)?.amount ?? 0 }))
+    .sort((a, b) => Math.abs(b.now - b.prev) - Math.abs(a.now - a.prev));
+  const last3 = [month, shiftMonth(month, -1), shiftMonth(month, -2)].map((m) => cut(m).out).filter((x) => x > 0);
+  const budget = last3.length ? Math.ceil(last3.reduce((a, b) => a + b, 0) / last3.length / 10000) * 10000 : null;
+  return { out: now.out, prevOut: prev.out, inn: now.inn, changes, budget, months: last3.length };
+}

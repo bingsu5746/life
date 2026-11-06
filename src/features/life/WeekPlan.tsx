@@ -100,6 +100,37 @@ export function WeekPlanPage() {
         </button>
       </section>
 
+      {d.settings.weekItems?.[start]?.some((x) => x.length) && (
+        <section className="st-card">
+          <div className="st-inline between">
+            <h3 className="st-h">요일별 할 일 (AI 코치)</h3>
+            <button className="st-link" onClick={() => go('/insights/coach')}>
+              AI 코치
+            </button>
+          </div>
+          {dates.map((date, i) => {
+            const its = d.settings.weekItems![start][i] ?? [];
+            if (!its.length) return null;
+            return (
+              <div key={date} className="wp-row">
+                <b className={date === today ? 'wp-today' : ''}>{shortDate(date)}</b>
+                <div>
+                  {its.map((x, j) => (
+                    <div key={j} className="cal-item">
+                      <span className="cal-tag">{x.subject || '공부'}</span>
+                      <span>
+                        {x.what}
+                        {x.minutes ? <small className="st-muted"> · {minutesText(x.minutes)}</small> : null}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            );
+          })}
+        </section>
+      )}
+
       <section className="st-card">
         <h3 className="st-h">이 주 일정</h3>
         {dates.every((x) => !(items.get(x) ?? []).length && !load.find((l) => l.date === x)?.total) ? (

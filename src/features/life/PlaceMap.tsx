@@ -26,7 +26,8 @@ function makeMap(el: HTMLElement, center: [number, number], zoom: number) {
 const pinStyle = (done?: boolean): L.CircleMarkerOptions => ({ radius: 8, weight: 2, color: '#fff', fillColor: done ? '#111' : '#c2410c', fillOpacity: 1 });
 
 /** 장소들을 핀으로. 누르면 이름, 이름을 누르면 onOpen */
-export default function PlaceMap({ pins, onOpen }: { pins: Pin[]; onOpen: (id: string) => void }) {
+/** path: 이 순서로 선을 잇는다 (다녀온 길) */
+export default function PlaceMap({ pins, onOpen, path }: { pins: Pin[]; onOpen: (id: string) => void; path?: { lat: number; lon: number }[] }) {
   const el = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (!el.current) return;
@@ -39,12 +40,13 @@ export default function PlaceMap({ pins, onOpen }: { pins: Pin[]; onOpen: (id: s
       b.onclick = () => onOpen(p.id);
       m.bindPopup(b, { closeButton: false });
     }
+    if (path && path.length > 1) L.polyline(path.map((p) => [p.lat, p.lon] as [number, number]), { color: '#c2410c', weight: 4, opacity: 0.8 }).addTo(map);
     if (pins.length > 1) map.fitBounds(L.latLngBounds(pins.map((p) => [p.lat, p.lon])), { padding: [30, 30], maxZoom: 15 });
     return () => {
       map.remove();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pins.map((p) => `${p.id}${p.lat}${p.lon}${p.done}`).join()]);
+  }, [pins.map((p) => `${p.id}${p.lat}${p.lon}${p.done}${p.name}`).join() + (path ? `|${path.map((p) => `${p.lat},${p.lon}`).join(';')}` : '')]);
   return <div ref={el} className="pm-map" />;
 }
 

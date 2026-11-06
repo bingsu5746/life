@@ -3,7 +3,9 @@ import { useState } from 'react';
 import { addDays, weekday, WEEKDAYS } from '../study/dates';
 import { newId, type CalEvent, type DateStr } from '../study/model';
 import { put, remove } from '../study/store';
-import { Field, Sheet, toast } from '../study/ui';
+import { Field, Sheet, SubjectPicker, toast } from '../study/ui';
+import { useStudy } from '../study/store';
+import { eventSessionId } from './events';
 import { EVENT_COLORS, REMIND_OPTS } from './events';
 import { localTimes } from '../study/notify';
 import { isLoggedIn } from '../auth/api';
@@ -38,6 +40,9 @@ export function EventSheet({ date, ev, on, onClose }: { date: DateStr; ev?: CalE
   const [remind, setRemind] = useState<number | undefined>(ev ? ev.remind : 10);
   const [place, setPlace] = useState(ev?.place ?? '');
   const [memo, setMemo] = useState(ev?.memo ?? '');
+  const [study, setStudy] = useState(!!ev?.study);
+  const [subjectId, setSubjectId] = useState(ev?.subjectId ?? '');
+  const d = useStudy();
 
   const save = () => {
     if (!title.trim()) return toast('제목을 적어 주세요');
@@ -63,14 +68,20 @@ export function EventSheet({ date, ev, on, onClose }: { date: DateStr; ev?: CalE
       remind,
       place: place.trim() || undefined,
       memo: memo.trim() || undefined,
+      study: !allDay && study ? true : undefined,
+      subjectId: !allDay && study && subjectId ? subjectId : undefined,
       created: ev?.created ?? Date.now(),
     });
     onClose();
   };
   const del = (only: boolean) => {
     if (!ev) return;
-    if (only && on) put('events', { ...ev, skip: [...(ev.skip ?? []), on] });
-    else if (window.confirm(`「${ev.title}」 일정을 지울까요?`)) remove('events', ev.id);
+    if (only && on) {
+      put('events', { ...ev, skip: [...(ev.skip ?? []), on] });
+      // 그날 안 간 학원 · 과외: 이미 들어간 공부 기록도 뺀다
+      const sid = eventSessionId(ev, on);
+      if (d.sessions[sid] && !d.sessions[sid].deleted) remove('sessions', sid);
+    } else if (window.confirm(`「${ev.title}」 일정을 지울까요?`)) remove('events', ev.id);
     else return;
     onClose();
   };
@@ -150,6 +161,20 @@ export function EventSheet({ date, ev, on, onClose }: { date: DateStr; ev?: CalE
               )}
             </label>
           </div>
+        )}
+        {!allDay && (
+          <>
+            <label className="ev-row">
+              <span>끝나면 공부 기록으로 (학원 · 과외)</span>
+              <input type="checkbox" className="ev-switch" checked={study} onChange={(e) => setStudy(e.target.checked)} />
+            </label>
+            {study && (
+              <Field group label="과목">
+                <SubjectPicker value={subjectId} onChange={setSubjectId} />
+              </Field>
+            )}
+            {study && <small className="st-hint">일정이 끝나면 그 시간이 공부 기록에 저절로 들어가요. 안 간 날은 「이 날만 지우기」를 누르면 기록도 빠져요.</small>}
+          </>
         )}
         <Field label="알림">
           <select className="st-input" value={remind === undefined ? '' : String(remind)} onChange={(e) => setRemind(e.target.value === '' ? undefined : Number(e.target.value))}>

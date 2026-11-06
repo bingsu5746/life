@@ -4,7 +4,7 @@ import { NOISE_NAME, playNoise, setNoiseVolume, stopNoise, type NoiseKind } from
 import { examSoundUrl, saveSound } from '../../lib/soundStore';
 import { addSession } from './actions';
 import { alive } from './model';
-import { hhmm, MOCK_SUBJECTS, mockView, type MockState } from './mockExam';
+import { hhmm, MOCK_SUBJECTS, mockMinutes, mockSection, mockView, type MockState } from './mockExam';
 import { getStudy, useStudy, useWords } from './store';
 import { clock, minutesText, nextPhase, pause, resume, view, type TimerState } from './timer';
 import { primeAudio } from './timerStore';
@@ -103,7 +103,8 @@ export function FocusTimer({ timer, update, onStop, onExit }: { timer: TimerStat
               </button>
               <button aria-label="집중 화면 닫기 (타이머는 계속)" onClick={onExit}>
                 <svg viewBox="0 0 24 24" aria-hidden className="line">
-                  <path d="M9 4H4v5M15 20h5v-5M4 4l6 6M20 20l-6-6" />
+                  {/* 축소(안쪽으로 모이는 화살표): 전체 화면에서 나가기 */}
+                  <path d="M4 10h6V4M20 14h-6v6M4 4l6 6M20 20l-6-6" />
                 </svg>
               </button>
             </div>
@@ -197,7 +198,7 @@ export function MockExamPage() {
   const [state, setState] = useState<MockState | null>(loadMock);
   const [title, setTitle] = useState('과학탐구');
   const set = (s: MockState | null) => (setState(s), saveMock(s));
-  if (state) return <MockScreen state={state} onRestart={() => set({ ...state, startedAt: Date.now() })} onQuit={() => set(null)} />;
+  if (state) return <MockScreen state={state} onRestart={() => set({ ...state, startedAt: Date.now(), finishedAt: undefined })} onFinish={() => set({ ...state, finishedAt: Date.now() })} onQuit={() => set(null)} />;
   return (
     <div className="st-page narrow">
       <div className="st-page-head">
@@ -252,7 +253,7 @@ function ExamSoundPicker() {
   );
 }
 
-function MockScreen({ state, onRestart, onQuit }: { state: MockState; onRestart: () => void; onQuit: () => void }) {
+function MockScreen({ state, onRestart, onFinish, onQuit }: { state: MockState; onRestart: () => void; onFinish: () => void; onQuit: () => void }) {
   useImmersive();
   const now = useNow(250);
   const v = mockView(state, now);
@@ -284,7 +285,9 @@ function MockScreen({ state, onRestart, onQuit }: { state: MockState; onRestart:
   if (!v) return null;
   const s = v.subject;
   const name = state.title ? s.name.replace('탐구', state.title) : s.name;
-  const total = s.parts[s.parts.length - 1].to - s.parts[0].from;
+  // 실제로 푼 시간 (시간 전에 다 풀었으면 그때까지)
+  const total = mockMinutes(state);
+  const full = s.parts[s.parts.length - 1].to - s.parts[0].from;
   return (
     <div className={`focus mock ${shown ? 'show' : ''}`} onPointerDown={poke}>
       <div className="focus-top">
@@ -296,7 +299,7 @@ function MockScreen({ state, onRestart, onQuit }: { state: MockState; onRestart:
       <div className="focus-main">
         <AnalogClock min={v.clockMin} />
       </div>
-      <div className="focus-bottom">{v.done && <span>시험 끝</span>}</div>
+      <div className="focus-bottom">{v.done && <span>{state.finishedAt ? `다 풀었어요 · ${total}분 걸림 (${full}분 중 ${full - total}분 남김)` : '시험 끝'}</span>}</div>
       <div className="focus-ctl" onPointerDown={(e) => e.stopPropagation()}>
         {!v.done && (
           <div className="focus-noise">
@@ -321,7 +324,7 @@ function MockScreen({ state, onRestart, onQuit }: { state: MockState; onRestart:
               className="primary"
               onClick={() => {
                 const sub = alive(getStudy().subjects).find((x) => x.name.includes(name.replace(/ \d과목|영역/g, '').slice(0, 2)));
-                const end = Date.now();
+                const end = state.finishedAt ?? Date.now();
                 addSession({ subjectId: sub?.id, start: end - total * 60_000, end, minutes: total, date: new Date(end + 9 * 3_600_000).toISOString().slice(0, 10), kind: 'manual' });
                 setSaved(true);
                 toast(`${name} ${total}분을 공부 기록에 넣었어요`);
@@ -332,12 +335,29 @@ function MockScreen({ state, onRestart, onQuit }: { state: MockState; onRestart:
           )}
           {v.done && (
             <button
+              className={saved ? 'primary' : ''}
+              onClick={() => {
+                onQuit();
+                // 풀이 기록: 영역 · 걸린 시간을 채워서 (점수 · 등급 · 틀린 번호는 거기서)
+                go(`/review/papers-new?section=${encodeURIComponent(mockSection(state))}&min=${total}&rec=${saved ? 0 : 1}`);
+              }}
+            >
+              점수 · 틀린 번호 넣기
+            </button>
+          )}
+          {v.done && (
+            <button
               onClick={() => {
                 onQuit();
                 go(`/exams/grades/self-${state.key}`);
               }}
             >
-              점수 넣기
+              성적표에 넣기
+            </button>
+          )}
+          {!v.done && (
+            <button className="primary" onClick={() => window.confirm('다 풀었나요? 지금까지 걸린 시간을 기록해요') && onFinish()}>
+              다 풀었어요
             </button>
           )}
           <button onClick={() => window.confirm('처음부터 다시 볼까요?') && onRestart()}>처음부터</button>

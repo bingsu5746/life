@@ -92,6 +92,11 @@ export function EvePage() {
                   못 푼 오답 {w.notes.length}개 다시 풀기
                 </button>
               )}
+              {w.notes.length >= 3 && (
+                <button className="btn btn-sm" onClick={() => go(`/review/redo?mini=1&n=10&min=20&subject=${sid}`)}>
+                  ⏱ 20분 미니 모의고사
+                </button>
+              )}
               <button className="btn btn-sm" onClick={() => go(`/exams/weak-${sid}`)}>
                 약점 한 장
               </button>

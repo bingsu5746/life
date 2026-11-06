@@ -71,6 +71,8 @@ npm run build      # 배포용 빌드 (dist)
 
 OTT 표시는 TMDB(themoviedb.org)에서 API 키를 받아 같은 방법으로 비밀값 `TMDB_KEY` 에 넣는다 (없으면 표시만 빠진다).
 
+여행 지도(`#/travel/map`)는 카카오맵 JavaScript 키를 비밀값 `kakaomap` 에 넣고, 카카오 개발자 콘솔 › 앱 › 플랫폼 › Web 의 사이트 도메인에 이 사이트 주소(예: `https://life.<계정>.workers.dev`)를 넣어야 지도가 뜬다 (안 되면 OpenStreetMap 으로 대신 보여 준다). 장소 찾기는 카카오 REST 키(`kakaorest` 또는 책 찾기용 `KAKAO_KEY`)를 쓴다.
+
 영화 정보(극장가)를 쓰려면 Cloudflare 대시보드 → Workers & Pages → life → Settings → Variables and Secrets → Add → 종류 **Secret**, 이름 `KOBIS_KEY`, 값에 KOBIS 키. (저장소가 공개라 키를 코드에 넣지 않는다)
 
 `wrangler.jsonc` 그대로 씁니다. Cloudflare 대시보드 → Workers & Pages → 만들기 → 이 GitHub 저장소 연결

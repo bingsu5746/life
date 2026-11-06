@@ -76,7 +76,7 @@ export function SubjectPicker({ value, onChange }: { value: Id; onChange: (id: I
         </button>
       ))}
       {adding ? (
-        <span className="st-inline">
+        <span className="st-inline sp-add">
           <input autoFocus className="st-input sm" placeholder="과목 이름 (예: 수학)" value={name} onChange={(e) => setName(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), add())} />
           <button type="button" className="btn btn-sm btn-primary" onClick={add}>
             추가

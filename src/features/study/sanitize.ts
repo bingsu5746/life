@@ -313,6 +313,8 @@ const FIX: Record<Collection, Fix> = {
           }
         : undefined,
     skip: Array.isArray(x.skip) ? (x.skip as unknown[]).filter(isDate).slice(0, 500) : undefined,
+    study: x.study === true ? true : undefined,
+    subjectId: optStr(x.subjectId)?.slice(0, 40),
     remind: typeof x.remind === 'number' && x.remind >= 0 && x.remind <= 7 * 24 * 60 ? Math.round(x.remind) : undefined,
     place: optStr(x.place)?.slice(0, 80),
     memo: optStr(x.memo)?.slice(0, 2000),
@@ -331,6 +333,7 @@ const FIX: Record<Collection, Fix> = {
     lon: typeof x.lat === 'number' && typeof x.lon === 'number' && Math.abs(x.lat) <= 90 && Math.abs(x.lon) <= 180 ? x.lon : undefined,
     addr: optStr(x.addr)?.slice(0, 120),
     url: typeof x.url === 'string' && /^https?:\/\/place\.map\.kakao\.com\/\d+$/.test(x.url) ? x.url : undefined,
+    photos: Array.isArray(x.photos) ? x.photos.filter((p): p is string => typeof p === 'string').slice(0, 4) : undefined,
     created: num(x.created),
   }),
   records: (x) => ({
@@ -430,7 +433,7 @@ const FIX: Record<Collection, Fix> = {
     created: num(x.created),
   }),
   moneyTx: (x) =>
-    isDate(x.date) && score(x.amount, 0, 1e10) !== undefined ? { ...x, type: x.type === 'in' ? 'in' : 'out', amount: Math.round(x.amount as number), category: str(x.category, '기타').slice(0, 20), memo: optStr(x.memo)?.slice(0, 200), ruleId: optStr(x.ruleId), created: num(x.created) } : null,
+    isDate(x.date) && score(x.amount, 0, 1e10) !== undefined ? { ...x, type: x.type === 'in' ? 'in' : 'out', amount: Math.round(x.amount as number), category: str(x.category, '기타').slice(0, 20), memo: optStr(x.memo)?.slice(0, 200), ruleId: optStr(x.ruleId), due: optDate(x.due), created: num(x.created) } : null,
   moneyRules: (x) =>
     isDate(x.start) && score(x.amount, 1, 1e10) !== undefined && ['daily', 'weekly', 'monthly', 'yearly'].includes(x.freq as string)
       ? {
@@ -663,6 +666,35 @@ export function sanitizeSettings(s: unknown): StudySettings & { updatedAt: numbe
             .map(([k, v]) => [k, Array.from({ length: 7 }, (_, i) => Math.round(cl((v as unknown[])[i], 0, 1440, 0)))]),
         )
       : undefined,
+    miniTests: Array.isArray(x.miniTests)
+      ? (x.miniTests as unknown[])
+          .filter(isObj)
+          .filter((t) => isDate((t as Obj).date))
+          .slice(-100)
+          .map((t) => {
+            const o = t as Obj;
+            const n = Math.round(cl(o.n, 1, 100, 1));
+            const solved = Math.round(cl(o.solved, 0, n, 0));
+            return { at: num(o.at), date: o.date as string, subjectId: optStr(o.subjectId)?.slice(0, 40), n, solved, right: Math.round(cl(o.right, 0, solved, 0)), minutes: Math.round(cl(o.minutes, 0, 600, 0)) };
+          })
+      : undefined,
+    weekItems: isObj(x.weekItems)
+      ? Object.fromEntries(
+          Object.entries(x.weekItems)
+            .filter(([k, v]) => isDate(k) && Array.isArray(v))
+            .sort(([a], [b]) => a.localeCompare(b))
+            .slice(-8)
+            .map(([k, v]) => [
+              k,
+              Array.from({ length: 7 }, (_, i) =>
+                (Array.isArray((v as unknown[])[i]) ? ((v as unknown[])[i] as unknown[]) : [])
+                  .filter(isObj)
+                  .slice(0, 8)
+                  .map((it) => ({ subject: str((it as Obj).subject).slice(0, 20), what: str((it as Obj).what).slice(0, 80), minutes: Math.round(cl((it as Obj).minutes, 0, 600, 0)) })),
+              ),
+            ]),
+        )
+      : undefined,
     morningOff: x.morningOff === true ? true : undefined,
     solveLimits: isObj(x.solveLimits)
       ? Object.fromEntries(
@@ -679,6 +711,29 @@ export function sanitizeSettings(s: unknown): StudySettings & { updatedAt: numbe
     school: isObj(x.school) && typeof x.school.name === 'string' && x.school.name.trim() ? { name: x.school.name.trim().slice(0, 40), grade: score(x.school.grade, 1, 3), cls: typeof x.school.cls === 'string' && /^\d{1,2}$/.test(x.school.cls) ? x.school.cls : undefined } : undefined,
     sleepGoal: score(x.sleepGoal, 3, 12),
     diaryTime: typeof x.diaryTime === 'string' && /^([01]\d|2[0-3]):[0-5]\d$/.test(x.diaryTime) ? x.diaryTime : undefined,
+    breakWords: isObj(x.breakWords) && typeof (x.breakWords as Obj).start === 'string' && /^([01]\d|2[0-3]):[0-5]\d$/.test((x.breakWords as Obj).start as string)
+      ? { start: (x.breakWords as Obj).start as string, len: Math.round(cl((x.breakWords as Obj).len, 30, 120, 50)), rest: Math.round(cl((x.breakWords as Obj).rest, 5, 30, 10)), per: Math.round(cl((x.breakWords as Obj).per, 1, 7, 3)) }
+      : undefined,
+    birthdays: Array.isArray(x.birthdays)
+      ? (x.birthdays as unknown[])
+          .filter(isObj)
+          .filter((b) => typeof (b as Obj).name === 'string' && typeof (b as Obj).md === 'string' && /^(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/.test((b as Obj).md as string))
+          .slice(0, 100)
+          .map((b) => {
+            const o = b as Obj;
+            return { id: str(o.id, `b${Math.random().toString(36).slice(2, 10)}`).slice(0, 40), name: (o.name as string).trim().slice(0, 30) || '이름', md: o.md as string, budget: score(o.budget, 1, 1e9), idea: optStr(o.idea)?.slice(0, 200) };
+          })
+      : undefined,
+    packAlways: Array.isArray(x.packAlways) ? (x.packAlways as unknown[]).filter((v): v is string => typeof v === 'string' && !!v.trim()).map((v) => v.trim().slice(0, 30)).slice(0, 20) : undefined,
+    packBySubject: isObj(x.packBySubject)
+      ? Object.fromEntries(
+          Object.entries(x.packBySubject)
+            .filter(([k, v]) => k.length <= 40 && typeof v === 'string' && v.trim())
+            .map(([k, v]) => [k, (v as string).trim().slice(0, 40)])
+            .slice(0, 40),
+        )
+      : undefined,
+    packChecks: isObj(x.packChecks) && isDate((x.packChecks as Obj).date) && Array.isArray((x.packChecks as Obj).ids) ? { date: (x.packChecks as Obj).date as string, ids: ((x.packChecks as Obj).ids as unknown[]).filter((v): v is string => typeof v === 'string').slice(0, 60) } : undefined,
     wordQuizTime: typeof x.wordQuizTime === 'string' && /^([01]\d|2[0-3]):[0-5]\d$/.test(x.wordQuizTime) ? x.wordQuizTime : undefined,
     checkinTime: typeof x.checkinTime === 'string' && /^([01]\d|2[0-3]):[0-5]\d$/.test(x.checkinTime) ? x.checkinTime : undefined,
     semesterGoals: isObj(x.semesterGoals)

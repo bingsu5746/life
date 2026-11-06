@@ -176,7 +176,7 @@ describe('toc', () => {
     expect(parseToc('가 10-5')[0].problem).toBeTruthy();
     expect(parseToc('가 1-10\n나 8-12')[1].problem).toBe('앞 단원과 페이지가 겹쳐요');
     expect(parseToc('머리말')[0]).toMatchObject({ name: '머리말', unitOnly: true });
-    expect(parseToc('머리말\n1. 집합 12-30\n2. 명제 31-40')[0].problem).toBe('페이지를 못 찾았어요');
+    expect(parseToc('머리말\n1. 집합 12-30\n2. 명제 31-40')[0]).toMatchObject({ header: true, problem: '쪽 없는 큰 제목 (빼요)' });
     expect(parseToc('가 5')[0].problem).toBe('끝 페이지를 알려 주세요');
   });
 });

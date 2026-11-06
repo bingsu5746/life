@@ -38,6 +38,10 @@ export interface StudySettings {
   hiddenTabs?: string[];
   /** 주마다 요일별 공부 시간 목표(분): 그 주 월요일 → [월 … 일] */
   weekTargets?: Record<DateStr, number[]>;
+  /** AI 코치가 짠 요일별 할 일 (주간 계획에 넣었을 때): 그 주 월요일 → [월 … 일][] */
+  /** 오답 미니 모의고사 기록 (최근 100번): 날짜 · 과목(없으면 모든 과목) · 낸 문제 · 푼 문제 · 맞힌 문제 · 걸린 분 */
+  miniTests?: { at: number; date: DateStr; subjectId?: Id; n: number; solved: number; right: number; minutes: number }[];
+  weekItems?: Record<DateStr, { subject: string; what: string; minutes: number }[][]>;
   /** 풀이 AI 하루 한도 (서비스 화면에서 본 숫자를 직접 넣음) */
   solveLimits?: Record<string, number>;
   /** 메인 아침 루틴 숨기기 */
@@ -54,6 +58,14 @@ export interface StudySettings {
   diaryTime?: string;
   /** 단어 퀴즈 알림 시각 (자주 틀린 단어 3개) */
   wordQuizTime?: string;
+  /** 내일 챙길 것: 늘 챙길 것 · 과목별 준비물 (예: 체육 → 체육복) · 체크한 것 (그 날짜 → id) */
+  /** 생일 · 선물 계획: 이름 · 월-일 · 선물 예산(원) · 선물 생각 */
+  birthdays?: { id: Id; name: string; md: string; budget?: number; idea?: string }[];
+  packAlways?: string[];
+  packBySubject?: Record<Id, string>;
+  packChecks?: { date: DateStr; ids: string[] };
+  /** 쉬는 시간 단어 알림: 1교시 시작 · 수업 길이(분) · 쉬는 시간(분) · 하루 몇 번 */
+  breakWords?: { start: string; len: number; rest: number; per: number };
   /** 하루 마감 체크인 알림 시각 HH:MM */
   checkinTime?: string;
   /** 잠 목표 (시간) */
@@ -568,6 +580,8 @@ export interface MoneyTx extends Stamp {
   memo?: string;
   /** 고정 지출·수입에서 자동으로 넣은 것이면 그 규칙 */
   ruleId?: Id;
+  /** 빚: 갚을 날 (그 전날 아침 알림) */
+  due?: DateStr;
   created: number;
 }
 
@@ -739,6 +753,8 @@ export interface TravelPlace extends Stamp {
   /** 지도 위치 */
   lat?: number;
   lon?: number;
+  /** 사진 (일기 사진과 같은 저장소, 4장까지) */
+  photos?: Id[];
   /** 주소 · 카카오맵 장소 페이지 */
   addr?: string;
   url?: string;
@@ -956,6 +972,9 @@ export interface CalEvent extends Stamp {
   remind?: number;
   place?: string;
   memo?: string;
+  /** 끝나면 공부 기록으로 넣기 (학원 · 과외처럼 시각이 있는 일정). 그 과목 */
+  study?: boolean;
+  subjectId?: Id;
   created: number;
 }
 

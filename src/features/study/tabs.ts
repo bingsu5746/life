@@ -57,6 +57,7 @@ export const AREA_ITEMS: Record<Exclude<AreaKey, 'home' | 'study'>, AreaItem[]> 
     { key: '', label: '일기', icon: 'area-diary' },
     { key: 'dream', label: '꿈', icon: 'moon' },
     { key: 'form', label: '양식', icon: 'settings' },
+    { key: 'highlight', label: '하이라이트', icon: 'review' },
     { key: 'recap', label: '한 해 결산', icon: 'target' },
   ],
 };
@@ -97,6 +98,16 @@ export const champItems = (id: string, pos: string): AreaItem[] => [
 ];
 export const champItem = (sub?: string) => (sub ?? 'build').split('-')[0];
 
+/** 여행 안에서의 메뉴 (취미로 돌아가기 + 가 볼 곳 · 다녀온 곳 · 지도 · 여행 기록) */
+export const TRAVEL_ITEMS: AreaItem[] = [
+  { key: 'hobby', label: '취미', icon: 'area-hobby', to: '/hobby' },
+  { key: 'want', label: '가 볼 곳', icon: 'target', to: '/travel' },
+  { key: 'visited', label: '다녀온 곳', icon: 'life', to: '/travel/visited' },
+  { key: 'map', label: '지도', icon: 'pin', to: '/travel/map' },
+  { key: 'trail', label: '여행 기록', icon: 'time', to: '/travel/trail' },
+];
+export const travelItem = (sub?: string) => (sub === 'visited' || sub === 'map' || sub === 'trail' ? sub : 'want');
+
 /** 농구 안에서의 메뉴 (취미로 돌아가기 + 농구 연습 · 농구 기록 · NBA) */
 export const BASKETBALL_ITEMS: AreaItem[] = [
   { key: 'hobby', label: '취미', icon: 'area-hobby', to: '/hobby' },
@@ -108,11 +119,12 @@ export const BASKETBALL_ITEMS: AreaItem[] = [
 export const basketballItem = (sub?: string) => (sub === 'drills' || sub === 'nba' || sub === 'shots' ? sub : 'log');
 
 /** NBA 안에서의 메뉴 (농구로 돌아가기 + 경기 · 순위 · 로스터 · 선수) */
-/** 돌아보기: 이번 주 · 이번 달 · AI 코치 · 영역별 통계 */
+/** 통계: 이번 주 · 이번 달 · AI 코치 · 이것저것 · 영역별 통계 */
 export const REVIEW_ITEMS: AreaItem[] = [
   { key: 'week', label: '이번 주', icon: 'review', to: '/week' },
   { key: 'month', label: '이번 달', icon: 'exams', to: '/month' },
   { key: 'coach', label: 'AI 코치', icon: 'area-ai', to: '/insights/coach' },
+  { key: 'fun', label: '이것저것', icon: 'target', to: '/insights/fun' },
   { key: 'study', label: '공부', icon: 'area-study', to: '/insights/study' },
   { key: 'grades', label: '성적', icon: 'target', to: '/insights/grades' },
   { key: 'fitness', label: '운동', icon: 'area-fitness', to: '/insights/fitness' },
@@ -137,7 +149,7 @@ export const movieItem = (sub?: string) => (sub === 'watched' || sub === 'want' 
 /** 지금 주소에서 어느 메뉴가 켜져 있는지 */
 export function activeItem(area: keyof typeof AREA_ITEMS, sub?: string, p0?: string): string {
   if (area === 'hobby' && (HOBBY_PARTS as readonly string[]).includes(p0 ?? '')) return p0!;
-  if (area === 'diary') return sub === 'dream' || sub === 'form' || sub === 'recap' ? sub : '';
+  if (area === 'diary') return sub === 'dream' || sub === 'form' || sub === 'recap' ? sub : sub?.startsWith('highlight') ? 'highlight' : '';
   if (area === 'money') return sub === 'fixed' || sub === 'saving' ? sub : '';
   if (area === 'hobby') return sub === 'wish' || sub === 'reading' ? sub : '';
   return '';
