@@ -395,9 +395,11 @@ function GradeSheet({
       at: r.at ?? now,
     }));
     put('grades', { ...(record ?? {}), id: record?.id ?? newId(), kind, level: kind === 'mock' ? lv : undefined, name: name.trim().slice(0, 40), date, examId: record?.examId ?? exam?.id, scores, memo: memo.trim() || undefined });
-    toast(record ? '성적을 고쳤어요' : '성적을 넣었어요');
+    toast(record ? '성적을 고쳤어요' : '성적을 넣었어요 · 시험 회고를 보여 드릴게요');
     onSaved(kind);
     onClose();
+    // 시험에서 넣은 성적이면 그 시험 회고로
+    if (!record && exam) setTimeout(() => go(`/exams/${exam.id}`), 0);
   }
 
   return (

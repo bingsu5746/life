@@ -56,6 +56,32 @@ export function diaryBody(text: string) {
   ].join('\n');
   return { contents: [{ role: 'user', parts: [{ text: prompt }] }], generationConfig: json };
 }
+/** 일기 제목 추천: 지금까지 쓴 제목들의 느낌(길이 · 말투 · 기호)을 따라 3개 */
+export function titleBody(text: string, past: string[]) {
+  const prompt = [
+    '아래 [오늘 일기]에 어울리는 제목을 3개 지어 줘.',
+    '- [지금까지 쓴 제목]의 느낌을 따라 해: 길이, 말투(반말 · 명사형 · 문장형), 이모지나 기호를 쓰는지, 유머 정도.',
+    '- 지금까지 쓴 제목이 없으면 짧고 담백하게 (15자 안).',
+    '- 일기에 없는 일은 지어내지 마. 세 개는 서로 느낌이 조금씩 다르게.',
+    'JSON: {"titles": [문자열 3개]}',
+    '',
+    '[지금까지 쓴 제목]',
+    ...(past.length ? past.map((t) => `- ${t}`) : ['- (없음)']),
+    '',
+    '[오늘 일기]',
+    text,
+  ].join('\n');
+  return { contents: [{ role: 'user', parts: [{ text: prompt }] }], generationConfig: { responseMimeType: 'application/json', temperature: 0.8 } };
+}
+export function parseTitles(text: string): { titles: string[] } {
+  const j = obj(text);
+  const titles = (Array.isArray(j.titles) ? j.titles : [])
+    .map((x) => str(x, 40))
+    .filter((x): x is string => !!x)
+    .slice(0, 3);
+  return { titles };
+}
+
 export function parseDiary(text: string): DiaryRead {
   const j = obj(text);
   const out: DiaryRead = {};

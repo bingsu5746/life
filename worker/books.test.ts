@@ -35,3 +35,25 @@ describe('예스24 응답 (문서 예시 모양)', () => {
     expect(r[0]).toMatchObject({ src: 'yes24', title: '클린 코드 : 애자일', price: 33000, sale: 29700, pages: '584쪽', date: '20131224', cover: 'https://image.yes24.com/goods/12345678/L', tocText: '1장 깨끗한 코드\n2장 의미 있는 이름' });
   });
 });
+
+describe('예스24 목차 (실제 상품 페이지 모양: <br/> 줄 · 끝에 쪽 · <b>대단원</b>)', () => {
+  it('줄로 나누고 쪽 번호를 지킨다', async () => {
+    const { tocClean } = await import('./books');
+    const html = '<b>Ⅰ. 다항식</b><br/><br/> 01 다항식의 연산 8<br/> 02 나머지 정리와 인수분해 24<br/><br/><b>Ⅱ. 방정식</b><br/><br/> 03 복소수 46<br/> 04 이차방정식 62';
+    const t = tocClean(html);
+    expect(t.split('\n').map((l) => l.trim())).toEqual(['Ⅰ. 다항식', '01 다항식의 연산 8', '02 나머지 정리와 인수분해 24', 'Ⅱ. 방정식', '03 복소수 46', '04 이차방정식 62']);
+    const { parseToc } = await import('../src/features/study/toc');
+    const rows = parseToc(t, 80).filter((r) => !r.problem);
+    expect(rows.map((r) => [r.name, r.from, r.to])).toEqual([
+      ['01 다항식의 연산', 8, 23],
+      ['02 나머지 정리와 인수분해', 24, 45],
+      ['03 복소수', 46, 61],
+      ['04 이차방정식', 62, 80],
+    ]);
+  });
+  it('상품 페이지에서 목차 글 꺼내기', async () => {
+    const { yes24PageToc } = await import('./books');
+    const page = '<div id="infoset_toc" class="gd_infoSet"><textarea style="display:none;" class="txtContentText"> <b>Ⅰ. 다항식</b><br/> 01 다항식의 연산 8<br/> </textarea></div><div id="infoset_chYes">';
+    expect(yes24PageToc(page)).toBe('Ⅰ. 다항식\n01 다항식의 연산 8');
+  });
+});

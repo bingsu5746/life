@@ -655,6 +655,8 @@ export const bookToc = (url: string) => call<{ text: string }>(`books/toc?url=${
 /** ISBN 으로 국립중앙도서관 목차 (예스24 목차에 쪽이 없을 때) */
 export const bookTocIsbn = (isbn: string) => remember(`tocisbn:${isbn}`, 60 * MIN, () => call<{ text: string }>(`books/toc?isbn=${encodeURIComponent(isbn)}`, 'GET', undefined, 25_000));
 /** 받아쓴 일기 → 칸 나누기 */
+/** 일기 → 제목 추천 3개 (지금까지 쓴 제목 느낌으로) */
+export const diaryTitles = (text: string, past: string[]) => aiJob<{ titles: string[] }>('ai/title', { text, past });
 export const diarySplit = (text: string) => aiJob<Partial<Record<'good' | 'hard' | 'thanks' | 'learned' | 'fix' | 'worry' | 'tomorrow' | 'dream', string>>>('ai/diary', { text });
 /** 카카오맵 JS 키 (브라우저용, 등록한 사이트에서만 동작) */
 export const kakaoKey = () => call<{ key: string }>('kakao/key');

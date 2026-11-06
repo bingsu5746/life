@@ -8,7 +8,7 @@ import { paceOf } from './plan';
 import { forecastFor, forecastText } from './forecast';
 import { bookDone, planCtx, planViews, reservedPages } from './select';
 import { getStudy, put, remove, useStudy, useWords } from './store';
-import { isUnitOnly, parseToc, tocText, type TocRow } from './toc';
+import { headerUnits, isUnitOnly, parseToc, tocText, type TocRow } from './toc';
 import { markBook } from './actions';
 import { BookSearch } from './BookSearch';
 import { bookToc, bookTocIsbn, tocScan, type BookHit } from '../auth/api';
@@ -204,7 +204,8 @@ function BookEditor({ book, onDone }: { book?: Book; onDone: (id?: string, plan?
     setOcr('쪽 번호가 있는 목차를 찾는 중…');
     const more: string[] = [];
     try {
-      if (h.isbn) more.push((await bookTocIsbn(h.isbn).catch(() => ({ text: '' }))).text.trim());
+      if (h.link) more.push((await bookToc(h.link).catch(() => ({ text: '' }))).text.trim());
+      if (h.isbn && !more.some((t) => t && pagedRows(t) >= 2)) more.push((await bookTocIsbn(h.isbn).catch(() => ({ text: '' }))).text.trim());
       if (h.toc) more.push((await bookToc(h.toc).catch(() => ({ text: '' }))).text.trim());
     } finally {
       setOcr(null);
@@ -376,6 +377,18 @@ function BookDetail({ id, plan }: { id: string; plan?: boolean }) {
   const n = all.filter((p) => done.has(p)).length;
   const pace = v ? paceOf(v.plan, v.target, planCtx(d, today)) : 0;
   const showPlan = planning;
+  // 예전에 대단원 이름도 단원으로 들어간 문제집: 계획에서 빼기
+  const heads = headerUnits(b.units, b.unitOnly);
+  function skipHeads() {
+    const full = (us: Unit[]) => compress(expand(us.filter((u) => !u.skip).map((u) => [u.from, u.to])));
+    const before = JSON.stringify(full(b.units));
+    const units = b.units.map((u, i) => (heads.includes(i) ? { ...u, skip: true } : u));
+    put('books', { ...b, units });
+    const after = full(units);
+    // 문제집 전체를 범위로 한 계획은 대단원을 빼고 다시 나눈다
+    for (const p of alive(d.plans)) if (p.target === 'book' && p.targetId === b.id && !p.finished && JSON.stringify(compress(expand(p.range))) === before) put('plans', { ...p, range: after, todayLock: undefined });
+    toast(`대단원 ${heads.length}개를 계획에서 뺐어요`);
+  }
 
   function markPages(on: boolean) {
     const r = expand(parseRanges(pages));
@@ -411,6 +424,18 @@ function BookDetail({ id, plan }: { id: string; plan?: boolean }) {
           ]}
         />
       </div>
+
+      {heads.length > 0 && (
+        <div className="st-banner">
+          <span>
+            대단원 이름 {heads.length}개({heads.slice(0, 3).map((i) => `「${b.units[i].name}」`).join(' ')}
+            {heads.length > 3 ? ' …' : ''})가 단원으로 들어가 있어요.
+          </span>
+          <button className="btn btn-sm btn-primary" onClick={skipHeads}>
+            계획에서 빼기
+          </button>
+        </div>
+      )}
 
       <section className="st-card">
         <div className="st-big-progress">

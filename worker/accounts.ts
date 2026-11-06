@@ -23,8 +23,8 @@ import { fetchSpecialDays } from './holidays';
 import { cleanFact, goodKo } from './fact';
 import { fetch2k } from './nba2k';
 import { hcBody, parseHc } from './homecourt';
-import { coachBody, diaryBody, noteBody, parseCoach, parseDiary, parseNote, parseReceipt, parseTocRead, receiptBody, tocBody } from './aiRead';
-import { seojiSearch, seojiToc, seojiTocByIsbn, yes24Search } from './books';
+import { coachBody, diaryBody, noteBody, parseCoach, parseDiary, parseNote, parseReceipt, parseTocRead, receiptBody, tocBody, titleBody, parseTitles } from './aiRead';
+import { seojiSearch, seojiToc, seojiTocByIsbn, yes24Search, yes24Toc } from './books';
 import { cheapShark } from './cheapshark';
 import { invenChamps, invenSkins, invenSkinVideo } from './skins';
 import { discordChannels, discordInfo, discordMessages, discordSend } from './discord';
@@ -388,6 +388,12 @@ export class Accounts extends DurableObject<Env> {
       const text = typeof body.text === 'string' ? body.text.trim().slice(0, 6000) : '';
       if (text.length < 20) return fail('기록이 너무 적어요.');
       return this.aiJob(user, coachBody(text), parseCoach, 'coach');
+    }
+    if (path === 'ai/title' && req.method === 'POST') {
+      const text = typeof body.text === 'string' ? body.text.trim().slice(0, 3000) : '';
+      if (text.length < 10) return fail('일기가 너무 짧아요.');
+      const past = (Array.isArray(body.past) ? body.past : []).filter((x): x is string => typeof x === 'string' && !!x.trim()).map((x) => x.trim().slice(0, 40)).slice(0, 30);
+      return this.aiJob(user, titleBody(text, past), parseTitles, 'title');
     }
     if (path === 'ai/stt' && req.method === 'POST') return this.stt(user, body);
     if (path === 'bb/scan' && req.method === 'POST') return this.bbScan(user, body);
@@ -2067,6 +2073,11 @@ export class Accounts extends DurableObject<Env> {
   }
   private async bookToc(url: string, isbn = ''): Promise<Response> {
     try {
+      // 예스24 상품 페이지 목차 (API 목차에 쪽이 없을 때)
+      if (/^https:\/\/(www|m)\.yes24\.com\//.test(url)) {
+        const r = await this.nbaCached(`y24toc:${url}`, 30 * DAY, () => yes24Toc(url));
+        return json({ text: r.v });
+      }
       if (isbn) {
         const key = this.nlKey();
         if (!key || !/^(\d{9}[\dXx]|\d{13})$/.test(isbn)) return json({ text: '' });

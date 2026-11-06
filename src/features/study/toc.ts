@@ -122,3 +122,17 @@ export function tocText(units: Unit[], unitOnly = false): string {
 export function unitOf(units: Unit[], page: number): Unit | undefined {
   return units.find((u) => page >= u.from && page <= u.to);
 }
+
+/**
+ * 이미 넣은 문제집에서 대단원 이름 같은 단원 (예전에 대단원도 한 칸으로 들어간 것): 몇 번째인지.
+ * 쪽 없는 문제집은 대단원 모양이고 다음 단원이 대단원이 아닌 것, 쪽 있는 문제집은 거기에 더해 다음 단원과 쪽이 겹치는 것
+ */
+export function headerUnits(units: Unit[], unitOnly = false): number[] {
+  const out: number[] = [];
+  units.forEach((u, i) => {
+    const next = units[i + 1];
+    if (u.skip || !next || !BIG.test(u.name.trim()) || BIG.test(next.name.trim())) return;
+    if (unitOnly || (next.from >= u.from && next.from <= u.to + 1)) out.push(i);
+  });
+  return out;
+}

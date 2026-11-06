@@ -11,8 +11,9 @@ import { guessCategory, topCategory } from './moneyGuess';
 import { receiptScan } from '../auth/api';
 import { compressProblemImage } from '../../lib/imageCompress';
 
-const OUT = ['식비', '간식·카페', '교통', '쇼핑', '문화·여가', '교육·책', '통신', '선물', '기타'];
-const IN = ['용돈', '알바', '선물', '기타'];
+const OUT = ['식비', '간식·카페', '교통', '쇼핑', '문화·여가', '교육·책', '통신', '선물', '빚 갚기', '기타'];
+/** 빚: 빌린 돈 (들어온 돈으로 적고, 갚으면 쓴 돈 「빚 갚기」로) */
+const IN = ['용돈', '알바', '선물', '빚', '기타'];
 
 /** sub: 'new' 이면 넣기 창, 'YYYY-MM' 이면 그 달 */
 export function Money({ sub }: { sub?: string }) {
@@ -42,6 +43,11 @@ export function Money({ sub }: { sub?: string }) {
     setEdit(null);
     if (sub === 'new') go('/money');
   };
+  // 남은 빚: 빌린 돈(수입 「빚」) − 갚은 돈(지출 「빚 갚기」)
+  const allTx = alive(d.moneyTx);
+  const borrowed = allTx.filter((t) => t.type === 'in' && t.category === '빚').reduce((a, t) => a + t.amount, 0);
+  const repaid = allTx.filter((t) => t.type === 'out' && t.category === '빚 갚기').reduce((a, t) => a + t.amount, 0);
+  const owe = borrowed - repaid;
   const short = (n: number) => (n >= 10000 ? `${Math.round(n / 1000) / 10}만` : n > 0 ? `${Math.round(n / 1000)}천` : '0');
 
   return (
@@ -100,6 +106,20 @@ export function Money({ sub }: { sub?: string }) {
               <button className="st-link mn-set" onClick={() => setBudgetOpen(true)}>
                 한 달 예산 정하기
               </button>
+            )}
+            {borrowed > 0 && (
+              <p className="mn-allow">
+                {owe > 0 ? (
+                  <>
+                    남은 빚 <b className="bad">{won(owe)}</b>
+                    <small className="st-muted"> · 빌린 돈 {won(borrowed)} 중 {won(repaid)} 갚음 (갚으면 쓴 돈 「빚 갚기」로 적어요)</small>
+                  </>
+                ) : (
+                  <>
+                    빚을 다 갚았어요 🎉<small className="st-muted"> · 빌린 돈 {won(borrowed)}</small>
+                  </>
+                )}
+              </p>
             )}
             {month === monthOf(today) && <WeekLimit today={today} />}
             {month === monthOf(today) &&

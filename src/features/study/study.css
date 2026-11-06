@@ -9966,3 +9966,47 @@ body.focus-on {
 .hl-ctl {
   margin: 10px 0;
 }
+
+.km-search.one {
+  grid-template-columns: 1fr;
+  display: grid;
+}
+
+.tr-addr {
+  display: grid;
+  gap: 6px;
+}
+
+/* 일기 제목 추천 */
+.dy-title {
+  position: relative;
+}
+.dy-title-row {
+  display: flex;
+  gap: 8px;
+}
+.dy-title-row .st-input {
+  flex: 1;
+}
+.dy-title-pop {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-top: 6px;
+  padding: 8px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+  box-shadow: 0 4px 14px rgb(0 0 0 / 0.08);
+  animation: hl-in 0.25s ease;
+}
+
+/* 오답 미니 모의고사 */
+.mk-mini {
+  display: grid;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+}

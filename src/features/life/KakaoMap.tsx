@@ -1,7 +1,7 @@
 // 여행 지도 (카카오맵): 장소 핀 · 이름으로 찾기 · 근처 맛집/카페/관광지/숙소 · 길찾기. 못 불러오면 OpenStreetMap 지도로
 import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import { toast } from '../study/ui';
-import { loadKakao, nearby, routeUrl, searchPlaces, type Kakao, type KPlace } from './kakao';
+import { loadKakao, nearby, routeUrl, suggestPlaces, type Kakao, type KPlace } from './kakao';
 import type { Pin } from './PlaceMap';
 
 // 카카오맵을 못 쓸 때만 OpenStreetMap 지도(leaflet)를 받는다
@@ -117,6 +117,31 @@ export default function KakaoMap({ pins, onOpen, onAdd, path }: { pins: Pin[]; o
       .catch((e) => toast(e instanceof Error ? e.message : '찾지 못했어요'))
       .finally(() => setBusy(false));
   };
+  // 치는 대로 찾기 (0.25초 쉬면): 장소 이름 → 없으면 주소
+  const seq = useRef(0);
+  useEffect(() => {
+    const t = q.trim();
+    if (!ready) return;
+    if (t.length < 2) {
+      seq.current++;
+      return;
+    }
+    const n = ++seq.current;
+    const timer = setTimeout(() => {
+      setBusy(true);
+      suggestPlaces(t, center())
+        .then((list) => {
+          if (n !== seq.current) return;
+          setFound(list);
+          setSel(null);
+          if (list.length) fit(window.kakao, list);
+        })
+        .catch(() => n === seq.current && setFound([]))
+        .finally(() => n === seq.current && setBusy(false));
+    }, 250);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [q, ready]);
   const here = () =>
     navigator.geolocation?.getCurrentPosition(
       (g) => map.current?.setCenter(new window.kakao.maps.LatLng(g.coords.latitude, g.coords.longitude)),
@@ -131,18 +156,10 @@ export default function KakaoMap({ pins, onOpen, onAdd, path }: { pins: Pin[]; o
     );
   return (
     <div className="km">
-      <form
-        className="km-search"
-        onSubmit={(e) => {
-          e.preventDefault();
-          if (q.trim().length > 1 && ready) run(() => searchPlaces(q.trim(), center()));
-        }}
-      >
-        <input className="st-input" value={q} onChange={(e) => setQ(e.target.value)} placeholder="장소 · 주소 찾기" aria-label="장소 찾기" enterKeyHint="search" />
-        <button className="btn" disabled={!ready || busy || q.trim().length < 2}>
-          {busy ? '…' : '찾기'}
-        </button>
-      </form>
+      <div className="km-search one">
+        <input className="st-input" type="search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="장소 · 주소 (치면 바로 찾아요)" aria-label="장소 찾기" enterKeyHint="search" />
+      </div>
+      {q.trim().length > 1 && found && !found.length && !busy && <small className="st-muted">「{q.trim()}」 장소도 주소도 찾지 못했어요. 지도에서 위치를 찍어 넣어 주세요.</small>}
       <div className="st-chips km-near">
         {NEAR.map(([code, label]) => (
           <button key={code} type="button" className="st-chip" disabled={!ready || busy} onClick={() => run(() => nearby(code, center()))}>
@@ -153,7 +170,7 @@ export default function KakaoMap({ pins, onOpen, onAdd, path }: { pins: Pin[]; o
           내 위치
         </button>
         {found && (
-          <button type="button" className="st-chip" onClick={() => (setFound(null), setSel(null))}>
+          <button type="button" className="st-chip" onClick={() => (setFound(null), setSel(null), setQ(''))}>
             지우기
           </button>
         )}

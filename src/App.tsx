@@ -60,15 +60,15 @@ export default function App() {
     : path[0] === 'settings'
       ? { label: '설정', to: '/settings' }
       : path[0] === 'week'
-        ? { label: '돌아보기', to: '/week' }
+        ? { label: '통계', to: '/week' }
         : path[0] === 'checkin'
           ? { label: '하루 마감', to: '/checkin' }
           : path[0] === 'month'
-            ? { label: '돌아보기', to: '/week' }
+            ? { label: '통계', to: '/week' }
             : path[0] === 'search'
               ? { label: '검색', to: '/search' }
               : path[0] === 'insights'
-                ? { label: '돌아보기', to: '/week' }
+                ? { label: '통계', to: '/week' }
                 : path[0] === 'calendar'
                   ? { label: '달력', to: '/calendar' }
                   : path[0] === 'plan'

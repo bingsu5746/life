@@ -1,11 +1,11 @@
 // 여행: 가 볼 곳 · 다녀온 곳 (맛집 · 카페 · 관광지 · 숙소)
-import { lazy, Suspense, useState } from 'react';
+import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import { shortDate } from '../study/dates';
 import { alive, newId, type TravelPlace } from '../study/model';
 import { put, remove, useStudy } from '../study/store';
 import { confirmDelete, Empty, Field, Icon, Sheet, tap, toast, useToday } from '../study/ui';
 import { StarInput, starText } from './MovieParts';
-import { routeUrl, searchPlaces, type KPlace } from './kakao';
+import { routeUrl, searchAddress, suggestPlaces, type KPlace } from './kakao';
 
 const KakaoMap = lazy(() => import('./KakaoMap'));
 const PickMap = lazy(() => import('./PlaceMap').then((m) => ({ default: m.PickMap })));
@@ -153,23 +153,20 @@ function PlaceSheet({ item, today, onClose }: { item: Partial<TravelPlace>; toda
   const [picking, setPicking] = useState(false);
   const [addr, setAddr] = useState(item.addr);
   const [url, setUrl] = useState(item.url);
-  const [found, setFound] = useState<KPlace[] | null>(null);
-  const [finding, setFinding] = useState(false);
-  const find = () => {
-    setFinding(true);
-    searchPlaces(name.trim() + (region.trim() ? ` ${region.trim()}` : ''))
-      .then((r) => (setFound(r), !r.length && toast('찾은 곳이 없어요')))
-      .catch((e) => toast(e instanceof Error ? e.message : '찾지 못했어요'))
-      .finally(() => setFinding(false));
-  };
-  const pick = (k: KPlace) => {
-    setName(k.name);
-    setKind(k.kind);
-    setRegion(k.region);
+  // 이름을 치는 대로 카카오맵 추천 (고르면 다시 칠 때까지 닫음). 못 찾으면 주소를 직접 넣는다
+  const found = useSuggest(name, !!item.id);
+  const [addrQ, setAddrQ] = useState<string | null>(null);
+  const addrFound = useSuggest(addrQ ?? '', false, true);
+  const pick = (k: KPlace, keepName = false) => {
+    if (!keepName) setName(k.name);
+    if (k.kind !== 'etc') setKind(k.kind);
+    if (k.region) setRegion(k.region);
     setPos({ lat: k.lat, lon: k.lon });
     setAddr(k.addr || undefined);
     setUrl(k.url || undefined);
-    setFound(null);
+    found.close();
+    addrFound.close();
+    setAddrQ(null);
   };
   const regions = [
     ...new Set(
@@ -181,15 +178,20 @@ function PlaceSheet({ item, today, onClose }: { item: Partial<TravelPlace>; toda
   return (
     <Sheet title={item.id ? '장소 고치기' : '장소 넣기'} onClose={onClose}>
       <div className="st-form">
-        <div className="km-search">
-          <input className="st-input" autoFocus={!item.id} value={name} onChange={(e) => setName(e.target.value)} placeholder="이름 (예: ○○ 국밥)" aria-label="이름" />
-          <button type="button" className="btn" disabled={name.trim().length < 2 || finding} onClick={find}>
-            {finding ? '…' : '찾기'}
-          </button>
-        </div>
-        {found && found.length > 0 && (
+        <input
+          className="st-input"
+          autoFocus={!item.id}
+          value={name}
+          onChange={(e) => {
+            setName(e.target.value);
+            found.open();
+          }}
+          placeholder="이름 (치면 카카오맵에서 찾아요)"
+          aria-label="이름"
+        />
+        {found.list && found.list.length > 0 && (
           <ul className="km-list">
-            {found.map((k) => (
+            {found.list.map((k) => (
               <li key={k.id}>
                 <button type="button" className="km-row" onClick={() => pick(k)}>
                   <b>{k.name}</b>
@@ -198,6 +200,33 @@ function PlaceSheet({ item, today, onClose }: { item: Partial<TravelPlace>; toda
               </li>
             ))}
           </ul>
+        )}
+        {(found.list?.length === 0 || addrQ !== null) && !pos && (
+          <div className="tr-addr">
+            {addrQ === null ? (
+              <button type="button" className="st-link" onClick={() => setAddrQ('')}>
+                못 찾았나요? 주소를 직접 넣기
+              </button>
+            ) : (
+              <>
+                <input className="st-input" autoFocus value={addrQ} onChange={(e) => (setAddrQ(e.target.value), addrFound.open())} placeholder="주소 (예: 부산 해운대구 우동 1394)" aria-label="주소" />
+                {addrFound.list?.map((k) => (
+                  <button key={k.id} type="button" className="km-row" onClick={() => pick(k, true)}>
+                    <b>{k.addr}</b>
+                    <small className="st-muted">{k.region}</small>
+                  </button>
+                ))}
+                {addrFound.list?.length === 0 && (
+                  <small className="st-muted">
+                    주소를 못 찾았어요.{' '}
+                    <button type="button" className="st-link" onClick={() => (setAddr(addrQ.trim() || undefined), setAddrQ(null), setPicking(true))}>
+                      이 주소로 적고 지도에서 위치 찍기
+                    </button>
+                  </small>
+                )}
+              </>
+            )}
+          </div>
         )}
         {addr && (
           <small className="st-muted">
@@ -309,4 +338,23 @@ function PlaceSheet({ item, today, onClose }: { item: Partial<TravelPlace>; toda
       </div>
     </Sheet>
   );
+}
+
+/** 치는 대로 카카오맵 추천 (0.25초 쉬면). 고른 뒤에는 다시 칠 때까지 닫는다. onlyAddr: 주소로만 */
+function useSuggest(q: string, closed0: boolean, onlyAddr = false) {
+  const [list, setList] = useState<KPlace[] | null>(null);
+  const [closed, setClosed] = useState(closed0);
+  const seq = useRef(0);
+  useEffect(() => {
+    const t = q.trim();
+    const n = ++seq.current;
+    if (closed || t.length < 2) return void setList(null);
+    const timer = setTimeout(() => {
+      (onlyAddr ? searchAddress(t) : suggestPlaces(t))
+        .then((r) => n === seq.current && setList(r))
+        .catch(() => n === seq.current && setList([]));
+    }, 250);
+    return () => clearTimeout(timer);
+  }, [q, closed, onlyAddr]);
+  return { list, open: () => setClosed(false), close: () => (setClosed(true), setList(null)) };
 }

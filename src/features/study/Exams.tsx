@@ -10,6 +10,7 @@ import { SchoolExams } from './SchoolPanel';
 import { Bar, Check, confirmDelete, Empty, Field, go, Icon, Menu, Sheet, SubjectDot, SubjectPicker, subjectsOf, toast, useToday, tap } from './ui';
 import { askAiLater } from './solveJob';
 import { CSAT_SECTIONS, sectionSubject } from './papers';
+import { examRetro } from './examRetro';
 import { useSpecialDays } from '../life/Calendar';
 
 // 성적 화면은 그래프가 있어 열 때 받는다
@@ -525,6 +526,7 @@ function ExamDetail({ id }: { id: string }) {
         </button>
       )}
 
+      {examEnd(exam) < today && <ExamRetroCard exam={exam} />}
       {examEnd(exam) < today && exam.plan && (
         <button className="st-addline" onClick={() => go(`/exams/${exam.id}/plan`)}>
           <Icon name="target" /> 공부 계획 돌아보기
@@ -618,6 +620,58 @@ function ExamDetail({ id }: { id: string }) {
         />
       )}
     </div>
+  );
+}
+
+/** 끝난 시험 회고: 과목별 점수(지난 시험과 비교) · 시험 전 2주 공부 · 범위 · 오답 */
+function ExamRetroCard({ exam }: { exam: Exam }) {
+  const d = useStudy();
+  const r = examRetro(d, exam);
+  if (!r.rows.length) return null;
+  const hm = (m: number) => (m >= 60 ? `${Math.floor(m / 60)}시간${m % 60 ? ` ${m % 60}분` : ''}` : `${m}분`);
+  // 공부 많이 한 과목 vs 점수: 같은 방향인지 한 줄로
+  const scored = r.rows.filter((x) => x.score !== null && x.subjectId);
+  const most = [...scored].sort((a, b) => b.minutes - a.minutes)[0];
+  const best = [...scored].sort((a, b) => b.score! - a.score!)[0];
+  return (
+    <section className="st-card">
+      <h3 className="st-h">시험 회고</h3>
+      <p className="st-sub">
+        시험 전 2주 동안 모두 {hm(r.total)} 공부했어요{r.prevName ? ` · 「${r.prevName}」와 비교` : ''}.
+      </p>
+      {r.rows.map((x) => (
+        <div key={x.name} className="xp-subj">
+          <div className="st-inline between">
+            <b>{x.name}</b>
+            <span>
+              {x.scoreText}
+              {x.score !== null && x.prev !== null && (
+                <small className={x.score >= x.prev ? 'wp-ok' : 'bad'}>
+                  {' '}
+                  ({x.score >= x.prev ? '▲' : '▼'}
+                  {Math.abs(x.score - x.prev)})
+                </small>
+              )}
+            </span>
+          </div>
+          {x.subjectId && (
+            <small className="st-muted">
+              2주 공부 {hm(x.minutes)}
+              {x.lines ? ` · 범위 ${x.done}/${x.lines}` : ''}
+              {` · 새 오답 ${x.notes}개`}
+            </small>
+          )}
+        </div>
+      ))}
+      {most && best && scored.length >= 2 && (
+        <p className="st-hint">{most.name === best.name ? `가장 많이 공부한 「${most.name}」이 점수도 가장 높았어요.` : `가장 많이 공부한 과목은 「${most.name}」, 점수가 가장 높은 과목은 「${best.name}」이에요.`}</p>
+      )}
+      {!r.grade && (
+        <button className="st-link" onClick={() => go(`/exams/grades/from-${exam.id}`)}>
+          성적을 넣으면 점수와 나란히 보여 드려요
+        </button>
+      )}
+    </section>
   );
 }
 

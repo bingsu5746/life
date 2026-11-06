@@ -149,8 +149,8 @@ describe('주간 돌아보기·알림 글', () => {
     expect(e).toHaveLength(4);
     expect(e[0]).toMatchObject({ date: '2026-10-25', slot: 0, title: '오늘 할 것' });
     // 10/25 는 일요일: 저녁 알림에 이번 주 요약이 붙는다
-    expect(e[1]).toMatchObject({ date: '2026-10-25', slot: 1, title: '내일 준비 · 이번 주 돌아보기', url: '/week' });
-    expect(e[1].body).toMatch(/^내일 수업 예습 1개 · 이번 주 공부 0분/);
+    expect(e[1]).toMatchObject({ date: '2026-10-25', slot: 1, title: '이번 주 통계 · 내일 준비', url: '/week' });
+    expect(e[1].body).toMatch(/^내일 수업 예습 1개 · 📊 이번 주 공부 0분/);
     expect(e[2].body).toContain('오늘 수업 예습 1개');
     expect(e[3].body).toBe('내일 수업: 수학');
   });
@@ -1171,5 +1171,43 @@ describe('AI 코치: 바쁜 날 줄이기 · 일정 → 공부 기록', () => {
     const out = eventSessions({ events: { e: ev }, sessions: {} } as never, '2026-11-16', Date.parse('2026-11-16T20:00:00+09:00'));
     // 최근 14일(11/3~) 안: 11/9 는 그날만 지워서 빠지고 11/16 만
     expect(out.map((s) => [s.date, s.minutes, s.subjectId])).toEqual([['2026-11-16', 90, 'eng']]);
+  });
+});
+
+describe('이것저것 통계 · 시험 회고', () => {
+  it('잠과 공부 · 공부 버릇 · 돈', async () => {
+    const { funInsights, sleepMinutes } = await import('../life/funStats');
+    const { emptyStudy } = await import('./model');
+    expect(sleepMinutes('23:30', '07:00')).toBe(450);
+    const ses = (id: string, date: string, minutes: number) => ({ id, date, minutes, start: Date.parse(`${date}T20:00:00+09:00`), end: 0, kind: 'manual', updatedAt: 1 });
+    const d = {
+      ...emptyStudy(),
+      conditions: { a: { id: '2026-11-02', sleep: '23:00', wake: '07:00', mood: 4, updatedAt: 1 }, b: { id: '2026-11-03', sleep: '02:00', wake: '07:00', mood: 2, updatedAt: 1 }, c: { id: '2026-11-04', sleep: '23:30', wake: '07:00', mood: 4, updatedAt: 1 } },
+      sessions: { s1: ses('s1', '2026-11-02', 120), s2: ses('s2', '2026-11-03', 30), s3: ses('s3', '2026-11-04', 90) },
+      moneyTx: { m1: { id: 'm1', date: '2026-11-02', type: 'out', amount: 9000, category: '간식·카페', created: 0, updatedAt: 1 }, m2: { id: 'm2', date: '2026-11-03', type: 'out', amount: 3000, category: '식비', created: 0, updatedAt: 1 }, m3: { id: 'm3', date: '2026-11-04', type: 'out', amount: 1000, category: '식비', created: 0, updatedAt: 1 } },
+    } as never;
+    const out = funInsights(d, '2026-11-06');
+    const sleep = out.find((s) => s.title === '잠과 공부')!;
+    expect(sleep.stats!.find((x) => x.label === '7시간 넘게 잔 날 공부')!.value).toBe('1시간 45분');
+    expect(sleep.stats!.find((x) => x.label === '6시간 못 잔 날 공부')!.value).toBe('30분');
+    expect(out.find((s) => s.title === '공부 버릇')!.stats![0].value).toBe('월요일');
+    expect(out.find((s) => s.title === '돈 버릇')!.stats![0]).toMatchObject({ value: '9,000원', sub: '2026-11-02' });
+  });
+  it('시험 회고: 과목 점수 · 지난 시험과 비교 · 2주 공부', async () => {
+    const { examRetro } = await import('./examRetro');
+    const { emptyStudy } = await import('./model');
+    const d = {
+      ...emptyStudy(),
+      subjects: { m: { id: 'm', name: '수학', color: '#000', order: 0, updatedAt: 1 } },
+      exams: { e: { id: 'e', name: '기말', kind: 'school', date: '2026-11-20', scopes: [{ id: 's', subjectId: 'm', lines: [{ id: 'l', text: '1단원', done: true }], at: 1 }], updatedAt: 1 } },
+      grades: {
+        g1: { id: 'g1', kind: 'school', name: '중간', date: '2026-09-01', scores: [{ id: 'x', subject: '수학', raw: 70 }], updatedAt: 1 },
+        g2: { id: 'g2', kind: 'school', name: '기말', date: '2026-11-20', examId: 'e', scores: [{ id: 'y', subject: '수학', raw: 85 }], updatedAt: 1 },
+      },
+      sessions: { s: { id: 's', date: '2026-11-15', minutes: 60, subjectId: 'm', start: 0, end: 0, kind: 'manual', updatedAt: 1 } },
+    } as never;
+    const r = examRetro(d, (d as { exams: Record<string, never> }).exams.e);
+    expect(r.rows[0]).toMatchObject({ name: '수학', score: 85, prev: 70, minutes: 60, done: 1, lines: 1 });
+    expect(r.prevName).toBe('중간');
   });
 });

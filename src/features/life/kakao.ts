@@ -77,6 +77,52 @@ export async function searchPlaces(q: string, near?: { lat: number; lon: number 
     );
   });
 }
+/** 주소로 찾기 (도로명 · 지번). 장소 이름으로 못 찾을 때 */
+export async function searchAddress(q: string): Promise<KPlace[]> {
+  const k = await loadKakao();
+  return new Promise((res, rej) => {
+    new k.maps.services.Geocoder().addressSearch(
+      q,
+      (data: Record<string, unknown>[], status: string) => {
+        if (status === k.maps.services.Status.ZERO_RESULT) return res([]);
+        if (status !== k.maps.services.Status.OK) return rej(new Error('주소를 찾지 못했어요'));
+        res(
+          data.map((x, i) => {
+            const road = (x.road_address ?? null) as Record<string, string> | null;
+            const jibun = (x.address ?? null) as Record<string, string> | null;
+            const name = String(x.address_name ?? '');
+            return {
+              id: `addr-${i}-${x.x},${x.y}`,
+              name: road?.building_name || name,
+              cat: '주소',
+              kind: 'etc' as const,
+              addr: road?.address_name || name,
+              region: [jibun?.region_1depth_name ?? road?.region_1depth_name, jibun?.region_2depth_name ?? road?.region_2depth_name].filter(Boolean).join(' '),
+              phone: '',
+              url: '',
+              lat: Number(x.y),
+              lon: Number(x.x),
+            };
+          }),
+        );
+      },
+      { size: 10 },
+    );
+  });
+}
+
+/** 치는 대로 추천: 장소 이름으로 찾고, 없으면 주소로 (같은 말은 다시 안 묻는다) */
+const suggestCache = new Map<string, KPlace[]>();
+export async function suggestPlaces(q: string, near?: { lat: number; lon: number }): Promise<KPlace[]> {
+  const key = `${q}|${near ? `${near.lat.toFixed(2)},${near.lon.toFixed(2)}` : ''}`;
+  const hit = suggestCache.get(key);
+  if (hit) return hit;
+  let list = await searchPlaces(q, near);
+  if (!list.length) list = await searchAddress(q).catch(() => []);
+  suggestCache.set(key, list);
+  return list;
+}
+
 /** 근처 맛집 · 카페 · 관광지 · 숙소 (반경 m) */
 export async function nearby(code: 'FD6' | 'CE7' | 'AT4' | 'AD5', at: { lat: number; lon: number }, radius = 1000): Promise<KPlace[]> {
   const k = await loadKakao();

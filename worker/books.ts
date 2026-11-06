@@ -86,8 +86,8 @@ export function tocClean(html: string): string {
     .replace(/&quot;/gi, '"')
     .replace(/&#(\d{2,5});/g, (_, n) => String.fromCharCode(Number(n)))
     .split('\n')
-    .map((l) => l.replace(/\s+$/, ''))
-    .filter((l) => l.trim())
+    .map((l) => l.trim())
+    .filter(Boolean)
     .join('\n')
     .slice(0, 8000);
 }
@@ -122,4 +122,22 @@ export async function yes24Search(key: string, q: string): Promise<BookHit[]> {
   const j = (await res.json().catch(() => null)) as { success?: boolean; message?: string } | null;
   if (!res.ok || j?.success === false) throw new Error(`예스24 ${res.status}${j?.message ? ` ${j.message}` : ''}`);
   return parseYes24(j);
+}
+
+/** 예스24 상품 페이지 HTML → 목차 글 (id="infoset_toc" 안 textarea.txtContentText. API 목차가 비었거나 쪽이 없을 때) */
+export function yes24PageToc(html: string): string {
+  const i = html.indexOf('id="infoset_toc"');
+  if (i < 0) return '';
+  const m = html.slice(i, i + 40_000).match(/<textarea[^>]*txtContentText[^>]*>([\s\S]*?)<\/textarea>/i);
+  return m ? tocClean(m[1].replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&')) : '';
+}
+
+/** 예스24 상품 페이지에서 목차 받기 (www.yes24.com 상품 주소만) */
+export async function yes24Toc(link: string): Promise<string> {
+  const u = new URL(link);
+  if (!/^(www|m)\.yes24\.com$/.test(u.hostname) || !/\/goods\/\d+/i.test(u.pathname)) throw new Error('예스24 상품 주소가 아니에요');
+  const id = u.pathname.match(/\/goods\/(\d+)/i)![1];
+  const res = await within(fetch(`https://www.yes24.com/product/goods/${id}`, { headers: { 'user-agent': 'Mozilla/5.0 (life study app)' } }), 15_000, '예스24 상품');
+  if (!res.ok) throw new Error(`예스24 상품 ${res.status}`);
+  return yes24PageToc(await res.text());
 }

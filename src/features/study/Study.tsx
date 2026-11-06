@@ -220,7 +220,7 @@ export function Study({ path, loggedIn, syncReady = true, onLogin }: { path: str
       )}
       {!running && area === 'ai' && <AiNav path={path} />}
       {!running && (isWeek || isInsights) && (
-        <nav className="st-nav" aria-label="돌아보기 메뉴">
+        <nav className="st-nav" aria-label="통계 메뉴">
           <button className="st-tab st-tab-home" onClick={() => go('/')}>
             <Icon name="area-home" />
             <span className="st-tab-label">메인으로</span>

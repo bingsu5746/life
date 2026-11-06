@@ -88,7 +88,7 @@ function TimeHome({ sub }: { sub?: string }) {
         <h2>공부 기록</h2>
         <div className="st-inline">
           <button className="st-link" onClick={() => go('/insights/study')}>
-            돌아보기
+            통계
           </button>
           <button className="btn btn-sm" onClick={() => setManual(true)}>
             <Icon name="plus" /> 공부 시간 넣기

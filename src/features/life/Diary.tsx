@@ -10,7 +10,7 @@ import { getStudy, put, putMany, remove, setSettings, useStudy } from '../study/
 import { confirmDelete, go, tap, toast, useToday } from '../study/ui';
 import { monthLabel, monthOf, shiftMonth } from './calc';
 import { daySummary, DIARY_PARTS, dreamDates, formOf, sleepSummary, studySummary } from './diaryForm';
-import { diarySplit, isLoggedIn, speechToText } from '../auth/api';
+import { diarySplit, diaryTitles, isLoggedIn, speechToText } from '../auth/api';
 import { LineChart } from '../study/charts';
 import { RecapPage } from './Recap';
 import { NotifyTime } from './NotifyTime';
@@ -375,7 +375,7 @@ function Write({ date, today }: { date: string; today: string }) {
             </button>
           ))}
         </div>
-        <input className="st-input" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="제목 (선택)" aria-label="제목" />
+        <TitleSuggest date={date} title={title} body={[text, ...Object.values(parts)].filter((x) => x?.trim()).join('\n')} onPick={setTitle} />
         {shownParts.map((p) => (
           <label key={p.key} className="st-field">
             <span className="st-label">
@@ -684,5 +684,70 @@ function YearShift() {
         </button>
       </div>
     </section>
+  );
+}
+
+/** 제목 칸 + AI 제목 추천: 제목이 비었고 일기가 조금 쓰였으면, 제목 칸을 누를 때 지금까지 쓴 제목 느낌으로 3개를 잠깐 띄운다 */
+function TitleSuggest({ date, title, body, onPick }: { date: string; title: string; body: string; onPick: (t: string) => void }) {
+  const d = useStudy();
+  const [list, setList] = useState<string[] | null>(null);
+  const [busy, setBusy] = useState(false);
+  const asked = useRef('');
+  const hide = useRef<ReturnType<typeof setTimeout>>(undefined);
+  const can = isLoggedIn() && body.trim().length >= 20;
+  const ask = (force = false) => {
+    if (!can || busy || (!force && (title.trim() || asked.current === body))) return;
+    asked.current = body;
+    setBusy(true);
+    const past = alive(d.diary)
+      .filter((e) => e.id !== date && e.title?.trim())
+      .sort((a, b) => b.id.localeCompare(a.id))
+      .slice(0, 30)
+      .map((e) => e.title!.trim());
+    diaryTitles(body.slice(0, 3000), past)
+      .then((r) => {
+        if (!r.titles.length) return;
+        setList(r.titles);
+        clearTimeout(hide.current);
+        // 잠깐 띄웠다가 닫는다
+        hide.current = setTimeout(() => setList(null), 20_000);
+      })
+      .catch((e) => force && toast(e instanceof Error ? e.message : '제목을 받지 못했어요'))
+      .finally(() => setBusy(false));
+  };
+  useEffect(() => () => clearTimeout(hide.current), []);
+  return (
+    <div className="dy-title">
+      <div className="dy-title-row">
+        <input className="st-input" value={title} onChange={(e) => onPick(e.target.value)} onFocus={() => ask()} placeholder="제목 (선택)" aria-label="제목" />
+        {can && (
+          <button type="button" className="btn btn-sm" disabled={busy} onClick={() => ask(true)} aria-label="제목 추천">
+            {busy ? '…' : '✨ 추천'}
+          </button>
+        )}
+      </div>
+      {list && (
+        <div className="dy-title-pop" role="listbox" aria-label="추천 제목">
+          {list.map((t) => (
+            <button
+              key={t}
+              type="button"
+              role="option"
+              aria-selected={title === t}
+              className="st-chip"
+              onClick={() => {
+                onPick(t);
+                setList(null);
+              }}
+            >
+              {t}
+            </button>
+          ))}
+          <button type="button" className="st-link" onClick={() => setList(null)}>
+            닫기
+          </button>
+        </div>
+      )}
+    </div>
   );
 }

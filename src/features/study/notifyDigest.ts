@@ -43,10 +43,17 @@ export function weakQuiz(words: WordsData, date: DateStr, n = 3): string[] {
 export function weekBody(d: StudyData, date: DateStr, today: DateStr): string {
   const w = lifeWeek(d, date, today);
   const hm = (m: number) => (m >= 60 ? `${Math.round((m / 60) * 10) / 10}시간` : `${m}분`);
-  const parts = [`공부 ${hm(w.study.now)}`, `운동 ${w.workout.days}일`, `쓴 돈 ${w.spent.now.toLocaleString('ko-KR')}원`];
+  // 지난주와 비교 (▲ 늘었음 · ▼ 줄었음)
+  const cmp = (now: number, prev: number, f: (n: number) => string) => (prev ? ` (${now >= prev ? '▲' : '▼'}${f(Math.abs(now - prev))})` : '');
+  const parts = [`공부 ${hm(w.study.now)}${cmp(w.study.now, w.study.prev, hm)}`, `운동 ${w.workout.days}일${cmp(w.workout.days, w.workout.prevDays, (n) => `${n}일`)}`, `쓴 돈 ${w.spent.now.toLocaleString('ko-KR')}원${cmp(w.spent.now, w.spent.prev, (n) => `${n.toLocaleString('ko-KR')}원`)}`];
   if (w.movies.length) parts.push(`영화 ${w.movies.length}편`);
   if (w.pages) parts.push(`책 ${w.pages}쪽`);
-  return `이번 주 ${parts.join(' · ')} (눌러서 돌아보기)`;
+  // 공부 가장 많이 한 날
+  const by = new Map<string, number>();
+  for (const x of alive(d.sessions)) if (x.date >= w.from && x.date <= w.to) by.set(x.date, (by.get(x.date) ?? 0) + x.minutes);
+  const best = [...by].sort((a, b) => b[1] - a[1])[0];
+  if (best) parts.push(`최고 ${['일', '월', '화', '수', '목', '금', '토'][weekday(best[0])]}요일 ${hm(best[1])}`);
+  return `📊 이번 주 ${parts.join(' · ')} (눌러서 통계)`;
 }
 
 /** 1월 1일이면 지난해 (본 영화가 있을 때만) */
@@ -169,7 +176,7 @@ export function buildDigest(d: StudyData, words: WordsData, today: DateStr, time
       out.push({
         date,
         slot,
-        title: y ? '🏆 영화 시상식' : sunday ? '내일 준비 · 이번 주 돌아보기' : am ? '오늘 할 것' : '내일 준비',
+        title: y ? '🏆 영화 시상식' : sunday ? '이번 주 통계 · 내일 준비' : am ? '오늘 할 것' : '내일 준비',
         body: sunday ? `${evening(d, today, date)} · ${weekBody(d, date, today)}` : am ? morning(d, words, today, date) : evening(d, today, date),
         url: y ? '/movies/ceremony' : sunday ? '/week' : wk ? `/exams/weak-${wk.subjectId}` : weak ? '/words/practice' : undefined,
       });
