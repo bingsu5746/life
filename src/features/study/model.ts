@@ -58,6 +58,8 @@ export interface StudySettings {
   diaryTime?: string;
   /** 단어 퀴즈 알림 시각 (자주 틀린 단어 3개) */
   wordQuizTime?: string;
+  /** 쉬는 시간 단어 알림: 1교시 시작 · 수업 길이(분) · 쉬는 시간(분) · 하루 몇 번 */
+  breakWords?: { start: string; len: number; rest: number; per: number };
   /** 하루 마감 체크인 알림 시각 HH:MM */
   checkinTime?: string;
   /** 잠 목표 (시간) */

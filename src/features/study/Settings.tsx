@@ -233,6 +233,7 @@ export function Settings({ cat: cat0 }: { cat?: string }) {
           <NotifyTime k="checkinTime" label="하루 마감 알림" fallback="22:00" />
           <NotifyTime k="diaryTime" label="일기 알림" fallback="22:30" />
           <NotifyTime k="wordQuizTime" label="단어 퀴즈 알림 (자주 틀린 단어 3개)" fallback="07:30" />
+          <BreakWordsSetting />
         </>
       )}
       {cat === 'life' && (
@@ -521,6 +522,66 @@ function GameAccounts() {
           저장
         </button>
       </div>
+    </section>
+  );
+}
+
+/** 쉬는 시간 단어 알림: 학교 시간표의 교시가 끝날 때 자주 틀린 단어 3개 */
+function BreakWordsSetting() {
+  const d = useStudy();
+  const bw = d.settings.breakWords;
+  const [start, setStart] = useState(bw?.start ?? '08:40');
+  const [len, setLen] = useState(String(bw?.len ?? 50));
+  const [rest, setRest] = useState(String(bw?.rest ?? 10));
+  const [per, setPer] = useState(bw?.per ?? 3);
+  const hasTT = Object.values(d.settings.schoolTimetable ?? {}).some((x) => x.length > 1);
+  const save = (on: boolean) => {
+    setSettings({ breakWords: on ? { start, len: Math.max(30, Math.min(120, Number(len) || 50)), rest: Math.max(5, Math.min(30, Number(rest) || 10)), per } : undefined });
+    toast(on ? '쉬는 시간 단어 알림을 켰어요' : '쉬는 시간 단어 알림을 껐어요');
+  };
+  return (
+    <section className="st-card">
+      <div className="st-inline between">
+        <h3 className="st-h">쉬는 시간 단어 알림</h3>
+        {bw && <span className="st-pill">켜짐</span>}
+      </div>
+      <p className="st-hint">학교 시간표의 교시가 끝나는 쉬는 시간에 자주 틀린 단어 3개를 휴대폰으로 보내요. 누르면 단어 연습으로 가요.</p>
+      {!hasTT && <p className="st-hint bad">먼저 「학교」 설정에서 시간표를 넣어 주세요 (교시 수를 시간표로 알아요).</p>}
+      <div className="st-inline wrap">
+        <label className="st-cond-time">
+          1교시 시작
+          <input className="st-input sm" type="time" value={start} onChange={(e) => setStart(e.target.value)} />
+        </label>
+        <label className="st-cond-time">
+          수업(분)
+          <input className="st-input xs" inputMode="numeric" value={len} onChange={(e) => setLen(e.target.value.replace(/\D/g, ''))} />
+        </label>
+        <label className="st-cond-time">
+          쉬는 시간(분)
+          <input className="st-input xs" inputMode="numeric" value={rest} onChange={(e) => setRest(e.target.value.replace(/\D/g, ''))} />
+        </label>
+      </div>
+      <div className="st-inline wrap">
+        <span className="st-muted">하루</span>
+        <div className="st-seg sm">
+          {[1, 2, 3, 5].map((x) => (
+            <button key={x} className={per === x ? 'on' : ''} onClick={() => setPer(x)}>
+              {x}번
+            </button>
+          ))}
+        </div>
+      </div>
+      <div className="st-row end">
+        {bw && (
+          <button className="btn btn-sm" onClick={() => save(false)}>
+            끄기
+          </button>
+        )}
+        <button className="btn btn-sm btn-primary" disabled={!hasTT} onClick={() => save(true)}>
+          {bw ? '저장' : '켜기'}
+        </button>
+      </div>
+      <small className="st-muted">로그인하고 이 기기 알림을 켜 둬야 와요. 점심시간도 쉬는 시간으로 세요.</small>
     </section>
   );
 }

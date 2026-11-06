@@ -2612,7 +2612,11 @@ export class Accounts extends DurableObject<Env> {
         .filter((e): e is { at: number; title: string; body: string } => !!e && typeof e === 'object' && typeof (e as { at?: unknown }).at === 'number' && typeof (e as { title?: unknown }).title === 'string' && typeof (e as { body?: unknown }).body === 'string')
         .filter((e) => e.at > now - 60_000 && e.at < now + 15 * DAY)
         .slice(0, 60)
-        .map((e) => ({ at: Math.round(e.at), title: e.title.slice(0, 60), body: e.body.slice(0, 200) }));
+        .map((e) => {
+          // 누르면 열 화면 (없으면 달력)
+          const url = (e as { url?: unknown }).url;
+          return { at: Math.round(e.at), title: e.title.slice(0, 60), body: e.body.slice(0, 200), ...(typeof url === 'string' && /^\/[a-z0-9/_-]{0,60}$/i.test(url) ? { url } : {}) };
+        });
       if (items.length) this.cacheSet(`remind:${user.id}`, JSON.stringify({ origin, items }));
       else this.sql.exec('DELETE FROM cache WHERE key = ?', `remind:${user.id}`);
       await this.scheduleAlarm();
@@ -2703,12 +2707,12 @@ export class Accounts extends DurableObject<Env> {
     // 달력 일정 알림 (때가 된 것만 보내고 지운다)
     for (const row of this.sql.exec<{ key: string; data: string }>("SELECT key, data FROM cache WHERE key LIKE 'remind:%'").toArray()) {
       const uid = row.key.slice(7);
-      const v = JSON.parse(row.data) as { origin: string; items: { at: number; title: string; body: string }[] };
+      const v = JSON.parse(row.data) as { origin: string; items: { at: number; title: string; body: string; url?: string }[] };
       const ready = v.items.filter((x) => x.at <= now + 30_000);
       if (!ready.length) continue;
       try {
         const subs = this.sql.exec<PushSub & { [k: string]: SqlStorageValue }>('SELECT endpoint, p256dh, auth FROM push_subs WHERE user_id = ?', uid).toArray();
-        for (const it of ready) if (subs.length && it.at > now - 3600_000) await this.pushTo(subs, { title: it.title, body: it.body, url: '/calendar' }, v.origin);
+        for (const it of ready) if (subs.length && it.at > now - 3600_000) await this.pushTo(subs, { title: it.title, body: it.body, url: it.url ?? '/calendar' }, v.origin);
       } catch (err) {
         console.error('remind push failed', err instanceof Error ? err.message : String(err));
       }

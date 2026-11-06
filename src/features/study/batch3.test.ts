@@ -1227,3 +1227,54 @@ describe('모의고사 문제집 목차 (쪽 없이 회 이름만)', () => {
     expect(b.map((r) => r.name)).toEqual(['실전 모의고사 01', '실전 모의고사 02', '실전 모의고사 03']);
   });
 });
+
+describe('말로 넣은 할 일', () => {
+  it('날짜 말을 마감으로 · 여러 개 나누기', async () => {
+    const { parseVoiceTodo, parseVoiceTodos } = await import('./voiceTodo');
+    // 2026-11-06 은 금요일
+    const T = '2026-11-06';
+    expect(parseVoiceTodo('내일까지 수학 숙제', T)).toEqual({ title: '수학 숙제', due: '2026-11-07' });
+    expect(parseVoiceTodo('영어 단어 외우기 다음 주 화요일까지', T)).toEqual({ title: '영어 단어 외우기', due: '2026-11-10' });
+    expect(parseVoiceTodo('수요일까지 독후감 써야 돼', T)).toEqual({ title: '독후감', due: '2026-11-11' });
+    expect(parseVoiceTodo('11월 20일까지 과학 보고서', T).due).toBe('2026-11-20');
+    expect(parseVoiceTodo('3일 뒤 실험 준비', T)).toEqual({ title: '실험 준비', due: '2026-11-09' });
+    expect(parseVoiceTodo('이틀 안에 국어 프린트', T).due).toBe('2026-11-08');
+    expect(parseVoiceTodo('3일까지 미술 과제', T).due).toBe('2026-12-03');
+    expect(parseVoiceTodo('방 청소', T)).toEqual({ title: '방 청소', due: undefined });
+    expect(parseVoiceTodos('내일까지 수학 숙제 그리고 금요일까지 영어 단어, 방 청소', T)).toEqual([
+      { title: '수학 숙제', due: '2026-11-07' },
+      { title: '영어 단어', due: '2026-11-06' },
+      { title: '방 청소', due: undefined },
+    ]);
+  });
+});
+
+describe('쉬는 시간 단어 알림 · 수행평가 단계 · 월말 돈 리포트', () => {
+  it('교시가 끝나는 시각에 · 하루 per 번 · 시간표 없는 날은 없음', async () => {
+    const { breakWordReminders } = await import('./notifyDigest');
+    const { emptyStudy } = await import('./model');
+    const d = emptyStudy();
+    d.settings.schoolTimetable = { '1': ['a', 'b', 'c', 'd', 'e', 'f', 'g'] };
+    d.settings.breakWords = { start: '08:40', len: 50, rest: 10, per: 3 };
+    const words = Object.fromEntries(['apple', 'brave', 'cling', 'dwell'].map((t, i) => [t, { id: t, term: t, meaning: '뜻', wrong: 4 - i, listId: 'l', order: i, box: 1, due: '2026-11-01', updatedAt: 1 }])) as never;
+    // 2026-11-09 은 월요일
+    const out = breakWordReminders(d, words, '2026-11-09', Date.parse('2026-11-09T00:00:00+09:00'), 1);
+    expect(out.map((x) => new Date(x.at + 9 * 3600_000).toISOString().slice(11, 16))).toEqual(['10:30', '12:30', '14:30']);
+    expect(out[0]).toMatchObject({ title: '☕ 2교시 끝 · 단어 3개', url: '/words/practice' });
+  });
+  it('수행평가 종류에 맞는 단계', async () => {
+    const { autoSteps } = await import('./assessPlan');
+    expect(autoSteps('영어 말하기 발표')[0]).toBe('주제 정하기');
+    expect(autoSteps('과학 실험 보고서')[0]).toBe('실험 주제 · 가설 정하기');
+    expect(autoSteps('독서 감상문')).toContain('개요 짜기');
+  });
+  it('월말 돈 리포트: 분류 비교 · 3달 평균 예산 (빚 갚기 뺌)', async () => {
+    const { monthReport } = await import('../life/calc');
+    const { emptyStudy } = await import('./model');
+    const tx = (id: string, date: string, amount: number, category: string) => ({ id, date, type: 'out', amount, category, created: 0, updatedAt: 1 });
+    const d = { ...emptyStudy(), moneyTx: { a: tx('a', '2026-10-03', 50000, '식비'), b: tx('b', '2026-10-05', 30000, '빚 갚기'), c: tx('c', '2026-09-03', 30000, '식비'), e: tx('e', '2026-08-03', 10000, '교통') } } as never;
+    const r = monthReport(d, '2026-10');
+    expect(r).toMatchObject({ out: 50000, prevOut: 30000, budget: 30000, months: 3 });
+    expect(r.changes[0]).toEqual({ category: '식비', now: 50000, prev: 30000 });
+  });
+});

@@ -5,7 +5,7 @@ import { shortDate } from '../study/dates';
 import { alive, newId, type MoneyRule, type MoneyTx, type SavingGoal } from '../study/model';
 import { put, remove, setSettings, useStudy } from '../study/store';
 import { Bar, confirmDelete, Empty, Field, go, Icon, Sheet, tap, toast, useToday } from '../study/ui';
-import { budgetView, compareMonths, savingPace, weekAllowance, weekSpent, monthlyAmount, monthLabel, monthlyOut, monthOf, monthSummary, readWon, saved, shiftMonth, upcomingRules, won } from './calc';
+import { budgetView, compareMonths, savingPace, weekAllowance, weekSpent, monthlyAmount, monthLabel, monthlyOut, monthOf, monthReport, monthSummary, readWon, saved, shiftMonth, upcomingRules, won } from './calc';
 import { WEEKDAYS } from '../study/dates';
 import { guessCategory, topCategory } from './moneyGuess';
 import { receiptScan } from '../auth/api';
@@ -137,6 +137,7 @@ export function Money({ sub }: { sub?: string }) {
               })()}
           </section>
 
+          {month === monthOf(today) && <MonthReport month={shiftMonth(month, -1)} />}
           {!alive(d.moneyTx).length ? (
             <Empty icon="💰" title="쓴 돈을 적어 보세요">
               <p>쓴 돈과 받은 용돈·알바비를 적으면 한 달에 어디에 얼마나 썼는지, 예산이 얼마 남았는지 보여 드려요.</p>
@@ -690,5 +691,70 @@ function PaceLine({ g, today }: { g: SavingGoal; today: string }) {
       {p.needPerWeek !== null && ` · 마감(${shortDate(g.due!)})에 맞추려면 한 주에 ${won(p.needPerWeek)}`}
       {p.faster.length > 0 && ` · 한 주에 ${won(p.faster[0].extra)} 더 모으면 ${p.faster[0].days}일 빨라져요`}
     </small>
+  );
+}
+
+/** 월말 돈 리포트 (지난달): 그 전 달과 분류별 비교 · 다음 달 예산 추천 */
+function MonthReport({ month }: { month: string }) {
+  const d = useStudy();
+  const r = monthReport(d, month);
+  const [open, setOpen] = useState(false);
+  if (!r.out && !r.inn) return null;
+  const diff = r.out - r.prevOut;
+  const sign = (n: number) => `${n > 0 ? '+' : n < 0 ? '−' : '±'}${won(Math.abs(n))}`;
+  return (
+    <section className="st-card">
+      <button className="mn-report-head" onClick={() => setOpen(!open)} aria-expanded={open}>
+        <h3 className="st-h">📋 {monthLabel(month)} 돈 리포트</h3>
+        <small className="st-muted">
+          쓴 돈 {won(r.out)}
+          {r.prevOut ? ` · 그 전 달보다 ${sign(diff)}` : ''} {open ? '▲' : '▼'}
+        </small>
+      </button>
+      {open && (
+        <>
+          <div className="in-stats">
+            <div>
+              <small>쓴 돈</small>
+              <b>{won(r.out)}</b>
+            </div>
+            <div>
+              <small>들어온 돈</small>
+              <b>{won(r.inn)}</b>
+            </div>
+            <div>
+              <small>남은 돈</small>
+              <b className={r.inn - r.out < 0 ? 'bad' : ''}>{sign(r.inn - r.out)}</b>
+            </div>
+          </div>
+          {r.changes.slice(0, 6).map((c) => (
+            <div key={c.category} className="st-inline between mn-report-row">
+              <span>{c.category}</span>
+              <span>
+                {won(c.now)}{' '}
+                {r.prevOut > 0 && <small className={c.now > c.prev ? 'bad' : 'wp-ok'}>({sign(c.now - c.prev)})</small>}
+              </span>
+            </div>
+          ))}
+          {r.budget && (
+            <div className="st-inline between wrap mn-report-row">
+              <span>
+                다음 달 예산 추천 <b>{won(r.budget)}</b>
+                <small className="st-muted"> · 최근 {r.months}달 쓴 돈 평균 (빚 갚기 뺌)</small>
+              </span>
+              <button
+                className="btn btn-sm"
+                onClick={() => {
+                  setSettings({ monthlyBudget: r.budget! });
+                  toast(`한 달 예산을 ${won(r.budget!)}으로 정했어요`);
+                }}
+              >
+                이 예산으로
+              </button>
+            </div>
+          )}
+        </>
+      )}
+    </section>
   );
 }

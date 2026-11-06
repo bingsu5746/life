@@ -10037,3 +10037,64 @@ body.focus-on {
   min-width: 0;
   width: 0;
 }
+
+/* 수행평가 단계 나누기 미리 보기 */
+.as-plan {
+  display: grid;
+  gap: 4px;
+  padding: 10px;
+  border-radius: var(--radius);
+  background: var(--soft);
+}
+.as-plan-row {
+  display: flex;
+  gap: 10px;
+  font-size: 0.88rem;
+}
+.as-plan-row b {
+  min-width: 64px;
+}
+.as-plan-row .done {
+  text-decoration: line-through;
+  color: var(--muted);
+}
+
+/* 일기: 오늘의 질문 */
+.dy-q {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.dy-q-main {
+  flex: 1;
+  display: flex;
+  gap: 6px;
+  padding: 8px 12px;
+  border: 1px dashed var(--line-strong);
+  border-radius: var(--radius);
+  background: none;
+  color: inherit;
+  font: inherit;
+  font-size: 0.9rem;
+  text-align: left;
+  cursor: pointer;
+}
+
+/* 월말 돈 리포트 */
+.mn-report-head {
+  display: grid;
+  gap: 2px;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.mn-report-row {
+  padding: 6px 0;
+  border-top: 1px solid var(--line);
+  font-size: 0.9rem;
+}

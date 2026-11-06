@@ -57,7 +57,7 @@ export const AREA_ITEMS: Record<Exclude<AreaKey, 'home' | 'study'>, AreaItem[]> 
     { key: '', label: '일기', icon: 'area-diary' },
     { key: 'dream', label: '꿈', icon: 'moon' },
     { key: 'form', label: '양식', icon: 'settings' },
-    { key: 'highlight', label: '이번 달 하이라이트', icon: 'review' },
+    { key: 'highlight', label: '하이라이트', icon: 'review' },
     { key: 'recap', label: '한 해 결산', icon: 'target' },
   ],
 };

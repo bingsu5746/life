@@ -184,3 +184,37 @@ export function buildDigest(d: StudyData, words: WordsData, today: DateStr, time
   }
   return out.slice(0, 24);
 }
+
+/**
+ * 쉬는 시간 단어 알림: 학교 시간표가 있는 날(빼는 날 · 주말 빼고), n교시가 끝나는 시각에 자주 틀린 단어 3개.
+ * 하루 per 번 (쉬는 시간을 고르게 골라서), 앞으로 days 일.
+ */
+export function breakWordReminders(d: StudyData, words: WordsData, today: DateStr, now = Date.now(), days = 10): { at: number; title: string; body: string; url: string }[] {
+  const bw = d.settings.breakWords;
+  if (!bw) return [];
+  const weak = alive(words)
+    .filter((w) => w.wrong > 0 && w.meaning)
+    .sort((a, b) => b.wrong - a.wrong || a.term.localeCompare(b.term))
+    .slice(0, 30);
+  if (weak.length < 3) return [];
+  const [h, m] = bw.start.split(':').map(Number);
+  const out: { at: number; title: string; body: string; url: string }[] = [];
+  for (let i = 0; i <= days; i++) {
+    const date = addDays(today, i);
+    const periods = d.settings.schoolTimetable?.[String(weekday(date))]?.length ?? 0;
+    if (periods < 2 || d.settings.offDates.includes(date)) continue;
+    // 쉬는 시간은 1~(교시-1) 교시 뒤. per 개를 고르게
+    const breaks = Array.from({ length: periods - 1 }, (_, k) => k + 1);
+    const pick = breaks.length <= bw.per ? breaks : Array.from({ length: bw.per }, (_, j) => breaks[Math.floor(((j + 0.5) * breaks.length) / bw.per)]);
+    pick.forEach((k, j) => {
+      const min = h * 60 + m + k * bw.len + (k - 1) * bw.rest;
+      const at = Date.parse(`${date}T${String(Math.floor(min / 60)).padStart(2, '0')}:${String(min % 60).padStart(2, '0')}:00+09:00`);
+      if (at <= now) return;
+      const day = Math.floor(Date.parse(`${date}T00:00:00Z`) / 86_400_000);
+      const start = ((day * 7 + j) * 3) % weak.length;
+      const ws = [0, 1, 2].map((x) => weak[(start + x) % weak.length]);
+      out.push({ at, title: `☕ ${k}교시 끝 · 단어 3개`, body: `${ws.map((w) => w.term).join(' · ')} — 뜻이 떠오르나요?`, url: '/words/practice' });
+    });
+  }
+  return out;
+}

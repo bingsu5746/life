@@ -4,7 +4,7 @@ import { addDays, dday, diffDays, shortDate } from './dates';
 import { scopeLines, scopeText } from './exams';
 import { ExamTabs } from './ExamHero';
 import { alive, newId, type Assessment } from './model';
-import { stepDates } from './assessPlan';
+import { autoSteps, stepDates } from './assessPlan';
 import { put, remove, useStudy } from './store';
 import { Bar, Check, confirmDelete, Empty, Field, go, Icon, Sheet, SubjectDot, SubjectPicker, subjectsOf, tap, toast, useToday } from './ui';
 
@@ -165,6 +165,25 @@ function TaskSheet({ item, today, onClose }: { item?: Assessment; today: string;
         <Field label="준비할 것 (한 줄에 하나, 선택)" hint="적은 순서대로 내는 날 전날까지 날마다 나눠 드려요. 밀리면 남은 날에 다시 나눠요.">
           <textarea className="st-input" rows={4} value={text} onChange={(e) => setText(e.target.value)} placeholder={'주제 정하기\n자료 찾기\n초안 쓰기\n발표 연습'} />
         </Field>
+        {title.trim() && (
+          <button type="button" className="st-link" onClick={() => setText(autoSteps(title).join('\n'))}>
+            ✨ 「{title.trim().slice(0, 20)}」에 맞게 단계 자동으로 채우기
+          </button>
+        )}
+        {steps.length > 0 && due > today && (
+          <div className="as-plan">
+            <small className="st-muted">이렇게 나눠요 (내는 날 {shortDate(due)}에서 거꾸로)</small>
+            {(() => {
+              const plan = stepDates({ due, steps }, today);
+              return steps.map((x) => (
+                <div key={x.id} className="as-plan-row">
+                  <b>{plan.has(x.id) ? shortDate(plan.get(x.id)!) : '끝남'}</b>
+                  <span className={x.done ? 'done' : ''}>{x.text}</span>
+                </div>
+              ));
+            })()}
+          </div>
+        )}
         <Field label="메모 (선택)">
           <input className="st-input" value={memo} onChange={(e) => setMemo(e.target.value)} placeholder="예: 평가 기준 — 내용 40, 발표 30, 질의응답 30" />
         </Field>

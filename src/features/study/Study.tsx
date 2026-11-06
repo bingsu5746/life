@@ -1,4 +1,5 @@
 // 공부 도우미: 탭과 하위 화면 (설계 docs/superpowers/specs/2026-10-23-study-planner-design.md)
+import { breakWordReminders } from './notifyDigest';
 import { dueTodoRules } from './todoRules';
 import { pendingExamLocks } from './examPlan';
 import { lazy, Suspense, useEffect, useRef, useState } from 'react';
@@ -144,7 +145,8 @@ export function Study({ path, loggedIn, syncReady = true, onLogin }: { path: str
   useEffect(() => {
     if (!loggedIn || !localTimes()) return;
     const t = setTimeout(() => {
-      const items = reminders(d, today);
+      // 일정 · 빚 갚을 날 · 쉬는 시간 단어 (서버는 60개까지라 가까운 것부터)
+      const items = [...reminders(d, today), ...breakWordReminders(d, words, today)].sort((a, b) => a.at - b.at).slice(0, 60);
       const key = JSON.stringify(items);
       if (lastRemind.current === key) return;
       notifyRemind(items)
@@ -152,7 +154,7 @@ export function Study({ path, loggedIn, syncReady = true, onLogin }: { path: str
         .catch(() => {});
     }, 4000);
     return () => clearTimeout(t);
-  }, [d.events, d.moneyTx, today, loggedIn]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [d.events, d.moneyTx, d.settings.breakWords, d.settings.schoolTimetable, words, today, loggedIn]); // eslint-disable-line react-hooks/exhaustive-deps
   // 새 영단어에 예문을 저절로 (로그인했을 때, 단어가 바뀌고 잠시 뒤)
   useEffect(() => {
     if (!loggedIn || !syncReady) return;
