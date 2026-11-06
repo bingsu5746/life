@@ -711,8 +711,9 @@ function MemoSheet({ id, onClose }: { id: string; onClose: () => void }) {
   const d = useStudy();
   const s = d.sessions[id];
   const [v, setV] = useState(s?.memo ?? '');
+  const [learned, setLearned] = useState(s?.learned ?? '');
   const save = () => {
-    if (s && v.trim()) put('sessions', { ...s, memo: v.trim().slice(0, 100) });
+    if (s && (v.trim() || learned.trim())) put('sessions', { ...s, memo: v.trim().slice(0, 100) || s.memo, learned: learned.trim().slice(0, 200) || undefined });
     onClose();
   };
   return (
@@ -726,11 +727,13 @@ function MemoSheet({ id, onClose }: { id: string; onClose: () => void }) {
       >
         <input className="st-input" autoFocus value={v} onChange={(e) => setV(e.target.value)} maxLength={100} placeholder="예: 미적분 3단원 문제 20개" aria-label="한 일 한 줄" />
         <small className="st-muted">적어 두면 일기의 「오늘 한 것」에 들어가요. 안 적어도 돼요.</small>
+        <input className="st-input" value={learned} onChange={(e) => setLearned(e.target.value)} maxLength={200} placeholder="배운 것 한 줄 (예: 합성함수 미분은 겉미분 × 속미분)" aria-label="배운 것 한 줄" />
+        <small className="st-muted">배운 것을 적으면 내일 오늘 화면에서 다시 떠올려 봐요.</small>
         <div className="st-row end">
           <button type="button" className="btn btn-sm" onClick={onClose}>
             건너뛰기
           </button>
-          <button className="btn btn-primary" disabled={!v.trim()}>
+          <button className="btn btn-primary" disabled={!v.trim() && !learned.trim()}>
             저장
           </button>
         </div>

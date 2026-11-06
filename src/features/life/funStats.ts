@@ -218,3 +218,24 @@ export function funInsights(d: StudyData, today: DateStr): Section[] {
 
 /** 일기 낱말 순위에서 뺄 흔한 말 */
 const STOP = new Set(['오늘', '그리고', '그래서', '근데', '진짜', '너무', '하고', '했다', '했는데', '있었다', '없었다', '같다', '그냥', '정말', '나는', '내가', '것도', '것을', '것이', '이제', '그런데', '하는', '해서', '했어', '있는', '없는', '아니', '많이', '조금', '좀', '거의']);
+
+/**
+ * 게임과 공부: 날마다 게임 분 · 공부 분으로 「게임 많이 한 날(1시간 넘게)」 · 「조금(1시간 안)」 · 「안 한 날」의 평균 공부, 주마다 비교.
+ * 게임 기록이 있는 날 범위 안에서만 센다
+ */
+export function gameVsStudy(game: Record<DateStr, number>, study: Map<DateStr, number> | Record<DateStr, number>, from: DateStr, to: DateStr) {
+  const st = study instanceof Map ? study : new Map(Object.entries(study));
+  const days: DateStr[] = [];
+  for (let x = from; x <= to; x = addDays(x, 1)) days.push(x);
+  const group = (f: (g: number) => boolean) => {
+    const xs = days.filter((x) => f(game[x] ?? 0)).map((x) => st.get(x) ?? 0);
+    return { days: xs.length, avg: Math.round(avg(xs)) };
+  };
+  // 주마다 (월요일 기준이 아니라 to 에서 7일씩 끊어서)
+  const weeks: { label: string; game: number; study: number }[] = [];
+  for (let end = to; end >= from && weeks.length < 8; end = addDays(end, -7)) {
+    const ds = days.filter((x) => x <= end && x > addDays(end, -7));
+    weeks.unshift({ label: `${addDays(end, -6).slice(5).replace('-', '/')}~`, game: ds.reduce((a, x) => a + (game[x] ?? 0), 0), study: ds.reduce((a, x) => a + (st.get(x) ?? 0), 0) });
+  }
+  return { heavy: group((g) => g >= 60), light: group((g) => g > 0 && g < 60), none: group((g) => g === 0), weeks };
+}

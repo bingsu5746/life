@@ -632,6 +632,8 @@ async function aiJob<T>(path: string, body: unknown): Promise<T> {
 export const noteScan = (image: { mime: string; data: string }, subjects: string[]) => aiJob<{ subject: string | null; number: string | null; question: string | null }>('ai/note', { image, subjects });
 /** 영수증 사진 → 금액 · 날짜 · 가게 */
 export const receiptScan = (image: { mime: string; data: string }) => aiJob<{ amount: number | null; date: string | null; store: string | null; items: string[] }>('ai/receipt', { image });
+/** 감상문 도우미: 생각을 끌어내는 질문 4개 */
+export const reviewQuestions = (kind: 'book' | 'movie', title: string, by: string, mine: string) => aiJob<{ questions: string[] }>('ai/reviewq', { kind, title, by, mine });
 /** 시험 범위 공지 사진들 → 과목별 범위 줄 */
 export const scopeScan = (images: { mime: string; data: string }[], subjects: string[]) => aiJob<{ scopes: { subject: string; date: string | null; lines: string[] }[] }>('ai/scope', { images, subjects });
 /** 목차 사진들 → 단원 · 쪽 */

@@ -23,7 +23,7 @@ import { fetchSpecialDays } from './holidays';
 import { cleanFact, goodKo } from './fact';
 import { fetch2k } from './nba2k';
 import { hcBody, parseHc } from './homecourt';
-import { coachBody, diaryBody, noteBody, parseCoach, parseDiary, parseNote, parseReceipt, parseTocRead, receiptBody, tocBody, titleBody, parseTitles, scopeBody, parseScopeRead } from './aiRead';
+import { coachBody, diaryBody, noteBody, parseCoach, parseDiary, parseNote, parseReceipt, parseTocRead, receiptBody, tocBody, titleBody, parseTitles, scopeBody, parseScopeRead, reviewQBody, parseReviewQ } from './aiRead';
 import { seojiSearch, seojiToc, seojiTocByIsbn, yes24Search, yes24Toc } from './books';
 import { cheapShark } from './cheapshark';
 import { invenChamps, invenSkins, invenSkinVideo } from './skins';
@@ -381,6 +381,13 @@ export class Accounts extends DurableObject<Env> {
     if (path === 'ai/note' && req.method === 'POST') return this.noteScan(user, body);
     if (path === 'ai/receipt' && req.method === 'POST') return this.receiptScan(user, body);
     if (path === 'ai/toc' && req.method === 'POST') return this.tocScan(user, body);
+    if (path === 'ai/reviewq' && req.method === 'POST') {
+      const title = typeof body.title === 'string' ? body.title.trim().slice(0, 80) : '';
+      if (!title) return fail('제목을 써 주세요.');
+      const by = typeof body.by === 'string' ? body.by.trim().slice(0, 60) : '';
+      const mine = typeof body.mine === 'string' ? body.mine.trim().slice(0, 600) : '';
+      return this.aiJob(user, reviewQBody(body.kind === 'movie' ? 'movie' : 'book', title, by, mine), parseReviewQ, 'reviewq');
+    }
     if (path === 'ai/scope' && req.method === 'POST') {
       const imgs = (Array.isArray(body.images) ? body.images : [])
         .slice(0, 4)

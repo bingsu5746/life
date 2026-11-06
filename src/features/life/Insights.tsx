@@ -7,6 +7,7 @@ import { useState } from 'react';
 import { Coach } from './Coach';
 import { Bar, Empty, toast, useToday } from '../study/ui';
 import { funInsights } from './funStats';
+import { GameStudyCard } from './GameStudy';
 import { fitnessInsights, gradeInsights, hobbyInsights, moneyInsights, studyInsights, yearReview, type Section, type Stat } from './insights';
 
 const TABS = [
@@ -33,6 +34,7 @@ export function InsightsPage({ tab: t0 }: { tab?: string }) {
         <h2>{TABS.find((t) => t.key === tab)!.label}</h2>
       </div>
       {tab === 'coach' && <Coach />}
+      {tab === 'fun' && <GameStudyCard />}
       {tab === 'study' && alive(d.sessions).length > 0 && <Analysis sessions={alive(d.sessions)} today={today} />}
       {tab === 'year' && <YearView today={today} />}
       {tab !== 'year' && tab !== 'coach' && !sections.length && <Empty title="아직 볼 기록이 없어요" />}

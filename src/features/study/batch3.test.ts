@@ -1311,3 +1311,35 @@ describe('내일 챙길 것 · 생일 · 시험 범위 사진 읽기', () => {
     expect(monthItems(d, '2026-11').get('2026-11-14')?.[0]).toMatchObject({ kind: 'bday', label: '엄마 생일 · 선물 30,000원' });
   });
 });
+
+describe('신기록 · 게임과 공부 · 영화 소식', () => {
+  it('하루 공부 시간 신기록 (공부한 날 5일 넘게)', async () => {
+    const { newRecords } = await import('./records');
+    const { emptyStudy } = await import('./model');
+    const ses = (id: string, date: string, minutes: number) => ({ id, date, minutes, start: 0, end: 0, kind: 'manual', updatedAt: 1 });
+    const d = { ...emptyStudy(), sessions: Object.fromEntries(['2026-11-01', '2026-11-02', '2026-11-03', '2026-11-04', '2026-11-05'].map((x, i) => [x, ses(x, x, 60 + i * 10)]).concat([['t', ses('t', '2026-11-08', 150)]])) } as never;
+    const r = newRecords(d, '2026-11-08');
+    expect(r[0]).toMatchObject({ key: 'study-day:2026-11-08', value: '2시간 30분', prev: '1시간 40분' });
+    // 기록이 적으면 축하하지 않음
+    const few = { ...emptyStudy(), sessions: { a: ses('a', '2026-11-01', 30), t: ses('t', '2026-11-08', 150) } } as never;
+    expect(newRecords(few, '2026-11-08')).toEqual([]);
+  });
+  it('게임 많이 한 날 · 안 한 날 공부 평균', async () => {
+    const { gameVsStudy } = await import('../life/funStats');
+    const r = gameVsStudy({ '2026-11-01': 120, '2026-11-02': 30 }, { '2026-11-01': 20, '2026-11-02': 60, '2026-11-03': 100 }, '2026-11-01', '2026-11-03');
+    expect(r.heavy).toEqual({ days: 1, avg: 20 });
+    expect(r.light).toEqual({ days: 1, avg: 60 });
+    expect(r.none).toEqual({ days: 1, avg: 100 });
+  });
+  it('보고 싶은 영화: 재개봉 · 상영 중 · OTT, 본 소식은 다시 안 냄', async () => {
+    const { findMovieNews } = await import('../life/movieNews');
+    const want = [
+      { id: 'a', title: '인터스텔라', year: 2014, status: 'want', created: 0, updatedAt: 1 },
+      { id: 'b', title: '새 영화', status: 'want', created: 0, updatedAt: 1 },
+    ] as never;
+    const kobis = { today: '2026-11-06', errors: [], boxOffice: [{ rank: 3, title: '인터스텔라', open: '2026-10-30' }], upcoming: [{ code: '1', title: '새 영화', open: '2026-12-01' }] };
+    const out = findMovieNews(want, kobis, [null, ['넷플릭스']], new Set(), 1);
+    expect(out.map((x) => x.text)).toEqual(['「인터스텔라」 지금 극장에서 재개봉 중이에요 (어제 박스오피스 3위)', '「새 영화」 이제 넷플릭스에서 볼 수 있어요']);
+    expect(findMovieNews(want, kobis, [null, ['넷플릭스']], new Set(out.map((x) => x.key)), 2)).toEqual([]);
+  });
+});

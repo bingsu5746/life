@@ -61,6 +61,10 @@ export interface StudySettings {
   /** 내일 챙길 것: 늘 챙길 것 · 과목별 준비물 (예: 체육 → 체육복) · 체크한 것 (그 날짜 → id) */
   /** 생일 · 선물 계획: 이름 · 월-일 · 선물 예산(원) · 선물 생각 */
   birthdays?: { id: Id; name: string; md: string; budget?: number; idea?: string }[];
+  /** 이미 축하한 신기록 (최근 50개 key) */
+  celebrated?: string[];
+  /** 보고 싶은 영화 소식 (최근 40개): OTT · 극장 상영 · 재개봉. key 로 같은 소식은 한 번만 */
+  movieNews?: { key: string; movieId: Id; text: string; at: number; read?: boolean }[];
   packAlways?: string[];
   packBySubject?: Record<Id, string>;
   packChecks?: { date: DateStr; ids: string[] };
@@ -874,6 +878,9 @@ export interface StudySession extends Stamp {
   place?: string;
   /** 무엇을 했는지 한 줄 (타이머를 멈출 때) */
   memo?: string;
+  /** 배운 것 한 줄 (다음 날 오늘 화면에서 다시 떠올려 본다) · 떠올려 본 결과 */
+  learned?: string;
+  learnedCheck?: 'ok' | 'fuzzy';
 }
 
 export interface Todo extends Stamp {

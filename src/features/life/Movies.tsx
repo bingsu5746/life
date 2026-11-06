@@ -8,7 +8,7 @@ import { MovieSheet, MovieView, starText } from './MovieParts';
 import { BarChart } from '../study/charts';
 import { dday, shortDate } from '../study/dates';
 import { alive, newId, type Movie } from '../study/model';
-import { putMany, useStudy } from '../study/store';
+import { putMany, setSettings, useStudy } from '../study/store';
 import { Empty, go, Icon, tap, toast, useToday } from '../study/ui';
 
 export { starText };
@@ -52,6 +52,27 @@ export function Movies({ sub }: { sub?: string }) {
           <Icon name="plus" />
         </button>
       </div>
+      {(d.settings.movieNews ?? []).some((n) => !n.read) && (
+        <section className="st-card">
+          <div className="st-inline between">
+            <h3 className="st-h">🎬 보고 싶은 영화 소식</h3>
+            <button className="st-link" onClick={() => setSettings({ movieNews: (d.settings.movieNews ?? []).map((n) => ({ ...n, read: true })) })}>
+              다 봤어요
+            </button>
+          </div>
+          {(d.settings.movieNews ?? [])
+            .filter((n) => !n.read)
+            .reverse()
+            .map((n) => (
+              <div key={n.key} className="st-item st-tap" {...tap(() => d.movies[n.movieId] && open(d.movies[n.movieId]))}>
+                <div className="st-item-main">
+                  <div className="st-item-title">{n.text}</div>
+                  <div className="st-item-sub">{new Date(n.at).toLocaleDateString('ko-KR', { month: 'numeric', day: 'numeric' })} 찾음</div>
+                </div>
+              </div>
+            ))}
+        </section>
+      )}
       {tab === 'mine' && (
         <nav className="mv-sub" aria-label="내 영화">
           <button className={mineSub === 'watched' ? 'on' : ''} onClick={() => go('/movies/watched')}>

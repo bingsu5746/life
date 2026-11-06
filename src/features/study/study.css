@@ -10119,3 +10119,100 @@ body.focus-on {
 .cal-tag.bday {
   background: #f59e0b;
 }
+
+/* 집중 화면: 쉬는 시간 스트레칭 */
+.fs-stretch {
+  display: grid;
+  gap: 4px;
+  width: 100%;
+  max-width: 420px;
+  margin: 12px auto 0;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: rgb(255 255 255 / 0.08);
+  color: inherit;
+  text-align: left;
+}
+.fs-stretch small {
+  opacity: 0.7;
+}
+.fs-stretch-btns {
+  display: flex;
+  gap: 8px;
+  margin-top: 4px;
+}
+.fs-stretch-btns button {
+  padding: 6px 12px;
+  border: 1px solid rgb(255 255 255 / 0.3);
+  border-radius: 999px;
+  background: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+.fs-stretch-note {
+  font-size: 0.75rem;
+}
+
+.rc-row {
+  display: grid;
+  gap: 6px;
+  padding: 10px 0;
+  border-top: 1px solid var(--line);
+}
+
+/* 신기록 축하 */
+.cb-back {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  background: rgb(0 0 0 / 0.4);
+}
+.cb-box {
+  display: grid;
+  gap: 8px;
+  width: min(340px, 100%);
+  padding: 22px 20px;
+  border-radius: 18px;
+  background: var(--surface);
+  text-align: center;
+  animation: cb-pop 0.35s cubic-bezier(0.2, 1.4, 0.4, 1);
+}
+.cb-box h3 {
+  margin: 0;
+}
+.cb-box p {
+  margin: 0;
+}
+.cb-emoji {
+  font-size: 3rem;
+  animation: cb-spin 0.8s ease;
+}
+@keyframes cb-pop {
+  from {
+    transform: scale(0.7);
+    opacity: 0;
+  }
+}
+@keyframes cb-spin {
+  from {
+    transform: rotate(-30deg) scale(0.5);
+  }
+}
+
+/* 감상문 도우미 */
+.rh {
+  display: grid;
+  gap: 8px;
+  padding: 10px;
+  border-radius: var(--radius);
+  background: var(--soft);
+}
+.rh-q {
+  display: grid;
+  gap: 4px;
+  font-size: 0.9rem;
+}
