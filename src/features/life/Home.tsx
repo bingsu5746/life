@@ -7,6 +7,8 @@ import { SchoolHome } from '../study/SchoolPanel';
 import { EveBanner } from '../study/Eve';
 import { MorningCard } from './Morning';
 import { MedsCard } from '../study/Meds';
+import { AfterExamCard, VacationCard } from '../study/Vacation';
+import { wallet } from './market';
 import { ConditionPrompt } from '../study/ConditionCard';
 import { alive } from '../study/model';
 import { todaySummary } from '../study/select';
@@ -101,6 +103,12 @@ export function Home(_: { loggedIn: boolean; onLogin: () => void }) {
       badge: nextOpen ? { big: dday(today, nextOpen.release!), small: nextOpen.title } : undefined,
       action: { label: '극장가', to: '/movies' },
     },
+    market: (() => {
+      const m = d.settings.market;
+      if (!m) return { lines: ['공부해서 포인트를 모아요', '모은 포인트로 내가 정한 보상과 바꿔요'], action: { label: '시장 열기', to: '/market' } };
+      const w = wallet(d, m, today);
+      return { lines: [`${w.balance.toLocaleString('ko-KR')}점 남음`, `오늘 +${w.today}점`], action: { label: '상점', to: '/market' } };
+    })(),
     ai: { lines: [aiToday ? `오늘 질문 ${aiToday}개` : '오늘은 아직 안 물어봤어요', '사진이나 글로 문제를 물어보세요'], action: { label: '질문하기', to: '/ai' } },
     diary: {
       lines: [diaryToday ? '오늘 일기를 썼어요' : '오늘 일기를 아직 안 썼어요', `이번 달 ${diaryMonth}편`],
@@ -149,6 +157,8 @@ export function Home(_: { loggedIn: boolean; onLogin: () => void }) {
       )}
       {on('morning') && <MorningCard today={today} />}
       {on('school') && <SchoolHome today={today} />}
+      <AfterExamCard banner />
+      <VacationCard compact />
       {!studyMode && <MedsCard compact />}
       <div className="hm-grid">
         {areaList

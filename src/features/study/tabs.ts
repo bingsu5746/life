@@ -19,6 +19,7 @@ export const AREAS = [
   { key: 'money', label: '돈' },
   { key: 'hobby', label: '취미' },
   { key: 'diary', label: '일기' },
+  { key: 'market', label: '시장' },
   { key: 'ai', label: 'AI' },
 ] as const;
 export type AreaKey = (typeof AREAS)[number]['key'];
@@ -53,6 +54,11 @@ export const AREA_ITEMS: Record<Exclude<AreaKey, 'home' | 'study'>, AreaItem[]> 
     { key: 'wish', label: '위시리스트', icon: 'save' },
   ],
   ai: [{ key: '', label: '문제 풀이', icon: 'area-ai' }],
+  market: [
+    { key: '', label: '상점', icon: 'area-market' },
+    { key: 'wallet', label: '지갑', icon: 'area-money' },
+    { key: 'rules', label: '규칙', icon: 'settings' },
+  ],
   diary: [
     { key: '', label: '일기', icon: 'area-diary' },
     { key: 'dream', label: '꿈', icon: 'moon' },
@@ -152,6 +158,7 @@ export function activeItem(area: keyof typeof AREA_ITEMS, sub?: string, p0?: str
   if (area === 'diary') return sub === 'dream' || sub === 'form' || sub === 'recap' ? sub : sub?.startsWith('highlight') ? 'highlight' : '';
   if (area === 'money') return sub === 'fixed' || sub === 'saving' ? sub : '';
   if (area === 'hobby') return sub === 'wish' || sub === 'reading' ? sub : '';
+  if (area === 'market') return sub === 'wallet' || sub === 'rules' ? sub : '';
   return '';
 }
 

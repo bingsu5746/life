@@ -217,6 +217,7 @@ const FIX: Record<Collection, Fix> = {
     myAnswer: str(x.myAnswer),
     answer: str(x.answer),
     reason: typeof x.reason === 'string' ? x.reason : null,
+    grammar: typeof x.grammar === 'string' && /^[a-z-]{2,20}$/.test(x.grammar) ? x.grammar : undefined,
     memo: str(x.memo),
     okRun: score(x.okRun, 1, 99),
     comments:
@@ -565,6 +566,8 @@ const FIX: Record<Collection, Fix> = {
     sleep: hhmm(x.sleep),
     wake: hhmm(x.wake),
     mood: Number.isInteger(x.mood) && (x.mood as number) >= 1 && (x.mood as number) <= 5 ? (x.mood as number) : undefined,
+    screen: score(x.screen, 0, 1440),
+    missed: Array.isArray(x.missed) ? (x.missed as unknown[]).filter((t): t is string => typeof t === 'string' && t.length <= 20).slice(0, 8) : undefined,
   }),
   weekNotes: (x) => ({ ...x, text: str(x.text).slice(0, 1000), change: optStr(x.change)?.slice(0, 100), kept: typeof x.kept === 'boolean' ? x.kept : undefined }),
   previews: (x) =>
@@ -728,6 +731,53 @@ export function sanitizeSettings(s: unknown): StudySettings & { updatedAt: numbe
             times: [...new Set(arr(m.times).filter((t): t is string => typeof t === 'string' && /^([01]\d|2[0-3]):[0-5]\d$/.test(t)))].sort().slice(0, 6),
             memo: optStr(m.memo)?.trim().slice(0, 100) || undefined,
           }))
+      : undefined,
+    market: isObj(x.market) && isDate((x.market as Obj).since)
+      ? (() => {
+          const m = x.market as Obj;
+          const r = isObj(m.rate) ? (m.rate as Obj) : {};
+          const pt = (v: unknown, d: number) => Math.round(cl(v, 0, 1000, d));
+          return {
+            rate: { study10: pt(r.study10, 1), habit: pt(r.habit, 2), todo: pt(r.todo, 1), note: pt(r.note, 3) },
+            since: m.since as string,
+            items: arr(m.items)
+              .filter((it): it is Obj => isObj(it) && typeof it.name === 'string' && !!it.name.trim())
+              .slice(0, 40)
+              .map((it) => ({ id: str(it.id, `i${Math.random().toString(36).slice(2, 10)}`).slice(0, 40), name: (it.name as string).trim().slice(0, 30), icon: str(it.icon, '🎁').slice(0, 4), price: Math.round(cl(it.price, 1, 100000, 10)) })),
+            buys: arr(m.buys)
+              .filter((b): b is Obj => isObj(b) && typeof b.name === 'string' && typeof b.price === 'number' && typeof b.at === 'number')
+              .slice(-300)
+              .map((b) => ({ id: str(b.id, `b${Math.random().toString(36).slice(2, 10)}`).slice(0, 40), itemId: str(b.itemId).slice(0, 40), name: (b.name as string).slice(0, 30), price: Math.round(cl(b.price, 0, 100000, 0)), at: b.at as number, used: b.used === true ? true : undefined })),
+          };
+        })()
+      : undefined,
+    rainRemind: x.rainRemind === false ? false : undefined,
+    vacation:
+      isObj(x.vacation) && isDate((x.vacation as Obj).from) && isDate((x.vacation as Obj).to) && ((x.vacation as Obj).to as string) >= ((x.vacation as Obj).from as string)
+        ? {
+            from: (x.vacation as Obj).from as string,
+            to: (x.vacation as Obj).to as string,
+            dailyMin: Math.round(cl((x.vacation as Obj).dailyMin, 0, 900, 240)),
+            goals: arr((x.vacation as Obj).goals)
+              .filter((g): g is Obj => isObj(g) && typeof g.text === 'string' && !!g.text.trim())
+              .slice(0, 30)
+              .map((g) => ({ id: str(g.id, `g${Math.random().toString(36).slice(2, 10)}`).slice(0, 40), text: (g.text as string).trim().slice(0, 80), done: g.done === true })),
+            memo: optStr((x.vacation as Obj).memo)?.slice(0, 500) || undefined,
+          }
+        : undefined,
+    afterExam: Array.isArray(x.afterExam)
+      ? (x.afterExam as unknown[])
+          .filter((g): g is Obj => isObj(g) && typeof g.text === 'string' && !!g.text.trim())
+          .slice(0, 40)
+          .map((g) => ({ id: str(g.id, `a${Math.random().toString(36).slice(2, 10)}`).slice(0, 40), text: (g.text as string).trim().slice(0, 80), done: g.done === true }))
+      : undefined,
+    textbooks: isObj(x.textbooks)
+      ? Object.fromEntries(
+          Object.entries(x.textbooks)
+            .filter(([k, v]) => k.length <= 40 && isObj(v) && typeof (v as Obj).name === 'string')
+            .slice(0, 30)
+            .map(([k, v]) => [k, { name: ((v as Obj).name as string).slice(0, 80), offset: Math.round(cl((v as Obj).offset, -50, 500, 0)) }]),
+        )
       : undefined,
     focusVideos: Array.isArray(x.focusVideos)
       ? (x.focusVideos as unknown[])

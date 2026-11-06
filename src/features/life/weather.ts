@@ -59,3 +59,34 @@ export async function getWeather(lat: number, lon: number): Promise<Weather | nu
     }
   return w;
 }
+
+/** 앞으로 며칠 날마다 비 · 눈 올 확률 (%) 과 날씨 코드. 3시간 동안 이 기기에 기억 */
+export async function getForecast(lat: number, lon: number, days = 8): Promise<Record<string, { rain: number; code: number }> | null> {
+  const ck = `${KEY}.fc.${lat.toFixed(2)},${lon.toFixed(2)}`;
+  try {
+    const c = JSON.parse(localStorage.getItem(ck) ?? 'null') as { at: number; v: Record<string, { rain: number; code: number }> } | null;
+    if (c && Date.now() - c.at < 3 * 3_600_000) return c.v;
+  } catch {
+    /* 무시 */
+  }
+  const q = new URLSearchParams({ latitude: String(lat), longitude: String(lon), daily: 'precipitation_probability_max,weather_code', timezone: 'Asia/Seoul', forecast_days: String(days) });
+  const res = await fetch(`https://api.open-meteo.com/v1/forecast?${q}`);
+  if (!res.ok) return null;
+  const v = parseForecast(await res.json());
+  try {
+    localStorage.setItem(ck, JSON.stringify({ at: Date.now(), v }));
+  } catch {
+    /* 무시 */
+  }
+  return v;
+}
+export function parseForecast(j: unknown): Record<string, { rain: number; code: number }> {
+  const o = j as { daily?: { time?: unknown[]; precipitation_probability_max?: unknown[]; weather_code?: unknown[] } };
+  const out: Record<string, { rain: number; code: number }> = {};
+  (o?.daily?.time ?? []).forEach((t, i) => {
+    const r = o.daily?.precipitation_probability_max?.[i];
+    const c = o.daily?.weather_code?.[i];
+    if (typeof t === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(t) && typeof r === 'number') out[t] = { rain: r, code: typeof c === 'number' ? c : -1 };
+  });
+  return out;
+}

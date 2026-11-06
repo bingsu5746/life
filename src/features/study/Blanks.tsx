@@ -7,11 +7,13 @@ import { alive, newId, type BlankSheet } from './model';
 import { answer, dueText } from './review';
 import { blanksToday } from './select';
 import { getStudy, put, remove, useStudy } from './store';
+import { TextbookBlanks } from './TextbookBlanks';
 import { confirmDelete, Empty, Field, go, Icon, Sheet, SubjectDot, SubjectPicker, subjectsOf, tap, toast, useToday } from './ui';
 
 export function Blanks({ today, adding }: { today: string; adding?: boolean }) {
   const d = useStudy();
   const [edit, setEdit] = useState<BlankSheet | 'new' | null>(adding ? 'new' : null);
+  const [fromBook, setFromBook] = useState(false);
   const all = alive(d.blanks).sort((a, b) => a.due.localeCompare(b.due));
   const due = blanksToday(d, today);
   const close = () => {
@@ -23,17 +25,27 @@ export function Blanks({ today, adding }: { today: string; adding?: boolean }) {
       {!all.length ? (
         <Empty title="백지 복습할 단원을 넣어 보세요">
           <p>단원 이름과 꼭 기억해야 할 핵심 내용(한 줄에 하나)을 넣어요. 교과서·노트 정리에서 옮겨 적으면 돼요.</p>
-          <button className="btn btn-primary" onClick={() => setEdit('new')}>
-            단원 넣기
-          </button>
+          <div className="st-row">
+            <button className="btn btn-primary" onClick={() => setEdit('new')}>
+              단원 넣기
+            </button>
+            <button className="btn" onClick={() => setFromBook(true)}>
+              교과서 PDF 로 만들기
+            </button>
+          </div>
         </Empty>
       ) : (
         <>
           <div className="st-inline between">
             <span className="st-sub">오늘 할 것 {due.length}개</span>
-            <button className="btn btn-sm" onClick={() => setEdit('new')}>
-              <Icon name="plus" /> 단원 넣기
-            </button>
+            <div className="st-inline">
+              <button className="btn btn-sm" onClick={() => setFromBook(true)}>
+                교과서 PDF 로
+              </button>
+              <button className="btn btn-sm" onClick={() => setEdit('new')}>
+                <Icon name="plus" /> 단원 넣기
+              </button>
+            </div>
           </div>
           <section className="st-card">
             {all.map((b) => {
@@ -57,6 +69,7 @@ export function Blanks({ today, adding }: { today: string; adding?: boolean }) {
           </section>
         </>
       )}
+      {fromBook && <TextbookBlanks onClose={() => setFromBook(false)} />}
       {edit && <BlankSheetEditor item={edit === 'new' ? undefined : edit} today={today} onClose={close} />}
     </>
   );

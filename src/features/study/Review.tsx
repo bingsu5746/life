@@ -18,6 +18,8 @@ import { loadTimer } from './timerStore';
 import { RetestSheet } from './RetestSheet';
 import { SavedProblems } from './SavedProblems';
 import { VAULT_ITEMS } from './vault';
+import { GRAMMAR_TYPES, isEnglish } from './grammar';
+import { GrammarPage } from './GrammarPage';
 import { noteScan } from '../auth/api';
 import { compressProblemImage } from '../../lib/imageCompress';
 import { askAiLater } from './solveJob';
@@ -29,6 +31,7 @@ export function Review({ sub }: { sub?: string }) {
   if (sub?.startsWith('blank-run-')) return <BlankRun id={sub.slice(10)} />;
   if (sub?.startsWith('deck-')) return <DeckView id={sub.slice(5)} />;
   if (sub === 'ai') return <SavedProblems />;
+  if (sub === 'grammar' || sub?.startsWith('grammar-')) return <GrammarPage open={sub.slice(8) || undefined} />;
   if (sub?.startsWith('papers')) return <Papers sub={sub.slice(7) || undefined} />;
   return <ReviewHome tab={sub === 'cards' || sub === 'new-deck' ? 'cards' : sub === 'blank' || sub === 'new-blank' ? 'blank' : sub === 'passages' || sub === 'new-passage' || sub?.startsWith('passage-') ? 'passages' : 'notes'} sub={sub} />;
 }
@@ -267,6 +270,7 @@ function NoteSheet({ note, today, onClose }: { note?: WrongNote; today: string; 
     reason: note?.reason ?? (null as WrongReason | null),
     memo: note?.memo ?? '',
     comments: note?.comments ?? ([] as NoteComment[]),
+    grammar: note?.grammar ?? '',
   }));
   const [busy, setBusy] = useState(false);
   const [ocr, setOcr] = useState<string | null>(null);
@@ -396,6 +400,7 @@ function NoteSheet({ note, today, onClose }: { note?: WrongNote; today: string; 
       reason: f.reason,
       memo: f.memo,
       comments: f.comments.length ? f.comments : undefined,
+      grammar: f.grammar && isEnglish(d.subjects[f.subjectId]?.name) ? f.grammar : undefined,
     });
     // 뺀 사진은 저장할 때 지운다 (취소하면 그대로 남게)
     for (const p of note?.photos ?? []) if (!f.photos.includes(p)) void removePhoto(p);
@@ -477,6 +482,17 @@ function NoteSheet({ note, today, onClose }: { note?: WrongNote; today: string; 
             ))}
           </div>
         </Field>
+        {isEnglish(d.subjects[f.subjectId]?.name) && (
+          <Field group label="어법 유형 (어법 문제면)">
+            <div className="st-chips">
+              {GRAMMAR_TYPES.map((g) => (
+                <button key={g.key} type="button" className={`st-chip ${f.grammar === g.key ? 'on' : ''}`} onClick={() => setF({ ...f, grammar: f.grammar === g.key ? '' : g.key })}>
+                  {g.name}
+                </button>
+              ))}
+            </div>
+          </Field>
+        )}
         <Field label="한 줄 메모">
           <input className="st-input" value={f.memo} onChange={(e) => setF({ ...f, memo: e.target.value })} placeholder="예: 부호 실수 조심" />
         </Field>

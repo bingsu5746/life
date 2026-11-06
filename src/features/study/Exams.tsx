@@ -6,6 +6,7 @@ import { alive, newId, REASONS, SUBJECT_COLORS, type Exam, type ExamDay, type Ex
 import { put, useStudy } from './store';
 import { removeExam } from './actions';
 import { ExamPlanPage } from './ExamPlan';
+import { AfterExamCard } from './Vacation';
 import { SchoolExams } from './SchoolPanel';
 import { Bar, Check, confirmDelete, Empty, Field, go, Icon, Menu, Sheet, SubjectDot, SubjectPicker, subjectsOf, toast, useToday, tap } from './ui';
 import { askAiLater } from './solveJob';
@@ -195,6 +196,7 @@ function ExamList({ adding, progress }: { adding: boolean; progress: boolean }) 
         </Sheet>
       )}
       {prog && prog !== 'pick' && <ProgressSheet subject={d.subjects[prog.id] ?? prog} today={today} onClose={close(() => setProg(null))} />}
+      <AfterExamCard />
     </div>
   );
 }

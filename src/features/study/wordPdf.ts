@@ -190,3 +190,41 @@ export async function readPdf(file: File, opts: { from: number; to: number; pass
   }
   return { text: texts.join('\n'), pages: numPages, scanned };
 }
+
+/** 교과서처럼 한국어 글이 많은 PDF 에서 쪽마다 글만 뽑는다 (글자 인식은 하지 않음: 글이 없는 쪽은 빈 글) */
+export async function readPdfPages(file: Blob, from: number, to: number, onProgress?: PdfProgress): Promise<{ page: number; text: string }[]> {
+  const pdfjs = await loadPdfJs();
+  const task = pdfjs.getDocument({ data: new Uint8Array(await file.arrayBuffer()) });
+  const out: { page: number; text: string }[] = [];
+  try {
+    const doc = await task.promise;
+    const a = Math.max(1, from);
+    const b = Math.min(doc.numPages, to);
+    for (let n = a; n <= b; n++) {
+      onProgress?.(`PDF ${n}번째 장 읽는 중`, (n - a) / Math.max(1, b - a + 1));
+      const page = await doc.getPage(n);
+      const vp = page.getViewport({ scale: 1 });
+      const content = await page.getTextContent();
+      const pieces: TextPiece[] = [];
+      for (const it of content.items) {
+        if (!('str' in it)) continue;
+        const [, , , d, e, f] = it.transform as number[];
+        pieces.push({ str: it.str, x: e, y: f, w: it.width, h: Math.abs(d) || it.height });
+      }
+      out.push({ page: n, text: pageToText(pieces, vp.width, true) });
+    }
+  } finally {
+    await task.destroy();
+  }
+  return out;
+}
+/** PDF 장 수 (파일이 Blob 일 때) */
+export async function pdfPages(file: Blob): Promise<number> {
+  const pdfjs = await loadPdfJs();
+  const task = pdfjs.getDocument({ data: new Uint8Array(await file.arrayBuffer()) });
+  try {
+    return (await task.promise).numPages;
+  } finally {
+    await task.destroy();
+  }
+}

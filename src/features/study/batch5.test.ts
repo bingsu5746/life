@@ -78,3 +78,58 @@ describe('단어 듣기', () => {
     expect(listenWords(all, lists, 'weak').map((x) => x.id)).toEqual(['y']);
   });
 });
+
+describe('교과서 쪽 범위', async () => {
+  const { scopePages, chunkPages } = await import('./textbook');
+  it('범위 줄에서 쪽 찾기', () => {
+    expect(scopePages(['교과서 12~80쪽', '학습지 1~5'])).toEqual([{ from: 12, to: 80 }]);
+    expect(scopePages(['1단원 ~ 3단원', 'p.100-120', '45쪽'])).toEqual([{ from: 45, to: 45 }, { from: 100, to: 120 }]);
+    expect(scopePages(['교과서 12쪽 ~ 30쪽', '교과서 25~40쪽'])).toEqual([{ from: 12, to: 40 }]);
+  });
+  it('글 묶기', () => {
+    const pages = [1, 2, 3, 5].map((page) => ({ page, text: 'x'.repeat(30) + page }));
+    expect(chunkPages(pages, 70).map((c) => c.label)).toEqual(['1~2', '3', '5']);
+  });
+});
+
+describe('시장 · 비 예보 · 방학 · 휴대폰', async () => {
+  const { wallet, newMarket } = await import('../life/market');
+  const { rainReminders } = await import('../life/events');
+  const { vacationView, afterExamReminder } = await import('./vacation');
+  const { screenStats, missedStats } = await import('./dayLog');
+  const { parseForecast } = await import('../life/weather');
+  it('포인트: since 부터 · 산 만큼 빼기', () => {
+    const d = emptyStudy();
+    d.sessions = { a: { id: 'a', updatedAt: 1, date: '2026-11-06', minutes: 95, start: 0, end: 0, kind: 'manual' }, b: { id: 'b', updatedAt: 1, date: '2026-11-01', minutes: 60, start: 0, end: 0, kind: 'manual' } } as never;
+    d.habits = { h: { id: 'h', updatedAt: 1, name: '물', icon: '💧', weekdays: [], checks: ['2026-11-05', '2026-11-06'], created: '2026-11-01' } } as never;
+    const m = { ...newMarket('2026-11-05'), buys: [{ id: 'x', itemId: 'i', name: '게임', price: 5, at: 1 }] };
+    const w = wallet(d, m, '2026-11-06');
+    expect(w).toMatchObject({ earned: 9 + 4, spent: 5, balance: 8, today: 11 });
+  });
+  it('비 예보: 50% 이상 · 공부 일정 빼기 · 전날 21시', () => {
+    const d = emptyStudy();
+    d.events = {
+      e: { id: 'e', updatedAt: 1, title: '놀이공원', date: '2026-11-08', allDay: true, color: 'blue', created: 1 },
+      s: { id: 's', updatedAt: 1, title: '학원', date: '2026-11-08', allDay: true, color: 'blue', study: true, created: 1 },
+      f: { id: 'f', updatedAt: 1, title: '농구', date: '2026-11-07', allDay: true, color: 'blue', created: 1 },
+    } as never;
+    const fc = parseForecast({ daily: { time: ['2026-11-06', '2026-11-07', '2026-11-08'], precipitation_probability_max: [10, 30, 80], weather_code: [0, 3, 61] } });
+    const r = rainReminders(d, fc, '2026-11-06', Date.parse('2026-11-06T12:00:00+09:00'));
+    expect(r).toHaveLength(1);
+    expect(r[0]).toMatchObject({ at: Date.parse('2026-11-07T21:00:00+09:00'), title: '☔ 내일 비 예보 (80%)', body: '놀이공원 — 우산 챙겨요' });
+  });
+  it('방학 · 시험 끝나고', () => {
+    const d = emptyStudy();
+    d.sessions = { a: { id: 'a', updatedAt: 1, date: '2026-12-21', minutes: 300, start: 0, end: 0, kind: 'manual' } } as never;
+    const v = vacationView(d, { from: '2026-12-21', to: '2026-12-30', dailyMin: 240, goals: [{ id: 'g', text: 'x', done: true }] }, '2026-12-22');
+    expect(v).toMatchObject({ total: 10, passed: 2, left: 8, kept: 1, avg: 150, goalsDone: 1, on: true });
+    expect(afterExamReminder('2026-12-10', [{ id: 'a', text: '노래방', done: false }], Date.parse('2026-12-01T00:00:00Z'))[0].at).toBe(Date.parse('2026-12-10T18:00:00+09:00'));
+    expect(afterExamReminder('2026-12-10', [{ id: 'a', text: '노래방', done: true }])).toEqual([]);
+  });
+  it('휴대폰 · 못 지킨 이유', () => {
+    const d = emptyStudy();
+    d.conditions = { '2026-11-05': { id: '2026-11-05', updatedAt: 1, screen: 120, missed: ['피곤해서'] }, '2026-11-06': { id: '2026-11-06', updatedAt: 1, screen: 60, missed: ['피곤해서', '폰 · 게임'] } };
+    expect(screenStats(d, '2026-11-06')?.avgScreen).toBe(90);
+    expect(missedStats(d, '2026-11-06')[0]).toEqual({ reason: '피곤해서', n: 2 });
+  });
+});

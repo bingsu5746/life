@@ -2,7 +2,10 @@
 import { useState } from 'react';
 import { habitOn, toggleHabit } from '../study/habits';
 import { alive, newId, type DiaryEntry, type Workout } from '../study/model';
-import { put, useStudy } from '../study/store';
+import { put, useStudy, useWords } from '../study/store';
+import { todaySummary } from '../study/select';
+import { MISSED_REASONS } from '../study/dayLog';
+import type { DayCondition } from '../study/model';
 import { go, toast, useToday } from '../study/ui';
 import { daySummary, studySummary } from './diaryForm';
 import { NotifyTime } from './NotifyTime';
@@ -23,7 +26,15 @@ export function CheckinPage() {
   const lines = [...studySummary(d, today).map((x, i) => (i === 0 ? `공부 ${x.replace(/^모두 /, '')}` : x)), ...daySummary(d, today)];
   const workedOut = alive(d.workouts).some((w) => w.date === today);
   const habits = alive(d.habits).filter((h) => !h.archived && habitOn(h, today));
+  const words = useWords();
+  const left = todaySummary(d, words, today).left;
+  const cond = d.conditions[today] && !d.conditions[today].deleted ? d.conditions[today] : undefined;
+  const [sh, setSh] = useState(cond?.screen !== undefined ? String(Math.floor(cond.screen / 60)) : '');
+  const [sm, setSm] = useState(cond?.screen !== undefined ? String(cond.screen % 60) : '');
+  const [missed, setMissed] = useState<string[]>(cond?.missed ?? []);
+  const screen = sh.trim() || sm.trim() ? Math.min(1440, (Number(sh) || 0) * 60 + (Number(sm) || 0)) : undefined;
   function save() {
+    if (screen !== undefined || missed.length) put('conditions', { ...(cond ?? { id: today }), id: today, screen: screen ?? cond?.screen, missed: missed.length ? missed : undefined } as DayCondition);
     const parts = { ...(cur?.parts ?? {}) };
     const bits = [feel && `공부 ${feel}`, kind && kind !== '안 했어요' && `운동 ${kind} ${min}분`, kind === '안 했어요' && '운동 안 함', line.trim()].filter(Boolean);
     if (bits.length) parts.checkin = bits.join(' · ');
@@ -91,8 +102,29 @@ export function CheckinPage() {
           </div>
         </section>
       )}
+      {left > 0 && (
+        <section className="st-card ck-q">
+          <small className="aw-label">오늘 할 것 {left}개를 못 했어요 · 왜 그랬나요?</small>
+          <div className="ck-opts wrap">
+            {MISSED_REASONS.map((r) => (
+              <button key={r} className={missed.includes(r) ? 'on' : ''} aria-pressed={missed.includes(r)} onClick={() => setMissed(missed.includes(r) ? missed.filter((x) => x !== r) : [...missed, r])}>
+                {r}
+              </button>
+            ))}
+          </div>
+        </section>
+      )}
+      <section className="st-card ck-q">
+        <small className="aw-label">오늘 휴대폰 쓴 시간</small>
+        <div className="st-inline">
+          <input className="st-input xs" inputMode="numeric" value={sh} onChange={(e) => setSh(e.target.value.replace(/\D/g, '').slice(0, 2))} aria-label="시간" />
+          시간
+          <input className="st-input xs" inputMode="numeric" value={sm} onChange={(e) => setSm(e.target.value.replace(/\D/g, '').slice(0, 2))} aria-label="분" />분
+        </div>
+        <p className="st-hint">아이폰은 설정 › 스크린 타임에서 오늘 사용 시간을 볼 수 있어요.</p>
+      </section>
       <input className="st-input" value={line} onChange={(e) => setLine(e.target.value)} placeholder="한 줄 남기기 (선택)" aria-label="한 줄" />
-      <button className="btn btn-primary btn-lg" disabled={!mood && !feel && !kind && !line.trim()} onClick={save}>
+      <button className="btn btn-primary btn-lg" disabled={!mood && !feel && !kind && !line.trim() && screen === undefined && !missed.length} onClick={save}>
         하루 마감
       </button>
       <NotifyTime k="checkinTime" label="하루 마감 알림" fallback="22:00" />

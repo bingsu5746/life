@@ -75,4 +75,8 @@ describe('시험 범위 사진 읽기 결과', () => {
     });
     expect(parseGradeCard('엉뚱한 답')).toEqual({ kind: null, name: null, date: null, scores: [] });
   });
+  it('교과서 → 백지 복습: 제목 · 핵심이 있는 것만', async () => {
+    const { parseBlank } = await import('./aiRead');
+    expect(parseBlank(JSON.stringify({ sheets: [{ title: '1. 세포의 구조', points: ['핵: 유전 물질 보관', ''] }, { title: '', points: ['x'] }, { title: '빈 것', points: [] }] }))).toEqual({ sheets: [{ title: '1. 세포의 구조', points: ['핵: 유전 물질 보관'] }] });
+  });
 });

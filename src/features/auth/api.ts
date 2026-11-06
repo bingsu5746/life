@@ -644,6 +644,8 @@ export interface GradeCardRead {
   scores: { subject: string; raw: number | null; full: number | null; grade: number | null; average: number | null; standard: number | null; percentile: number | null }[];
 }
 export const gradeCardScan = (images: { mime: string; data: string }[]) => aiJob<GradeCardRead>('ai/gradecard', { images });
+/** 교과서 글 → 백지 복습 카드 */
+export const blankScan = (text: string, subject: string, pages: string) => aiJob<{ sheets: { title: string; points: string[] }[] }>('ai/blank', { text, subject, pages });
 /** 목차 사진들 → 단원 · 쪽 */
 export const tocScan = (images: { mime: string; data: string }[]) => aiJob<{ units: { name: string; from: number | null; to: number | null }[] }>('ai/toc', { images });
 /** 책 찾기 (국립중앙도서관) */

@@ -17,7 +17,7 @@ export function MedsCard({ compact }: { compact?: boolean }) {
   return (
     <section className="st-card">
       <div className="st-inline between">
-        <h3 className="st-h">💊 약 · 영양제</h3>
+        <h3 className="st-h">약 · 영양제</h3>
         {!compact && (
           <button className="btn btn-sm" onClick={() => setEdit('new')}>
             ＋ 넣기

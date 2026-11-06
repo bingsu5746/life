@@ -235,6 +235,12 @@ export function Settings({ cat: cat0 }: { cat?: string }) {
           <NotifyTime k="wordQuizTime" label="단어 퀴즈 알림 (자주 틀린 단어 3개)" fallback="07:30" />
           <BreakWordsSetting />
           <BedtimeSetting />
+          <section className="st-card">
+            <label className="st-toggle">
+              <input type="checkbox" checked={d.settings.rainRemind !== false} onChange={(e) => setSettings({ rainRemind: e.target.checked ? undefined : false })} /> 일정 날 비 · 눈 예보 알림
+            </label>
+            <small className="st-muted">달력에 일정이 있는 날 비 · 눈 올 확률이 50% 이상이면 전날 21시에 알려요 (날씨 위치 기준, 공부 일정은 빼고).</small>
+          </section>
         </>
       )}
       {cat === 'life' && (

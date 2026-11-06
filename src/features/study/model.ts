@@ -82,6 +82,16 @@ export interface StudySettings {
   medLog?: Record<DateStr, string[]>;
   /** 집중 화면에서 틀 유튜브 (영상 · 재생목록, 이름은 내가 붙임) */
   focusVideos?: { kind: 'v' | 'list'; id: string; name: string }[];
+  /** 시장: 포인트로 살 보상 · 산 기록 · 포인트 규칙 */
+  market?: MarketSettings;
+  /** 일정 날 비 예보 알림 (끄면 false) */
+  rainRemind?: boolean;
+  /** 방학 계획 */
+  vacation?: { from: DateStr; to: DateStr; dailyMin: number; goals: { id: Id; text: string; done: boolean }[]; memo?: string };
+  /** 시험 끝나고 할 것 (가장 가까운 시험이 끝나는 날 알려 준다) */
+  afterExam?: { id: Id; text: string; done: boolean }[];
+  /** 과목별 교과서 PDF: 책의 1쪽이 PDF 몇 번째 장인지 (파일은 이 기기 IndexedDB) */
+  textbooks?: Record<Id, { name: string; offset: number }>;
   /** 일주일에 쓸 돈 한도 (넘으면 저녁 알림) */
   weeklyLimit?: number;
   /** 날씨 위치 (없으면 노원구) */
@@ -115,6 +125,16 @@ export interface StudySettings {
   gradeGoals?: { school?: Record<string, number>; mock?: Record<string, number> };
   /** 목표 대학 · 학과 (목표 성적은 직접 넣는다) */
   univGoals?: UnivGoal[];
+}
+
+/** 시장: 공부 · 습관 · 할 일로 포인트를 모아 내가 정한 보상과 바꾼다 */
+export interface MarketSettings {
+  /** 포인트 규칙: 공부 10분당 · 습관 하나 · 할 일 하나 · 오답 해결 하나 */
+  rate: { study10: number; habit: number; todo: number; note: number };
+  /** 처음 포인트를 세기 시작한 날 (그 전 기록은 세지 않음) */
+  since: DateStr;
+  items: { id: Id; name: string; icon: string; price: number }[];
+  buys: { id: Id; itemId: Id; name: string; price: number; at: number; used?: boolean }[];
 }
 
 /** 목표 대학 · 학과 하나: 내신 목표 평균 등급 · 모의고사 과목별 목표 (등급 · 백분위) */
@@ -297,6 +317,10 @@ export interface DayCondition extends Stamp {
   wake?: string;
   /** 컨디션 1(나쁨)~5(좋음) */
   mood?: number;
+  /** 휴대폰 사용 시간 (분, 하루 마감에서 직접 적음) */
+  screen?: number;
+  /** 오늘 계획을 다 못 했을 때 고른 이유 */
+  missed?: string[];
 }
 
 /** 주간 돌아보기 한 줄 (id 는 그 주 월요일) */
@@ -445,6 +469,8 @@ export interface WrongNote extends Stamp, Review {
   paperId?: Id;
   /** 다시 풀기에서 연달아 맞힌 횟수 (2번이면 졸업 = 해결됨) */
   okRun?: number;
+  /** 영어 어법 오답이면 그 유형 (src/features/study/grammar.ts 의 key) */
+  grammar?: string;
   created: number;
 }
 

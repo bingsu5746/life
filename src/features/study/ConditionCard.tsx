@@ -61,13 +61,15 @@ export function ConditionPrompt({ today }: { today: string }) {
           <input type="time" value={c?.sleep ?? ''} onChange={(e) => save({ sleep: e.target.value || undefined })} aria-label="잔 시각" />
         </label>
         <div className={`cp-time ${c?.wake ? 'on' : ''}`}>
-          <span>일어난 시각</span>
+          <span className="cp-time-head">
+            <span>일어난 시각</span>
+            {!c?.wake && (
+              <button type="button" className="st-link" onClick={() => save({ wake: `${String(new Date().getHours()).padStart(2, '0')}:${String(new Date().getMinutes()).padStart(2, '0')}` })}>
+                지금
+              </button>
+            )}
+          </span>
           <input type="time" value={c?.wake ?? ''} onChange={(e) => save({ wake: e.target.value || undefined })} aria-label="일어난 시각" />
-          {!c?.wake && (
-            <button type="button" className="st-link" onClick={() => save({ wake: `${String(new Date().getHours()).padStart(2, '0')}:${String(new Date().getMinutes()).padStart(2, '0')}` })}>
-              지금 일어났어요
-            </button>
-          )}
         </div>
       </div>
       {slept !== null && <p className="cp-slept">{minutesText(slept)} 잤어요</p>}

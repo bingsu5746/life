@@ -23,7 +23,7 @@ import { fetchSpecialDays } from './holidays';
 import { cleanFact, goodKo } from './fact';
 import { fetch2k } from './nba2k';
 import { hcBody, parseHc } from './homecourt';
-import { coachBody, diaryBody, noteBody, parseCoach, parseDiary, parseNote, parseReceipt, parseTocRead, receiptBody, tocBody, titleBody, parseTitles, scopeBody, parseScopeRead, reviewQBody, parseReviewQ, gradeCardBody, parseGradeCard } from './aiRead';
+import { coachBody, diaryBody, noteBody, parseCoach, parseDiary, parseNote, parseReceipt, parseTocRead, receiptBody, tocBody, titleBody, parseTitles, scopeBody, parseScopeRead, reviewQBody, parseReviewQ, gradeCardBody, parseGradeCard, blankBody, parseBlank } from './aiRead';
 import { seojiSearch, seojiToc, seojiTocByIsbn, yes24Search, yes24Toc } from './books';
 import { cheapShark } from './cheapshark';
 import { invenChamps, invenSkins, invenSkinVideo } from './skins';
@@ -251,7 +251,7 @@ export class Accounts extends DurableObject<Env> {
     if (req.method === 'POST' || req.method === 'PUT' || req.method === 'DELETE') {
       const big = path.startsWith('store/') || path.startsWith('study-photo/') || path.startsWith('study-video/') || path === 'solve' || path === 'solve/img' || path === 'bb/scan' || path === 'ai/note' || path === 'ai/receipt' || path === 'ai/toc' || path === 'ai/stt';
       const text = await req.text();
-      if (text.length > (big ? MAX_STORE + 1000 : path === 'translate' || path === 'notify/digest' || path === 'notify/remind' || path === 'ai/diary' || path === 'ai/coach' ? 4 * MAX_SMALL_BODY : MAX_SMALL_BODY)) return fail('보낸 내용이 너무 커요.', 413);
+      if (text.length > (big ? MAX_STORE + 1000 : path === 'translate' || path === 'notify/digest' || path === 'notify/remind' || path === 'ai/diary' || path === 'ai/coach' || path === 'ai/blank' ? 4 * MAX_SMALL_BODY : MAX_SMALL_BODY)) return fail('보낸 내용이 너무 커요.', 413);
       try {
         const parsed: unknown = text ? JSON.parse(text) : {};
         if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return fail('잘못된 요청이에요.');
@@ -397,6 +397,13 @@ export class Accounts extends DurableObject<Env> {
       if (imgs.reduce((a, x) => a + x.data.length, 0) > MAX_STORE) return fail('사진이 너무 커요. 장 수를 줄여 주세요.', 413);
       const subjects = (Array.isArray(body.subjects) ? body.subjects : []).filter((x): x is string => typeof x === 'string').map((x) => x.slice(0, 20)).slice(0, 30);
       return this.aiJob(user, scopeBody(imgs, subjects), parseScopeRead, 'scope');
+    }
+    if (path === 'ai/blank' && req.method === 'POST') {
+      const text = typeof body.text === 'string' ? body.text.trim().slice(0, 6000) : '';
+      if (text.length < 40) return fail('글이 너무 적어요.');
+      const subject = typeof body.subject === 'string' ? body.subject.trim().slice(0, 20) : '';
+      const pages = typeof body.pages === 'string' ? body.pages.trim().slice(0, 20) : '';
+      return this.aiJob(user, blankBody(text, subject, pages), parseBlank, 'blank');
     }
     if (path === 'ai/gradecard' && req.method === 'POST') {
       const imgs = (Array.isArray(body.images) ? body.images : [])

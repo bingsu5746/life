@@ -17,8 +17,12 @@ import { autoSaves, dueRuleTx } from '../life/calc';
 import { tutorSessions } from './tutor';
 import { eventSessions } from '../life/events';
 import { autoDiaries } from '../life/diaryForm';
-import { reminders } from '../life/events';
+import { eventsBetween, rainReminders, reminders } from '../life/events';
+import { DEFAULT_PLACE, getForecast } from '../life/weather';
+import { addDays } from './dates';
 import { medReminders } from './meds';
+import { afterExamReminder } from './vacation';
+import { examEnd, upcomingExams } from './exams';
 import { notifyRemind } from '../auth/api';
 // 시험 화면은 오늘 화면(D-day)과 같이 쓰여 함께 받는다
 import { go, Icon, Sheet, Toaster, useToday } from './ui';
@@ -52,6 +56,7 @@ const Movies = lazy(() => import('../life/Movies').then((m) => ({ default: m.Mov
 const Search = lazy(() => import('../life/Search').then((m) => ({ default: m.Search })));
 const LifeWeekPage = lazy(() => import('../life/LifeWeek').then((m) => ({ default: m.LifeWeekPage })));
 const CheckinPage = lazy(() => import('../life/Checkin').then((m) => ({ default: m.CheckinPage })));
+const Market = lazy(() => import('../life/Market').then((m) => ({ default: m.Market })));
 const Diary = lazy(() => import('../life/Diary').then((m) => ({ default: m.Diary })));
 const SubjectProblems = lazy(() => import('./SavedProblems').then((m) => ({ default: m.SubjectProblems })));
 const Solve = lazy(() => import('./Solve').then((m) => ({ default: m.Solve })));
@@ -152,11 +157,15 @@ export function Study({ path, loggedIn, syncReady = true, onLogin }: { path: str
     let gone = false;
     const t = setTimeout(() => {
       // 쉬는 시간 단어 계산은 첫 화면에 필요 없어서 이때 받는다
-      void import('./notifyDigest')
-        .then(({ breakWordReminders, bedtimeReminders }) => {
+      // 일정 날 비 예보: 앞으로 일주일 안에 일정이 있을 때만 날씨를 받는다
+      const place = d.settings.weatherPlace ?? DEFAULT_PLACE;
+      const wantRain = d.settings.rainRemind !== false && eventsBetween(d, today, addDays(today, 7)).size > 0;
+      const fc = wantRain ? getForecast(place.lat, place.lon).catch(() => null) : Promise.resolve(null);
+      void Promise.all([import('./notifyDigest'), fc])
+        .then(([{ breakWordReminders, bedtimeReminders }, forecast]) => {
           if (gone) return;
-          // 일정 · 빚 갚을 날 · 쉬는 시간 단어 · 잘 시간 (서버는 60개까지라 가까운 것부터)
-          const items = [...reminders(d, today), ...breakWordReminders(d, words, today), ...bedtimeReminders(d, today), ...medReminders(d, today)].sort((a, b) => a.at - b.at).slice(0, 60);
+          // 일정 · 빚 갚을 날 · 쉬는 시간 단어 · 잘 시간 · 약 · 비 예보 (서버는 60개까지라 가까운 것부터)
+          const items = [...reminders(d, today), ...breakWordReminders(d, words, today), ...bedtimeReminders(d, today), ...medReminders(d, today), ...(forecast ? rainReminders(d, forecast, today) : []), ...afterExamReminder(upcomingExams(d, today)[0] ? examEnd(upcomingExams(d, today)[0]) : null, d.settings.afterExam)].sort((a, b) => a.at - b.at).slice(0, 60);
           const key = JSON.stringify(items);
           if (lastRemind.current === key) return;
           return notifyRemind(items).then(() => (lastRemind.current = key));
@@ -167,7 +176,7 @@ export function Study({ path, loggedIn, syncReady = true, onLogin }: { path: str
       gone = true;
       clearTimeout(t);
     };
-  }, [d.events, d.moneyTx, d.settings.breakWords, d.settings.schoolTimetable, d.settings.birthdays, d.settings.movieNews, d.settings.bedRemind, d.settings.sleepGoal, d.settings.meds, d.settings.medLog, words, today, loggedIn]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [d.events, d.moneyTx, d.settings.breakWords, d.settings.schoolTimetable, d.settings.birthdays, d.settings.movieNews, d.settings.bedRemind, d.settings.sleepGoal, d.settings.meds, d.settings.medLog, d.settings.rainRemind, d.settings.weatherPlace, d.settings.afterExam, d.exams, words, today, loggedIn]); // eslint-disable-line react-hooks/exhaustive-deps
   // 보고 싶은 영화 소식: 하루 한 번 (이 기기) OTT · 극장 상영 · 재개봉을 찾아 새 것만 남긴다
   useEffect(() => {
     if (!loggedIn || !syncReady) return;
@@ -231,6 +240,7 @@ export function Study({ path, loggedIn, syncReady = true, onLogin }: { path: str
   else if (p0 === 'travel') content = <Travel sub={path[1]} />;
   else if (area === 'hobby') content = <Hobby sub={path[1]} sub2={path[2]} />;
   else if (area === 'diary') content = <Diary sub={path[1]} />;
+  else if (area === 'market') content = <Market sub={path[1]} />;
   else if (area === 'ai' && path[1] === 's' && path[2]) content = <SubjectProblems subject={path[2]} />;
   else if (area === 'ai') content = <Solve open={path[1]} />;
   else if (tab === 'books') content = <Books id={id} sub={sub} />;

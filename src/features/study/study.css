@@ -9795,7 +9795,7 @@ body.focus-on {
   padding: 20px;
   border-radius: var(--radius);
   background: var(--surface);
-  border: 2px solid var(--accent);
+  border: 1px solid var(--line);
 }
 .cp-title {
   margin: 0;
@@ -9821,6 +9821,15 @@ body.focus-on {
 .cp-time span {
   font-size: 0.85rem;
   color: var(--muted);
+}
+.cp-time-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 6px;
+}
+.cp-time-head .st-link {
+  font-size: 0.8rem;
 }
 .cp-time input {
   width: 100%;
@@ -10440,4 +10449,86 @@ body.focus-on {
 .focus-noise button.on {
   background: #f2f2f0;
   color: #050505;
+}
+
+/* 영어 어법 */
+.gm-list {
+  display: grid;
+  gap: 10px;
+}
+.gm-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  border: 0;
+  background: none;
+  padding: 0;
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.gm-check {
+  margin: 8px 0;
+  padding-left: 1.2em;
+  display: grid;
+  gap: 4px;
+  font-size: 0.92rem;
+}
+.gm-ex {
+  font-size: 0.9rem;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: var(--soft);
+}
+
+/* 시장 */
+.mk-wallet {
+  display: grid;
+  justify-items: center;
+  gap: 2px;
+  text-align: center;
+}
+.mk-wallet b {
+  font-size: 2.4rem;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+}
+.mk-shop {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 10px;
+}
+.mk-shop-item {
+  display: grid;
+  justify-items: center;
+  gap: 4px;
+}
+.mk-shop-buy {
+  width: 100%;
+  display: grid;
+  justify-items: center;
+  gap: 4px;
+  padding: 16px 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  cursor: pointer;
+}
+.mk-shop-item.short .mk-shop-buy {
+  opacity: 0.55;
+}
+.mk-icon {
+  font-size: 1.8rem;
+}
+.mk-plus {
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+.mk-minus {
+  color: var(--bad);
+  font-variant-numeric: tabular-nums;
 }

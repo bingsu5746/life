@@ -299,3 +299,37 @@ export function parseGradeCard(text: string): GradeCardRead {
     scores,
   };
 }
+
+/** 교과서 글 → 백지 복습 카드 (단원 · 소단원 이름 + 꼭 외울 핵심 줄). 글에 있는 것만 */
+export interface BlankRead {
+  sheets: { title: string; points: string[] }[];
+}
+export function blankBody(text: string, subject: string, pages: string) {
+  const prompt = [
+    `아래는 한국 고등학교 ${subject} 교과서 ${pages}쪽의 글이에요 (PDF 에서 뽑아 줄바꿈 · 띄어쓰기가 흐트러졌을 수 있어요).`,
+    '시험 대비 백지 복습 카드를 만들어 주세요.',
+    '- 소단원(또는 큰 제목)마다 카드 하나. title 은 글에 적힌 제목 그대로.',
+    '- points: 그 부분에서 꼭 외울 핵심을 한 줄씩 (개념 정의, 원리, 공식, 인물 · 사건 · 연도, 특징 비교). 3~10줄, 한 줄 80자 안.',
+    '- 글에 없는 내용은 절대 더하지 마세요. 용어 · 숫자 · 이름은 글에 적힌 그대로.',
+    '- 학습 목표, 탐구 활동 안내, 쪽 번호, 그림 설명 같은 것은 빼세요.',
+    'JSON: {"sheets": [{"title": 문자열, "points": [문자열]}]}',
+    '',
+    text,
+  ].join('\n');
+  return { contents: [{ role: 'user', parts: [{ text: prompt }] }], generationConfig: { responseMimeType: 'application/json', temperature: 0.2 } };
+}
+export function parseBlank(text: string): BlankRead {
+  const j = obj(text);
+  const sheets = (Array.isArray(j.sheets) ? j.sheets : [])
+    .map((x) => x as { title?: unknown; points?: unknown })
+    .map((x) => ({
+      title: str(x.title, 60) ?? '',
+      points: (Array.isArray(x.points) ? x.points : [])
+        .map((p) => str(p, 120))
+        .filter((p): p is string => !!p)
+        .slice(0, 15),
+    }))
+    .filter((x) => x.title && x.points.length)
+    .slice(0, 12);
+  return { sheets };
+}

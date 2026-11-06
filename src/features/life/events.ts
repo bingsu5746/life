@@ -159,3 +159,24 @@ export function eventSessions(d: Pick<StudyData, 'events' | 'sessions'>, today: 
     }
   return out;
 }
+
+/** 일정 날 비 · 눈 예보 알림: 비 올 확률이 50% 이상인 날의 일정을 전날 21시에 (지났으면 그날 7시에). 공부 일정(학원 등)은 뺀다 */
+export function rainReminders(d: Pick<StudyData, 'events'>, forecast: Record<DateStr, { rain: number; code: number }>, today: DateStr, now = Date.now()): { at: number; title: string; body: string; url: string }[] {
+  const out: { at: number; title: string; body: string; url: string }[] = [];
+  const dates = Object.keys(forecast).sort();
+  if (!dates.length) return out;
+  const map = eventsBetween(d, today, dates[dates.length - 1]);
+  for (const [date, list] of map) {
+    const f = forecast[date];
+    if (!f || f.rain < 50) continue;
+    const names = list.filter((x) => !x.e.study).map((x) => x.e.title);
+    if (!names.length) continue;
+    const snow = (f.code >= 71 && f.code <= 77) || f.code === 85 || f.code === 86;
+    const prev = Date.parse(`${addDays(date, -1)}T21:00:00+09:00`);
+    const morning = Date.parse(`${date}T07:00:00+09:00`);
+    const at = prev > now ? prev : morning > now ? morning : 0;
+    if (!at) continue;
+    out.push({ at, title: `${snow ? '🌨️' : '☔'} ${at === prev ? '내일' : '오늘'} ${snow ? '눈' : '비'} 예보 (${f.rain}%)`, body: `${names.slice(0, 2).join(' · ')}${names.length > 2 ? ` 외 ${names.length - 2}개` : ''} — ${snow ? '따뜻하게 입고 미끄럼 조심해요' : '우산 챙겨요'}`, url: '/calendar' });
+  }
+  return out;
+}
