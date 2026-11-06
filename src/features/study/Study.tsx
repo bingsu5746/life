@@ -1,4 +1,7 @@
 // 공부 도우미: 탭과 하위 화면 (설계 docs/superpowers/specs/2026-10-23-study-planner-design.md)
+import { findMovieNews } from '../life/movieNews';
+import { kobisInfo, movieProviders } from '../auth/api';
+import { Celebrate } from './Celebrate';
 import { breakWordReminders } from './notifyDigest';
 import { dueTodoRules } from './todoRules';
 import { pendingExamLocks } from './examPlan';
@@ -6,7 +9,8 @@ import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import './study.css';
 import { AddButton } from './Add';
 import { pendingLocks, reviewCountToday } from './select';
-import { putMany, useSaveFailed, useStudy, useWords } from './store';
+import { getStudy, putMany, setSettings, useSaveFailed, useStudy, useWords } from './store';
+import { alive } from './model';
 import { useTimerAlarm, useTimerView } from './timerStore';
 import { clock } from './timer';
 import { Today } from './Today';
@@ -154,7 +158,34 @@ export function Study({ path, loggedIn, syncReady = true, onLogin }: { path: str
         .catch(() => {});
     }, 4000);
     return () => clearTimeout(t);
-  }, [d.events, d.moneyTx, d.settings.breakWords, d.settings.schoolTimetable, d.settings.birthdays, words, today, loggedIn]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [d.events, d.moneyTx, d.settings.breakWords, d.settings.schoolTimetable, d.settings.birthdays, d.settings.movieNews, words, today, loggedIn]); // eslint-disable-line react-hooks/exhaustive-deps
+  // 보고 싶은 영화 소식: 하루 한 번 (이 기기) OTT · 극장 상영 · 재개봉을 찾아 새 것만 남긴다
+  useEffect(() => {
+    if (!loggedIn || !syncReady) return;
+    const want = alive(d.movies).filter((m) => m.status === 'want').slice(0, 40);
+    if (!want.length) return;
+    let day = '';
+    try {
+      day = localStorage.getItem('my-study.movienews.day') ?? '';
+    } catch {
+      /* 무시 */
+    }
+    if (day === today) return;
+    const t = setTimeout(() => {
+      try {
+        localStorage.setItem('my-study.movienews.day', today);
+      } catch {
+        /* 무시 */
+      }
+      void Promise.all([kobisInfo().catch(() => null), movieProviders(want.map((m) => ({ title: m.title, year: m.year }))).then((r) => r.providers).catch(() => null)]).then(([k, p]) => {
+        const s = getStudy().settings;
+        const news = findMovieNews(want, k, p, new Set((s.movieNews ?? []).map((n) => n.key)));
+        if (news.length) setSettings({ movieNews: [...(s.movieNews ?? []), ...news].slice(-40) });
+      });
+    }, 8000);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loggedIn, syncReady, today]);
   // 새 영단어에 예문을 저절로 (로그인했을 때, 단어가 바뀌고 잠시 뒤)
   useEffect(() => {
     if (!loggedIn || !syncReady) return;
@@ -209,6 +240,7 @@ export function Study({ path, loggedIn, syncReady = true, onLogin }: { path: str
   const studyTabs = TABS.filter((t) => t.key === 'today' || t.key === tab || !d.settings.hiddenTabs?.includes(t.key));
   return (
     <main className={`study ${running ? 'running' : ''}`}>
+      {!running && <Celebrate />}
       {!running && area === 'home' && !isWeek && !isInsights && (
         <nav className="st-nav" aria-label="영역">
           {AREAS.filter((a) => (a.key === 'home' || !d.settings.hiddenAreas?.includes(a.key)) && (!studyMode || STUDY_MODE_AREAS.includes(a.key))).map((a) => (

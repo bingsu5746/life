@@ -111,6 +111,7 @@ export function FocusTimer({ timer, update, onStop, onExit }: { timer: TimerStat
           )}
         </div>
       </div>
+      {timer.kind === 'pomo' && timer.phase !== 'work' && <Stretch />}
       {timer.kind === 'pomo' && timer.phase !== 'work' && <BreakWords dark />}
       <div className="focus-bottom">
         <span>오늘 {minutesText(todayMin)}</span>
@@ -402,6 +403,42 @@ export function BreakWords({ dark }: { dark?: boolean }) {
       >
         다른 단어
       </button>
+    </div>
+  );
+}
+
+/** 쉬는 시간 스트레칭: 30초짜리 하나씩 (쉬는 시간마다 바뀜). 아프면 멈추기 */
+const STRETCHES: [string, string][] = [
+  ['목 옆으로 늘이기', '오른손으로 머리를 오른쪽으로 살짝 당겨 15초, 반대도 15초'],
+  ['어깨 으쓱', '어깨를 귀까지 올렸다가 툭 내리기 10번'],
+  ['어깨 뒤로 돌리기', '어깨를 크게 뒤로 10번 돌리기'],
+  ['가슴 펴기', '두 손을 등 뒤로 깍지 끼고 가슴을 펴서 15초'],
+  ['손목 풀기', '팔을 앞으로 뻗고 손가락을 몸 쪽으로 당겨 10초씩, 양손'],
+  ['고개 숙이기', '턱을 가슴 쪽으로 당겨 목 뒤를 늘이며 15초'],
+  ['옆구리 늘이기', '두 팔을 위로 뻗고 왼쪽 · 오른쪽으로 10초씩 기울이기'],
+  ['일어나서 걷기', '자리에서 일어나 30초 걷고 물 한 모금'],
+  ['눈 쉬기', '창밖 먼 곳을 20초 보기 (가까운 화면에서 눈 쉬기)'],
+  ['허리 비틀기', '앉아서 몸통을 왼쪽 · 오른쪽으로 천천히 15초씩 돌리기'],
+];
+function Stretch() {
+  const [i, setI] = useState(() => Math.floor(Date.now() / 600_000) % STRETCHES.length);
+  const [left, setLeft] = useState<number | null>(null);
+  useEffect(() => {
+    if (left === null || left <= 0) return;
+    const t = setTimeout(() => setLeft(left - 1), 1000);
+    return () => clearTimeout(t);
+  }, [left]);
+  const [name, how] = STRETCHES[i];
+  return (
+    <div className="fs-stretch" onPointerDown={(e) => e.stopPropagation()}>
+      <small>쉬는 시간 스트레칭</small>
+      <b>🤸 {name}</b>
+      <span>{how}</span>
+      <div className="fs-stretch-btns">
+        <button onClick={() => setLeft(30)}>{left === null ? '30초 시작' : left > 0 ? `${left}초` : '끝! 잘했어요'}</button>
+        <button onClick={() => (setI((i + 1) % STRETCHES.length), setLeft(null))}>다른 것</button>
+      </div>
+      <small className="fs-stretch-note">아프면 바로 멈춰요.</small>
     </div>
   );
 }

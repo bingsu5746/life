@@ -1,4 +1,5 @@
 // 영화 한 편: 별점 입력 · 넣기/고치기 창 · 보기 창 (감상평·리뷰·태그·또 본 기록)
+import { ReviewHelper } from './ReviewHelper';
 import { useEffect, useState } from 'react';
 import { catalogSearch, type CatalogFilm } from '../auth/api';
 import { shortDate } from '../study/dates';
@@ -214,6 +215,7 @@ export function MovieSheet({ item, today, onClose }: { item: Partial<Movie>; tod
             <Field label={`리뷰${review.trim() ? ` · ${review.trim().length.toLocaleString('ko-KR')}자` : ''}`}>
               <textarea className="st-input mv-review-input" rows={8} value={review} onChange={(e) => setReview(e.target.value)} placeholder="줄거리, 좋았던 장면, 아쉬운 점… 길게 써도 돼요" aria-label="리뷰" />
             </Field>
+            <ReviewHelper kind="movie" title={title} by={year ? `${year}년` : ""} mine={[item.comment, quote].filter(Boolean).join(" / ")} onDraft={(t) => setReview((r) => (r.trim() ? `${r.trim()}\n\n${t}` : t))} />
             <Field group label="태그">
               <div className="st-chips">
                 {choices.map((t) => (

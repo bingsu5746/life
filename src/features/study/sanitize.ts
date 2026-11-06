@@ -515,7 +515,7 @@ const FIX: Record<Collection, Fix> = {
   }),
   sessions: (x) =>
     isDate(x.date)
-      ? { ...x, subjectId: optStr(x.subjectId), bookId: optStr(x.bookId), start: num(x.start), end: num(x.end), minutes: Math.max(0, num(x.minutes)), kind: x.kind === 'pomo' || x.kind === 'watch' ? x.kind : 'manual', place: optStr(x.place)?.slice(0, 20), memo: optStr(x.memo)?.slice(0, 100) }
+      ? { ...x, subjectId: optStr(x.subjectId), bookId: optStr(x.bookId), start: num(x.start), end: num(x.end), minutes: Math.max(0, num(x.minutes)), kind: x.kind === 'pomo' || x.kind === 'watch' ? x.kind : 'manual', place: optStr(x.place)?.slice(0, 20), memo: optStr(x.memo)?.slice(0, 100), learned: optStr(x.learned)?.slice(0, 200), learnedCheck: x.learnedCheck === 'ok' || x.learnedCheck === 'fuzzy' ? x.learnedCheck : undefined }
       : null,
   todos: (x) => ({
     ...x,
@@ -722,6 +722,17 @@ export function sanitizeSettings(s: unknown): StudySettings & { updatedAt: numbe
           .map((b) => {
             const o = b as Obj;
             return { id: str(o.id, `b${Math.random().toString(36).slice(2, 10)}`).slice(0, 40), name: (o.name as string).trim().slice(0, 30) || '이름', md: o.md as string, budget: score(o.budget, 1, 1e9), idea: optStr(o.idea)?.slice(0, 200) };
+          })
+      : undefined,
+    celebrated: Array.isArray(x.celebrated) ? (x.celebrated as unknown[]).filter((v): v is string => typeof v === 'string').map((v) => v.slice(0, 60)).slice(-50) : undefined,
+    movieNews: Array.isArray(x.movieNews)
+      ? (x.movieNews as unknown[])
+          .filter(isObj)
+          .filter((n) => typeof (n as Obj).key === 'string' && typeof (n as Obj).text === 'string')
+          .slice(-40)
+          .map((n) => {
+            const o = n as Obj;
+            return { key: (o.key as string).slice(0, 200), movieId: str(o.movieId).slice(0, 40), text: (o.text as string).slice(0, 200), at: num(o.at), read: o.read === true ? true : undefined };
           })
       : undefined,
     packAlways: Array.isArray(x.packAlways) ? (x.packAlways as unknown[]).filter((v): v is string => typeof v === 'string' && !!v.trim()).map((v) => v.trim().slice(0, 30)).slice(0, 20) : undefined,

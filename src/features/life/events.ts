@@ -93,6 +93,8 @@ export function repeatText(e: CalEvent): string {
 /** 앞으로 days 일 동안의 알림 (서버에 올려 두면 그 시각에 휴대폰으로). 빚 갚을 날도 (전날 · 당일 아침 9시, 남은 빚이 있을 때) */
 export function reminders(d: Pick<StudyData, 'events'> & Partial<Pick<StudyData, 'moneyTx' | 'settings'>>, today: DateStr, now = Date.now(), days = 14): { at: number; title: string; body: string; url?: string }[] {
   const out: { at: number; title: string; body: string; url?: string }[] = [];
+  // 보고 싶은 영화 소식: 방금 찾은 것만 (1분 뒤 한 번)
+  for (const n of d.settings?.movieNews ?? []) if (!n.read && n.at + 60_000 > now && n.at > now - 10 * 60_000) out.push({ at: n.at + 60_000, title: '🎬 보고 싶은 영화 소식', body: n.text, url: '/movies/want' });
   // 생일: 일주일 전 · 당일 아침 9시
   for (const b of d.settings?.birthdays ?? []) {
     const day = nextBirthday(b.md, today);

@@ -148,6 +148,30 @@ export function parseTocRead(text: string): TocRead {
   return { units };
 }
 
+/** 감상문 도우미: 책 · 영화 제목(과 내가 남긴 말)으로 생각을 끌어내는 질문 4개 (줄거리를 지어내지 않게) */
+export function reviewQBody(kind: 'book' | 'movie', title: string, by: string, mine: string) {
+  const prompt = [
+    `한국 고등학생이 ${kind === 'book' ? '책' : '영화'} 「${title}」${by ? ` (${by})` : ''} 감상문을 쓰려고 해. 생각을 끌어내는 질문 4개를 만들어 줘.`,
+    '- 줄거리 · 인물 · 장면을 네가 아는 것처럼 지어내지 마. 확실하지 않으면 「가장 기억에 남는 장면은?」처럼 작품 내용 없이도 답할 수 있게.',
+    '- 순서: 첫인상 → 기억에 남는 부분 → 나와 연결 · 생각이 바뀐 점 → 누구에게 추천 / 아쉬운 점',
+    '- 친근한 반말, 한 문장씩 짧게',
+    mine ? `- 학생이 이미 남긴 말: ${mine}` : '',
+    'JSON: {"questions": [문자열 4개]}',
+  ]
+    .filter(Boolean)
+    .join('\n');
+  return { contents: [{ role: 'user', parts: [{ text: prompt }] }], generationConfig: { responseMimeType: 'application/json', temperature: 0.6 } };
+}
+export function parseReviewQ(text: string): { questions: string[] } {
+  const j = obj(text);
+  return {
+    questions: (Array.isArray(j.questions) ? j.questions : [])
+      .map((x) => str(x, 120))
+      .filter((x): x is string => !!x)
+      .slice(0, 5),
+  };
+}
+
 /** 시험 범위 공지 사진 → 과목별 범위 줄 (적힌 것만) */
 export interface ScopeRead {
   scopes: { subject: string; date: string | null; lines: string[] }[];

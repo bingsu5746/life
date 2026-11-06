@@ -1,4 +1,5 @@
 // 「오늘」 화면 (설계 §7): 과외 숙제 → 문제집 오늘 분량 → 영단어 → 복습 → 할 일·습관 → 공부 시간
+import { RecallCard } from './Recall';
 import { PackCard } from './Pack';
 import { unitWord } from './toc';
 import { ExamToday } from './ExamPlan';
@@ -76,6 +77,7 @@ export function Today() {
       <EveBanner today={today} />
       <DdayHero today={today} />
       <PackCard today={today} />
+      <RecallCard today={today} />
       <header className="st-today-head">
         <div>
           <h2>{longDate(today)}</h2>

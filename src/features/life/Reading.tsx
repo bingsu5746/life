@@ -1,4 +1,5 @@
 // 독서: 읽는 중인 책의 쪽 수, 읽고 싶은 책, 다 읽은 책의 별점·한줄평·리뷰
+import { ReviewHelper } from './ReviewHelper';
 import { useEffect, useState } from 'react';
 import { addDays, shortDate } from '../study/dates';
 import { alive, newId, type Reading } from '../study/model';
@@ -321,6 +322,7 @@ function ReadSheet({ item, today, onClose }: { item: Partial<Reading>; today: st
             <Field label="리뷰">
               <textarea className="st-input mv-review-input" rows={6} value={review} onChange={(e) => setReview(e.target.value)} placeholder="인상 깊은 문장, 느낀 점…" aria-label="리뷰" />
             </Field>
+            <ReviewHelper kind="book" title={title} by={author} mine={comment} onDraft={(t) => setReview((r) => (r.trim() ? `${r.trim()}\n\n${t}` : t))} />
           </>
         )}
         <div className="st-row end">
