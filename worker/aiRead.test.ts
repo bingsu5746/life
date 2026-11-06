@@ -91,3 +91,11 @@ describe('세계 뉴스', () => {
     expect(guardianUrl('k', 'all')).not.toContain('section=');
   });
 });
+
+describe('국내 뉴스', () => {
+  it('Google 뉴스 RSS 읽기', async () => {
+    const { parseGoogleNews } = await import('./news');
+    const xml = `<rss><channel><item><title>제목 &amp; 하나 - 연합뉴스</title><link>https://news.google.com/rss/articles/AB?oc=5</link><guid isPermaLink="false">AB</guid><pubDate>Fri, 06 Nov 2026 11:00:00 GMT</pubDate><source url="https://www.yna.co.kr">연합뉴스</source></item><item><title>나쁜 것</title><link>https://evil.com/x</link></item></channel></rss>`;
+    expect(parseGoogleNews(xml)).toEqual([{ id: 'AB', title: '제목 & 하나', trail: '', url: 'https://news.google.com/rss/articles/AB?oc=5', section: '연합뉴스', at: '2026-11-06T11:00:00.000Z' }]);
+  });
+});

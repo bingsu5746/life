@@ -81,3 +81,37 @@ export function readNewsTranslate(text: string, n: number): ({ title: string; tr
   for (let i = 0; i < n; i++) if (t[i]) out[i] = { title: t[i].slice(0, 200), trail: s[i] && s[i] !== '-' ? s[i].slice(0, 400) : '' };
   return out;
 }
+
+// ===== 국내 뉴스: Google 뉴스 RSS (한국어 · 한국판). 피드 안내: 개인 피드 리더에서 개인적 · 비상업적으로 보여 주는 용도 =====
+export const KR_TOPICS = { top: '', nation: 'NATION', business: 'BUSINESS', technology: 'TECHNOLOGY', science: 'SCIENCE', entertainment: 'ENTERTAINMENT', sports: 'SPORTS', health: 'HEALTH', world: 'WORLD' } as const;
+export type KrTopic = keyof typeof KR_TOPICS;
+
+export const googleNewsUrl = (t: KrTopic) => (t === 'top' ? 'https://news.google.com/rss?hl=ko&gl=KR&ceid=KR:ko' : `https://news.google.com/rss/headlines/section/topic/${KR_TOPICS[t]}?hl=ko&gl=KR&ceid=KR:ko`);
+
+const unxml = (s: string) =>
+  s
+    .replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, '$1')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;|&apos;/g, "'")
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&amp;/g, '&');
+
+/** RSS → 기사 (제목 끝의 「 - 언론사」 는 source 로) */
+export function parseGoogleNews(xml: string, max = 20): NewsItem[] {
+  const out: NewsItem[] = [];
+  for (const m of xml.matchAll(/<item>([\s\S]*?)<\/item>/g)) {
+    const b = m[1];
+    const tag = (n: string) => b.match(new RegExp(`<${n}[^>]*>([\\s\\S]*?)</${n}>`))?.[1];
+    const title = unxml(tag('title') ?? '').trim();
+    const link = unxml(tag('link') ?? '').trim();
+    if (!title || !/^https:\/\/news\.google\.com\//.test(link)) continue;
+    const src = unxml(tag('source') ?? '').trim();
+    const cut = src && title.endsWith(` - ${src}`) ? title.slice(0, -(src.length + 3)) : title.replace(/\s+-\s+[^-]{1,30}$/, '');
+    const at = Date.parse(tag('pubDate') ?? '');
+    out.push({ id: unxml(tag('guid') ?? link).slice(0, 200), title: cut.slice(0, 200), trail: '', url: link, section: (src || title.match(/-\s+([^-]{1,30})$/)?.[1] || '').trim().slice(0, 40), at: Number.isFinite(at) ? new Date(at).toISOString() : '' });
+    if (out.length >= max) break;
+  }
+  return out;
+}

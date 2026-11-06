@@ -655,6 +655,8 @@ export interface WorldNews {
   thumb?: string;
   ko?: { title: string; trail: string };
 }
+/** 국내 뉴스 (Google 뉴스 RSS) */
+export const krNews = (topic: string) => call<{ items: WorldNews[]; at: number }>(`news/kr?topic=${encodeURIComponent(topic)}`, 'GET', undefined, 30_000);
 export const worldNews = (section: string) => call<{ items: WorldNews[]; at: number }>(`news/world?section=${encodeURIComponent(section)}`, 'GET', undefined, 60_000);
 /** 교과서 글 → 백지 복습 카드 */
 export const blankScan = (text: string, subject: string, pages: string) => aiJob<{ sheets: { title: string; points: string[] }[] }>('ai/blank', { text, subject, pages });
