@@ -11611,3 +11611,94 @@ button.mt-pill {
   color: #ff6b6f;
   font-weight: 600;
 }
+/* 거래 내역: 날짜별 묶음 */
+.mt-day {
+  animation: mt-in 0.35s calc(var(--i, 0) * 40ms) var(--ease) both;
+}
+.mt-day + .mt-day {
+  margin-top: 10px;
+}
+.mt-day-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  padding: 6px 0 4px;
+  font-size: 0.78rem;
+  color: var(--muted);
+  border-bottom: 1px solid var(--line);
+}
+.mt-day-head em {
+  font-style: normal;
+  font-variant-numeric: tabular-nums;
+}
+.mt-day .mt-row {
+  justify-content: flex-start;
+  animation: none;
+}
+.mt-day .mt-row span {
+  flex: 1;
+}
+.mt-day .mt-row small {
+  white-space: normal;
+  line-height: 1.35;
+}
+.mt-dot {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--soft, rgba(127, 127, 127, 0.1));
+  color: var(--muted);
+}
+.mt-dot .st-icon {
+  width: 17px;
+  height: 17px;
+}
+.mt-dot.k-study,
+.mt-dot.k-pay {
+  color: var(--up);
+}
+.mt-dot.k-fine {
+  color: var(--down);
+}
+.mt-up,
+.mt-row em.up {
+  color: var(--up);
+}
+.mt-row em.down {
+  color: var(--down);
+}
+/* 종목 소식 */
+.mt-events {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.mt-events li {
+  display: flex;
+  gap: 10px;
+  justify-content: space-between;
+  padding: 9px 0;
+  border-bottom: 1px solid var(--line);
+  font-size: 0.86rem;
+}
+.mt-events li:last-child {
+  border-bottom: 0;
+}
+.mt-events small {
+  color: var(--muted);
+  margin-right: 6px;
+}
+.mt-events em {
+  font-style: normal;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.mt-events .up em {
+  color: var(--up);
+}
+.mt-events .down em {
+  color: var(--down);
+}

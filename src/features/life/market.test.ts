@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { emptyStudy, type StudyData } from '../study/model';
-import { creditBand, examSurge, fines, gameUse, loanOwed, marketView, newMarket, priceOf, stockPrices, weeklyPays, won } from './market';
+import { addDays } from '../study/dates';
+import { companyName, creditBand, tickerOf, examSurge, fines, gameUse, loanOwed, marketView, newMarket, priceOf, stockPrices, weeklyPays, won } from './market';
 import { sanitizeSettings } from '../study/sanitize';
 
 const ses = (id: string, date: string, minutes: number, subjectId?: string) => ({ id, updatedAt: 1, date, minutes, subjectId, start: 0, end: 0, kind: 'manual' });
@@ -67,13 +68,36 @@ describe('시장', () => {
     const m = { ...newMarket('2026-11-12'), loans: [{ id: 'l', amount: 100, at: Date.parse('2026-11-04T12:00:00+09:00'), due: '2026-11-11', rate: 0.07, repays: [] }] };
     expect(fines(d, m, '2026-11-13')[0].why).toContain('120분 중 90분');
   });
-  it('과목 주식: 공부하면 오르고 안 하면 내린다', () => {
+  it('과목 주식: 무작위지만 기기마다 같고, 그 과목 공부를 하면 호재가 더 자주 뜬다', () => {
     const d = emptyStudy() as StudyData;
-    d.subjects = { m: { id: 'm', updatedAt: 1, name: '수학', color: '#000', order: 0 }, e: { id: 'e', updatedAt: 1, name: '영어', color: '#000', order: 1 } };
-    d.sessions = { a: ses('a', '2026-11-02', 60, 'm') } as never;
-    const p = stockPrices(d, newMarket('2026-11-02'), '2026-11-03');
-    expect(p.get('m')!.price).toBe(103); // 11-02: 60분 +3%, 11-03(오늘)은 아직 내리지 않음
-    expect(p.get('e')!.price).toBe(Math.round(100 * 0.985)); // 11-02 공부 안 함 −1.5%
+    const subjects: Record<string, unknown> = {};
+    for (let i = 0; i < 20; i++) subjects[`s${i}`] = { id: `s${i}`, updatedAt: 1, name: i % 2 ? '영어' : '수학', color: '#000', order: i };
+    d.subjects = subjects as never;
+    const days = Array.from({ length: 60 }, (_, i) => addDays('2026-09-01', i));
+    // 짝수 과목만 날마다 2시간 공부
+    d.sessions = Object.fromEntries(days.flatMap((day) => Array.from({ length: 10 }, (_, i) => [`${day}${i}`, ses(`${day}${i}`, day, 120, `s${i * 2}`)]))) as never;
+    const m = newMarket('2026-09-01');
+    const a = stockPrices(d, m, '2026-10-31');
+    expect(stockPrices(d, m, '2026-10-31').get('s0')).toEqual(a.get('s0'));
+    let goodStudy = 0, goodIdle = 0, badStudy = 0, badIdle = 0;
+    for (const [id, p] of a) {
+      const even = Number(id.slice(1)) % 2 === 0;
+      for (const e of p.events) {
+        expect(Math.abs(e.pct)).toBeGreaterThanOrEqual(0.05);
+        expect(Math.abs(e.pct)).toBeLessThanOrEqual(0.12);
+        if (e.pct > 0) even ? goodStudy++ : goodIdle++;
+        else even ? badStudy++ : badIdle++;
+      }
+      expect(p.price).toBeGreaterThanOrEqual(10);
+    }
+    expect(goodStudy).toBeGreaterThan(goodIdle * 2);
+    expect(badIdle).toBeGreaterThan(badStudy * 2);
+  });
+  it('회사 이름 · 종목 번호', () => {
+    expect(companyName('수학', 'a')).toBe('수학전자');
+    expect(companyName('영어', 'a')).toBe('영어항공');
+    expect(companyName('국어', 'x')).toMatch(/^국어/);
+    expect(tickerOf('a')).toMatch(/^\d{6}$/);
   });
   it('설정에 저장 (예전 포인트 시장은 보상 이름만)', () => {
     const old = sanitizeSettings({ market: { since: '2026-11-01', rate: {}, items: [{ id: 'i', name: '게임 30분', icon: '🎮', price: 30 }], buys: [{ id: 'b', name: 'x', price: 3, at: 1 }] } });
@@ -89,14 +113,14 @@ describe('시장 뉴스 · 주식 거르기', async () => {
     d.subjects = { m: { id: 'm', updatedAt: 1, name: '수학', color: '#000', order: 0 } };
     d.sessions = Object.fromEntries(['01', '02', '03', '04'].map((x) => [x, { id: x, updatedAt: 1, date: `2026-11-${x}`, minutes: 60, subjectId: 'm', start: 0, end: 0, kind: 'manual' }])) as never;
     const n = marketNews(d, newMarket('2026-11-01'), '2026-11-05').map((x) => x.title);
-    expect(n).toContain('수학 주가 4일 연속 상승');
+    expect(n.some((t) => t.startsWith('수학전자'))).toBe(true);
     expect(n.some((t) => t.startsWith('오늘 최소 공부까지'))).toBe(true);
   });
   it('시험 3주 전부터만 내리는 과목 · 뺀 과목', () => {
     const d = emptyStudy();
     d.subjects = { c: { id: 'c', updatedAt: 1, name: '중국어', color: '#000', order: 0 } };
     const m = { ...newMarket('2026-11-01'), examOnly: ['c'] };
-    expect(stockPrices(d, m, '2026-11-05').get('c')!.price).toBe(100);
+    expect(stockPrices(d, m, '2026-11-05').get('c')!.price).toBeGreaterThan(0);
     expect(stockPrices(d, { ...m, stockOff: ['c'] }, '2026-11-05').has('c')).toBe(false);
   });
 });

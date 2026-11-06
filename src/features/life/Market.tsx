@@ -5,10 +5,10 @@ import { addDays, diffDays, shortDate, weekStart } from '../study/dates';
 import { alive, newId, type MarketItem, type MarketSettings, type MoneyTx } from '../study/model';
 import { getStudy, put, setSettings, useStudy } from '../study/store';
 import { minutesText } from '../study/timer';
-import { confirmDelete, Empty, Field, go, Sheet, toast, useNow, useToday } from '../study/ui';
+import { confirmDelete, Empty, Field, go, Icon, Sheet, toast, useNow, useToday } from '../study/ui';
 import { blackOpen } from './blackOpen';
 import { lolDaily } from './GameTime';
-import { avgDaily, betMult, betState, blackToday, contractMult, contractState, drawLotto, kst, lastGrade, loanOwed, LOTTO_PRICE, LOTTO_TABLE, marketNews, marketView, newMarket, piecesOf, priceOf, promoPrice, RULE, SAME_DAY_FINE, SAVING_PLANS, savingValue, seasonOf, TIERS, timeSale, voucherEnds, won } from './market';
+import { companyName, tickerOf, avgDaily, betMult, betState, blackToday, contractMult, contractState, drawLotto, kst, lastGrade, loanOwed, LOTTO_PRICE, LOTTO_TABLE, marketNews, marketView, newMarket, piecesOf, priceOf, promoPrice, RULE, SAME_DAY_FINE, SAVING_PLANS, savingValue, seasonOf, TIERS, timeSale, voucherEnds, won } from './market';
 import { dailyPlay } from './steamPlay';
 
 const save = (p: Partial<MarketSettings>) => {
@@ -182,16 +182,37 @@ function MarketHome({ m }: { m: MarketSettings }) {
   const weekMin = [...v.inc.values()].filter((x) => x.date >= ws && x.date <= today).reduce((a, x) => a + x.minutes, 0);
   const ratio = m.weeklyTarget ? weekMin / m.weeklyTarget : 0;
   const nextPay = RULE.pay.find(([r]) => ratio >= r)?.[1] ?? 0;
-  const ledger = [
-    ...[...v.inc.values()].map((x) => ({ k: `i${x.date}`, date: x.date, text: `공부 ${minutesText(x.minutes)}${x.note + x.scope + x.habit + x.todo ? ' · 보너스' : ''}`, amt: x.total })),
-    ...v.pays.filter((p) => p.pay).map((p) => ({ k: `p${p.week}`, date: addDays(p.week, 7), text: `주급 · ${Math.round(p.ratio * 100)}%`, amt: p.pay })),
-    ...v.fines.map((f, i) => ({ k: `f${i}`, date: f.date, text: `벌금 · ${f.why}`, amt: -f.amount })),
-    ...m.buys.map((b) => ({ k: b.id, date: kst(b.at), text: b.name, amt: -(b.price + b.tax) })),
-    ...m.loans.flatMap((l) => [{ k: `l${l.id}`, date: kst(l.at), text: '대출', amt: l.amount }, ...l.repays.map((r, i) => ({ k: `r${l.id}${i}`, date: kst(r.at), text: '대출 갚음', amt: -r.amount }))]),
-    ...m.savings.flatMap((s) => [{ k: `s${s.id}`, date: kst(s.at), text: `적금 ${s.weeks}주`, amt: -s.amount }, ...(s.closedAt ? [{ k: `c${s.id}`, date: kst(s.closedAt), text: '적금 찾음', amt: s.closedAt >= Date.parse(`${savingValue(s, today).ends}T00:00:00+09:00`) ? Math.round(s.amount * (1 + s.rate)) : s.amount }] : [])]),
-    ...m.trades.map((t) => ({ k: t.id, date: kst(t.at), text: `${d.subjects[t.subjectId]?.name ?? '과목'} ${Math.abs(t.qty)}주 ${t.qty > 0 ? '매수' : '매도'}`, amt: -t.qty * t.price - Math.round(Math.abs(t.qty * t.price) * RULE.stockFee) })),
-    ...(v.game.charge ? [{ k: 'game', date: today, text: `무단 게임 ${minutesText(v.game.raw)}`, amt: -v.game.charge }] : []),
+  // 날마다 과목별 공부 (거래 내역에 무엇을 공부했는지)
+  const bySub = new Map<string, Map<string, number>>();
+  for (const x of alive(d.sessions)) {
+    if (x.date < m.since || x.date > today || x.minutes <= 0) continue;
+    const day = bySub.get(x.date) ?? new Map<string, number>();
+    const name = (x.subjectId && d.subjects[x.subjectId] && !d.subjects[x.subjectId].deleted && d.subjects[x.subjectId].name) || '기타';
+    day.set(name, (day.get(name) ?? 0) + x.minutes);
+    bySub.set(x.date, day);
+  }
+  const studyText = (date: string) =>
+    [...(bySub.get(date) ?? new Map<string, number>())]
+      .sort((a, b) => b[1] - a[1])
+      .map(([n, mm]) => `${n} ${minutesText(mm)}`)
+      .join(' · ');
+  type Row = { k: string; date: string; kind: 'study' | 'pay' | 'fine' | 'buy' | 'bank' | 'stock' | 'dare'; text: string; sub?: string; amt: number };
+  const ledger: Row[] = [
+    ...[...v.inc.values()].map((x): Row => {
+      const bonus = [x.note && `오답 ${won(x.note)}`, x.scope && `범위 ${won(x.scope)}`, x.habit && `습관 ${won(x.habit)}`, x.todo && `할 일 ${won(x.todo)}`, x.fever && `피버 ${won(x.fever)}`].filter(Boolean).join(' · ');
+      return { k: `i${x.date}`, date: x.date, kind: 'study', text: `공부 ${minutesText(x.minutes)}`, sub: [studyText(x.date), bonus].filter(Boolean).join(' / '), amt: x.total };
+    }),
+    ...v.pays.filter((p) => p.pay).map((p): Row => ({ k: `p${p.week}`, date: addDays(p.week, 7), kind: 'pay', text: '주급', sub: `${shortDate(p.week)} 주 ${Math.round(p.ratio * 100)}%${p.streak >= 2 ? ` · ${p.streak}주 연속` : ''}`, amt: p.pay })),
+    ...v.fines.map((f, i): Row => ({ k: `f${i}`, date: f.date, kind: 'fine', text: '벌금', sub: f.why, amt: -f.amount })),
+    ...m.buys.map((b): Row => ({ k: b.id, date: kst(b.at), kind: 'buy', text: b.name, sub: b.tax ? `사치세 ${won(b.tax)}` : b.piece ? '조각' : undefined, amt: -(b.price + b.tax) })),
+    ...m.loans.flatMap((l): Row[] => [{ k: `l${l.id}`, date: kst(l.at), kind: 'bank', text: '대출', amt: l.amount }, ...l.repays.map((r, i): Row => ({ k: `r${l.id}${i}`, date: kst(r.at), kind: 'bank', text: '대출 갚음', amt: -r.amount }))]),
+    ...m.savings.flatMap((sv): Row[] => [{ k: `s${sv.id}`, date: kst(sv.at), kind: 'bank', text: `적금 ${sv.weeks}주`, amt: -sv.amount }, ...(sv.closedAt ? [{ k: `c${sv.id}`, date: kst(sv.closedAt), kind: 'bank' as const, text: '적금 찾음', amt: sv.closedAt >= Date.parse(`${savingValue(sv, today).ends}T00:00:00+09:00`) ? Math.round(sv.amount * (1 + sv.rate)) : sv.amount }] : [])]),
+    ...m.trades.map((t): Row => ({ k: t.id, date: kst(t.at), kind: 'stock', text: `${companyName(d.subjects[t.subjectId]?.name ?? '과목', t.subjectId)} ${t.qty > 0 ? '매수' : '매도'}`, sub: `${Math.abs(t.qty)}주 × ${won(t.price)}`, amt: -t.qty * t.price - Math.round(Math.abs(t.qty * t.price) * RULE.stockFee) })),
+    ...(v.game.charge ? [{ k: 'game', date: today, kind: 'fine' as const, text: '무단 게임', sub: minutesText(v.game.raw), amt: -v.game.charge }] : []),
+    ...(m.contracts ?? []).map((c): Row => ({ k: c.id, date: c.date, kind: 'dare', text: '악마의 계약서', sub: `순공 ${minutesText(c.minutes)} · ×${c.mult}`, amt: contractState(c, v.inc, today) === 'won' ? Math.round(c.stake * c.mult) - c.stake : contractState(c, v.inc, today) === 'lost' ? -c.stake : -c.stake })),
+    ...(m.lotto ?? []).map((l): Row => ({ k: l.id, date: kst(l.at), kind: 'dare', text: '공부 복권', sub: `당첨 ${won(l.prize)}`, amt: l.prize - l.price })),
   ].sort((a, b) => b.date.localeCompare(a.date) || a.amt - b.amt);
+  const days = [...new Set(ledger.map((r) => r.date))].slice(0, 14);
   return (
     <div className="st-page narrow mt">
       <Wallet m={m} />
@@ -214,23 +235,43 @@ function MarketHome({ m }: { m: MarketSettings }) {
       <NewsBoard m={m} />
       <section className="mt-panel">
         <h3>거래 내역</h3>
-        {ledger.slice(0, 40).map((r, i) => (
-          <div key={r.k} className="mt-row" style={{ ['--i' as string]: Math.min(i, 12) }}>
-            <span>
-              <b>{r.text}</b>
-              <small>{shortDate(r.date)}</small>
-            </span>
-            <em className={r.amt < 0 ? 'down' : 'up'}>
-              {r.amt > 0 ? '+' : ''}
-              {won(r.amt)}
-            </em>
-          </div>
-        ))}
+        {days.map((day, di) => {
+          const rows = ledger.filter((r) => r.date === day);
+          const net = rows.reduce((x, r) => x + r.amt, 0);
+          return (
+            <div key={day} className="mt-day" style={{ ['--i' as string]: Math.min(di, 8) }}>
+              <div className="mt-day-head">
+                <span>{shortDate(day)}</span>
+                <em className={net < 0 ? 'down' : 'up'}>
+                  {net > 0 ? '+' : ''}
+                  {won(net)}
+                </em>
+              </div>
+              {rows.map((r) => (
+                <div key={r.k} className="mt-row">
+                  <i className={`mt-dot k-${r.kind}`} aria-hidden>
+                    <Icon name={LEDGER_ICON[r.kind]} />
+                  </i>
+                  <span>
+                    <b>{r.text}</b>
+                    {r.sub && <small>{r.sub}</small>}
+                  </span>
+                  <em className={r.amt < 0 ? 'down' : 'up'}>
+                    {r.amt > 0 ? '+' : ''}
+                    {won(r.amt)}
+                  </em>
+                </div>
+              ))}
+            </div>
+          );
+        })}
         {!ledger.length && <p className="st-muted">공부를 기록하면 은화가 들어와요.</p>}
       </section>
     </div>
   );
 }
+
+const LEDGER_ICON = { study: 'books', pay: 'coin', fine: 'scale', buy: 'bag', bank: 'bank', stock: 'chart', dare: 'flag' } as const;
 
 /** 오늘의 시장 뉴스 (실검처럼 1~10위, 하나씩 나타남) */
 function NewsBoard({ m }: { m: MarketSettings }) {
@@ -1063,8 +1104,8 @@ function Stocks({ m }: { m: MarketSettings }) {
               <span className="mt-tick-name">
                 <i style={{ background: s.color }} aria-hidden />
                 <span>
-                  <b>{s.name}</b>
-                  <small>{h?.qty ? `${h.qty}주` : (m.examOnly ?? []).includes(s.id) ? '시험 3주 전부터 내림' : ''}</small>
+                  <b>{companyName(s.name, s.id)}</b>
+                  <small>{h?.qty ? `${h.qty}주` : tickerOf(s.id)}</small>
                 </span>
               </span>
               <Spark ys={p.hist.slice(-14)} tone={ch < 0 ? 'down' : ch > 0 ? 'up' : 'flat'} />
@@ -1118,7 +1159,8 @@ function StockDetail({ m, id, onBack }: { m: MarketSettings; id: string; onBack:
         <button className="st-back" onClick={onBack} aria-label="과목 목록">
           ‹
         </button>
-        <h2>{s?.name}</h2>
+        <h2>{companyName(s?.name ?? '', id)}</h2>
+        <small className="st-muted">{tickerOf(id)} · {s?.name} 공부로 움직여요</small>
       </div>
       <section className="mt-quote">
         <Coins v={p.price} big />
@@ -1136,6 +1178,24 @@ function StockDetail({ m, id, onBack }: { m: MarketSettings; id: string; onBack:
           </button>
         ))}
       </div>
+      <section className="mt-panel">
+        <h3>소식</h3>
+        {p.events.length ? (
+          <ul className="mt-events">
+            {[...p.events].reverse().slice(0, 8).map((e) => (
+              <li key={e.date} className={e.pct > 0 ? 'up' : 'down'}>
+                <span>
+                  <small>{shortDate(e.date)}</small>
+                  {e.title}
+                </span>
+                <em>{signed(e.pct)}</em>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="st-muted">아직 소식이 없어요. {s?.name} 공부를 하면 호재가 뜰 확률이 올라가요.</p>
+        )}
+      </section>
       {h && h.qty > 0 && (
         <section className="mt-panel mt-hold">
           <h3>내 주식</h3>
@@ -1161,7 +1221,7 @@ function StockDetail({ m, id, onBack }: { m: MarketSettings; id: string; onBack:
       )}
       <div className="mt-links">
         <button className="st-link" onClick={() => toggle('examOnly')}>
-          {ex ? '늘 내리게' : '시험 3주 전부터만 내리기'}
+          {ex ? '늘 똑같이 흔들리게' : '시험 3주 전까지는 잔잔하게'}
         </button>
         {!h?.qty && (
           <button
@@ -1199,7 +1259,7 @@ function TradeSheet({ m, id, side, onClose }: { m: MarketSettings; id: string; s
   const fee = Math.round(n * p * RULE.stockFee);
   const total = side === 'buy' ? n * p + fee : n * p - fee;
   return (
-    <Sheet title={`${d.subjects[id]?.name} ${side === 'buy' ? '사기' : '팔기'}`} onClose={onClose}>
+    <Sheet title={`${companyName(d.subjects[id]?.name ?? '', id)} ${side === 'buy' ? '사기' : '팔기'}`} onClose={onClose}>
       <div className="st-form">
         <div className="mt-step">
           <button onClick={() => setN(Math.max(0, n - 1))} aria-label="하나 빼기">

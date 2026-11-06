@@ -302,9 +302,54 @@ export function priceOf(it: MarketItem, m: MarketSettings, d: Pick<StudyData, 'e
 
 // ===== 과목 주식 =====
 
-/** 과목 주가 (은화): since 에 100 에서 시작해 날마다 — 공부 10분 +0.5%(하루 +8% 까지), 오답 해결 +2%, 그날 공부 안 하면 −1.5%(오늘은 빼고). 성적이 오르면 +10%, 내리면 −10% */
-export function stockPrices(d: D, m: MarketSettings, today: DateStr): Map<Id, { price: number; prev: number; hist: number[] }> {
-  const out = new Map<Id, { price: number; prev: number; hist: number[] }>();
+/** 과목 → 회사 이름 (과목 이름 + 분야). 흔한 과목은 어울리는 분야, 나머지는 과목마다 정해진 분야 */
+const FIELDS = ['전자', '바이오', '항공', '건설', '화학', '엔터', '모빌리티', '에너지', '식품', '게임즈', '증권', '통신', '로보틱스', '반도체'];
+const FIELD_OF: [RegExp, string][] = [
+  [/수학|미적|확통|기하/, '전자'],
+  [/영어|english/i, '항공'],
+  [/국어|문학|독서|언어|화작|언매/, '미디어'],
+  [/물리/, '에너지'],
+  [/화학/, '화학'],
+  [/생명|생물/, '바이오'],
+  [/지구/, '우주항공'],
+  [/정보|코딩|컴퓨터/, '소프트'],
+  [/역사|한국사/, '건설'],
+  [/사회|경제|정치|법/, '증권'],
+  [/윤리|철학/, '출판'],
+  [/지리/, '모빌리티'],
+  [/중국어|일본어|프랑스|독일|스페인|한문/, '무역'],
+  [/음악|미술|체육/, '엔터'],
+];
+const hashOf = (s: string) => {
+  let h = 2166136261;
+  for (const c of s) h = Math.imul(h ^ c.charCodeAt(0), 16777619) >>> 0;
+  return h;
+};
+export function companyName(name: string, id: Id): string {
+  const f = FIELD_OF.find(([re]) => re.test(name))?.[1] ?? FIELDS[hashOf(id) % FIELDS.length];
+  return `${name.replace(/\s+/g, '')}${f}`;
+}
+/** 종목 번호 (6자리, 과목마다 정해짐) */
+export const tickerOf = (id: Id) => String(100000 + (hashOf(`t${id}`) % 900000));
+
+export interface StockEvent {
+  subjectId: Id;
+  date: DateStr;
+  pct: number;
+  title: string;
+}
+const GOOD = ['깜짝 실적 발표', '신제품 대박', '대형 계약 따내', '해외 진출 성공', '기술 특허 등록', '목표 주가 상향'];
+const BAD = ['실적 부진', '제품 리콜 사태', '공장 가동 멈춤', '대표 사임설', '목표 주가 하향', '소송에 휘말려'];
+
+/**
+ * 과목 주가 (은화): since 에 100 에서 시작해 날마다 무작위로 움직인다 (과목 · 날짜마다 정해진 난수라 어느 기기에서나 같다).
+ * - 평소 흔들림 ±2% 쯤, 공부 10분마다 +0.3% (하루 +3% 까지)
+ * - 호재(+5~12%) 확률: 기본 6%, 그날 그 과목 공부가 많을수록 올라 10시간이면 40%
+ * - 악재(−5~12%) 확률: 공부한 날 3%, 안 한 날 14% (오늘 · 「시험 3주 전부터만」 과목의 평소에는 3%, 오늘은 악재 없음)
+ * - 오답 해결 +2%, 성적이 오르면 +10%, 내리면 −10%
+ */
+export function stockPrices(d: D, m: MarketSettings, today: DateStr): Map<Id, { price: number; prev: number; hist: number[]; events: StockEvent[] }> {
+  const out = new Map<Id, { price: number; prev: number; hist: number[]; events: StockEvent[] }>();
   const subs = alive(d.subjects);
   const days = today < m.since ? [] : daysBetween(m.since, today);
   const min = new Map<string, number>();
@@ -329,21 +374,38 @@ export function stockPrices(d: D, m: MarketSettings, today: DateStr): Map<Id, { 
   const decays = (id: Id, date: DateStr) => !m.examOnly?.includes(id) || (examDays.get(id) ?? []).some((x) => x >= date && diffDays(date, x) <= 21);
   for (const sub of subs) {
     if (m.stockOff?.includes(sub.id)) continue;
+    const co = companyName(sub.name, sub.id);
     let p = 100;
     // 처음 값(100)부터 적어 둔다 (첫날 오르내림도 비교할 수 있게)
     const hist: number[] = [100];
+    const events: StockEvent[] = [];
     let prev = 100;
     for (const date of days) {
       const k = `${sub.id}|${date}`;
       const mm = min.get(k) ?? 0;
-      // 오늘은 아직 끝나지 않았으니 안 한 날 내림은 내일부터
-      let r = mm > 0 ? Math.min(0.08, Math.floor(mm / 10) * 0.005) : date === today || !decays(sub.id, date) ? 0 : -0.015;
+      const rnd = seeded(date, hashOf(sub.id));
+      const calm = !decays(sub.id, date);
+      // 평소 흔들림 (세 난수 평균이라 가운데가 많다)
+      let r = ((rnd() + rnd() + rnd()) / 3 - 0.5) * (calm ? 0.03 : 0.06);
+      r += Math.min(0.03, Math.floor(mm / 10) * 0.003);
+      const u = rnd();
+      const size = 0.05 + rnd() * 0.07;
+      const pick = rnd();
+      const pGood = 0.06 + Math.min(0.34, (mm / 600) * 0.34);
+      const pBad = date === today ? 0 : mm > 0 || calm ? 0.03 : 0.14;
+      if (u < pGood) {
+        r += size;
+        events.push({ subjectId: sub.id, date, pct: size, title: `${co} ${GOOD[Math.floor(pick * GOOD.length)]}` });
+      } else if (u > 1 - pBad) {
+        r -= size;
+        events.push({ subjectId: sub.id, date, pct: -size, title: `${co} ${BAD[Math.floor(pick * BAD.length)]}` });
+      }
       r += (notes.get(k) ?? 0) * 0.02 + (gradeMove.get(k) ?? 0);
       prev = p;
       p = Math.max(10, p * (1 + r));
       hist.push(Math.round(p * 100) / 100);
     }
-    out.set(sub.id, { price: Math.round(p), prev: Math.round(prev), hist });
+    out.set(sub.id, { price: Math.round(p), prev: Math.round(prev), hist, events });
   }
   return out;
 }
@@ -464,15 +526,18 @@ export function marketNews(d: D, m: MarketSettings, today: DateStr): News[] {
     // 오늘 아직 움직이지 않았으면 어제까지로
     const h = p.hist.length > 1 && p.hist[p.hist.length - 1] === p.hist[p.hist.length - 2] ? p.hist.slice(0, -1) : p.hist;
     if (h.length < 2) continue;
-    const ch = (h[h.length - 1] - h[h.length - 2]) / h[h.length - 2];
     let run = 0;
     for (let i = h.length - 1; i > 0 && h[i] > h[i - 1]; i--) run++;
     let fall = 0;
     for (let i = h.length - 1; i > 0 && h[i] < h[i - 1]; i--) fall++;
-    if (run >= 3) items.push({ score: 50 + run * 5, title: `${subName(id)} 주가 ${run}일 연속 상승`, tone: 'up' });
-    else if (ch >= 0.04) items.push({ score: 40 + ch * 300, title: `${subName(id)} 급등 +${(ch * 100).toFixed(1)}%`, tone: 'up' });
-    if (fall >= 3) items.push({ score: 45 + fall * 5, title: `${subName(id)} ${fall}일째 내림세 · 공부 없이 방치`, tone: 'down' });
+    if (run >= 3) items.push({ score: 50 + run * 5, title: `${companyName(subName(id), id)} ${run}일 연속 상승`, tone: 'up' });
+    
+    if (fall >= 3) items.push({ score: 45 + fall * 5, title: `${companyName(subName(id), id)} ${fall}일째 내림세`, tone: 'down' });
   }
+  // 과목 주식 호재 · 악재 (오늘 · 어제)
+  for (const [, p] of v.prices)
+    for (const e of p.events)
+      if (e.date === today || e.date === yday) items.push({ score: (e.date === today ? 85 : 60) + Math.abs(e.pct) * 100, title: `${e.title} ${e.pct > 0 ? '+' : ''}${(e.pct * 100).toFixed(1)}%`, tone: e.pct > 0 ? 'up' : 'down' });
   const s = examSurge(d, today);
   if (s.factor > 1) items.push({ score: 70, title: `${s.why}: 오락 값 ${s.factor}배`, tone: 'warn' });
   const yInc = v.inc.get(yday);
@@ -486,7 +551,7 @@ export function marketNews(d: D, m: MarketSettings, today: DateStr): News[] {
   if (v.credit.score >= 900) items.push({ score: 30, title: `신용 ${v.credit.score}점 최우량`, tone: 'up' });
   else if (v.credit.score < 680) items.push({ score: 50, title: `신용 ${v.credit.score}점 · 대출 불가`, tone: 'down' });
   const bestStock = [...v.prices].sort((a, b) => b[1].price - a[1].price)[0];
-  if (bestStock) items.push({ score: 20, title: `시가 1위 ${subName(bestStock[0])} ${won(bestStock[1].price)}`, tone: 'hot' });
+  if (bestStock) items.push({ score: 20, title: `시가 1위 ${companyName(subName(bestStock[0]), bestStock[0])} ${won(bestStock[1].price)}`, tone: 'hot' });
   const today0 = v.todayInc?.minutes ?? 0;
   if (today0 < v.need) items.push({ score: 35, title: `오늘 최소 공부까지 ${v.need - today0}분 남아`, tone: 'warn' });
   return items
