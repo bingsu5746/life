@@ -710,6 +710,10 @@ export function sanitizeSettings(s: unknown): StudySettings & { updatedAt: numbe
         : undefined,
     school: isObj(x.school) && typeof x.school.name === 'string' && x.school.name.trim() ? { name: x.school.name.trim().slice(0, 40), grade: score(x.school.grade, 1, 3), cls: typeof x.school.cls === 'string' && /^\d{1,2}$/.test(x.school.cls) ? x.school.cls : undefined } : undefined,
     sleepGoal: score(x.sleepGoal, 3, 12),
+    bedRemind:
+      isObj(x.bedRemind) && [x.bedRemind.weekday, x.bedRemind.weekend].every((t) => typeof t === 'string' && /^([01]\d|2[0-3]):[0-5]\d$/.test(t))
+        ? { weekday: x.bedRemind.weekday as string, weekend: x.bedRemind.weekend as string, before: Math.round(cl(x.bedRemind.before, 0, 120, 30)) }
+        : undefined,
     diaryTime: typeof x.diaryTime === 'string' && /^([01]\d|2[0-3]):[0-5]\d$/.test(x.diaryTime) ? x.diaryTime : undefined,
     breakWords: isObj(x.breakWords) && typeof (x.breakWords as Obj).start === 'string' && /^([01]\d|2[0-3]):[0-5]\d$/.test((x.breakWords as Obj).start as string)
       ? { start: (x.breakWords as Obj).start as string, len: Math.round(cl((x.breakWords as Obj).len, 30, 120, 50)), rest: Math.round(cl((x.breakWords as Obj).rest, 5, 30, 10)), per: Math.round(cl((x.breakWords as Obj).per, 1, 7, 3)) }

@@ -218,3 +218,30 @@ export function breakWordReminders(d: StudyData, words: WordsData, today: DateSt
   }
   return out;
 }
+
+/** 그날 밤 잘 시각 (한국 시간 ms): 다음 날 일어날 시각(다음 날이 토 · 일이면 주말 시각) − 잠 목표 */
+export function bedtimeAt(date: DateStr, wake: { weekday: string; weekend: string }, goalHours: number): number {
+  const next = addDays(date, 1);
+  const w = weekday(next);
+  const t = w === 0 || w === 6 ? wake.weekend : wake.weekday;
+  return Date.parse(`${next}T${t}:00+09:00`) - Math.round(goalHours * 60) * 60_000;
+}
+
+/** 잘 시간 알림: 앞으로 days 일, 잘 시각보다 before 분 먼저 (잠 목표와 일어날 시각이 있어야) */
+export function bedtimeReminders(d: StudyData, today: DateStr, now = Date.now(), days = 10): { at: number; title: string; body: string; url: string }[] {
+  const br = d.settings.bedRemind;
+  const goal = d.settings.sleepGoal;
+  if (!br || !goal) return [];
+  const out: { at: number; title: string; body: string; url: string }[] = [];
+  const hm = (ms: number) => new Date(ms + 9 * 3_600_000).toISOString().slice(11, 16);
+  for (let i = 0; i <= days; i++) {
+    const date = addDays(today, i);
+    const bed = bedtimeAt(date, br, goal);
+    const at = bed - br.before * 60_000;
+    if (at <= now) continue;
+    const next = addDays(date, 1);
+    const wake = weekday(next) === 0 || weekday(next) === 6 ? br.weekend : br.weekday;
+    out.push({ at, title: br.before ? `🌙 ${br.before}분 뒤 잘 시간` : '🌙 잘 시간이에요', body: `${hm(bed)}에 자면 ${wake}까지 ${goal}시간 잘 수 있어요`, url: '/' });
+  }
+  return out;
+}

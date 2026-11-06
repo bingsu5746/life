@@ -636,6 +636,14 @@ export const receiptScan = (image: { mime: string; data: string }) => aiJob<{ am
 export const reviewQuestions = (kind: 'book' | 'movie', title: string, by: string, mine: string) => aiJob<{ questions: string[] }>('ai/reviewq', { kind, title, by, mine });
 /** 시험 범위 공지 사진들 → 과목별 범위 줄 */
 export const scopeScan = (images: { mime: string; data: string }[], subjects: string[]) => aiJob<{ scopes: { subject: string; date: string | null; lines: string[] }[] }>('ai/scope', { images, subjects });
+/** 성적표 사진들 → 성적 (적힌 값만) */
+export interface GradeCardRead {
+  kind: 'school' | 'mock' | null;
+  name: string | null;
+  date: string | null;
+  scores: { subject: string; raw: number | null; full: number | null; grade: number | null; average: number | null; standard: number | null; percentile: number | null }[];
+}
+export const gradeCardScan = (images: { mime: string; data: string }[]) => aiJob<GradeCardRead>('ai/gradecard', { images });
 /** 목차 사진들 → 단원 · 쪽 */
 export const tocScan = (images: { mime: string; data: string }[]) => aiJob<{ units: { name: string; from: number | null; to: number | null }[] }>('ai/toc', { images });
 /** 책 찾기 (국립중앙도서관) */

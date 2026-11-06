@@ -55,3 +55,23 @@ describe('목표 대학', () => {
     expect(s.univGoals).toEqual([{ id: 'g', univ: '○○대', major: '컴퓨터', school: 2.3, mock: { 수학: { grade: undefined, percentile: 90 } }, memo: undefined }]);
   });
 });
+
+describe('잘 시간 알림', () => {
+  it('다음 날이 주말이면 주말 시각 · 잠 목표만큼 앞 · 알림은 그보다 먼저', async () => {
+    const { bedtimeAt, bedtimeReminders } = await import('./notifyDigest');
+    const wake = { weekday: '07:00', weekend: '09:00' };
+    // 2026-11-05 목요일 밤 → 금요일 07:00 기상, 7.5시간 → 23:30
+    expect(bedtimeAt('2026-11-05', wake, 7.5)).toBe(Date.parse('2026-11-05T23:30:00+09:00'));
+    // 2026-11-06 금요일 밤 → 토요일 09:00 기상 → 01:30 (다음 날)
+    expect(bedtimeAt('2026-11-06', wake, 7.5)).toBe(Date.parse('2026-11-07T01:30:00+09:00'));
+    const d = emptyStudy();
+    d.settings.sleepGoal = 7.5;
+    d.settings.bedRemind = { ...wake, before: 30 };
+    const now = Date.parse('2026-11-05T22:00:00+09:00');
+    const r = bedtimeReminders(d, '2026-11-05', now, 1);
+    expect(r.map((x) => x.at)).toEqual([Date.parse('2026-11-05T23:00:00+09:00'), Date.parse('2026-11-07T01:00:00+09:00')]);
+    expect(r[0].body).toBe('23:30에 자면 07:00까지 7.5시간 잘 수 있어요');
+    d.settings.sleepGoal = undefined;
+    expect(bedtimeReminders(d, '2026-11-05', now)).toEqual([]);
+  });
+});

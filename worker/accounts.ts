@@ -23,7 +23,7 @@ import { fetchSpecialDays } from './holidays';
 import { cleanFact, goodKo } from './fact';
 import { fetch2k } from './nba2k';
 import { hcBody, parseHc } from './homecourt';
-import { coachBody, diaryBody, noteBody, parseCoach, parseDiary, parseNote, parseReceipt, parseTocRead, receiptBody, tocBody, titleBody, parseTitles, scopeBody, parseScopeRead, reviewQBody, parseReviewQ } from './aiRead';
+import { coachBody, diaryBody, noteBody, parseCoach, parseDiary, parseNote, parseReceipt, parseTocRead, receiptBody, tocBody, titleBody, parseTitles, scopeBody, parseScopeRead, reviewQBody, parseReviewQ, gradeCardBody, parseGradeCard } from './aiRead';
 import { seojiSearch, seojiToc, seojiTocByIsbn, yes24Search, yes24Toc } from './books';
 import { cheapShark } from './cheapshark';
 import { invenChamps, invenSkins, invenSkinVideo } from './skins';
@@ -397,6 +397,15 @@ export class Accounts extends DurableObject<Env> {
       if (imgs.reduce((a, x) => a + x.data.length, 0) > MAX_STORE) return fail('사진이 너무 커요. 장 수를 줄여 주세요.', 413);
       const subjects = (Array.isArray(body.subjects) ? body.subjects : []).filter((x): x is string => typeof x === 'string').map((x) => x.slice(0, 20)).slice(0, 30);
       return this.aiJob(user, scopeBody(imgs, subjects), parseScopeRead, 'scope');
+    }
+    if (path === 'ai/gradecard' && req.method === 'POST') {
+      const imgs = (Array.isArray(body.images) ? body.images : [])
+        .slice(0, 3)
+        .map((x) => this.imageOf({ image: x }))
+        .filter((x): x is { mime: string; data: string } => !!x);
+      if (!imgs.length) return fail('사진이 너무 크거나 잘못됐어요.', 413);
+      if (imgs.reduce((a, x) => a + x.data.length, 0) > MAX_STORE) return fail('사진이 너무 커요. 장 수를 줄여 주세요.', 413);
+      return this.aiJob(user, gradeCardBody(imgs), parseGradeCard, 'gradecard');
     }
     if (path === 'books/search' && req.method === 'GET') return this.bookSearch((new URL(req.url).searchParams.get('q') ?? '').trim().slice(0, 80));
     if (path === 'books/toc' && req.method === 'GET') return this.bookToc(new URL(req.url).searchParams.get('url') ?? '', (new URL(req.url).searchParams.get('isbn') ?? '').replace(/[^\dXx]/g, ''));

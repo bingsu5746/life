@@ -1,5 +1,7 @@
 // 지난 성적: 내신 · 모의고사 넣기, 과목별 흐름 그래프, 시험 전 공부 시간과 함께 보기
-import { useState } from 'react';
+import { useRef, useState } from 'react';
+import { gradeCardScan, isLoggedIn } from '../auth/api';
+import { compressProblemImage } from '../../lib/imageCompress';
 import { shortDate } from './dates';
 import { examEnd, examSubjectIds } from './exams';
 import { parseWrongNums, wrongFrequency, change, changeText, findScore, METRIC_NAME, metricsFor, MOCK_SUBJECTS, readNum, prepBefore, recordAverage, recordsOf, scoreValue, series, studyBefore, subjectNames, type Metric } from './grades';
@@ -372,6 +374,42 @@ function GradeSheet({
       ];
   const bad = rows.flatMap((r) => cols.filter((c) => r[c.k] && readNum(r[c.k] as string, c.lo, c.hi) === undefined).map((c) => `${r.subject || '과목'} ${c.label}`));
   const filled = rows.filter((r) => r.subject.trim() && (cols.some((c) => (r[c.k] as string).trim()) || parseWrongNums(r.wrong).length));
+  // 성적표 사진 → AI 가 읽은 값으로 채운다 (적힌 값만, 확인 · 고쳐서 저장)
+  const file = useRef<HTMLInputElement>(null);
+  const [reading, setReading] = useState(false);
+  async function readCard(files: FileList) {
+    setReading(true);
+    try {
+      const images = await Promise.all(
+        [...files].slice(0, 3).map(async (f) => {
+          const small = await compressProblemImage(f, 1600, 0.85);
+          const data = await new Promise<string>((ok, no) => {
+            const fr = new FileReader();
+            fr.onload = () => ok(String(fr.result).split(',')[1] ?? '');
+            fr.onerror = () => no(new Error('사진을 읽지 못했어요'));
+            fr.readAsDataURL(small);
+          });
+          return { mime: small.type || 'image/jpeg', data };
+        }),
+      );
+      const got = await gradeCardScan(images);
+      if (!got.scores.length) throw new Error('과목 점수를 찾지 못했어요. 더 밝게 · 가까이 찍어 주세요');
+      const k = got.kind ?? kind;
+      setKind(k);
+      if (k === 'mock') setShowWrong(true);
+      if (got.name) setName(got.name);
+      if (got.date && got.date <= today) setDate(got.date);
+      const v = (x: number | null) => (x === null ? '' : String(x));
+      setRows(got.scores.map((x) => ({ ...emptyRow(x.subject), raw: v(x.raw), full: v(x.full), grade: v(x.grade), average: k === 'school' ? v(x.average) : '', standard: k === 'mock' ? v(x.standard) : '', percentile: k === 'mock' ? v(x.percentile) : '', at: Date.now() })));
+      setTouched(true);
+      toast(`${got.scores.length}과목을 읽었어요. 사진과 맞는지 확인해 주세요`);
+    } catch (e) {
+      toast(e instanceof Error ? e.message : 'AI 가 읽지 못했어요');
+    } finally {
+      setReading(false);
+      if (file.current) file.current.value = '';
+    }
+  }
   const set = (id: string, k: keyof Row, v: string) => {
     setTouched(true);
     setRows((rs) => rs.map((r) => (r.id === id ? { ...r, [k]: v, at: Date.now() } : r)));
@@ -421,6 +459,14 @@ function GradeSheet({
             </button>
           ))}
         </div>
+        {!record && (
+          <>
+            <button type="button" className="st-addline" disabled={reading || !isLoggedIn()} onClick={() => file.current?.click()}>
+              📷 {reading ? 'AI 가 성적표를 읽는 중… (10~40초)' : isLoggedIn() ? '성적표 사진으로 채우기' : '성적표 사진으로 채우기 (로그인하면 쓸 수 있어요)'}
+            </button>
+            <input ref={file} type="file" accept="image/*" multiple hidden onChange={(e) => e.target.files?.length && void readCard(e.target.files)} />
+          </>
+        )}
         {!school && (
           <div className="st-seg sm" aria-label="학년">
             {(['고1', '고2', '고3'] as const).map((l) => (

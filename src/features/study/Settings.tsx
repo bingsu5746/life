@@ -234,6 +234,7 @@ export function Settings({ cat: cat0 }: { cat?: string }) {
           <NotifyTime k="diaryTime" label="일기 알림" fallback="22:30" />
           <NotifyTime k="wordQuizTime" label="단어 퀴즈 알림 (자주 틀린 단어 3개)" fallback="07:30" />
           <BreakWordsSetting />
+          <BedtimeSetting />
         </>
       )}
       {cat === 'life' && (
@@ -582,6 +583,79 @@ function BreakWordsSetting() {
         </button>
       </div>
       <small className="st-muted">로그인하고 이 기기 알림을 켜 둬야 와요. 점심시간도 쉬는 시간으로 세요.</small>
+    </section>
+  );
+}
+
+/** 잘 시간 알림: 일어날 시각(평일 · 주말)과 잠 목표로 잘 시각을 계산해 그보다 조금 먼저 알린다 */
+function BedtimeSetting() {
+  const d = useStudy();
+  const br = d.settings.bedRemind;
+  const [goal, setGoal] = useState(d.settings.sleepGoal ?? 7.5);
+  const [wd, setWd] = useState(br?.weekday ?? '07:00');
+  const [we, setWe] = useState(br?.weekend ?? '09:00');
+  const [before, setBefore] = useState(br?.before ?? 30);
+  // 잘 시각 미리 보기 (일어날 시각 − 잠 목표)
+  const bed = (wake: string) => {
+    const [h, m] = wake.split(':').map(Number);
+    const min = (((h * 60 + m - Math.round(goal * 60)) % 1440) + 1440) % 1440;
+    return `${String(Math.floor(min / 60)).padStart(2, '0')}:${String(min % 60).padStart(2, '0')}`;
+  };
+  const save = (on: boolean) => {
+    setSettings(on ? { sleepGoal: goal, bedRemind: { weekday: wd, weekend: we, before } } : { bedRemind: undefined });
+    toast(on ? '잘 시간 알림을 켰어요' : '잘 시간 알림을 껐어요');
+  };
+  return (
+    <section className="st-card">
+      <div className="st-inline between">
+        <h3 className="st-h">잘 시간 알림</h3>
+        {br && <span className="st-pill">켜짐</span>}
+      </div>
+      <p className="st-hint">다음 날 일어날 시각에서 잠 목표를 빼서 잘 시각을 정하고, 그보다 조금 먼저 휴대폰으로 알려요. 다음 날이 토 · 일요일이면 주말 시각으로 계산해요.</p>
+      <div className="st-inline wrap">
+        <label className="st-cond-time">
+          잠 목표
+          <select className="st-input xs" value={goal} onChange={(e) => setGoal(Number(e.target.value))} aria-label="잠 목표">
+            {[6, 6.5, 7, 7.5, 8, 8.5, 9].map((h) => (
+              <option key={h} value={h}>
+                {h}시간
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="st-cond-time">
+          평일 일어날 시각
+          <input className="st-input sm" type="time" value={wd} onChange={(e) => e.target.value && setWd(e.target.value)} />
+        </label>
+        <label className="st-cond-time">
+          주말 일어날 시각
+          <input className="st-input sm" type="time" value={we} onChange={(e) => e.target.value && setWe(e.target.value)} />
+        </label>
+      </div>
+      <div className="st-inline wrap">
+        <span className="st-muted">알림</span>
+        <div className="st-seg sm">
+          {[0, 15, 30, 60].map((x) => (
+            <button key={x} className={before === x ? 'on' : ''} onClick={() => setBefore(x)}>
+              {x ? `${x}분 전` : '잘 시각에'}
+            </button>
+          ))}
+        </div>
+      </div>
+      <p className="st-sub">
+        일~목요일 밤 {bed(wd)} · 금 · 토요일 밤 {bed(we)}에 자면 돼요
+      </p>
+      <div className="st-row end">
+        {br && (
+          <button className="btn btn-sm" onClick={() => save(false)}>
+            끄기
+          </button>
+        )}
+        <button className="btn btn-sm btn-primary" onClick={() => save(true)}>
+          {br ? '저장' : '켜기'}
+        </button>
+      </div>
+      <small className="st-muted">로그인하고 이 기기 알림을 켜 둬야 와요.</small>
     </section>
   );
 }

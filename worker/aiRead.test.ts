@@ -49,4 +49,30 @@ describe('시험 범위 사진 읽기 결과', () => {
       scopes: [{ subject: '수학', date: '2026-12-01', lines: ['교과서 12~80쪽', '학습지 1~5'] }],
     });
   });
+  it('성적표 사진: 적힌 값만 · 합계 줄 빼기 · 이상한 값은 null', async () => {
+    const { parseGradeCard } = await import('./aiRead');
+    const r = parseGradeCard(
+      JSON.stringify({
+        kind: 'mock',
+        name: '2026년 6월 모의평가',
+        date: '6월 4일',
+        scores: [
+          { subject: '국어', raw: 88, grade: 2, standard: '131', percentile: 92 },
+          { subject: '수학', raw: 70, grade: 3.5, percentile: 150 },
+          { subject: '합계', raw: 300 },
+          { subject: '영어' },
+        ],
+      }),
+    );
+    expect(r).toEqual({
+      kind: 'mock',
+      name: '2026년 6월 모의평가',
+      date: null,
+      scores: [
+        { subject: '국어', raw: 88, full: null, grade: 2, average: null, standard: 131, percentile: 92 },
+        { subject: '수학', raw: 70, full: null, grade: null, average: null, standard: null, percentile: null },
+      ],
+    });
+    expect(parseGradeCard('엉뚱한 답')).toEqual({ kind: null, name: null, date: null, scores: [] });
+  });
 });

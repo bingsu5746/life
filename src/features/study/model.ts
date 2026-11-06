@@ -74,6 +74,8 @@ export interface StudySettings {
   checkinTime?: string;
   /** 잠 목표 (시간) */
   sleepGoal?: number;
+  /** 잘 시간 알림: 다음 날 일어날 시각(평일 · 주말) − 잠 목표 = 잘 시각, 그보다 before 분 먼저 알림 */
+  bedRemind?: { weekday: string; weekend: string; before: number };
   /** 일주일에 쓸 돈 한도 (넘으면 저녁 알림) */
   weeklyLimit?: number;
   /** 날씨 위치 (없으면 노원구) */

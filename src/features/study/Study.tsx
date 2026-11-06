@@ -152,10 +152,10 @@ export function Study({ path, loggedIn, syncReady = true, onLogin }: { path: str
     const t = setTimeout(() => {
       // 쉬는 시간 단어 계산은 첫 화면에 필요 없어서 이때 받는다
       void import('./notifyDigest')
-        .then(({ breakWordReminders }) => {
+        .then(({ breakWordReminders, bedtimeReminders }) => {
           if (gone) return;
-          // 일정 · 빚 갚을 날 · 쉬는 시간 단어 (서버는 60개까지라 가까운 것부터)
-          const items = [...reminders(d, today), ...breakWordReminders(d, words, today)].sort((a, b) => a.at - b.at).slice(0, 60);
+          // 일정 · 빚 갚을 날 · 쉬는 시간 단어 · 잘 시간 (서버는 60개까지라 가까운 것부터)
+          const items = [...reminders(d, today), ...breakWordReminders(d, words, today), ...bedtimeReminders(d, today)].sort((a, b) => a.at - b.at).slice(0, 60);
           const key = JSON.stringify(items);
           if (lastRemind.current === key) return;
           return notifyRemind(items).then(() => (lastRemind.current = key));
@@ -166,7 +166,7 @@ export function Study({ path, loggedIn, syncReady = true, onLogin }: { path: str
       gone = true;
       clearTimeout(t);
     };
-  }, [d.events, d.moneyTx, d.settings.breakWords, d.settings.schoolTimetable, d.settings.birthdays, d.settings.movieNews, words, today, loggedIn]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [d.events, d.moneyTx, d.settings.breakWords, d.settings.schoolTimetable, d.settings.birthdays, d.settings.movieNews, d.settings.bedRemind, d.settings.sleepGoal, words, today, loggedIn]); // eslint-disable-line react-hooks/exhaustive-deps
   // 보고 싶은 영화 소식: 하루 한 번 (이 기기) OTT · 극장 상영 · 재개봉을 찾아 새 것만 남긴다
   useEffect(() => {
     if (!loggedIn || !syncReady) return;

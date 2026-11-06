@@ -250,3 +250,52 @@ export function parseCoach(text: string): CoachRead {
     tip: str(j.tip, 200),
   };
 }
+
+/** 성적표 사진 → 성적 (내신 · 모의고사). 적힌 값만 */
+export interface GradeCardRead {
+  kind: 'school' | 'mock' | null;
+  name: string | null;
+  date: string | null;
+  scores: { subject: string; raw: number | null; full: number | null; grade: number | null; average: number | null; standard: number | null; percentile: number | null }[];
+}
+export function gradeCardBody(images: { mime: string; data: string }[]) {
+  const prompt = [
+    'These are photos of a Korean high school score report: a school exam result (내신 · 중간/기말고사 성적표, 성적통지표) or a mock exam / CSAT score report (모의고사 · 학력평가 · 수능 성적표). Read ONLY what is printed. Never guess, never compute values that are not printed.',
+    'Return JSON with exactly these keys:',
+    '"kind": "school" for 내신 school exams, "mock" for 모의고사 · 학력평가 · 모의평가 · 수능, or null if unsure;',
+    '"name": the exam name as printed (e.g. "2학년 1학기 기말고사", "2026년 6월 모의평가"), or null;',
+    '"date": the exam date as YYYY-MM-DD if printed, else null;',
+    '"scores": one item per subject row in printed order: {"subject": subject name exactly as printed (for 탐구 use the elective subject name like "생활과 윤리"), "raw": 원점수, "full": 만점 if printed, "grade": 등급 (1-9), "average": 과목 평균 (school only), "standard": 표준점수 (mock only), "percentile": 백분위 (mock only)}. Use numbers, or null for anything not printed.',
+    'Do not include total/sum rows (합계, 총점) or rank rows (석차) as subjects.',
+  ].join('\n');
+  return { contents: [{ role: 'user', parts: [...images.map((im) => ({ inlineData: { mimeType: im.mime, data: im.data } })), { text: prompt }] }], generationConfig: json };
+}
+export function parseGradeCard(text: string): GradeCardRead {
+  const j = obj(text);
+  const n = (v: unknown, lo: number, hi: number) => {
+    const x = typeof v === 'number' ? v : typeof v === 'string' && v.trim() ? Number(v.replace(/[^\d.]/g, '')) : NaN;
+    return Number.isFinite(x) && x >= lo && x <= hi ? x : null;
+  };
+  const scores = (Array.isArray(j.scores) ? j.scores : [])
+    .map((x) => x as Record<string, unknown>)
+    .map((x) => ({
+      subject: str(x.subject, 20) ?? '',
+      raw: n(x.raw, 0, 1000),
+      full: n(x.full, 1, 1000),
+      grade: (() => {
+        const g = n(x.grade, 1, 9);
+        return g !== null && Number.isInteger(g) ? g : null;
+      })(),
+      average: n(x.average, 0, 1000),
+      standard: n(x.standard, 0, 300),
+      percentile: n(x.percentile, 0, 100),
+    }))
+    .filter((x) => x.subject && !/^(합계|총점|평균|석차)$/.test(x.subject.replace(/\s/g, '')) && [x.raw, x.grade, x.average, x.standard, x.percentile].some((v) => v !== null))
+    .slice(0, 20);
+  return {
+    kind: j.kind === 'school' || j.kind === 'mock' ? j.kind : null,
+    name: str(j.name, 40),
+    date: typeof j.date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(j.date) ? j.date : null,
+    scores,
+  };
+}
