@@ -1,4 +1,5 @@
 // 여행: 가 볼 곳 · 다녀온 곳 (맛집 · 카페 · 관광지 · 숙소)
+import { addPhoto, photoUrl, removePhoto } from '../study/photos';
 import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import { shortDate } from '../study/dates';
 import { alive, newId, type TravelPlace } from '../study/model';
@@ -72,6 +73,7 @@ export function Travel({ sub }: { sub?: string }) {
             <ol className="tr-steps">
               {steps.map((p, i) => (
                 <li key={p.id} className="st-tap" {...tap(() => setEdit(p))}>
+                  {p.photos?.[0] && <PlacePhoto id={p.photos[0]} />}
                   <b>{p.name}</b>
                   <small className="st-muted">{[shortDate(p.visited!), p.region, i > 0 && `앞 곳에서 ${km(steps[i - 1], p).toFixed(1)}km`].filter(Boolean).join(' · ')}</small>
                 </li>
@@ -103,7 +105,7 @@ export function Travel({ sub }: { sub?: string }) {
             <small className="aw-label">{region}</small>
             {ps.map((p) => (
               <div key={p.id} className="st-item st-tap" {...tap(() => setEdit(p))}>
-                <span className="st-pill">{KIND[p.kind]}</span>
+                {p.photos?.[0] ? <PlacePhoto id={p.photos[0]} small /> : <span className="st-pill">{KIND[p.kind]}</span>}
                 <div className="st-item-main">
                   <div className="st-item-title">{p.name}</div>
                   {(p.note || p.visited || p.rating || p.addr) && <div className="st-item-sub">{[p.rating && starText(p.rating), p.visited && shortDate(p.visited), p.note?.split('\n')[0] || p.addr].filter(Boolean).join(' · ')}</div>}
@@ -150,6 +152,21 @@ function PlaceSheet({ item, today, onClose }: { item: Partial<TravelPlace>; toda
   const [rating, setRating] = useState(item.rating ?? 0);
   const [note, setNote] = useState(item.note ?? '');
   const [pos, setPos] = useState(item.lat !== undefined && item.lon !== undefined ? { lat: item.lat, lon: item.lon } : undefined);
+  const [photos, setPhotos] = useState<string[]>(item.photos ?? []);
+  const [pBusy, setPBusy] = useState(false);
+  const addPhotos = async (files: FileList) => {
+    setPBusy(true);
+    const ids: string[] = [];
+    for (const f of [...files].slice(0, 4 - photos.length)) {
+      try {
+        ids.push((await addPhoto(f)).id);
+      } catch {
+        toast('사진을 넣지 못했어요');
+      }
+    }
+    setPhotos((x) => [...x, ...ids].slice(0, 4));
+    setPBusy(false);
+  };
   const [picking, setPicking] = useState(false);
   const [addr, setAddr] = useState(item.addr);
   const [url, setUrl] = useState(item.url);
@@ -302,9 +319,25 @@ function PlaceSheet({ item, today, onClose }: { item: Partial<TravelPlace>; toda
             </button>
           )}
         </div>
+        <div className="dy-photos">
+          {photos.map((id) => (
+            <div key={id} className="dy-photo">
+              <PlacePhoto id={id} />
+              <button type="button" className="dy-photo-x" aria-label="사진 빼기" onClick={() => setPhotos(photos.filter((x) => x !== id))}>
+                ✕
+              </button>
+            </div>
+          ))}
+          {photos.length < 4 && (
+            <label className="dy-photo-add">
+              {pBusy ? '넣는 중…' : '+ 사진'}
+              <input type="file" accept="image/*" multiple hidden disabled={pBusy} onChange={(e) => e.target.files?.length && void addPhotos(e.target.files)} />
+            </label>
+          )}
+        </div>
         <div className="st-row end">
           {item.id && (
-            <button className="btn btn-sm st-danger" onClick={() => confirmDelete(`「${item.name}」`) && (remove('places', item.id!), onClose())}>
+            <button className="btn btn-sm st-danger" onClick={() => confirmDelete(`「${item.name}」`) && (remove('places', item.id!), (item.photos ?? []).forEach((p) => void removePhoto(p)), onClose())}>
               지우기
             </button>
           )}
@@ -312,6 +345,8 @@ function PlaceSheet({ item, today, onClose }: { item: Partial<TravelPlace>; toda
             className="btn btn-primary"
             disabled={!name.trim()}
             onClick={() => {
+              // 뺀 사진은 저장소에서도 지운다
+              for (const p of item.photos ?? []) if (!photos.includes(p)) void removePhoto(p);
               put('places', {
                 ...item,
                 id: item.id ?? newId(),
@@ -323,6 +358,7 @@ function PlaceSheet({ item, today, onClose }: { item: Partial<TravelPlace>; toda
                 visited: status === 'visited' ? visited || undefined : undefined,
                 rating: status === 'visited' && rating ? rating : undefined,
                 note: note.trim() || undefined,
+                photos: photos.length ? photos : undefined,
                 lat: pos?.lat,
                 lon: pos?.lon,
                 addr,
@@ -357,4 +393,18 @@ function useSuggest(q: string, closed0: boolean, onlyAddr = false) {
     return () => clearTimeout(timer);
   }, [q, closed, onlyAddr]);
   return { list, open: () => setClosed(false), close: () => (setClosed(true), setList(null)) };
+}
+
+/** 장소 사진 (small: 목록의 작은 그림) */
+function PlacePhoto({ id, small }: { id: string; small?: boolean }) {
+  const [url, setUrl] = useState<string | null | undefined>(undefined);
+  useEffect(() => {
+    let on = true;
+    void photoUrl(id).then((u) => on && setUrl(u));
+    return () => {
+      on = false;
+    };
+  }, [id]);
+  if (!url) return <div className={`dy-img ${small ? 'tr-thumb' : ''}`} />;
+  return <img className={`dy-img ${small ? 'tr-thumb' : ''}`} src={url} alt="장소 사진" loading="lazy" />;
 }

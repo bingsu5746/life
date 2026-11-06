@@ -60,7 +60,11 @@ export function parseToc(text: string, lastPage?: number): TocRow[] {
   text = lines.join('\n');
   // 쪽이 거의 없는 목차(국어 작품별 · 강별 목차 등): 단원(줄)마다 한 칸으로 (쪽 대신 단원 수로 계획).
   // 쪽 붙은 줄이 조금이라도 모여 있으면(두 줄 넘게 · 네 줄에 한 줄 넘게) 쪽으로 읽고, 쪽 없는 줄은 큰 제목으로 뺀다
-  const paged = lines.filter((l) => parseLine(l)).length;
+  const parsed = lines.map((l) => parseLine(l)).filter((x): x is NonNullable<typeof x> => !!x);
+  const paged = parsed.length;
+  // 「실전 모의고사 01 · 02 · 03 …」처럼 끝 숫자가 1씩 늘어나는 번호면 쪽이 아니라 회 번호 → 줄마다 한 칸
+  const numbering = paged >= 3 && parsed.every((x, i) => x.to === null && (i === 0 ? x.from <= 1 : x.from === parsed[i - 1].from + 1));
+  if (numbering) return unitRows(lines);
   if (lines.length && (paged === 0 || (paged < 2 && lines.length > 2) || paged < lines.length * 0.25)) return unitRows(lines);
   const rows: (TocRow & { open: boolean })[] = [];
   for (const raw of text.split(/\r?\n/)) {
@@ -136,3 +140,6 @@ export function headerUnits(units: Unit[], unitOnly = false): number[] {
   });
   return out;
 }
+
+/** 쪽 없는 문제집을 세는 말: 단원 이름 반이 넘게 「n회」면 회 (모의고사 문제집), 아니면 단원 */
+export const unitWord = (units: { name: string }[]) => (units.length && units.filter((u) => /\d+\s*회|회\s*\d+/.test(u.name)).length * 2 > units.length ? '회' : '단원');

@@ -89,9 +89,21 @@ export function repeatText(e: CalEvent): string {
   return r.until ? `${base} · ${r.until}까지` : base;
 }
 
-/** 앞으로 days 일 동안의 알림 (서버에 올려 두면 그 시각에 휴대폰으로) */
-export function reminders(d: Pick<StudyData, 'events'>, today: DateStr, now = Date.now(), days = 14): { at: number; title: string; body: string }[] {
+/** 앞으로 days 일 동안의 알림 (서버에 올려 두면 그 시각에 휴대폰으로). 빚 갚을 날도 (전날 · 당일 아침 9시, 남은 빚이 있을 때) */
+export function reminders(d: Pick<StudyData, 'events'> & Partial<Pick<StudyData, 'moneyTx'>>, today: DateStr, now = Date.now(), days = 14): { at: number; title: string; body: string }[] {
   const out: { at: number; title: string; body: string }[] = [];
+  const tx = alive(d.moneyTx ?? {});
+  const owe = tx.filter((t) => t.type === 'in' && t.category === '빚').reduce((a, t) => a + t.amount, 0) - tx.filter((t) => t.type === 'out' && t.category === '빚 갚기').reduce((a, t) => a + t.amount, 0);
+  if (owe > 0)
+    for (const t of tx)
+      if (t.type === 'in' && t.category === '빚' && t.due && t.due >= today && t.due <= addDays(today, days))
+        for (const [day, when] of [
+          [addDays(t.due, -1), '내일'],
+          [t.due, '오늘'],
+        ] as const) {
+          const at = Date.parse(`${day}T09:00:00+09:00`);
+          if (at > now) out.push({ at, title: `💸 ${when} 빚 갚는 날`, body: `${t.memo ? `${t.memo} · ` : ''}빌린 돈 ${t.amount.toLocaleString('ko-KR')}원 (남은 빚 ${owe.toLocaleString('ko-KR')}원)` });
+        }
   const map = eventsBetween(d, today, addDays(today, days));
   for (const list of map.values())
     for (const { e, first, on } of list) {

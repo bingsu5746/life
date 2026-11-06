@@ -1,12 +1,13 @@
 // 한 달 달력: 날마다 시험 · 수행 · 예습 · 할 일 · 개봉 · 결제 · 학교 일정 · 공휴일 · 기념일
-import { useEffect, useState } from 'react';
-import { isLoggedIn, specialDays, type SpecialDay } from '../auth/api';
+import { useState } from 'react';
 import { addDays, longDate, shortDate, weekday, WEEKDAYS } from '../study/dates';
 import { useSchoolData } from '../study/SchoolPanel';
 import { put, remove, useStudy } from '../study/store';
 import { go, toast, useToday } from '../study/ui';
 import { daysInMonth, monthLabel, shiftMonth } from './calc';
 import { CAL_KIND, monthItems } from './calendar';
+import { useSpecialDays } from './specialDays';
+export { useSpecialDays };
 import { EventSheet } from './EventSheet';
 import { colorOf, eventsBetween, repeatText, timeText } from './events';
 import type { CalEvent } from '../study/model';
@@ -133,36 +134,3 @@ export function CalendarPage() {
 }
 
 /** 그해 공휴일 · 기념일 (로그인했을 때만, 이 기기에 하루 기억) */
-export function useSpecialDays(year: number): SpecialDay[] {
-  const ck = `my-study.special.${year}`;
-  const read = (): { at: number; days: SpecialDay[] } | null => {
-    try {
-      return JSON.parse(localStorage.getItem(ck) ?? 'null');
-    } catch {
-      return null;
-    }
-  };
-  const [days, setDays] = useState<SpecialDay[]>(() => read()?.days ?? []);
-  useEffect(() => {
-    const c = read();
-    setDays(c?.days ?? []);
-    if (!isLoggedIn() || (c && Date.now() - c.at < 86_400_000)) return;
-    let live = true;
-    specialDays(year)
-      .then((r) => {
-        if (!live) return;
-        setDays(r.days);
-        try {
-          localStorage.setItem(ck, JSON.stringify({ at: Date.now(), days: r.days }));
-        } catch {
-          /* 무시 */
-        }
-      })
-      .catch(() => {});
-    return () => {
-      live = false;
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [year]);
-  return days;
-}

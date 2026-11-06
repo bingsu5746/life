@@ -10010,3 +10010,30 @@ body.focus-on {
   border: 1px solid var(--line);
   border-radius: var(--radius);
 }
+
+.dy-img.tr-thumb {
+  width: 44px;
+  height: 44px;
+  border-radius: 8px;
+  flex: none;
+}
+
+.tr-steps li .dy-img {
+  width: 100%;
+  max-width: 240px;
+  height: 130px;
+}
+
+/* 과목 고르기: 새 과목 칸이 좁은 화면을 넘지 않게 */
+.st-inline.sp-add {
+  min-width: 0;
+  max-width: 100%;
+}
+.st-inline.sp-add {
+  flex: 1 1 100%;
+}
+.st-inline.sp-add .st-input {
+  flex: 1;
+  min-width: 0;
+  width: 0;
+}

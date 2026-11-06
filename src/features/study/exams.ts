@@ -1,5 +1,5 @@
 // 시험 범위 · 학교 진도 (계산)
-import { addDays, daysBetween, diffDays } from './dates';
+import { addDays, daysBetween, diffDays, longDate, shortDate } from './dates';
 import { alive, newId, type DateStr, type Exam, type ExamDay, type ExamScope, type Id, type ScopeLine, type StudyData } from './model';
 
 /**
@@ -96,3 +96,9 @@ export function addProgress(list: { date: DateStr; text: string; at?: number }[]
 
 /** 진도 기록이 며칠 전인지 */
 export const daysAgo = (today: DateStr, date: DateStr) => diffDays(date, today);
+
+/** 2026-11-30 ~ 12-03 처럼 기간 글 */
+export function examPeriodText(e: Exam): string {
+  const end = examEnd(e);
+  return end !== e.date ? `${longDate(e.date)} ~ ${shortDate(end)}` : longDate(e.date);
+}

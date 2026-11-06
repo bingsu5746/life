@@ -42,6 +42,8 @@ export interface MockState {
   /** 탐구 이름 (과학탐구 · 사회탐구) */
   title?: string;
   startedAt: number;
+  /** 시간 전에 「다 풀었어요」를 누른 때 (그때 시계가 멈춘다) */
+  finishedAt?: number;
 }
 
 export interface MockView {
@@ -59,8 +61,17 @@ export function mockView(s: MockState, now: number): MockView | null {
   if (!subject) return null;
   const start = subject.parts[0].from;
   const end = subject.parts[subject.parts.length - 1].to;
-  const passedMin = Math.max(0, (now - s.startedAt) / 60_000);
+  const passedMin = Math.max(0, ((s.finishedAt ?? now) - s.startedAt) / 60_000);
   const clockMin = Math.min(end, start + passedMin);
   const part = subject.parts.find((p) => clockMin < p.to) ?? subject.parts[subject.parts.length - 1];
-  return { subject, part, clockMin, leftMs: Math.max(0, (end - clockMin) * 60_000), done: clockMin >= end };
+  return { subject, part, clockMin, leftMs: Math.max(0, (end - clockMin) * 60_000), done: clockMin >= end || !!s.finishedAt };
+}
+
+/** 모의고사 보기 과목 → 수능 영역 이름 (풀이 기록 칸) */
+export const mockSection = (s: Pick<MockState, 'key' | 'title'>) => ({ korean: '국어', math: '수학', english: '영어', history: '한국사' })[s.key as 'korean'] ?? (s.title === '사회탐구' ? '사회탐구' : '과학탐구');
+/** 실제로 푼 시간 (분): 다 풀었어요를 눌렀으면 그때까지, 아니면 정해진 시간 */
+export function mockMinutes(s: MockState): number {
+  const subject = MOCK_SUBJECTS.find((x) => x.key === s.key);
+  const total = subject ? subject.parts[subject.parts.length - 1].to - subject.parts[0].from : 0;
+  return s.finishedAt ? Math.max(1, Math.min(total, Math.round((s.finishedAt - s.startedAt) / 60_000))) : total;
 }

@@ -5,12 +5,13 @@ import { shortDate } from './dates';
 import { alive, newId, REASONS, type CardDeck, type MemoCard, type NoteComment, type WrongNote, type WrongReason } from './model';
 import { answer, dueText, dueToday } from './review';
 import { cardsToday } from './select';
-import { getStudy, put, putMany, remove, useStudy } from './store';
+import { getStudy, put, putMany, remove, setSettings, useStudy } from './store';
 import { addPhoto, photoBlob, photoUrl, removePhoto } from './photos';
 import { BlankRun, Blanks } from './Blanks';
 import { requeue } from './wordSession';
 import { Bar, confirmDelete, Empty, Field, go, Menu, Sheet, SubjectDot, SubjectPicker, SubjectTag, subjectsOf, toast, useToday, tap } from './ui';
 import { SwipeCard } from './SwipeCard';
+import { LineChart } from './charts';
 import { Passages } from './Passages';
 import { GRADUATE, guessNoteSubject, isCareless, mistakePatterns, redoAnswer } from './mistakes';
 import { loadTimer } from './timerStore';
@@ -583,6 +584,15 @@ function NoteRun() {
   const [first, setFirst] = useState<Map<string, boolean>>(new Map());
   const timeUp = mini && leftSec === 0;
   const n = queue.length && !timeUp ? d.notes[queue[0]] : null;
+  // 미니 모의고사가 끝나면 기록을 한 번 남긴다 (점수 흐름)
+  const savedRun = useRef(false);
+  useEffect(() => {
+    if (!mini || n || savedRun.current || !total) return;
+    savedRun.current = true;
+    const s = getStudy().settings;
+    const minutes = Math.max(1, Math.round((Math.min(Date.now(), startAt + miniMin * 60_000) - startAt) / 60_000));
+    setSettings({ miniTests: [...(s.miniTests ?? []), { at: Date.now(), date: today, subjectId: subject || undefined, n: total, solved: first.size, right: [...first.values()].filter(Boolean).length, minutes }].slice(-100) });
+  }, [mini, n, total]); // eslint-disable-line react-hooks/exhaustive-deps
   if (!n)
     return (
       <div className="st-page narrow">
@@ -980,10 +990,11 @@ function MiniStart({ subject: s0 }: { subject?: string }) {
   const left = alive(d.notes).filter((x) => !x.learned);
   const subs = subjectsOf(d).filter((s) => left.some((x) => x.subjectId === s.id));
   const have = left.filter((x) => !subject || x.subjectId === subject).length;
+  const runs = (d.settings.miniTests ?? []).filter((t) => !subject || t.subjectId === subject);
   if (!open)
     return (
       <button className="btn" onClick={() => setOpen(true)}>
-        ⏱ 오답 미니 모의고사
+        ⏱ 오답 미니 모의고사{d.settings.miniTests?.length ? ` · ${d.settings.miniTests.length}번 봄` : ''}
       </button>
     );
   return (
@@ -1019,6 +1030,19 @@ function MiniStart({ subject: s0 }: { subject?: string }) {
       <button className="btn btn-primary" disabled={!have} onClick={() => go(`/review/redo?mini=1&n=${n}&min=${min}${subject ? `&subject=${subject}` : ''}`)}>
         시작 ({Math.min(n, have)}문제 · {min}분)
       </button>
+      {runs.length > 0 && (
+        <>
+          {runs.length > 1 && <LineChart label="맞힌 비율 (%)" height={140} points={runs.slice(-20).map((t) => ({ label: t.date.slice(5).replace('-', '/'), title: `${t.right}/${t.n} · ${t.minutes}분`, y: Math.round((t.right / t.n) * 100) }))} domain={[0, 100]} format={(v) => `${Math.round(v)}%`} />}
+          <small className="st-muted">
+            지난 기록:{' '}
+            {runs
+              .slice(-5)
+              .reverse()
+              .map((t) => `${t.date.slice(5).replace('-', '/')} ${t.right}/${t.n}문제 ${t.minutes}분${t.subjectId ? ` (${d.subjects[t.subjectId]?.name ?? '과목'})` : ''}`)
+              .join(' · ')}
+          </small>
+        </>
+      )}
     </div>
   );
 }

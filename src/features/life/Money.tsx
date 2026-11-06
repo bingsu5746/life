@@ -48,6 +48,7 @@ export function Money({ sub }: { sub?: string }) {
   const borrowed = allTx.filter((t) => t.type === 'in' && t.category === '빚').reduce((a, t) => a + t.amount, 0);
   const repaid = allTx.filter((t) => t.type === 'out' && t.category === '빚 갚기').reduce((a, t) => a + t.amount, 0);
   const owe = borrowed - repaid;
+  const nextDue = allTx.filter((t) => t.type === 'in' && t.category === '빚' && t.due && t.due >= today).sort((a, b) => a.due!.localeCompare(b.due!))[0];
   const short = (n: number) => (n >= 10000 ? `${Math.round(n / 1000) / 10}만` : n > 0 ? `${Math.round(n / 1000)}천` : '0');
 
   return (
@@ -112,7 +113,9 @@ export function Money({ sub }: { sub?: string }) {
                 {owe > 0 ? (
                   <>
                     남은 빚 <b className="bad">{won(owe)}</b>
-                    <small className="st-muted"> · 빌린 돈 {won(borrowed)} 중 {won(repaid)} 갚음 (갚으면 쓴 돈 「빚 갚기」로 적어요)</small>
+                    <small className="st-muted">
+                      {nextDue ? ` · 갚을 날 ${nextDue.due}${nextDue.memo ? ` (${nextDue.memo})` : ''}` : ''} · 빌린 돈 {won(borrowed)} 중 {won(repaid)} 갚음 (갚으면 쓴 돈 「빚 갚기」로 적어요)
+                    </small>
                   </>
                 ) : (
                   <>
@@ -306,6 +309,7 @@ function TxSheet({ item, today, onClose }: { item?: MoneyTx; today: string; onCl
   const [category, setCategory] = useState(item?.category ?? '식비');
   const [date, setDate] = useState(item?.date ?? today);
   const [memo, setMemo] = useState(item?.memo ?? '');
+  const [due, setDue] = useState(item?.due ?? '');
   const cats = type === 'out' ? OUT : IN;
   const n = readWon(amount);
   // 분류를 직접 고르기 전까지는 「무엇에」 글로 분류를 짐작해 바꾼다
@@ -343,7 +347,7 @@ function TxSheet({ item, today, onClose }: { item?: MoneyTx; today: string; onCl
   };
   function save() {
     if (!n || !date) return;
-    put('moneyTx', { ...(item ?? { created: Date.now() }), id: item?.id ?? newId(), type, amount: n, category: cats.includes(category) ? category : cats[0], date, memo: memo.trim() || undefined } as MoneyTx);
+    put('moneyTx', { ...(item ?? { created: Date.now() }), id: item?.id ?? newId(), type, amount: n, category: cats.includes(category) ? category : cats[0], date, memo: memo.trim() || undefined, due: type === 'in' && category === '빚' && due ? due : undefined } as MoneyTx);
     toast(item ? '고쳤어요' : `${won(n)} 적었어요`);
     onClose();
   }
@@ -389,6 +393,12 @@ function TxSheet({ item, today, onClose }: { item?: MoneyTx; today: string; onCl
             ))}
           </div>
         </Field>
+        {type === 'in' && category === '빚' && (
+          <label className="st-cond-time">
+            갚을 날 (전날 아침에 알려 드려요)
+            <input className="st-input sm" type="date" value={due} min={date} onChange={(e) => setDue(e.target.value)} aria-label="갚을 날" />
+          </label>
+        )}
         <div className="st-inline wrap">
           <input className="st-input sm" type="date" value={date} max={today} onChange={(e) => setDate(e.target.value)} aria-label="날짜" />
           <input className="st-input" value={memo} onChange={(e) => typeMemo(e.target.value)} placeholder="무엇에 (예: 떡볶이, 버스) · 분류를 짐작해 골라 줘요" aria-label="메모" />

@@ -39,6 +39,8 @@ export interface StudySettings {
   /** 주마다 요일별 공부 시간 목표(분): 그 주 월요일 → [월 … 일] */
   weekTargets?: Record<DateStr, number[]>;
   /** AI 코치가 짠 요일별 할 일 (주간 계획에 넣었을 때): 그 주 월요일 → [월 … 일][] */
+  /** 오답 미니 모의고사 기록 (최근 100번): 날짜 · 과목(없으면 모든 과목) · 낸 문제 · 푼 문제 · 맞힌 문제 · 걸린 분 */
+  miniTests?: { at: number; date: DateStr; subjectId?: Id; n: number; solved: number; right: number; minutes: number }[];
   weekItems?: Record<DateStr, { subject: string; what: string; minutes: number }[][]>;
   /** 풀이 AI 하루 한도 (서비스 화면에서 본 숫자를 직접 넣음) */
   solveLimits?: Record<string, number>;
@@ -570,6 +572,8 @@ export interface MoneyTx extends Stamp {
   memo?: string;
   /** 고정 지출·수입에서 자동으로 넣은 것이면 그 규칙 */
   ruleId?: Id;
+  /** 빚: 갚을 날 (그 전날 아침 알림) */
+  due?: DateStr;
   created: number;
 }
 
@@ -741,6 +745,8 @@ export interface TravelPlace extends Stamp {
   /** 지도 위치 */
   lat?: number;
   lon?: number;
+  /** 사진 (일기 사진과 같은 저장소, 4장까지) */
+  photos?: Id[];
   /** 주소 · 카카오맵 장소 페이지 */
   addr?: string;
   url?: string;

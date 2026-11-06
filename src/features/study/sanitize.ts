@@ -333,6 +333,7 @@ const FIX: Record<Collection, Fix> = {
     lon: typeof x.lat === 'number' && typeof x.lon === 'number' && Math.abs(x.lat) <= 90 && Math.abs(x.lon) <= 180 ? x.lon : undefined,
     addr: optStr(x.addr)?.slice(0, 120),
     url: typeof x.url === 'string' && /^https?:\/\/place\.map\.kakao\.com\/\d+$/.test(x.url) ? x.url : undefined,
+    photos: Array.isArray(x.photos) ? x.photos.filter((p): p is string => typeof p === 'string').slice(0, 4) : undefined,
     created: num(x.created),
   }),
   records: (x) => ({
@@ -432,7 +433,7 @@ const FIX: Record<Collection, Fix> = {
     created: num(x.created),
   }),
   moneyTx: (x) =>
-    isDate(x.date) && score(x.amount, 0, 1e10) !== undefined ? { ...x, type: x.type === 'in' ? 'in' : 'out', amount: Math.round(x.amount as number), category: str(x.category, '기타').slice(0, 20), memo: optStr(x.memo)?.slice(0, 200), ruleId: optStr(x.ruleId), created: num(x.created) } : null,
+    isDate(x.date) && score(x.amount, 0, 1e10) !== undefined ? { ...x, type: x.type === 'in' ? 'in' : 'out', amount: Math.round(x.amount as number), category: str(x.category, '기타').slice(0, 20), memo: optStr(x.memo)?.slice(0, 200), ruleId: optStr(x.ruleId), due: optDate(x.due), created: num(x.created) } : null,
   moneyRules: (x) =>
     isDate(x.start) && score(x.amount, 1, 1e10) !== undefined && ['daily', 'weekly', 'monthly', 'yearly'].includes(x.freq as string)
       ? {
@@ -664,6 +665,18 @@ export function sanitizeSettings(s: unknown): StudySettings & { updatedAt: numbe
             .slice(-20)
             .map(([k, v]) => [k, Array.from({ length: 7 }, (_, i) => Math.round(cl((v as unknown[])[i], 0, 1440, 0)))]),
         )
+      : undefined,
+    miniTests: Array.isArray(x.miniTests)
+      ? (x.miniTests as unknown[])
+          .filter(isObj)
+          .filter((t) => isDate((t as Obj).date))
+          .slice(-100)
+          .map((t) => {
+            const o = t as Obj;
+            const n = Math.round(cl(o.n, 1, 100, 1));
+            const solved = Math.round(cl(o.solved, 0, n, 0));
+            return { at: num(o.at), date: o.date as string, subjectId: optStr(o.subjectId)?.slice(0, 40), n, solved, right: Math.round(cl(o.right, 0, solved, 0)), minutes: Math.round(cl(o.minutes, 0, 600, 0)) };
+          })
       : undefined,
     weekItems: isObj(x.weekItems)
       ? Object.fromEntries(

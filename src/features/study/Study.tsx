@@ -152,7 +152,7 @@ export function Study({ path, loggedIn, syncReady = true, onLogin }: { path: str
         .catch(() => {});
     }, 4000);
     return () => clearTimeout(t);
-  }, [d.events, today, loggedIn]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [d.events, d.moneyTx, today, loggedIn]); // eslint-disable-line react-hooks/exhaustive-deps
   // 새 영단어에 예문을 저절로 (로그인했을 때, 단어가 바뀌고 잠시 뒤)
   useEffect(() => {
     if (!loggedIn || !syncReady) return;

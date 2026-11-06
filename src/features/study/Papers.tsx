@@ -40,7 +40,9 @@ export function Papers({ sub }: { sub?: string }) {
   const lvs = (['고1', '고2', '고3'] as const).filter((l) => everything.some((p) => (p.level ?? (p.kind === 'csat' ? '고3' : '')) === l));
   const ofLv = (p: PastPaper) => !lv || (p.level ?? (p.kind === 'csat' ? '고3' : '')) === lv;
   const all = everything.filter(ofLv);
-  const editing = sub === 'new' ? 'new' : sub && d.papers[sub] && !d.papers[sub].deleted ? d.papers[sub] : null;
+  // 「new?section=영어&min=52&rec=0」: 모의고사 보기에서 넘어올 때 영역 · 걸린 시간을 채운다
+  const editing = sub === 'new' || sub?.startsWith('new?') ? 'new' : sub && d.papers[sub] && !d.papers[sub].deleted ? d.papers[sub] : null;
+  const pre = sub?.startsWith('new?') ? new URLSearchParams(sub.slice(4)) : null;
   // 수능 · 모의고사는 정해진 영역 이름으로 (내 과목 이름이 아니라)
   const subjects = [...new Set(all.map((p) => p.subjectId))].map((id) => ({ id, name: all.find((p) => p.subjectId === id && p.section)?.section ?? paperSubjectName(d, id) }));
   // 과목이 하나뿐이면 그 과목으로 (그래프·번호 분석을 바로 보이게)
@@ -148,16 +150,16 @@ export function Papers({ sub }: { sub?: string }) {
           </section>
         </>
       )}
-      {editing && <PaperSheet item={editing === 'new' ? undefined : editing} onClose={() => go('/review/papers')} />}
+      {editing && <PaperSheet item={editing === 'new' ? undefined : editing} pre={pre ? { section: pre.get('section') ?? '', minutes: pre.get('min') ?? '', rec: pre.get('rec') !== '0' } : undefined} onClose={() => go('/review/papers')} />}
     </div>
   );
 }
 
-function PaperSheet({ item, onClose }: { item?: PastPaper; onClose: () => void }) {
+function PaperSheet({ item, pre, onClose }: { item?: PastPaper; pre?: { section: string; minutes: string; rec: boolean }; onClose: () => void }) {
   const d = useStudy();
   const today = useToday();
   const [subjectId, setSubjectId] = useState(item?.subjectId ?? subjectsOf(d)[0]?.id ?? '');
-  const [section, setSection] = useState(item?.section ?? '');
+  const [section, setSection] = useState(item?.section ?? (CSAT_SECTIONS.some((s) => s.name === pre?.section) ? pre!.section : ''));
   const [kind, setKind] = useState<PastPaper['kind']>(item?.kind ?? 'csat');
   const [level, setLevel] = useState<NonNullable<PastPaper['level']>>(item?.level ?? '고3');
   const [year, setYear] = useState('');
@@ -167,13 +169,14 @@ function PaperSheet({ item, onClose }: { item?: PastPaper; onClose: () => void }
   const [bookId, setBookId] = useState(item?.bookId ?? '');
   const [date, setDate] = useState(item?.date ?? today);
   const [score, setScore] = useState(item?.score?.toString() ?? '');
-  const [full, setFull] = useState(item?.full?.toString() ?? '100');
+  const [full, setFull] = useState(item?.full?.toString() ?? String(CSAT_SECTIONS.find((s) => s.name === pre?.section)?.full ?? 100));
   const [grade, setGrade] = useState(item?.grade?.toString() ?? '');
-  const [minutes, setMinutes] = useState(item?.minutes?.toString() ?? '');
+  const [minutes, setMinutes] = useState(item?.minutes?.toString() ?? pre?.minutes ?? '');
   const [wrong, setWrong] = useState(item?.wrong.join(', ') ?? '');
   const [memo, setMemo] = useState(item?.memo ?? '');
   const [toNotes, setToNotes] = useState(!item);
-  const [toTime, setToTime] = useState(!item);
+  // 모의고사 보기에서 이미 공부 기록에 넣었으면 두 번 넣지 않게
+  const [toTime, setToTime] = useState(!item && (pre?.rec ?? true));
   const nums = parseWrongNums(wrong);
   const autoTitle = paperTitle(kind, year, month);
   const name = touched ? title : autoTitle;

@@ -1211,3 +1211,19 @@ describe('이것저것 통계 · 시험 회고', () => {
     expect(r.prevName).toBe('중간');
   });
 });
+
+describe('모의고사 문제집 목차 (쪽 없이 회 이름만)', () => {
+  it('PART 대단원은 빼고 회마다 한 칸 · 끝 번호 01 02 03 은 쪽이 아님', async () => {
+    const { parseToc, isUnitOnly } = await import('./toc');
+    const a = parseToc('PART 1 기출 모의고사\n제1회 2025학년도 6월 모의평가\n제2회 2025학년도 9월 모의평가\nPART 2 실전 모의고사\n실전 모의고사 1회');
+    expect(isUnitOnly(a)).toBe(true);
+    expect(a.filter((r) => !r.header).map((r) => [r.name, r.from])).toEqual([
+      ['제1회 2025학년도 6월 모의평가', 1],
+      ['제2회 2025학년도 9월 모의평가', 2],
+      ['실전 모의고사 1회', 3],
+    ]);
+    const b = parseToc('실전 모의고사 01\n실전 모의고사 02\n실전 모의고사 03');
+    expect(isUnitOnly(b)).toBe(true);
+    expect(b.map((r) => r.name)).toEqual(['실전 모의고사 01', '실전 모의고사 02', '실전 모의고사 03']);
+  });
+});

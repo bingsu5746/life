@@ -8,7 +8,7 @@ import { paceOf } from './plan';
 import { forecastFor, forecastText } from './forecast';
 import { bookDone, planCtx, planViews, reservedPages } from './select';
 import { getStudy, put, remove, useStudy, useWords } from './store';
-import { headerUnits, isUnitOnly, parseToc, tocText, type TocRow } from './toc';
+import { headerUnits, isUnitOnly, unitWord, parseToc, tocText, type TocRow } from './toc';
 import { markBook } from './actions';
 import { BookSearch } from './BookSearch';
 import { bookToc, bookTocIsbn, tocScan, type BookHit } from '../auth/api';
@@ -104,7 +104,7 @@ function BookList() {
                 <Bar value={n} max={all.length} label="푼 쪽" />
                 <small>
                   {n}/{all.length}
-                  {b.unitOnly ? '단원' : '쪽'} ({all.length ? Math.round((n / all.length) * 100) : 0}%)
+                  {b.unitOnly ? unitWord(b.units) : '쪽'} ({all.length ? Math.round((n / all.length) * 100) : 0}%)
                 </small>
                 {v ? (
                   <small className={v.sched.warning ? 'bad' : ''}>
@@ -368,7 +368,7 @@ function BookDetail({ id, plan }: { id: string; plan?: boolean }) {
       </Empty>
     );
   const book = b;
-  const W = b.unitOnly ? '단원' : '쪽';
+  const W = b.unitOnly ? unitWord(b.units) : '쪽';
   if (editing) return <BookEditor book={b} onDone={() => setEditing(false)} />;
   const done = bookDone(b);
   const reserved = reservedPages(d, b.id);

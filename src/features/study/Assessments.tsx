@@ -2,7 +2,7 @@
 import { useState } from 'react';
 import { addDays, dday, diffDays, shortDate } from './dates';
 import { scopeLines, scopeText } from './exams';
-import { ExamTabs } from './Exams';
+import { ExamTabs } from './ExamHero';
 import { alive, newId, type Assessment } from './model';
 import { stepDates } from './assessPlan';
 import { put, remove, useStudy } from './store';
