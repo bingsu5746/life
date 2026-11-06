@@ -67,6 +67,25 @@ export function requeue(queue: Id[], correct: boolean, gap = 3): Id[] {
   return [...rest.slice(0, at), head, ...rest.slice(at)];
 }
 
+/**
+ * 단어 외우기 순서: 모른다고 한 단어는 이번 바퀴(round: 지금 바퀴에 남은 장 수)의 단어를 다 본 뒤에, 섞어서 다시.
+ * 다음 바퀴에서도 모르면 또 그다음 바퀴로 (한 번 맞혀야 세션이 끝난다).
+ */
+export function nextInRound(queue: Id[], round: number, correct: boolean, rand: () => number = Math.random): { queue: Id[]; round: number } {
+  const [head, ...rest] = queue;
+  if (head === undefined) return { queue: [], round: 0 };
+  if (!correct) rest.push(head);
+  let left = Math.min(round, queue.length) - 1;
+  if (left <= 0) {
+    for (let i = rest.length - 1; i > 0; i--) {
+      const j = Math.floor(rand() * (i + 1));
+      [rest[i], rest[j]] = [rest[j], rest[i]];
+    }
+    left = rest.length;
+  }
+  return { queue: rest, round: left };
+}
+
 const norm = (s: string) => s.replace(/\s+/g, '').replace(/[.,;·]/g, '').toLowerCase();
 const POS = /^(?:\(|\[)?\s*(n|v|vt|vi|adj|a|adv|ad|prep|conj|pron|명|동|형|부|전|접)\b/i;
 const posOf = (m: string) => m.match(POS)?.[1].toLowerCase() ?? null;

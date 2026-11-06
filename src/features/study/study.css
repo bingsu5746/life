@@ -10532,3 +10532,11 @@ body.focus-on {
   color: var(--bad);
   font-variant-numeric: tabular-nums;
 }
+.focus .fy-file {
+  border: 1px dashed rgba(255, 255, 255, 0.3);
+  color: #f2f2f0;
+  padding: 9px 16px;
+  border-radius: 999px;
+  font-size: 0.9rem;
+  cursor: pointer;
+}

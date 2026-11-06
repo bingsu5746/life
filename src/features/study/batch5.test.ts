@@ -133,3 +133,21 @@ describe('시장 · 비 예보 · 방학 · 휴대폰', async () => {
     expect(missedStats(d, '2026-11-06')[0]).toEqual({ reason: '피곤해서', n: 2 });
   });
 });
+
+describe('단어 외우기 순서', async () => {
+  const { nextInRound } = await import('./wordSession');
+  it('모른 단어는 이번 바퀴를 다 본 뒤 섞어서', () => {
+    const rev = () => 0; // 섞기를 정해진 대로 (뒤집기에 가깝게)
+    let s = nextInRound(['a', 'b', 'c', 'd'], 4, false, rev); // a 모름
+    expect(s).toEqual({ queue: ['b', 'c', 'd', 'a'], round: 3 });
+    s = nextInRound(s.queue, s.round, true, rev); // b 앎
+    s = nextInRound(s.queue, s.round, false, rev); // c 모름
+    expect(s).toEqual({ queue: ['d', 'a', 'c'], round: 1 });
+    s = nextInRound(s.queue, s.round, true, rev); // d 앎 → 바퀴 끝, 남은 a · c 섞어서
+    expect(s.round).toBe(2);
+    expect([...s.queue].sort()).toEqual(['a', 'c']);
+    s = nextInRound(s.queue, s.round, true);
+    s = nextInRound(s.queue, s.round, true);
+    expect(s).toEqual({ queue: [], round: 0 });
+  });
+});

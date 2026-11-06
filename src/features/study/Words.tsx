@@ -10,7 +10,7 @@ import { dayUnits, listDoneDays, listWords, planViews, wordListViews } from './s
 import { getStudy, getWords, put, putWords, remove, removeWords, useStudy, useWords } from './store';
 import { addWords, answerWord, markDays } from './actions';
 import { parseWords, wordsText, type ParsedWord } from './wordParse';
-import { choicesFor, requeue, type Mode } from './wordSession';
+import { choicesFor, nextInRound, type Mode } from './wordSession';
 import { PlanForm } from './PlanForm';
 import { SwipeCard } from './SwipeCard';
 import { WithSpeak } from './Speak';
@@ -775,7 +775,13 @@ function WordRun({ listId, mode }: { listId: string; mode: 'learn' | 'prep' | 'w
   });
   const [dir, setDir] = useState<'en' | 'ko'>('en');
   // 세션을 시작할 때의 단어 목록 (도중에 상자가 바뀌어도 그대로)
-  const [queue, setQueue] = useState<string[] | null>(null);
+  const [queue, setQueueState] = useState<string[] | null>(null);
+  // 이번 바퀴에 남은 장 수 (모른 단어는 이 바퀴가 끝난 뒤 섞어서 다시)
+  const [round, setRound] = useState(0);
+  const setQueue = (q: string[] | null, r?: number) => {
+    setQueueState(q);
+    setRound(r ?? q?.length ?? 0);
+  };
   const [answered, setAnswered] = useState<Map<string, boolean>>(new Map());
   // (뜻 보기는 넘기는 카드가 스스로 한다)
   const [picked, setPicked] = useState<string | null>(null);
@@ -787,7 +793,7 @@ function WordRun({ listId, mode }: { listId: string; mode: 'learn' | 'prep' | 'w
   const runKey = `my-study.study.word-run.${listId}.${mode}`;
   const [resumed] = useState(() => {
     try {
-      const r = JSON.parse(localStorage.getItem(runKey) ?? 'null') as { day: string; queue: string[]; answered: [string, boolean][]; total: number; method: 'card' | 'quiz'; dir: 'en' | 'ko' } | null;
+      const r = JSON.parse(localStorage.getItem(runKey) ?? 'null') as { day: string; queue: string[]; round?: number; answered: [string, boolean][]; total: number; method: 'card' | 'quiz'; dir: 'en' | 'ko' } | null;
       return r && r.day === today && r.queue.length ? r : null;
     } catch {
       return null;
@@ -797,19 +803,19 @@ function WordRun({ listId, mode }: { listId: string; mode: 'learn' | 'prep' | 'w
     if (!resumed) return;
     setMethod(resumed.method);
     setDir(resumed.dir);
-    setQueue(resumed.queue);
+    setQueue(resumed.queue, resumed.round);
     setAnswered(new Map(resumed.answered));
     setTotal(resumed.total);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   useEffect(() => {
     try {
-      if (queue && queue.length) localStorage.setItem(runKey, JSON.stringify({ day: today, queue, answered: [...answered], total, method, dir }));
+      if (queue && queue.length) localStorage.setItem(runKey, JSON.stringify({ day: today, queue, round, answered: [...answered], total, method, dir }));
       else if (queue) localStorage.removeItem(runKey);
     } catch {
       /* 무시 */
     }
-  }, [queue, answered, total, method, dir, today, runKey]);
+  }, [queue, round, answered, total, method, dir, today, runKey]);
 
   function begin() {
     const all = getWords();
@@ -938,7 +944,8 @@ function WordRun({ listId, mode }: { listId: string; mode: 'learn' | 'prep' | 'w
       answerWord(cur!, correct, useQuiz ? 'quiz' : 'card', mode === 'prep' ? 'prep' : ('learn' as Mode), today);
       setAnswered(new Map(answered).set(cur!.id, correct));
     }
-    setQueue(requeue(queue!, correct));
+    const n = nextInRound(queue!, round, correct);
+    setQueue(n.queue, n.round);
     setStep((x) => x + 1);
     setPicked(null);
   }

@@ -150,6 +150,7 @@ export function FocusTimer({ timer, update, onStop, onExit }: { timer: TimerStat
           <button className={yt || ytOpen ? 'on' : ''} onClick={() => setYtOpen(!ytOpen)}>
             유튜브
           </button>
+          <MyAudio onStart={() => (stopNoise(), setNoise(''), setYt(null))} />
         </div>
         {ytOpen && <YtPicker onPick={(r) => (stopNoise(), setNoise(''), setYt(r), setYtOpen(false))} />}
         <div className="focus-btns">
@@ -162,6 +163,86 @@ export function FocusTimer({ timer, update, onStop, onExit }: { timer: TimerStat
         </div>
       </div>
     </div>
+  );
+}
+
+/** 내 음원 파일: 이 기기에 넣어 두고 집중 화면에서 되풀이해 튼다 (파일은 서버로 보내지 않음) */
+const MY_AUDIO = 'my-study.focus.audio';
+function MyAudio({ onStart }: { onStart: () => void }) {
+  const [list, setList] = useState<{ id: string; name: string }[]>(() => {
+    try {
+      return JSON.parse(localStorage.getItem(MY_AUDIO) ?? '[]');
+    } catch {
+      return [];
+    }
+  });
+  const [open, setOpen] = useState(false);
+  const [on, setOn] = useState('');
+  const a = useRef<HTMLAudioElement | null>(null);
+  const url = useRef('');
+  const stop = () => {
+    a.current?.pause();
+    if (url.current) URL.revokeObjectURL(url.current);
+    url.current = '';
+    setOn('');
+  };
+  useEffect(() => () => stop(), []);
+  const keep = (l: { id: string; name: string }[]) => {
+    setList(l);
+    try {
+      localStorage.setItem(MY_AUDIO, JSON.stringify(l));
+    } catch {
+      /* 무시 */
+    }
+  };
+  async function play(id: string) {
+    stop();
+    const b = await loadSound(`focus:${id}`);
+    if (!b) return toast('이 기기에서 파일을 찾지 못했어요');
+    onStart();
+    url.current = URL.createObjectURL(b);
+    a.current = new Audio(url.current);
+    a.current.loop = true;
+    void a.current.play().then(() => setOn(id), () => toast('눌러서 다시 틀어 주세요'));
+  }
+  return (
+    <>
+      <button className={on || open ? 'on' : ''} onClick={() => (on ? stop() : setOpen(!open))}>
+        {on ? '내 음원 끄기' : '내 음원'}
+      </button>
+      {open && !on && (
+        <div className="fy-pick">
+          <div className="focus-noise">
+            {list.map((x) => (
+              <span key={x.id} className="fy-saved">
+                <button onClick={() => (setOpen(false), void play(x.id))}>{x.name}</button>
+                <button aria-label={`${x.name} 지우기`} onClick={() => keep(list.filter((y) => y.id !== x.id))}>
+                  ✕
+                </button>
+              </span>
+            ))}
+            <label className="fy-file">
+              ＋ 파일 넣기
+              <input
+                type="file"
+                accept="audio/*"
+                hidden
+                onChange={async (e) => {
+                  const f = e.target.files?.[0];
+                  if (!f) return;
+                  const id = Math.random().toString(36).slice(2, 10);
+                  await saveSound(`focus:${id}`, f);
+                  keep([...list, { id, name: f.name.replace(/\.[^.]+$/, '').slice(0, 30) }].slice(-20));
+                  setOpen(false);
+                  void play(id);
+                }}
+              />
+            </label>
+          </div>
+          <small>가지고 있는 음원 파일(mp3 등)을 이 기기에 넣어 두고 되풀이해 틀어요.</small>
+        </div>
+      )}
+    </>
   );
 }
 
