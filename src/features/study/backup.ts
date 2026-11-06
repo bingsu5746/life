@@ -18,10 +18,12 @@ export function exportBackup() {
   const blob = new Blob([JSON.stringify(data)], { type: 'application/json' });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
-  a.download = `내공부-백업-${new Date().toISOString().slice(0, 10)}.json`;
+  // 파일 이름 날짜도 한국 날짜로 (UTC 로 하면 아침 9시 전에는 어제 날짜가 붙는다)
+  const today = new Date(Date.now() + 9 * 3600_000).toISOString().slice(0, 10);
+  a.download = `내공부-백업-${today}.json`;
   a.click();
   setTimeout(() => URL.revokeObjectURL(a.href), 2000);
-  setSettings({ lastBackup: new Date(Date.now() + 9 * 3600_000).toISOString().slice(0, 10) });
+  setSettings({ lastBackup: today });
 }
 
 /** 백업을 알려 줄 날: 마지막 백업 30일 뒤 (한 번도 안 했으면 오늘). 그 전이면 null */

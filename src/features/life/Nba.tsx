@@ -35,8 +35,8 @@ import { NBA_TEAMS, nbaFace, nbaLogo } from './nbaLogo';
 import { NBA_IDS } from './nbaIds';
 
 const FAV_KEY = 'my-study.nba.fav';
-/** 미국 동부 기준 오늘 (한국보다 13~14시간 늦다: 한국 아침이면 미국은 전날 밤) */
-const usToday = () => new Date(Date.now() - 5 * 3600_000).toISOString().slice(0, 10);
+/** 미국 동부 기준 오늘 (한국보다 13~14시간 늦다: 한국 아침이면 미국은 전날 밤). 서머타임(3~11월)도 맞게 */
+const usToday = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'America/New_York', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
 
 const isFinal = (g: NbaGame) => /final/i.test(g.status);
 const isLive = (g: NbaGame) => !isFinal(g) && g.period > 0;
