@@ -29,12 +29,9 @@ export function CheckinPage() {
   const words = useWords();
   const left = todaySummary(d, words, today).left;
   const cond = d.conditions[today] && !d.conditions[today].deleted ? d.conditions[today] : undefined;
-  const [sh, setSh] = useState(cond?.screen !== undefined ? String(Math.floor(cond.screen / 60)) : '');
-  const [sm, setSm] = useState(cond?.screen !== undefined ? String(cond.screen % 60) : '');
   const [missed, setMissed] = useState<string[]>(cond?.missed ?? []);
-  const screen = sh.trim() || sm.trim() ? Math.min(1440, (Number(sh) || 0) * 60 + (Number(sm) || 0)) : undefined;
   function save() {
-    if (screen !== undefined || missed.length) put('conditions', { ...(cond ?? { id: today }), id: today, screen: screen ?? cond?.screen, missed: missed.length ? missed : undefined } as DayCondition);
+    if (missed.length || cond?.missed) put('conditions', { ...(cond ?? { id: today }), id: today, missed: missed.length ? missed : undefined } as DayCondition);
     const parts = { ...(cur?.parts ?? {}) };
     const bits = [feel && `공부 ${feel}`, kind && kind !== '안 했어요' && `운동 ${kind} ${min}분`, kind === '안 했어요' && '운동 안 함', line.trim()].filter(Boolean);
     if (bits.length) parts.checkin = bits.join(' · ');
@@ -114,17 +111,8 @@ export function CheckinPage() {
           </div>
         </section>
       )}
-      <section className="st-card ck-q">
-        <small className="aw-label">오늘 휴대폰 쓴 시간</small>
-        <div className="st-inline">
-          <input className="st-input xs" inputMode="numeric" value={sh} onChange={(e) => setSh(e.target.value.replace(/\D/g, '').slice(0, 2))} aria-label="시간" />
-          시간
-          <input className="st-input xs" inputMode="numeric" value={sm} onChange={(e) => setSm(e.target.value.replace(/\D/g, '').slice(0, 2))} aria-label="분" />분
-        </div>
-        <p className="st-hint">아이폰은 설정 › 스크린 타임에서 오늘 사용 시간을 볼 수 있어요.</p>
-      </section>
       <input className="st-input" value={line} onChange={(e) => setLine(e.target.value)} placeholder="한 줄 남기기 (선택)" aria-label="한 줄" />
-      <button className="btn btn-primary btn-lg" disabled={!mood && !feel && !kind && !line.trim() && screen === undefined && !missed.length} onClick={save}>
+      <button className="btn btn-primary btn-lg" disabled={!mood && !feel && !kind && !line.trim() && !missed.length} onClick={save}>
         하루 마감
       </button>
       <NotifyTime k="checkinTime" label="하루 마감 알림" fallback="22:00" />

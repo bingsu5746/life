@@ -8,7 +8,7 @@ import { EveBanner } from '../study/Eve';
 import { MorningCard } from './Morning';
 import { MedsCard } from '../study/Meds';
 import { AfterExamCard, VacationCard } from '../study/Vacation';
-import { wallet } from './market';
+import { marketView, won as coin } from './market';
 import { ConditionPrompt } from '../study/ConditionCard';
 import { alive } from '../study/model';
 import { todaySummary } from '../study/select';
@@ -105,9 +105,9 @@ export function Home(_: { loggedIn: boolean; onLogin: () => void }) {
     },
     market: (() => {
       const m = d.settings.market;
-      if (!m) return { lines: ['공부해서 포인트를 모아요', '모은 포인트로 내가 정한 보상과 바꿔요'], action: { label: '시장 열기', to: '/market' } };
-      const w = wallet(d, m, today);
-      return { lines: [`${w.balance.toLocaleString('ko-KR')}점 남음`, `오늘 +${w.today}점`], action: { label: '상점', to: '/market' } };
+      if (!m) return { lines: ['공부로 은화를 벌어요', '은화로 오락 · 물건을 사고, 은행 · 주식도 있어요'], action: { label: '시장 열기', to: '/market' } };
+      const v = marketView(d, m, today);
+      return { lines: [coin(v.balance), v.overdue ? '대출이 밀렸어요' : `오늘 +${coin(v.todayInc?.total ?? 0)} · 신용 ${v.credit.score}점`], action: { label: '상점', to: '/market/shop' } };
     })(),
     ai: { lines: [aiToday ? `오늘 질문 ${aiToday}개` : '오늘은 아직 안 물어봤어요', '사진이나 글로 문제를 물어보세요'], action: { label: '질문하기', to: '/ai' } },
     diary: {

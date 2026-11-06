@@ -10540,3 +10540,20 @@ body.focus-on {
   font-size: 0.9rem;
   cursor: pointer;
 }
+.mk-alert {
+  border-color: var(--bad);
+}
+.mk-alert b {
+  color: var(--bad);
+}
+.mk-spark {
+  width: 100%;
+  height: 34px;
+  margin: 4px 0;
+}
+.mk-spark polyline {
+  fill: none;
+  stroke: var(--text);
+  stroke-width: 1.5;
+  vector-effect: non-scaling-stroke;
+}

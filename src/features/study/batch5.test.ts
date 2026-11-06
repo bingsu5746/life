@@ -93,19 +93,10 @@ describe('교과서 쪽 범위', async () => {
 });
 
 describe('시장 · 비 예보 · 방학 · 휴대폰', async () => {
-  const { wallet, newMarket } = await import('../life/market');
   const { rainReminders } = await import('../life/events');
   const { vacationView, afterExamReminder } = await import('./vacation');
-  const { screenStats, missedStats } = await import('./dayLog');
+  const { missedStats } = await import('./dayLog');
   const { parseForecast } = await import('../life/weather');
-  it('포인트: since 부터 · 산 만큼 빼기', () => {
-    const d = emptyStudy();
-    d.sessions = { a: { id: 'a', updatedAt: 1, date: '2026-11-06', minutes: 95, start: 0, end: 0, kind: 'manual' }, b: { id: 'b', updatedAt: 1, date: '2026-11-01', minutes: 60, start: 0, end: 0, kind: 'manual' } } as never;
-    d.habits = { h: { id: 'h', updatedAt: 1, name: '물', icon: '💧', weekdays: [], checks: ['2026-11-05', '2026-11-06'], created: '2026-11-01' } } as never;
-    const m = { ...newMarket('2026-11-05'), buys: [{ id: 'x', itemId: 'i', name: '게임', price: 5, at: 1 }] };
-    const w = wallet(d, m, '2026-11-06');
-    expect(w).toMatchObject({ earned: 9 + 4, spent: 5, balance: 8, today: 11 });
-  });
   it('비 예보: 50% 이상 · 공부 일정 빼기 · 전날 21시', () => {
     const d = emptyStudy();
     d.events = {
@@ -126,10 +117,9 @@ describe('시장 · 비 예보 · 방학 · 휴대폰', async () => {
     expect(afterExamReminder('2026-12-10', [{ id: 'a', text: '노래방', done: false }], Date.parse('2026-12-01T00:00:00Z'))[0].at).toBe(Date.parse('2026-12-10T18:00:00+09:00'));
     expect(afterExamReminder('2026-12-10', [{ id: 'a', text: '노래방', done: true }])).toEqual([]);
   });
-  it('휴대폰 · 못 지킨 이유', () => {
+  it('못 지킨 이유', () => {
     const d = emptyStudy();
-    d.conditions = { '2026-11-05': { id: '2026-11-05', updatedAt: 1, screen: 120, missed: ['피곤해서'] }, '2026-11-06': { id: '2026-11-06', updatedAt: 1, screen: 60, missed: ['피곤해서', '폰 · 게임'] } };
-    expect(screenStats(d, '2026-11-06')?.avgScreen).toBe(90);
+    d.conditions = { '2026-11-05': { id: '2026-11-05', updatedAt: 1, missed: ['피곤해서'] }, '2026-11-06': { id: '2026-11-06', updatedAt: 1, missed: ['피곤해서', '폰 · 게임'] } };
     expect(missedStats(d, '2026-11-06')[0]).toEqual({ reason: '피곤해서', n: 2 });
   });
 });

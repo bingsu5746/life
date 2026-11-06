@@ -55,8 +55,10 @@ export const AREA_ITEMS: Record<Exclude<AreaKey, 'home' | 'study'>, AreaItem[]> 
   ],
   ai: [{ key: '', label: '문제 풀이', icon: 'area-ai' }],
   market: [
-    { key: '', label: '상점', icon: 'area-market' },
-    { key: 'wallet', label: '지갑', icon: 'area-money' },
+    { key: '', label: '시장', icon: 'area-market' },
+    { key: 'shop', label: '상점', icon: 'save' },
+    { key: 'bank', label: '은행', icon: 'area-money' },
+    { key: 'stocks', label: '주식', icon: 'up' },
     { key: 'rules', label: '규칙', icon: 'settings' },
   ],
   diary: [
@@ -158,7 +160,7 @@ export function activeItem(area: keyof typeof AREA_ITEMS, sub?: string, p0?: str
   if (area === 'diary') return sub === 'dream' || sub === 'form' || sub === 'recap' ? sub : sub?.startsWith('highlight') ? 'highlight' : '';
   if (area === 'money') return sub === 'fixed' || sub === 'saving' ? sub : '';
   if (area === 'hobby') return sub === 'wish' || sub === 'reading' ? sub : '';
-  if (area === 'market') return sub === 'wallet' || sub === 'rules' ? sub : '';
+  if (area === 'market') return sub === 'shop' || sub === 'bank' || sub === 'stocks' || sub === 'rules' ? sub : '';
   return '';
 }
 

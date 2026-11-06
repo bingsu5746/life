@@ -566,7 +566,6 @@ const FIX: Record<Collection, Fix> = {
     sleep: hhmm(x.sleep),
     wake: hhmm(x.wake),
     mood: Number.isInteger(x.mood) && (x.mood as number) >= 1 && (x.mood as number) <= 5 ? (x.mood as number) : undefined,
-    screen: score(x.screen, 0, 1440),
     missed: Array.isArray(x.missed) ? (x.missed as unknown[]).filter((t): t is string => typeof t === 'string' && t.length <= 20).slice(0, 8) : undefined,
   }),
   weekNotes: (x) => ({ ...x, text: str(x.text).slice(0, 1000), change: optStr(x.change)?.slice(0, 100), kept: typeof x.kept === 'boolean' ? x.kept : undefined }),
@@ -732,25 +731,7 @@ export function sanitizeSettings(s: unknown): StudySettings & { updatedAt: numbe
             memo: optStr(m.memo)?.trim().slice(0, 100) || undefined,
           }))
       : undefined,
-    market: isObj(x.market) && isDate((x.market as Obj).since)
-      ? (() => {
-          const m = x.market as Obj;
-          const r = isObj(m.rate) ? (m.rate as Obj) : {};
-          const pt = (v: unknown, d: number) => Math.round(cl(v, 0, 1000, d));
-          return {
-            rate: { study10: pt(r.study10, 1), habit: pt(r.habit, 2), todo: pt(r.todo, 1), note: pt(r.note, 3) },
-            since: m.since as string,
-            items: arr(m.items)
-              .filter((it): it is Obj => isObj(it) && typeof it.name === 'string' && !!it.name.trim())
-              .slice(0, 40)
-              .map((it) => ({ id: str(it.id, `i${Math.random().toString(36).slice(2, 10)}`).slice(0, 40), name: (it.name as string).trim().slice(0, 30), icon: str(it.icon, '🎁').slice(0, 4), price: Math.round(cl(it.price, 1, 100000, 10)) })),
-            buys: arr(m.buys)
-              .filter((b): b is Obj => isObj(b) && typeof b.name === 'string' && typeof b.price === 'number' && typeof b.at === 'number')
-              .slice(-300)
-              .map((b) => ({ id: str(b.id, `b${Math.random().toString(36).slice(2, 10)}`).slice(0, 40), itemId: str(b.itemId).slice(0, 40), name: (b.name as string).slice(0, 30), price: Math.round(cl(b.price, 0, 100000, 0)), at: b.at as number, used: b.used === true ? true : undefined })),
-          };
-        })()
-      : undefined,
+    market: isObj(x.market) && isDate((x.market as Obj).since) ? sanitizeMarket(x.market as Obj) : undefined,
     rainRemind: x.rainRemind === false ? false : undefined,
     vacation:
       isObj(x.vacation) && isDate((x.vacation as Obj).from) && isDate((x.vacation as Obj).to) && ((x.vacation as Obj).to as string) >= ((x.vacation as Obj).from as string)
@@ -951,4 +932,61 @@ const fixWord: Fix = (x) =>
 /** 단어 묶음 다듬기 */
 export function sanitizeWords(w: unknown): WordsData {
   return fixRecords(w, fixWord) as unknown as Record<Id, Word>;
+}
+
+const rid = (p: string) => `${p}${Math.random().toString(36).slice(2, 10)}`;
+const money = (v: unknown) => Math.round(cl(v, 0, 10_000_000, 0));
+/** 시장 (은화). 예전(포인트) 시장 자료는 보상 이름만 옮긴다 */
+function sanitizeMarket(m: Obj) {
+  const old = !('weeklyTarget' in m);
+  const kind = (v: unknown) => (v === 'game' || v === 'fun' || v === 'thing' ? v : 'fun');
+  const items = arr(m.items)
+    .filter((it): it is Obj => isObj(it) && typeof it.name === 'string' && !!it.name.trim())
+    .slice(0, 60)
+    .map((it) => {
+      const k = old ? (/게임/.test(it.name as string) ? 'game' : 'fun') : kind(it.kind);
+      return {
+        id: str(it.id, rid('i')).slice(0, 40),
+        name: (it.name as string).trim().slice(0, 30),
+        kind: k as 'game' | 'fun' | 'thing',
+        minutes: k === 'thing' ? undefined : Math.round(cl(it.minutes, 1, 600, 30)),
+        price: old ? 150 : money(it.price) || 1,
+        won: k === 'thing' ? money(it.won) : undefined,
+      };
+    });
+  const at = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) ? v : 0);
+  return {
+    since: m.since as string,
+    weeklyTarget: Math.round(cl(m.weeklyTarget, 60, 100 * 60, 30 * 60)),
+    minDay: isObj(m.minDay) ? { weekday: Math.round(cl((m.minDay as Obj).weekday, 0, 900, 60)), weekend: Math.round(cl((m.minDay as Obj).weekend, 0, 900, 120)) } : { weekday: 60, weekend: 120 },
+    wonPerGold: Math.round(cl(m.wonPerGold, 100, 1_000_000, 5000)),
+    items,
+    buys: old
+      ? []
+      : arr(m.buys)
+          .filter((b): b is Obj => isObj(b) && typeof b.name === 'string')
+          .slice(-500)
+          .map((b) => ({ id: str(b.id, rid('b')).slice(0, 40), itemId: str(b.itemId).slice(0, 40), name: (b.name as string).slice(0, 30), kind: kind(b.kind) as 'game' | 'fun' | 'thing', minutes: b.minutes === undefined ? undefined : Math.round(cl(b.minutes, 0, 600, 0)), price: money(b.price), tax: money(b.tax), at: at(b.at), used: b.used === true ? true : undefined })),
+    savings: arr(m.savings)
+      .filter(isObj)
+      .slice(-100)
+      .map((v) => ({ id: str(v.id, rid('s')).slice(0, 40), amount: money(v.amount), at: at(v.at), weeks: Math.round(cl(v.weeks, 1, 52, 1)), rate: cl(v.rate, 0, 1, 0), closedAt: typeof v.closedAt === 'number' ? v.closedAt : undefined })),
+    loans: arr(m.loans)
+      .filter((l): l is Obj => isObj(l) && isDate(l.due))
+      .slice(-100)
+      .map((l) => ({ id: str(l.id, rid('l')).slice(0, 40), amount: money(l.amount), at: at(l.at), due: l.due as string, rate: cl(l.rate, 0, 1, 0.07), repays: arr(l.repays).filter(isObj).slice(-100).map((r) => ({ at: at(r.at), amount: money(r.amount) })) })),
+    trades: arr(m.trades)
+      .filter((t): t is Obj => isObj(t) && typeof t.subjectId === 'string' && typeof t.qty === 'number')
+      .slice(-1000)
+      .map((t) => ({ id: str(t.id, rid('t')).slice(0, 40), subjectId: (t.subjectId as string).slice(0, 40), qty: Math.round(cl(t.qty, -100000, 100000, 0)), price: money(t.price), at: at(t.at) })),
+    play: isObj(m.play)
+      ? Object.fromEntries(
+          Object.entries(m.play)
+            .filter(([k, v]) => isDate(k) && typeof v === 'number')
+            .sort((a, b) => b[0].localeCompare(a[0]))
+            .slice(0, 120)
+            .map(([k, v]) => [k, Math.round(cl(v, 0, 1440, 0))]),
+        )
+      : {},
+  };
 }

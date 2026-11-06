@@ -4,7 +4,7 @@ import { addDays, daysBetween, shortDate, weekStart, WEEKDAYS } from './dates';
 import { BarChart, TableView } from './charts';
 import { WeekReview } from './WeekReview';
 import { BreakWords, FocusTimer, MockExamPage } from './Focus';
-import { missedStats, screenStats } from './dayLog';
+import { missedStats } from './dayLog';
 import { sleepMinutes, splitStudy } from './condition';
 import { bySubject, compare, daily, minutesByDate, studyStreak, weekdayAverage, weekly } from './timeStats';
 import { alive, type StudySession } from './model';
@@ -744,35 +744,16 @@ function MemoSheet({ id, onClose }: { id: string; onClose: () => void }) {
   );
 }
 
-/** 하루 마감에서 적은 휴대폰 사용 시간 · 계획을 못 지킨 이유 */
+/** 하루 마감에서 고른 계획을 못 지킨 이유 */
 function DayLogStats({ today }: { today: string }) {
   const d = useStudy();
-  const sc = screenStats(d, today);
   const mi = missedStats(d, today);
-  if (!sc && !mi.length) return null;
-  const max = Math.max(1, ...(sc?.rows ?? []).map((r) => Math.max(r.screen, r.study)));
+  if (!mi.length) return null;
   return (
     <section className="st-card">
-      <h3 className="st-h">휴대폰 · 못 지킨 이유</h3>
-      {sc && (
-        <>
-          <p className="st-sub">
-            최근 4주 휴대폰 하루 평균 {minutesText(sc.avgScreen)}
-            {sc.lowStudy !== null && sc.highStudy !== null && ` · 폰을 적게 쓴 날 공부 ${minutesText(sc.lowStudy)}, 많이 쓴 날 ${minutesText(sc.highStudy)}`}
-          </p>
-          {sc.rows.slice(-7).map((r) => (
-            <div key={r.date} className="st-subj-row">
-              <span>{shortDate(r.date)}</span>
-              <Bar value={r.screen} max={max} label={`${r.date} 휴대폰`} />
-              <small>
-                폰 {minutesText(r.screen)} · 공부 {minutesText(r.study)}
-              </small>
-            </div>
-          ))}
-        </>
-      )}
-      {mi.length > 0 && <p className="st-sub">최근 60일 못 지킨 이유: {mi.slice(0, 4).map((x) => `${x.reason} ${x.n}번`).join(' · ')}</p>}
-      <small className="st-muted">하루 마감에서 적은 것만 세요.</small>
+      <h3 className="st-h">계획을 못 지킨 이유</h3>
+      <p className="st-sub">최근 60일: {mi.slice(0, 4).map((x) => `${x.reason} ${x.n}번`).join(' · ')}</p>
+      <small className="st-muted">하루 마감에서 고른 것만 세요.</small>
     </section>
   );
 }

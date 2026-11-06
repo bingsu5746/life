@@ -127,14 +127,35 @@ export interface StudySettings {
   univGoals?: UnivGoal[];
 }
 
-/** 시장: 공부 · 습관 · 할 일로 포인트를 모아 내가 정한 보상과 바꾼다 */
+/** 시장: 은화(100 = 1금화)를 공부로 벌고, 오락 · 물건을 사고, 은행(적금 · 대출) · 과목 주식. 돈은 모두 은화로 적는다 */
 export interface MarketSettings {
-  /** 포인트 규칙: 공부 10분당 · 습관 하나 · 할 일 하나 · 오답 해결 하나 */
-  rate: { study10: number; habit: number; todo: number; note: number };
-  /** 처음 포인트를 세기 시작한 날 (그 전 기록은 세지 않음) */
+  /** 이날부터 센다 */
   since: DateStr;
-  items: { id: Id; name: string; icon: string; price: number }[];
-  buys: { id: Id; itemId: Id; name: string; price: number; at: number; used?: boolean }[];
+  /** 일주일 공부 목표 (분, 주급 기준) */
+  weeklyTarget: number;
+  /** 하루 최소 공부 (분): 못 채우면 벌금 */
+  minDay: { weekday: number; weekend: number };
+  /** 실제 물건: 1금화 = 몇 원 */
+  wonPerGold: number;
+  items: MarketItem[];
+  buys: { id: Id; itemId: Id; name: string; kind: MarketItem['kind']; minutes?: number; price: number; tax: number; at: number; used?: boolean }[];
+  savings: { id: Id; amount: number; at: number; weeks: number; rate: number; closedAt?: number }[];
+  loans: { id: Id; amount: number; at: number; due: DateStr; rate: number; repays: { at: number; amount: number }[] }[];
+  /** 과목 주식 사고판 기록 (qty: 산 것 +, 판 것 −) */
+  trades: { id: Id; subjectId: Id; qty: number; price: number; at: number }[];
+  /** 날마다 게임한 분 (Steam · 롤에서 받아 적어 둔 것) */
+  play: Record<DateStr, number>;
+}
+export interface MarketItem {
+  id: Id;
+  name: string;
+  /** game: 게임 이용권(분) · fun: 그 밖 오락(분) · thing: 실제 물건(원) */
+  kind: 'game' | 'fun' | 'thing';
+  /** 이용권 분 (game · fun) */
+  minutes?: number;
+  /** 기본 값 (은화). thing 이면 won 으로 계산 */
+  price: number;
+  won?: number;
 }
 
 /** 목표 대학 · 학과 하나: 내신 목표 평균 등급 · 모의고사 과목별 목표 (등급 · 백분위) */
@@ -317,8 +338,6 @@ export interface DayCondition extends Stamp {
   wake?: string;
   /** 컨디션 1(나쁨)~5(좋음) */
   mood?: number;
-  /** 휴대폰 사용 시간 (분, 하루 마감에서 직접 적음) */
-  screen?: number;
   /** 오늘 계획을 다 못 했을 때 고른 이유 */
   missed?: string[];
 }
