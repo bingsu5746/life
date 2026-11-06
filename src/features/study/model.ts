@@ -139,7 +139,7 @@ export interface MarketSettings {
   wonPerGold: number;
   items: MarketItem[];
   /** 산 것. 이용권은 expires 까지 쓸 수 있고(산 날 쓰면 벌금), 오락 이용권은 쓴 때(usedAt)를 적는다 */
-  buys: { id: Id; itemId: Id; name: string; kind: MarketItem['kind']; minutes?: number; price: number; tax: number; at: number; used?: boolean; expires?: DateStr; usedAt?: number; passDate?: DateStr }[];
+  buys: { id: Id; itemId: Id; name: string; kind: MarketItem['kind']; minutes?: number; price: number; tax: number; at: number; used?: boolean; expires?: DateStr; usedAt?: number; passDate?: DateStr; effect?: MarketItem['effect']; piece?: boolean }[];
   savings: { id: Id; amount: number; at: number; weeks: number; rate: number; closedAt?: number }[];
   loans: { id: Id; amount: number; at: number; due: DateStr; rate: number; repays: { at: number; amount: number }[] }[];
   /** 과목 주식 사고판 기록 (qty: 산 것 +, 판 것 −) */
@@ -149,18 +149,36 @@ export interface MarketSettings {
   /** 주식에서 뺀 과목 · 시험 3주 전부터만 내리는 과목 */
   stockOff?: Id[];
   examOnly?: Id[];
+  /** 악마의 계약서: 그날(date) 공부 minutes 를 채우면 stake × mult, 못 채우면 stake 를 잃는다 */
+  contracts?: { id: Id; at: number; date: DateStr; minutes: number; stake: number; mult: number }[];
+  /** 성적 배당권: until 까지 그 과목 성적이 target 등급 이내면 stake × mult */
+  bets?: { id: Id; at: number; kind: 'school' | 'mock'; subject: string; target: number; stake: number; mult: number; until: DateStr }[];
+  /** 공부 복권: 낸 돈 · 당첨 은화 */
+  lotto?: { id: Id; at: number; price: number; prize: number }[];
+  /** 티어 (3달마다 처음부터): 시즌 · 지금 등급 0 브론즈 ~ 3 다이아 */
+  tier?: { season: string; rank: number };
+  /** 시험이 끝난 주 할인 (0~0.9) */
+  postExamSale?: number;
 }
 export interface MarketItem {
   id: Id;
   name: string;
   /** game: 게임 이용권(분) · fun: 그 밖 오락(분) · meet: 약속(친구 · 가족, 사치세 없음) · thing: 실제 물건(원) */
   /** pass: 하루 쉬기권 (그날 하루 최소 공부 벌금 없음) */
-  kind: 'game' | 'fun' | 'meet' | 'thing' | 'pass';
+  kind: 'game' | 'fun' | 'meet' | 'thing' | 'pass' | 'perk';
   /** 이용권 분 (game · fun) */
   minutes?: number;
   /** 기본 값 (은화). thing 이면 won 으로 계산 */
   price: number;
   won?: number;
+  /** 물건: 몇 조각으로 나눠 사는지 (없으면 한 번에) */
+  pieces?: number;
+  /** 물건: 살 수 있는 티어 (0 브론즈 ~ 3 다이아) */
+  tier?: number;
+  /** 위시리스트에서 올린 것 */
+  wishId?: Id;
+  /** perk: fever 피버타임(1시간 공부 은화 2배) · shield 연속 실드 · half 내일 계획 반토막 · permit 허가권 */
+  effect?: 'fever' | 'shield' | 'half' | 'permit';
 }
 
 /** 목표 대학 · 학과 하나: 내신 목표 평균 등급 · 모의고사 과목별 목표 (등급 · 백분위) */
@@ -719,8 +737,11 @@ export interface HobbyLog extends Stamp {
 /** 하고 싶은 것 (책·영화·드라마·게임·장소·그 밖) */
 export interface WishItem extends Stamp {
   id: Id;
-  kind: 'book' | 'movie' | 'show' | 'game' | 'place' | 'other';
+  kind: 'book' | 'movie' | 'show' | 'game' | 'place' | 'thing' | 'other';
   title: string;
+  /** 물건: 가격 (원) · 파는 곳 주소 */
+  won?: number;
+  link?: string;
   status: 'want' | 'doing' | 'done';
   /** 별점 1~5 (끝낸 것) */
   rating?: number;

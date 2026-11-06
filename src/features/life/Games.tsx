@@ -1,4 +1,5 @@
 // 게임: 하는 중 · 하고 싶어요 · 끝낸 것 (기기 · 한 시간 · 별점 · 한줄평) · 한국 Steam 값 · 값 알림 · 내 Steam(가진 게임 · 찜 · 업적)
+import { WishThings } from './WishThings';
 import { useEffect, useState } from 'react';
 import { gamePrices, gameSearch, gameWatch, isLoggedIn, steamAch, steamMe, steamNames, steamStore, steamThumb, steamWatchGet, steamWatchSet, type SteamHit, type SteamMe, type SteamPrice } from '../auth/api';
 import { LolPage } from './Lol';
@@ -550,11 +551,16 @@ export function WishPage() {
   const steamOnly = wish.filter((w) => !games.some((g) => g.steamAppId === w.appid));
   const total = [...games.map((g) => (g.steamAppId ? (prices[g.steamAppId]?.final ?? 0) : 0)), ...steamOnly.map((w) => prices[w.appid]?.final ?? 0), ...records.map((r) => r.price ?? 0)].reduce((a, b) => a + b, 0);
   const onSale = steamIds.filter((id) => (prices[id]?.discount ?? 0) > 0).length;
+  const [adding, setAdding] = useState(false);
   return (
     <div className="st-page narrow">
       <div className="st-page-head">
         <h2>위시리스트</h2>
+        <button className="btn btn-sm btn-primary" onClick={() => setAdding(true)}>
+          ＋ 물건
+        </button>
       </div>
+      <WishThings adding={adding} onAdded={() => setAdding(false)} />
       <div className="mv-summary">
         <span>
           게임 <b>{games.length + steamOnly.length}</b>

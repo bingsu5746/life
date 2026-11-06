@@ -18,6 +18,7 @@ import { tutorSessions } from './tutor';
 import { eventSessions } from '../life/events';
 import { autoDiaries } from '../life/diaryForm';
 import { eventsBetween, rainReminders, reminders } from '../life/events';
+import { blackOpen } from '../life/blackOpen';
 import { DEFAULT_PLACE, getForecast } from '../life/weather';
 import { addDays } from './dates';
 import { medReminders } from './meds';
@@ -57,6 +58,7 @@ const Search = lazy(() => import('../life/Search').then((m) => ({ default: m.Sea
 const LifeWeekPage = lazy(() => import('../life/LifeWeek').then((m) => ({ default: m.LifeWeekPage })));
 const CheckinPage = lazy(() => import('../life/Checkin').then((m) => ({ default: m.CheckinPage })));
 const NewsPage = lazy(() => import('../life/News').then((m) => ({ default: m.NewsPage })));
+const WishPage = lazy(() => import('../life/Games').then((m) => ({ default: m.WishPage })));
 const Market = lazy(() => import('../life/Market').then((m) => ({ default: m.Market })));
 const Diary = lazy(() => import('../life/Diary').then((m) => ({ default: m.Diary })));
 const SubjectProblems = lazy(() => import('./SavedProblems').then((m) => ({ default: m.SubjectProblems })));
@@ -234,6 +236,7 @@ export function Study({ path, loggedIn, syncReady = true, onLogin }: { path: str
   else if (area === 'home') content = <Home loggedIn={loggedIn} onLogin={onLogin} />;
   else if (p0 === 'fitness') content = <FitnessMoved sub={path[1]} sub2={path[2]} />;
   else if (p0 === 'basketball') content = <BasketballArea sub={path[1]} sub2={path[2]} />;
+  else if (area === 'money' && path[1] === 'wish') content = <WishPage />;
   else if (area === 'money') content = <Money sub={path[1]} />;
   else if (p0 === 'movies') content = <Movies sub={path[1]} />;
   else if (p0 === 'games') content = <Games sub={path[1]} sub2={path[2]} sub3={path[3]} />;
@@ -300,7 +303,10 @@ export function Study({ path, loggedIn, syncReady = true, onLogin }: { path: str
             <span className="st-tab-label">메인으로</span>
             <span className="st-tab-short">메인</span>
           </button>
-          {(p0 === 'movies' ? MOVIE_ITEMS : isChamp ? champItems(path[2] ?? '', (path[3] ?? '').split('-')[1] ?? '') : p0 === 'games' ? GAME_ITEMS : p0 === 'travel' ? TRAVEL_ITEMS : isNba ? NBA_ITEMS : p0 === 'basketball' ? BASKETBALL_ITEMS : AREA_ITEMS[area]).map((it) => {
+          {(p0 === 'movies' ? MOVIE_ITEMS : isChamp ? champItems(path[2] ?? '', (path[3] ?? '').split('-')[1] ?? '') : p0 === 'games' ? GAME_ITEMS : p0 === 'travel' ? TRAVEL_ITEMS : isNba ? NBA_ITEMS : p0 === 'basketball' ? BASKETBALL_ITEMS : AREA_ITEMS[area])
+            // 암시장은 열려 있을 때만 (또는 지금 그 화면일 때)
+            .filter((it) => area !== 'market' || it.key !== 'black' || path[1] === 'black' || blackOpen(d, today).open)
+            .map((it) => {
             const on = (p0 === 'movies' ? movieItem(path[1]) : isChamp ? champItem(path[3]) : p0 === 'games' ? gameItem(path[1]) : p0 === 'travel' ? travelItem(path[1]) : isNba ? nbaItem(path[2]) : p0 === 'basketball' ? basketballItem(path[1]) : activeItem(area, path[1], p0)) === it.key;
             return (
               <button key={it.key} className={`st-tab ${on ? 'on' : ''}`} aria-current={on ? 'page' : undefined} onClick={() => go(it.to ?? (it.key ? `/${area}/${it.key}` : `/${area}`))}>

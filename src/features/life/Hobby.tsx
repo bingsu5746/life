@@ -16,6 +16,7 @@ const WISH_KIND: Record<WishItem['kind'], string> = {
   show: '드라마',
   game: '게임',
   place: '가 볼 곳',
+  thing: '물건',
   other: '기타',
 };
 // 영화는 「영화」 칸에서 따로 (예전에 넣은 영화만 여기 남는다)

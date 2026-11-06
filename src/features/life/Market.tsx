@@ -5,9 +5,10 @@ import { addDays, diffDays, shortDate, weekStart } from '../study/dates';
 import { alive, newId, type MarketItem, type MarketSettings, type MoneyTx } from '../study/model';
 import { getStudy, put, setSettings, useStudy } from '../study/store';
 import { minutesText } from '../study/timer';
-import { confirmDelete, Empty, Field, go, Sheet, toast, useToday } from '../study/ui';
+import { confirmDelete, Empty, Field, go, Sheet, toast, useNow, useToday } from '../study/ui';
+import { blackOpen } from './blackOpen';
 import { lolDaily } from './GameTime';
-import { kst, loanOwed, marketNews, marketView, newMarket, priceOf, RULE, SAME_DAY_FINE, SAVING_PLANS, savingValue, voucherEnds, won } from './market';
+import { avgDaily, betMult, betState, blackToday, contractMult, contractState, drawLotto, kst, lastGrade, loanOwed, LOTTO_PRICE, LOTTO_TABLE, marketNews, marketView, newMarket, piecesOf, priceOf, promoPrice, RULE, SAME_DAY_FINE, SAVING_PLANS, savingValue, seasonOf, TIERS, timeSale, voucherEnds, won } from './market';
 import { dailyPlay } from './steamPlay';
 
 const save = (p: Partial<MarketSettings>) => {
@@ -79,6 +80,8 @@ export function Market({ sub }: { sub?: string }) {
       </div>
     );
   if (sub === 'shop') return <Shop m={m} />;
+  if (sub === 'dare') return <Dare m={m} />;
+  if (sub === 'black') return <Black m={m} />;
   if (sub === 'bank') return <Bank m={m} />;
   if (sub === 'stocks') return <Stocks m={m} />;
   if (sub === 'rules') return <Rules m={m} />;
@@ -142,6 +145,9 @@ function Wallet({ m }: { m: MarketSettings }) {
         <span className="mt-pill">순자산 {won(v.net)}</span>
         <button className="mt-pill" onClick={() => go('/market/bank')}>
           신용 {v.credit.score}
+        </button>
+        <button className={`mt-pill tier r${v.rank}`} onClick={() => go('/market/shop')}>
+          {TIERS[v.rank]}
         </button>
       </div>
     </section>
@@ -248,13 +254,14 @@ function NewsBoard({ m }: { m: MarketSettings }) {
   );
 }
 
-const KIND_NAME: Record<MarketItem['kind'], string> = { game: '게임', fun: '오락', meet: '약속', pass: '쉬기권', thing: '물건' };
+const KIND_NAME: Record<MarketItem['kind'], string> = { game: '게임', fun: '오락', meet: '약속', pass: '쉬기권', perk: '아이템', thing: '물건' };
 
 /** 눌러서 상점에 넣을 수 있는 것들 */
 const IDEAS: Omit<MarketItem, 'id'>[] = [
   { name: '게임 30분', kind: 'game', minutes: 30, price: 150 },
   { name: '게임 1시간', kind: 'game', minutes: 60, price: 280 },
   { name: '게임 3시간 (주말)', kind: 'game', minutes: 180, price: 750 },
+  { name: '숏폼 20분', kind: 'fun', minutes: 20, price: 80 },
   { name: '유튜브 30분', kind: 'fun', minutes: 30, price: 100 },
   { name: '넷플릭스 · 드라마 한 편', kind: 'fun', minutes: 60, price: 180 },
   { name: '영화 한 편 (집)', kind: 'fun', minutes: 120, price: 300 },
@@ -272,6 +279,10 @@ const IDEAS: Omit<MarketItem, 'id'>[] = [
   { name: '쇼핑하러 가기', kind: 'meet', minutes: 180, price: 350 },
   { name: '가족 외식', kind: 'meet', minutes: 120, price: 150 },
   { name: '하루 쉬기권', kind: 'pass', price: 1500 },
+  { name: '피버타임 물약 (1시간 2배)', kind: 'perk', effect: 'fever', price: 400 },
+  { name: '연속 달성 실드', kind: 'perk', effect: 'shield', price: 600 },
+  { name: '음악 들으며 문제 풀기 1시간', kind: 'perk', effect: 'permit', price: 60 },
+  { name: '게임 과금 허가권', kind: 'perk', effect: 'permit', price: 300 },
 ];
 
 type Sort = 'rec' | 'low' | 'high' | 'long' | 'cheap';
@@ -283,54 +294,111 @@ const SORTS: [Sort, string][] = [
   ['cheap', '분당 싼 순'],
 ];
 
+/** 상점에서 사기 (타임 세일 · 암시장 값이면 price 로) */
+function useBuy(m: MarketSettings) {
+  const d = useStudy();
+  const today = useToday();
+  const now = useNow(30_000);
+  const v = marketView(d, m, today);
+  const ctx = { now, todayMin: v.todayInc?.minutes ?? 0, need: v.need };
+  return {
+    v,
+    ctx,
+    buy: (it: MarketItem, special?: { id: string; price: number; tax?: number }) => {
+      if (v.overdue) return toast('대출 연체 중이라 상점을 쓸 수 없어요'), false;
+      if (it.tier && v.rank < it.tier) return toast(`${TIERS[it.tier]} 티어부터 살 수 있어요`), false;
+      const p = special ? { price: special.price, tax: special.tax ?? 0 } : priceOf(it, m, d, today, ctx);
+      const cost = p.price + p.tax;
+      if (v.balance < cost) return toast(`${won(cost - v.balance)} 모자라요`), false;
+      const vch = it.kind !== 'thing';
+      const piece = it.kind === 'thing' && !!it.pieces;
+      if (!window.confirm(`${it.name}${piece ? ' 한 조각' : ''}\n${won(cost)}${p.tax ? ` (사치세 ${won(p.tax)} 포함)` : ''}${vch ? `\n${shortDate(voucherEnds(Date.now()))}까지` : ''}`)) return false;
+      save({ buys: [...m.buys, { id: newId(), itemId: special?.id ?? it.id, name: it.name, kind: it.kind, minutes: it.minutes, price: p.price, tax: p.tax, at: Date.now(), expires: vch ? voucherEnds(Date.now()) : undefined, effect: it.effect, piece: piece || undefined }] });
+      return true;
+    },
+  };
+}
+
+/** 조각: 산 만큼 아래에서부터 칠해지는 동그라미 */
+function PieceFill({ name, got, of }: { name: string; got: number; of: number }) {
+  const k = Math.min(1, got / of);
+  return (
+    <span className="mt-piece" style={{ ['--k' as string]: k }} aria-label={`${got}/${of}조각`}>
+      <b>{[...name][0]}</b>
+    </span>
+  );
+}
+
 function Shop({ m }: { m: MarketSettings }) {
   const d = useStudy();
   const today = useToday();
-  const v = marketView(d, m, today);
+  const { v, ctx, buy } = useBuy(m);
   const [edit, setEdit] = useState<MarketItem | 'new' | null>(null);
   const [adding, setAdding] = useState(false);
   const [kind, setKind] = useState<'all' | MarketItem['kind']>('all');
   const [sort, setSort] = useState<Sort>('rec');
   const [pop, setPop] = useState('');
-  const [usePass, setUsePass] = useState<MarketSettings['buys'][number] | null>(null);
-  const buy = (it: MarketItem) => {
-    if (v.overdue) return toast('대출 연체 중이라 상점을 쓸 수 없어요');
-    const p = priceOf(it, m, d, today);
-    const cost = p.price + p.tax;
-    if (v.balance < cost) return toast(`${won(cost - v.balance)} 모자라요`);
-    const vch = it.kind !== 'thing';
-    if (!window.confirm(`${it.name}\n${won(cost)}${p.tax ? ` (사치세 ${won(p.tax)} 포함)` : ''}${vch ? `\n${shortDate(voucherEnds(Date.now()))}까지 · 오늘 쓰면 벌금` : ''}`)) return;
-    save({ buys: [...m.buys, { id: newId(), itemId: it.id, name: it.name, kind: it.kind, minutes: it.minutes, price: p.price, tax: p.tax, at: Date.now(), expires: vch ? voucherEnds(Date.now()) : undefined }] });
-    setPop(it.id);
-    setTimeout(() => setPop(''), 900);
+  const [useDay, setUseDay] = useState<MarketSettings['buys'][number] | null>(null);
+  const sale = timeSale(m, today, ctx.now);
+  const saleBought = sale && m.buys.some((b) => b.itemId === sale.id);
+  const tap = (it: MarketItem) => {
+    if (buy(it)) {
+      setPop(it.id);
+      setTimeout(() => setPop(''), 900);
+    }
   };
   const realBuy = (b: MarketSettings['buys'][number]) => {
     const it = m.items.find((x) => x.id === b.itemId);
-    save({ buys: m.buys.map((x) => (x.id === b.id ? { ...x, used: true } : x)) });
+    save({ buys: m.buys.map((x) => (x.id === b.id || (x.itemId === b.itemId && x.piece) ? { ...x, used: true } : x)) });
     if (it?.won) {
       put('moneyTx', { id: newId(), date: today, type: 'out', amount: it.won, category: '쇼핑', memo: `${b.name} (시장)`, created: Date.now() } as MoneyTx);
+      if (it.wishId && d.wishes[it.wishId]) put('wishes', { ...d.wishes[it.wishId], status: 'done', doneDate: today });
       toast(`돈 › 쓴 돈에 ${it.won.toLocaleString('ko-KR')}원`);
     }
   };
   const cost = (it: MarketItem) => {
-    const p = priceOf(it, m, d, today);
+    const p = priceOf(it, m, d, today, ctx);
     return p.price + p.tax;
   };
   const list = m.items
     .filter((x) => kind === 'all' || x.kind === kind)
     .sort((a, b) => (sort === 'low' ? cost(a) - cost(b) : sort === 'high' ? cost(b) - cost(a) : sort === 'long' ? (b.minutes ?? 0) - (a.minutes ?? 0) : sort === 'cheap' ? cost(a) / (a.minutes || 1e6) - cost(b) / (b.minutes || 1e6) : 0));
   const kinds = (Object.keys(KIND_NAME) as MarketItem['kind'][]).filter((k) => m.items.some((x) => x.kind === k));
-  const live = m.buys.filter((b) => b.kind !== 'thing' && b.kind !== 'game' && !b.usedAt && !b.passDate && (b.expires ?? voucherEnds(b.at)) >= today);
-  const waiting = m.buys.filter((b) => b.kind === 'thing' && !b.used);
+  const live = m.buys.filter((b) => b.kind !== 'thing' && b.kind !== 'game' && b.effect !== 'shield' && !b.usedAt && !b.passDate && (b.expires ?? voucherEnds(b.at)) >= today);
+  const shields = m.buys.filter((b) => b.effect === 'shield').length - v.pays.filter((p) => p.shield).length;
+  // 다 모은 조각 물건 · 한 번에 산 물건 중 아직 실제로 안 산 것
+  const waiting = m.items
+    .filter((it) => it.kind === 'thing')
+    .flatMap((it) => {
+      const bs = m.buys.filter((b) => b.itemId === it.id && !b.used);
+      if (it.pieces) return piecesOf(m, it.id) >= it.pieces && bs.length ? [bs[bs.length - 1]] : [];
+      return bs;
+    });
   return (
     <div className="st-page narrow mt">
       <Wallet m={m} />
-      {(live.length > 0 || v.game.left > 0) && (
+      {sale && !saleBought && (
+        <button className="mt-sale" onClick={() => buy(sale.item, { id: sale.id, price: sale.price })}>
+          <small>타임 세일 · {Math.ceil(sale.endsIn / 60_000)}분 남음</small>
+          <b>{sale.item.name}</b>
+          <span>
+            <s>{won(sale.item.price)}</s> {won(sale.price)} <em>−{Math.round(sale.off * 100)}%</em>
+          </span>
+        </button>
+      )}
+      {(live.length > 0 || v.game.left > 0 || shields > 0) && (
         <div className="mt-tickets">
           {v.game.left > 0 && (
             <div className="mt-ticket game">
               <small>게임</small>
               <b>{minutesText(v.game.left)}</b>
+              <span>자동으로 써요</span>
+            </div>
+          )}
+          {shields > 0 && (
+            <div className="mt-ticket perk">
+              <small>아이템</small>
+              <b>연속 실드 {shields}개</b>
               <span>자동으로 써요</span>
             </div>
           )}
@@ -345,9 +413,10 @@ function Shop({ m }: { m: MarketSettings }) {
                 <span>{left === 0 ? '오늘까지' : `D-${left}`}</span>
                 <button
                   onClick={() => {
-                    if (b.kind === 'pass') return setUsePass(b);
-                    if (fresh && !window.confirm(`오늘 산 이용권이에요. 쓰면 벌금 ${won(Math.round(b.price * SAME_DAY_FINE))}`)) return;
+                    if (b.kind === 'pass' || b.effect === 'half') return setUseDay(b);
+                    if (b.kind !== 'perk' && fresh && !window.confirm(`오늘 산 이용권이에요. 쓰면 벌금 ${won(Math.round(b.price * SAME_DAY_FINE))}`)) return;
                     save({ buys: m.buys.map((x) => (x.id === b.id ? { ...x, usedAt: Date.now() } : x)) });
+                    if (b.effect === 'fever') toast('피버타임! 1시간 동안 공부 은화 2배');
                   }}
                 >
                   쓰기
@@ -357,6 +426,7 @@ function Shop({ m }: { m: MarketSettings }) {
           })}
         </div>
       )}
+      <TierCard m={m} />
       <div className="mt-toolbar">
         <div className="mt-filter" role="group" aria-label="종류">
           {(['all', ...kinds] as const).map((k) => (
@@ -375,17 +445,25 @@ function Shop({ m }: { m: MarketSettings }) {
       </div>
       <div className="mt-goods">
         {list.map((it, i) => {
-          const p = priceOf(it, m, d, today);
-          const short = v.balance < p.price + p.tax || v.overdue;
+          const p = priceOf(it, m, d, today, ctx);
+          const locked = !!it.tier && v.rank < it.tier;
+          const got = it.pieces ? piecesOf(m, it.id) : 0;
+          const full = !!it.pieces && got >= it.pieces;
+          const short = v.balance < p.price + p.tax || v.overdue || locked || full;
           return (
-            <div key={it.id} className={`mt-good ${it.kind} ${short ? 'short' : ''} ${pop === it.id ? 'pop' : ''}`} style={{ ['--i' as string]: Math.min(i, 12) }}>
-              <button className="mt-good-buy" onClick={() => buy(it)}>
-                <small>{KIND_NAME[it.kind]}</small>
+            <div key={it.id} className={`mt-good ${it.kind} ${short ? 'short' : ''} ${pop === it.id ? 'pop' : ''} ${locked ? 'locked' : ''}`} style={{ ['--i' as string]: Math.min(i, 12) }}>
+              <button className="mt-good-buy" onClick={() => !full && tap(it)}>
+                <small>
+                  {KIND_NAME[it.kind]}
+                  {locked && ` · ${TIERS[it.tier!]}부터`}
+                </small>
+                {it.pieces && <PieceFill name={it.name} got={got} of={it.pieces} />}
                 <b>{it.name}</b>
-                <span className="mt-good-meta">{it.kind === 'thing' ? `${(it.won ?? 0).toLocaleString('ko-KR')}원` : it.kind === 'pass' ? '하루' : minutesText(it.minutes ?? 0)}</span>
+                <span className="mt-good-meta">{it.kind === 'thing' ? `${(it.won ?? 0).toLocaleString('ko-KR')}원${it.pieces ? ` · ${got}/${it.pieces}조각` : ''}` : it.kind === 'pass' ? '하루' : it.kind === 'perk' ? '' : minutesText(it.minutes ?? 0)}</span>
                 <span className="mt-price">
-                  {won(p.price + p.tax)}
-                  {p.why && <i className="up">▲</i>}
+                  {full ? '다 모음' : `${won(p.price + p.tax)}${it.pieces ? ' / 조각' : ''}`}
+                  {!full && p.price > p.base && <i className="up">▲</i>}
+                  {!full && p.price < p.base && <i className="down">▼</i>}
                 </span>
               </button>
               <button className="mt-good-edit" aria-label={`${it.name} 고치기`} onClick={() => setEdit(it)}>
@@ -401,7 +479,7 @@ function Shop({ m }: { m: MarketSettings }) {
       </div>
       {waiting.length > 0 && (
         <section className="mt-panel">
-          <h3>산 물건</h3>
+          <h3>실제로 살 물건</h3>
           {waiting.map((b) => (
             <div key={b.id} className="mt-row">
               <span>
@@ -418,7 +496,7 @@ function Shop({ m }: { m: MarketSettings }) {
       {adding && (
         <Sheet title="상점에 넣기" onClose={() => setAdding(false)}>
           <div className="mt-ideas">
-            {(['game', 'fun', 'meet', 'pass'] as const).map((k) => {
+            {(['game', 'fun', 'meet', 'pass', 'perk'] as const).map((k) => {
               const xs = IDEAS.filter((x) => x.kind === k && !m.items.some((y) => y.name === x.name));
               return xs.length ? (
                 <div key={k}>
@@ -433,6 +511,9 @@ function Shop({ m }: { m: MarketSettings }) {
                 </div>
               ) : null;
             })}
+            <button className="btn" onClick={() => go('/money/wish')}>
+              위시리스트에서 물건 올리기
+            </button>
             <button
               className="btn"
               onClick={() => {
@@ -440,25 +521,27 @@ function Shop({ m }: { m: MarketSettings }) {
                 setEdit('new');
               }}
             >
-              직접 만들기 (물건 · 이용권)
+              직접 만들기
             </button>
           </div>
         </Sheet>
       )}
-      {usePass && <PassSheet m={m} b={usePass} onClose={() => setUsePass(null)} />}
+      {useDay && <DaySheet m={m} b={useDay} onClose={() => setUseDay(null)} />}
       {edit && <ItemSheet m={m} item={edit === 'new' ? undefined : edit} onClose={() => setEdit(null)} />}
     </div>
   );
 }
 
-/** 하루 쉬기권: 쉴 날 고르기 (기한 안, 오늘이면 벌금) */
-function PassSheet({ m, b, onClose }: { m: MarketSettings; b: MarketSettings['buys'][number]; onClose: () => void }) {
+/** 하루 쉬기권 · 내일 계획 반토막권: 쓸 날 고르기 (기한 안. 쉬기권은 산 날이면 벌금, 반토막권은 내일부터) */
+function DaySheet({ m, b, onClose }: { m: MarketSettings; b: MarketSettings['buys'][number]; onClose: () => void }) {
   const today = useToday();
   const ends = b.expires ?? voucherEnds(b.at);
-  const days = Array.from({ length: Math.max(0, diffDays(today, ends)) + 1 }, (_, i) => addDays(today, i));
-  const taken = new Set(m.buys.filter((x) => x.passDate).map((x) => x.passDate));
+  const half = b.effect === 'half';
+  const first = half ? addDays(today, 1) : today;
+  const days = Array.from({ length: Math.max(0, diffDays(first, ends)) + 1 }, (_, i) => addDays(first, i));
+  const taken = new Set(m.buys.filter((x) => x.passDate && (x.effect === 'half') === half).map((x) => x.passDate));
   return (
-    <Sheet title="쉴 날 고르기" onClose={onClose}>
+    <Sheet title={half ? '계획을 반으로 줄일 날' : '쉴 날 고르기'} onClose={onClose}>
       <div className="st-chips">
         {days.map((x) => (
           <button
@@ -466,9 +549,9 @@ function PassSheet({ m, b, onClose }: { m: MarketSettings; b: MarketSettings['bu
             className="st-chip"
             disabled={taken.has(x)}
             onClick={() => {
-              if (x === kst(b.at) && !window.confirm(`산 날 쓰면 벌금 ${won(Math.round(b.price * SAME_DAY_FINE))}`)) return;
+              if (!half && x === kst(b.at) && !window.confirm(`산 날 쓰면 벌금 ${won(Math.round(b.price * SAME_DAY_FINE))}`)) return;
               save({ buys: m.buys.map((y) => (y.id === b.id ? { ...y, passDate: x, usedAt: Date.parse(`${x}T12:00:00+09:00`) } : y)) });
-              toast(`${shortDate(x)}은(는) 쉬는 날`);
+              toast(half ? `${shortDate(x)}은(는) 최소 공부 절반` : `${shortDate(x)}은(는) 쉬는 날`);
               onClose();
             }}
           >
@@ -477,6 +560,299 @@ function PassSheet({ m, b, onClose }: { m: MarketSettings; b: MarketSettings['bu
         ))}
       </div>
     </Sheet>
+  );
+}
+
+/** 티어 카드: 지금 티어 · 점수 · 승급 심사 */
+function TierCard({ m }: { m: MarketSettings }) {
+  const d = useStudy();
+  const today = useToday();
+  const v = marketView(d, m, today);
+  const t = v.tier;
+  const next = v.rank + 1;
+  const can = next <= 3 && t.eligible >= next;
+  const price = promoPrice(v.rank);
+  return (
+    <section className={`mt-tier r${v.rank}`}>
+      <div>
+        <small>{seasonOf(today)}</small>
+        <b>{TIERS[v.rank]}</b>
+      </div>
+      <div className="mt-tier-bar" aria-label={`티어 점수 ${t.score}`}>
+        <i style={{ width: `${t.score}%` }} />
+        {[40, 60, 80].map((x) => (
+          <em key={x} style={{ left: `${x}%` }} />
+        ))}
+      </div>
+      <small className="st-muted">
+        공부 {t.parts.study}/50 · 모의고사 {t.parts.mock}/30 · 자산 {t.parts.money}/20
+      </small>
+      {next <= 3 && (
+        <button
+          className="btn btn-sm"
+          disabled={!can || v.balance < price || v.overdue}
+          onClick={() => {
+            if (!window.confirm(`${TIERS[next]} 승급 심사권 ${won(price)}`)) return;
+            save({ buys: [...m.buys, { id: newId(), itemId: `promo:${seasonOf(today)}:${next}`, name: `${TIERS[next]} 승급 심사권`, kind: 'perk', price, tax: 0, at: Date.now() }], tier: { season: seasonOf(today), rank: next } });
+            toast(`${TIERS[next]} 승급!`);
+          }}
+        >
+          {can ? `${TIERS[next]} 승급 심사 · ${won(price)}` : `${TIERS[next]}까지 ${[40, 60, 80][v.rank] - t.score}점`}
+        </button>
+      )}
+    </section>
+  );
+}
+
+/** 도전: 악마의 계약서 · 성적 배당권 · 공부 복권 */
+function Dare({ m }: { m: MarketSettings }) {
+  const d = useStudy();
+  const today = useToday();
+  const v = marketView(d, m, today);
+  const [sheet, setSheet] = useState<'' | 'deal' | 'bet'>('');
+  const [roll, setRoll] = useState<number | null>(null);
+  const avg = avgDaily(v.inc, today);
+  const deals = [...(m.contracts ?? [])].reverse().slice(0, 10);
+  const bets = [...(m.bets ?? [])].reverse();
+  const lotto = m.lotto ?? [];
+  const STATE = { won: '성공', lost: '실패', open: '진행 중' };
+  return (
+    <div className="st-page narrow mt">
+      <Wallet m={m} />
+      <section className="mt-panel mt-dare">
+        <h3>악마의 계약서</h3>
+        {deals.map((c) => {
+          const s = contractState(c, v.inc, today);
+          const got = v.inc.get(c.date)?.minutes ?? 0;
+          return (
+            <div key={c.id} className={`mt-row ${s}`}>
+              <span>
+                <b>
+                  {shortDate(c.date)} 순공 {minutesText(c.minutes)}
+                </b>
+                <small>
+                  {won(c.stake)} × {c.mult} · {s === 'open' ? `${minutesText(got)} 했어요` : STATE[s]}
+                </small>
+              </span>
+              {s === 'open' ? <div className="mt-meter wide"><i style={{ width: `${Math.min(100, (got / c.minutes) * 100)}%` }} /></div> : <em className={s === 'won' ? 'up' : 'down'}>{s === 'won' ? `+${won(Math.round(c.stake * c.mult) - c.stake)}` : `−${won(c.stake)}`}</em>}
+            </div>
+          );
+        })}
+        <button className="btn btn-sm" disabled={v.overdue || (m.contracts ?? []).some((c) => c.date === today)} onClick={() => setSheet('deal')}>
+          오늘 계약하기
+        </button>
+      </section>
+      <section className="mt-panel mt-dare">
+        <h3>성적 배당권</h3>
+        {bets.map((b) => {
+          const s = betState(b, d, today);
+          return (
+            <div key={b.id} className={`mt-row ${s.state}`}>
+              <span>
+                <b>
+                  {b.kind === 'mock' ? '모의고사' : '내신'} {b.subject} {b.target}등급 이내
+                </b>
+                <small>
+                  {won(b.stake)} × {b.mult} · {s.state === 'open' ? `${shortDate(b.until)}까지` : `${s.name ?? ''} ${s.got ? `${s.got}등급` : ''} ${STATE[s.state]}`}
+                </small>
+              </span>
+              {s.state !== 'open' && <em className={s.state === 'won' ? 'up' : 'down'}>{s.state === 'won' ? `+${won(Math.round(b.stake * b.mult) - b.stake)}` : `−${won(b.stake)}`}</em>}
+            </div>
+          );
+        })}
+        <button className="btn btn-sm" disabled={v.overdue} onClick={() => setSheet('bet')}>
+          배당권 사기
+        </button>
+      </section>
+      <section className="mt-panel mt-dare">
+        <h3>공부 복권 · 한 장 {won(LOTTO_PRICE)}</h3>
+        <div className={`mt-lotto ${roll !== null ? 'show' : ''}`} key={lotto.length}>
+          {roll !== null ? <b className={roll >= LOTTO_PRICE ? 'up' : ''}>{won(roll)}</b> : <b>?</b>}
+        </div>
+        <button
+          className="btn btn-primary"
+          disabled={v.balance < LOTTO_PRICE || v.overdue}
+          onClick={() => {
+            const prize = drawLotto();
+            save({ lotto: [...lotto, { id: newId(), at: Date.now(), price: LOTTO_PRICE, prize }] });
+            setRoll(prize);
+          }}
+        >
+          긁기
+        </button>
+        <div className="mt-odds">
+          {LOTTO_TABLE.map((x) => (
+            <span key={x.prize}>
+              {won(x.prize)} <small>{(x.p * 100).toFixed(1)}%</small>
+            </span>
+          ))}
+        </div>
+        {lotto.length > 0 && (
+          <small className="st-muted">
+            {lotto.length}장 · 낸 돈 {won(lotto.reduce((a, l) => a + l.price, 0))} · 받은 돈 {won(lotto.reduce((a, l) => a + l.prize, 0))}
+          </small>
+        )}
+      </section>
+      {sheet === 'deal' && <DealSheet m={m} avg={avg} studied={v.todayInc?.minutes ?? 0} balance={v.balance} onClose={() => setSheet('')} />}
+      {sheet === 'bet' && <BetSheet m={m} balance={v.balance} onClose={() => setSheet('')} />}
+    </div>
+  );
+}
+
+function DealSheet({ m, avg, studied, balance, onClose }: { m: MarketSettings; avg: number; studied: number; balance: number; onClose: () => void }) {
+  const today = useToday();
+  // 이미 한 것보다 1시간 이상 더 해야 하는 목표만 (거의 다 한 걸로 쉽게 벌지 않게)
+  const opts = [120, 180, 240, 300, 360, 480].filter((x) => x >= studied + 60);
+  const [target, setTarget] = useState(opts[0] ?? 0);
+  const [amt, setAmt] = useState('');
+  const a = silver(amt);
+  const mult = contractMult(target, avg);
+  return (
+    <Sheet title="악마의 계약서" onClose={onClose}>
+      <div className="st-form">
+        <p className="st-sub">오늘 밤 12시까지 순공</p>
+        <div className="mt-plans">
+          {opts.map((x) => (
+            <button key={x} className={target === x ? 'on' : ''} onClick={() => setTarget(x)}>
+              <b>{minutesText(x)}</b>
+              <span>×{contractMult(x, avg)}</span>
+            </button>
+          ))}
+        </div>
+        {!opts.length && <p className="st-hint">오늘은 더 걸 수 있는 목표가 없어요.</p>}
+        <div className="mt-amount">
+          <input inputMode="decimal" value={amt} onChange={(e) => setAmt(e.target.value)} placeholder="0" aria-label="걸 금화" />
+          <span>금화</span>
+        </div>
+        {a > 0 && (
+          <p className="st-sub">
+            성공하면 {won(Math.round(a * mult))} · 실패하면 {won(a)} 사라짐 (지금 {minutesText(studied)})
+          </p>
+        )}
+        <button
+          className="btn btn-primary"
+          disabled={!target || !a || a > balance}
+          onClick={() => {
+            save({ contracts: [...(m.contracts ?? []), { id: newId(), at: Date.now(), date: today, minutes: target, stake: a, mult }] });
+            toast('계약했어요');
+            onClose();
+          }}
+        >
+          서명하기
+        </button>
+      </div>
+    </Sheet>
+  );
+}
+
+function BetSheet({ m, balance, onClose }: { m: MarketSettings; balance: number; onClose: () => void }) {
+  const d = useStudy();
+  const today = useToday();
+  const [kind, setKind] = useState<'school' | 'mock'>('mock');
+  const names = [...new Set([...(kind === 'mock' ? ['국어', '수학', '영어', '한국사', '탐구1', '탐구2'] : []), ...alive(d.grades).filter((r) => r.kind === kind).flatMap((r) => r.scores.map((s) => s.subject)), ...(kind === 'school' ? alive(d.subjects).map((s) => s.name) : [])])].slice(0, 20);
+  const [subject, setSubject] = useState(names[0] ?? '');
+  const [target, setTarget] = useState(1);
+  const [until, setUntil] = useState(addDays(today, 60));
+  const [amt, setAmt] = useState('');
+  const now = subject ? lastGrade(d, kind, subject) : null;
+  const mult = betMult(now, target);
+  const a = silver(amt);
+  return (
+    <Sheet title="성적 배당권" onClose={onClose}>
+      <div className="st-form">
+        <div className="st-seg">
+          {(['mock', 'school'] as const).map((k) => (
+            <button key={k} className={kind === k ? 'on' : ''} onClick={() => setKind(k)}>
+              {k === 'mock' ? '모의고사' : '내신'}
+            </button>
+          ))}
+        </div>
+        <div className="st-chips">
+          {names.map((n) => (
+            <button key={n} className={`st-chip ${subject === n ? 'on' : ''}`} onClick={() => setSubject(n)}>
+              {n}
+            </button>
+          ))}
+        </div>
+        <div className="mt-plans">
+          {[1, 2, 3].map((g) => (
+            <button key={g} className={target === g ? 'on' : ''} onClick={() => setTarget(g)}>
+              <b>{g}등급</b>
+              <span>×{betMult(now, g)}</span>
+            </button>
+          ))}
+        </div>
+        <small className="st-muted">지금 {now ? `${now}등급` : '성적 없음'} · 성적 칸에 넣은 그 기간의 첫 성적으로 판정</small>
+        <label className="st-cond-time">
+          언제까지
+          <input className="st-input sm" type="date" value={until} min={today} onChange={(e) => setUntil(e.target.value)} />
+        </label>
+        <div className="mt-amount">
+          <input inputMode="decimal" value={amt} onChange={(e) => setAmt(e.target.value)} placeholder="0" aria-label="걸 금화" />
+          <span>금화</span>
+        </div>
+        {a > 0 && <p className="st-sub">달성하면 {won(Math.round(a * mult))}</p>}
+        <button
+          className="btn btn-primary"
+          disabled={!subject || !a || a > balance || until < today}
+          onClick={() => {
+            save({ bets: [...(m.bets ?? []), { id: newId(), at: Date.now(), kind, subject, target, stake: a, mult, until }] });
+            toast('배당권을 샀어요');
+            onClose();
+          }}
+        >
+          사기
+        </button>
+      </div>
+    </Sheet>
+  );
+}
+
+/** 암시장: 오늘 목표를 채운 날, 잘 시각 2시간 전부터만 */
+function Black({ m }: { m: MarketSettings }) {
+  const d = useStudy();
+  const today = useToday();
+  const now = useNow(30_000);
+  const { buy } = useBuy(m);
+  const b = blackOpen(d, today, now);
+  const hm = (ms: number) => new Date(ms + 9 * 3_600_000).toISOString().slice(11, 16);
+  if (!b.open)
+    return (
+      <div className="st-page narrow mt">
+        <section className="mt-black closed">
+          <b>암시장은 닫혀 있어요</b>
+          <small>
+            {b.done ? `${hm(b.from)} ~ ${hm(b.to)}에 열려요` : `오늘 ${minutesText(b.goal)} 공부하면 ${hm(b.from)}에 열려요 (지금 ${minutesText(b.studied)})`}
+          </small>
+        </section>
+      </div>
+    );
+  const items = blackToday(today);
+  return (
+    <div className="st-page narrow mt mt-dark">
+      <section className="mt-black">
+        <small>
+          {hm(b.from)} ~ {hm(b.to)} · {Math.ceil((b.to - now) / 60_000)}분 남음
+        </small>
+        <b>암시장</b>
+      </section>
+      <div className="mt-goods">
+        {items.map((x, i) => {
+          const sold = m.buys.some((y) => y.itemId === x.id);
+          return (
+            <div key={x.id} className={`mt-good black ${sold ? 'short' : ''}`} style={{ ['--i' as string]: i }}>
+              <button className="mt-good-buy" disabled={sold} onClick={() => buy({ ...x.item, id: x.id }, { id: x.id, price: x.price })}>
+                <small>{sold ? '샀어요' : `−${Math.round(x.off * 100)}%`}</small>
+                <b>{x.item.name}</b>
+                <span className="mt-price">
+                  <s>{won(x.item.price)}</s> {won(x.price)}
+                </span>
+              </button>
+            </div>
+          );
+        })}
+      </div>
+    </div>
   );
 }
 
@@ -922,7 +1298,11 @@ function ItemSheet({ m, item, onClose }: { m: MarketSettings; item?: MarketItem;
   const [minutes, setMinutes] = useState(String(item?.minutes ?? 30));
   const [price, setPrice] = useState(String(item?.price ?? 100));
   const [wonV, setWon] = useState(String(item?.won ?? ''));
-  const ok = name.trim() && (kind === 'thing' ? Number(wonV) > 0 : Number(price) > 0 && (kind === 'pass' || Number(minutes) > 0));
+  const [pieces, setPieces] = useState(String(item?.pieces ?? ''));
+  const [tier, setTier] = useState(item?.tier ?? 0);
+  const [effect, setEffect] = useState<NonNullable<MarketItem['effect']>>(item?.effect ?? 'permit');
+  const noMin = kind === 'pass' || kind === 'perk';
+  const ok = name.trim() && (kind === 'thing' ? Number(wonV) > 0 : Number(price) > 0 && (noMin || Number(minutes) > 0));
   return (
     <Sheet title={item ? '고치기' : '상점에 넣기'} onClose={onClose}>
       <div className="st-form">
@@ -940,9 +1320,44 @@ function ItemSheet({ m, item, onClose }: { m: MarketSettings; item?: MarketItem;
           <Field label="실제 가격 (원)" hint={`1금화 = ${m.wonPerGold.toLocaleString('ko-KR')}원으로 바꿔요 (규칙에서 바꿀 수 있어요). 지금 ${won(Math.round(((Number(wonV) || 0) / m.wonPerGold) * 100))}`}>
             <input className="st-input sm" inputMode="numeric" value={wonV} onChange={(e) => setWon(e.target.value.replace(/\D/g, ''))} />
           </Field>
-        ) : (
+        ) : null}
+        {kind === 'thing' && (
           <div className="st-inline wrap">
-            {kind !== 'pass' && (
+            <label className="st-cond-time">
+              조각 (선택)
+              <input className="st-input xs" inputMode="numeric" value={pieces} onChange={(e) => setPieces(e.target.value.replace(/\D/g, ''))} placeholder="한 번에" />
+            </label>
+            <label className="st-cond-time">
+              티어
+              <select className="st-input sm" value={tier} onChange={(e) => setTier(Number(e.target.value))}>
+                {TIERS.map((t, i) => (
+                  <option key={t} value={i}>
+                    {i ? `${t}부터` : '누구나'}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
+        )}
+        {kind === 'perk' && (
+          <div className="st-seg">
+            {(
+              [
+                ['permit', '허가권'],
+                ['fever', '피버타임'],
+                ['shield', '연속 실드'],
+                ['half', '계획 반토막'],
+              ] as const
+            ).map(([k, n]) => (
+              <button key={k} type="button" className={effect === k ? 'on' : ''} onClick={() => setEffect(k)}>
+                {n}
+              </button>
+            ))}
+          </div>
+        )}
+        {kind === 'thing' ? null : (
+          <div className="st-inline wrap">
+            {!noMin && (
               <label className="st-cond-time">
                 시간 (분)
                 <input className="st-input xs" inputMode="numeric" value={minutes} onChange={(e) => setMinutes(e.target.value.replace(/\D/g, ''))} />
@@ -964,7 +1379,8 @@ function ItemSheet({ m, item, onClose }: { m: MarketSettings; item?: MarketItem;
             className="btn btn-primary"
             disabled={!ok}
             onClick={() => {
-              const it: MarketItem = { id: item?.id ?? newId(), name: name.trim().slice(0, 30), kind, minutes: kind === 'thing' || kind === 'pass' ? undefined : Math.min(600, Number(minutes)), price: kind === 'thing' ? 0 : Math.min(1_000_000, Number(price)), won: kind === 'thing' ? Number(wonV) : undefined };
+              const pc = Number(pieces);
+              const it: MarketItem = { id: item?.id ?? newId(), name: name.trim().slice(0, 30), kind, minutes: kind === 'thing' || noMin ? undefined : Math.min(600, Number(minutes)), price: kind === 'thing' ? 0 : Math.min(1_000_000, Number(price)), won: kind === 'thing' ? Number(wonV) : undefined, pieces: kind === 'thing' && pc >= 2 ? Math.min(100, pc) : undefined, tier: kind === 'thing' && tier ? tier : undefined, wishId: item?.wishId, effect: kind === 'perk' ? effect : undefined };
               save({ items: item ? m.items.map((x) => (x.id === item.id ? it : x)) : [...m.items, it] });
               onClose();
             }}

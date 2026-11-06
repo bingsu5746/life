@@ -68,6 +68,7 @@ export interface DayIncome {
   scope: number;
   habit: number;
   todo: number;
+  fever?: number;
   total: number;
   minutes: number;
 }
@@ -82,23 +83,49 @@ export function incomeByDay(d: D, m: MarketSettings, today: DateStr): Map<DateSt
   const ok = (date: DateStr) => date >= m.since && date <= today;
   for (const s of alive(d.sessions)) if (ok(s.date) && s.minutes > 0) at(s.date).minutes += s.minutes;
   for (const x of map.values()) x.study = x.minutes * RULE.perMin;
+  // 피버타임 물약: 쓴 때부터 1시간 동안 한 공부는 은화 2배
+  const fevers = m.buys.filter((b) => b.effect === 'fever' && b.usedAt).map((b) => [b.usedAt!, b.usedAt! + 3_600_000] as const);
+  if (fevers.length)
+    for (const s of alive(d.sessions)) {
+      if (!ok(s.date) || !s.start || !s.end || s.end <= s.start) continue;
+      const over = fevers.reduce((a, [f0, f1]) => a + Math.max(0, Math.min(s.end, f1) - Math.max(s.start, f0)), 0);
+      const extra = Math.min(s.minutes, Math.round(over / 60_000)) * RULE.perMin;
+      if (extra > 0) at(s.date).fever = (at(s.date).fever ?? 0) + extra;
+    }
   for (const n of alive(d.notes)) if (n.learned && ok(kst(n.updatedAt))) at(kst(n.updatedAt)).note += RULE.note;
   for (const e of alive(d.exams)) for (const sc of e.scopes ?? []) for (const l of sc.lines) if (l.done && l.at && ok(kst(l.at))) at(kst(l.at)).scope += RULE.scope;
   for (const h of alive(d.habits)) for (const c of h.checks) if (ok(c)) at(c).habit += RULE.habit;
   for (const t of alive(d.todos)) if (t.done && t.doneAt && ok(kst(t.doneAt))) at(kst(t.doneAt)).todo += RULE.todo;
-  for (const x of map.values()) x.total = x.study + x.note + x.scope + x.habit + x.todo;
+  for (const x of map.values()) x.total = x.study + x.note + x.scope + x.habit + x.todo + (x.fever ?? 0);
   return map;
 }
 
 /** 주급: since 뒤로 다 지난 주마다 (그다음 월요일에 받음) */
-export function weeklyPays(d: D, m: MarketSettings, today: DateStr, inc = incomeByDay(d, m, today)): { week: DateStr; minutes: number; ratio: number; pay: number }[] {
-  const out: { week: DateStr; minutes: number; ratio: number; pay: number }[] = [];
+/**
+ * 주급 + 연속 달성 보너스: 주 목표 100% 를 이어 가면 연속 주마다 +100은화(500까지).
+ * 못 채운 주에 쓸 수 있는 연속 실드가 있으면(그 주가 끝나기 전에 산 것) 연속이 끊기지 않는다 (그 주 주급은 없음).
+ */
+export function weeklyPays(d: D, m: MarketSettings, today: DateStr, inc = incomeByDay(d, m, today)): { week: DateStr; minutes: number; ratio: number; pay: number; streak: number; shield?: boolean }[] {
+  const out: { week: DateStr; minutes: number; ratio: number; pay: number; streak: number; shield?: boolean }[] = [];
+  const shields = m.buys.filter((b) => b.effect === 'shield').map((b) => kst(b.at)).sort();
+  let streak = 0;
   for (let w = weekStart(m.since); addDays(w, 7) <= today; w = addDays(w, 7)) {
     if (w < m.since) continue; // 중간에 시작한 첫 주는 빼기
     const minutes = daysBetween(w, addDays(w, 6)).reduce((a, x) => a + (inc.get(x)?.minutes ?? 0), 0);
     const ratio = m.weeklyTarget ? minutes / m.weeklyTarget : 0;
-    const pay = RULE.pay.find(([r]) => ratio >= r)?.[1] ?? 0;
-    out.push({ week: w, minutes, ratio, pay });
+    let pay = RULE.pay.find(([r]) => ratio >= r)?.[1] ?? 0;
+    let shield = false;
+    if (ratio >= 1) {
+      streak++;
+      if (streak >= 2) pay += Math.min(500, (streak - 1) * 100);
+    } else {
+      const k = shields.findIndex((x) => x <= addDays(w, 6));
+      if (k >= 0 && streak > 0) {
+        shields.splice(k, 1);
+        shield = true;
+      } else streak = 0;
+    }
+    out.push({ week: w, minutes, ratio, pay, streak, shield: shield || undefined });
   }
   return out;
 }
@@ -145,10 +172,13 @@ export function fines(d: D, m: MarketSettings, today: DateStr, inc = incomeByDay
   const yesterday = addDays(today, -1);
   if (yesterday < m.since) return out;
   const rest = new Set(m.buys.filter((b) => b.kind === 'pass' && b.passDate).map((b) => b.passDate!));
+  const half = new Set(m.buys.filter((b) => b.effect === 'half' && b.passDate).map((b) => b.passDate!));
   for (const date of daysBetween(m.since, yesterday)) {
     // 하루 쉬기권을 쓴 날은 최소 공부 벌금 없음 (밀린 대출의 벌칙 공부는 그대로)
     if (rest.has(date) && !overdueOn(m, date)) continue;
-    const need = (isWeekend(date) ? m.minDay.weekend : m.minDay.weekday) + (overdueOn(m, date) ? RULE.penaltyMin : 0);
+    // 내일 계획 반토막권을 쓴 날은 최소 공부가 절반
+    const base = (isWeekend(date) ? m.minDay.weekend : m.minDay.weekday) * (half.has(date) ? 0.5 : 1);
+    const need = Math.round(base) + (overdueOn(m, date) ? RULE.penaltyMin : 0);
     const got = inc.get(date)?.minutes ?? 0;
     if (need > 0 && got < need) out.push({ date, why: `하루 최소 공부 ${need}분 중 ${got}분${overdueOn(m, date) ? ' (벌칙 공부 포함)' : ''}`, amount: RULE.fineMin });
   }
@@ -235,15 +265,39 @@ const funThisWeek = (m: MarketSettings, today: DateStr) =>
   m.buys.filter((b) => (b.kind === 'game' || b.kind === 'fun') && kst(b.at) >= weekStart(today)).reduce((a, b) => a + (b.minutes ?? 0), 0);
 
 /** 물건 하나의 지금 값 · 세금 */
-export function priceOf(it: MarketItem, m: MarketSettings, d: Pick<StudyData, 'exams'>, today: DateStr): { price: number; tax: number; why: string } {
-  if (it.kind === 'pass') return { price: Math.round(it.price * examSurge(d, today).factor), tax: 0, why: examSurge(d, today).why };
-  if (it.kind === 'thing') return { price: Math.max(1, Math.round(((it.won ?? 0) / m.wonPerGold) * 100)), tax: 0, why: '' };
-  const s = examSurge(d, today);
-  const price = Math.round(it.price * s.factor);
-  // 약속(친구 · 가족)은 사치세가 없다
-  if (it.kind === 'meet') return { price, tax: 0, why: s.why };
+/** 시험이 끝난 주(끝난 날부터 7일)에는 할인 */
+export function postExamSale(d: Pick<StudyData, 'exams'>, m: MarketSettings, today: DateStr): { rate: number; why: string } {
+  for (const e of alive(d.exams)) {
+    const end = examEnd(e);
+    if (end < today && diffDays(end, today) <= 7) return { rate: m.postExamSale ?? 0.3, why: `${e.name} 끝난 주` };
+  }
+  return { rate: 0, why: '' };
+}
+
+/** 자정 할증: 오늘 최소 공부를 못 채운 채 저녁 6시가 지나면 오락 값이 자정까지 +50% 로 오른다 */
+export function lateSurge(now: number, today: DateStr, todayMin: number, need: number): number {
+  if (todayMin >= need) return 1;
+  const t = (now - Date.parse(`${today}T18:00:00+09:00`)) / (6 * 3_600_000);
+  return t <= 0 ? 1 : Math.round((1 + 0.5 * Math.min(1, t)) * 100) / 100;
+}
+
+/** 물건 하나의 지금 값 · 세금. ctx(지금 시각 · 오늘 공부 · 최소 공부)가 있으면 자정 할증도 */
+export function priceOf(it: MarketItem, m: MarketSettings, d: Pick<StudyData, 'exams'>, today: DateStr, ctx?: { now: number; todayMin: number; need: number }): { price: number; tax: number; why: string; base: number } {
+  if (it.kind === 'thing') {
+    const whole = Math.max(1, Math.round(((it.won ?? 0) / m.wonPerGold) * 100));
+    const p = it.pieces ? Math.ceil(whole / it.pieces) : whole;
+    return { price: p, tax: 0, why: '', base: p };
+  }
+  const sale = postExamSale(d, m, today);
+  const s = sale.rate ? { factor: 1, why: '' } : examSurge(d, today);
+  const fun = it.kind === 'game' || it.kind === 'fun';
+  const late = fun && ctx ? lateSurge(ctx.now, today, ctx.todayMin, ctx.need) : 1;
+  const price = Math.max(1, Math.round(it.price * s.factor * late * (1 - sale.rate)));
+  const why = [sale.rate ? `${sale.why} ${Math.round(sale.rate * 100)}% 할인` : s.why, late > 1 ? `자정 할증 ×${late}` : ''].filter(Boolean).join(' · ');
+  // 약속 · 쉬기권 · 아이템은 사치세가 없다
+  if (!fun) return { price, tax: 0, why, base: it.price };
   const rate = Math.min(RULE.luxMax, RULE.luxBase + RULE.luxPerHour * Math.floor(funThisWeek(m, today) / 60));
-  return { price, tax: Math.round(price * rate), why: s.why };
+  return { price, tax: Math.round(price * rate), why, base: it.price };
 }
 
 // ===== 과목 주식 =====
@@ -370,7 +424,8 @@ export function marketView(d: D, m: MarketSettings, today: DateStr) {
   const loanOut = m.loans.reduce((a, l) => a + l.repays.reduce((x, r) => x + r.amount, 0), 0);
   const prices = stockPrices(d, m, today);
   const stockNet = m.trades.reduce((a, t) => a - t.qty * t.price - Math.round(Math.abs(t.qty * t.price) * RULE.stockFee), 0);
-  const balance = income + pay - fine - game.charge - spent - saveIn + saveOut + loanIn - loanOut + stockNet;
+  const gamble = gambleNet(d, m, today, inc);
+  const balance = income + pay - fine - game.charge - spent - saveIn + saveOut + loanIn - loanOut + stockNet + gamble;
   const owed = m.loans.reduce((a, l) => a + loanOwed(l, today).owed, 0);
   const overdue = overdueOn(m, today) || m.loans.some((l) => loanOwed(l, today).overdueDays > 0);
   const credit = creditScore(d, m, today, f, pays);
@@ -383,8 +438,11 @@ export function marketView(d: D, m: MarketSettings, today: DateStr) {
   const stockValue = [...hold].reduce((a, [id, h]) => a + h.qty * (prices.get(id)?.price ?? 0), 0);
   const savingNow = m.savings.filter((s) => !s.closedAt).reduce((a, s) => a + s.amount, 0);
   const todayInc = inc.get(today);
-  const need = (isWeekend(today) ? m.minDay.weekend : m.minDay.weekday) + (overdue ? RULE.penaltyMin : 0);
-  return { inc, income, pays, pay, fines: f, fine, game, spent, balance, owed, overdue, credit, band, limit, weekly, prices, hold, stockValue, savingNow, todayInc, need, net: balance + stockValue + savingNow - owed };
+  const halfToday = m.buys.some((b) => b.effect === 'half' && b.passDate === today);
+  const need = Math.round((isWeekend(today) ? m.minDay.weekend : m.minDay.weekday) * (halfToday ? 0.5 : 1)) + (overdue ? RULE.penaltyMin : 0);
+  const net = balance + stockValue + savingNow - owed;
+  const tier = tierScore(d, m, today, inc, net);
+  return { inc, income, pays, pay, fines: f, fine, game, spent, balance, owed, overdue, credit, band, limit, weekly, prices, hold, stockValue, savingNow, todayInc, need, net, gamble, tier, rank: tierNow(m, today) };
 }
 
 // ===== 시장 뉴스 (실검처럼) =====
@@ -436,3 +494,161 @@ export function marketNews(d: D, m: MarketSettings, today: DateStr): News[] {
     .slice(0, 10)
     .map((x, i) => ({ rank: i + 1, title: x.title, tone: x.tone }));
 }
+
+// ===== 악마의 계약서 · 성적 배당권 · 복권 =====
+
+/** 최근 14일 하루 평균 공부 (분) */
+export function avgDaily(inc: Map<DateStr, DayIncome>, today: DateStr): number {
+  const days = daysBetween(addDays(today, -14), addDays(today, -1));
+  return Math.round(days.reduce((a, x) => a + (inc.get(x)?.minutes ?? 0), 0) / days.length);
+}
+/** 계약서 배율: 목표가 평소(최근 14일 평균)보다 클수록 크게 (1.3 ~ 5배) */
+export function contractMult(target: number, avg: number): number {
+  if (avg < 30) return 3;
+  return Math.round(Math.max(1.3, Math.min(5, 1 + (target / avg - 1) * 1.5)) * 10) / 10;
+}
+export function contractState(c: NonNullable<MarketSettings['contracts']>[number], inc: Map<DateStr, DayIncome>, today: DateStr): 'won' | 'lost' | 'open' {
+  if ((inc.get(c.date)?.minutes ?? 0) >= c.minutes) return 'won';
+  return c.date < today ? 'lost' : 'open';
+}
+
+/** 그 과목의 가장 최근 등급 (내신 · 모의고사) */
+export function lastGrade(d: Pick<StudyData, 'grades'>, kind: 'school' | 'mock', subject: string): number | null {
+  const k = (x: string) => x.replace(/\s/g, '');
+  const recs = alive(d.grades)
+    .filter((r) => r.kind === kind)
+    .sort((a, b) => b.date.localeCompare(a.date));
+  for (const r of recs) {
+    const g = r.scores.find((s) => k(s.subject) === k(subject))?.grade;
+    if (g !== undefined) return g;
+  }
+  return null;
+}
+/** 배당 배율: 지금 등급보다 얼마나 높은 목표인지 (같거나 쉬우면 1.2배 · 1등급 위 2배 · 2등급 3.5배 · 3등급 이상 5배, 지금 등급을 모르면 2.5배) */
+export function betMult(now: number | null, target: number): number {
+  if (now === null) return 2.5;
+  const up = now - target;
+  return up <= 0 ? 1.2 : up === 1 ? 2 : up === 2 ? 3.5 : 5;
+}
+export function betState(b: NonNullable<MarketSettings['bets']>[number], d: Pick<StudyData, 'grades'>, today: DateStr): { state: 'won' | 'lost' | 'open'; got?: number; name?: string } {
+  const k = (x: string) => x.replace(/\s/g, '');
+  const from = kst(b.at);
+  const recs = alive(d.grades)
+    .filter((r) => r.kind === b.kind && r.date >= from && r.date <= b.until)
+    .sort((a, b2) => a.date.localeCompare(b2.date));
+  for (const r of recs) {
+    const g = r.scores.find((s) => k(s.subject) === k(b.subject))?.grade;
+    if (g === undefined) continue;
+    return { state: g <= b.target ? 'won' : 'lost', got: g, name: r.name };
+  }
+  return { state: b.until < today ? 'lost' : 'open' };
+}
+
+/** 복권 상금표 (공개): 한 장 100은화, 기대값 약 95은화 */
+export const LOTTO_PRICE = 100;
+export const LOTTO_TABLE: { prize: number; p: number }[] = [
+  { prize: 20, p: 0.4 },
+  { prize: 60, p: 0.3 },
+  { prize: 120, p: 0.18 },
+  { prize: 250, p: 0.09 },
+  { prize: 600, p: 0.025 },
+  { prize: 2000, p: 0.005 },
+];
+export function drawLotto(r = Math.random()): number {
+  let acc = 0;
+  for (const x of LOTTO_TABLE) {
+    acc += x.p;
+    if (r < acc) return x.prize;
+  }
+  return LOTTO_TABLE[LOTTO_TABLE.length - 1].prize;
+}
+
+/** 계약서 · 배당 · 복권으로 들어오고 나간 돈 */
+export function gambleNet(d: D, m: MarketSettings, today: DateStr, inc: Map<DateStr, DayIncome>): number {
+  let n = 0;
+  for (const c of m.contracts ?? []) {
+    n -= c.stake;
+    if (contractState(c, inc, today) === 'won') n += Math.round(c.stake * c.mult);
+  }
+  for (const b of m.bets ?? []) {
+    n -= b.stake;
+    if (betState(b, d, today).state === 'won') n += Math.round(b.stake * b.mult);
+  }
+  for (const l of m.lotto ?? []) n += l.prize - l.price;
+  return n;
+}
+
+// ===== 티어 (3달마다 시즌) =====
+
+export const TIERS = ['브론즈', '실버', '골드', '다이아'];
+export const seasonOf = (date: DateStr) => `${date.slice(0, 4)}-${Math.floor((Number(date.slice(5, 7)) - 1) / 3) + 1}시즌`;
+/** 티어 점수 (0~100): 최근 2주 공부(50) · 최근 모의고사 평균 등급(30) · 순자산(20) */
+export function tierScore(d: D, m: MarketSettings, today: DateStr, inc: Map<DateStr, DayIncome>, net: number): { score: number; parts: { study: number; mock: number; money: number }; eligible: number } {
+  const two = daysBetween(addDays(today, -13), today).reduce((a, x) => a + (inc.get(x)?.minutes ?? 0), 0);
+  const study = Math.round(Math.min(1, two / Math.max(1, 2 * m.weeklyTarget)) * 50);
+  const mocks = alive(d.grades)
+    .filter((r) => r.kind === 'mock')
+    .sort((a, b) => b.date.localeCompare(a.date));
+  const gs = mocks[0]?.scores.map((s) => s.grade).filter((g): g is number => typeof g === 'number') ?? [];
+  const mock = gs.length ? Math.round(((9 - gs.reduce((a, b) => a + b, 0) / gs.length) / 8) * 30) : 10;
+  const money = Math.round(Math.max(0, Math.min(1, net / 20000)) * 20);
+  const score = study + mock + money;
+  const eligible = score >= 80 ? 3 : score >= 60 ? 2 : score >= 40 ? 1 : 0;
+  return { score, parts: { study, mock, money }, eligible };
+}
+export const tierNow = (m: MarketSettings, today: DateStr) => (m.tier && m.tier.season === seasonOf(today) ? m.tier.rank : 0);
+/** 승급 심사권 값 (다음 티어로) */
+export const promoPrice = (rank: number) => [500, 1200, 2500][rank] ?? 0;
+
+// ===== 암시장 · 타임 세일 =====
+
+/** 날짜로 정해지는 섞기 (그날은 늘 같은 결과) */
+function seeded(date: DateStr, salt: number) {
+  let x = (Number(date.replace(/-/g, '')) * 2654435761 + salt * 97) >>> 0;
+  return () => {
+    x = (x * 1664525 + 1013904223) >>> 0;
+    return x / 2 ** 32;
+  };
+}
+
+export const BLACK_ITEMS: (Omit<MarketItem, 'id'> & { key: string })[] = [
+  { key: 'half', name: '내일 계획 반토막권', kind: 'perk', effect: 'half', price: 800 },
+  { key: 'yt11', name: '유튜브 1+1 이용권', kind: 'fun', minutes: 60, price: 100 },
+  { key: 'game11', name: '게임 1+1 이용권', kind: 'game', minutes: 60, price: 150 },
+  { key: 'fever', name: '피버타임 물약', kind: 'perk', effect: 'fever', price: 400 },
+  { key: 'shield', name: '연속 달성 실드', kind: 'perk', effect: 'shield', price: 600 },
+  { key: 'rest', name: '하루 쉬기권', kind: 'pass', price: 1500 },
+  { key: 'sleep2', name: '늦잠 2시간', kind: 'fun', minutes: 120, price: 220 },
+];
+/** 오늘의 암시장 3개 (20~50% 할인) */
+export function blackToday(today: DateStr): { item: Omit<MarketItem, 'id'> & { key: string }; off: number; price: number; id: string }[] {
+  const r = seeded(today, 7);
+  const pool = [...BLACK_ITEMS];
+  const out: { item: (typeof BLACK_ITEMS)[number]; off: number; price: number; id: string }[] = [];
+  while (out.length < 3 && pool.length) {
+    const it = pool.splice(Math.floor(r() * pool.length), 1)[0];
+    const off = Math.round((0.2 + r() * 0.3) * 100) / 100;
+    out.push({ item: it, off, price: Math.max(1, Math.round(it.price * (1 - off))), id: `black:${today}:${it.key}` });
+  }
+  return out;
+}
+/** 암시장이 열려 있는지: 오늘 하루 목표(주 목표 ÷ 7)를 채웠고, 잘 시각 2시간 전 ~ 잘 시각 (잘 시각을 모르면 21시 ~ 23시) */
+export function blackWindow(today: DateStr, bed: number | null): { from: number; to: number } {
+  const to = bed ?? Date.parse(`${today}T23:00:00+09:00`);
+  return { from: to - 2 * 3_600_000, to };
+}
+export const dailyGoal = (m: MarketSettings) => Math.round(m.weeklyTarget / 7);
+
+/** 타임 세일: 저녁 6시부터 1시간, 오늘 고른 이용권 하나가 1분마다 1%씩 내려간다 (60%까지) */
+export function timeSale(m: MarketSettings, today: DateStr, now: number): { item: MarketItem; off: number; price: number; id: string; endsIn: number } | null {
+  const start = Date.parse(`${today}T18:00:00+09:00`);
+  if (now < start || now >= start + 3_600_000) return null;
+  const pool = m.items.filter((x) => x.kind === 'game' || x.kind === 'fun');
+  if (!pool.length) return null;
+  const item = pool[Math.floor(seeded(today, 3)() * pool.length)];
+  const off = Math.min(0.6, Math.floor((now - start) / 60_000) * 0.01);
+  return { item, off, price: Math.max(1, Math.round(item.price * (1 - off))), id: `sale:${today}`, endsIn: start + 3_600_000 - now };
+}
+
+/** 조각 산 수 (물건마다) */
+export const piecesOf = (m: MarketSettings, itemId: Id) => m.buys.filter((b) => b.itemId === itemId && b.piece).length;

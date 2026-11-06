@@ -11419,3 +11419,195 @@ button.mt-pill {
     transition: none !important;
   }
 }
+/* 시장: 타임 세일 · 조각 · 티어 · 도전 · 암시장 */
+@keyframes mt-pulse {
+  50% {
+    box-shadow: 0 0 0 6px color-mix(in srgb, var(--up) 15%, transparent);
+  }
+}
+.mt-sale {
+  display: grid;
+  gap: 2px;
+  padding: 14px 16px;
+  border: 1px solid var(--up);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  animation: mt-pulse 2s ease-in-out infinite;
+}
+.mt-sale small {
+  color: var(--up);
+  font-weight: 600;
+}
+.mt-sale s,
+.mt-good s {
+  color: var(--faint);
+  font-weight: 400;
+}
+.mt-sale em {
+  font-style: normal;
+  color: var(--up);
+  font-weight: 700;
+}
+.mt-piece {
+  width: 44px;
+  height: 44px;
+  margin: 6px 0 2px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--line-strong);
+  background: linear-gradient(to top, var(--text) calc(var(--k) * 100%), var(--soft) calc(var(--k) * 100%));
+  transition: background 0.8s var(--ease);
+}
+.mt-piece b {
+  min-height: 0 !important;
+  font-size: 1.1rem !important;
+  color: var(--bg);
+  mix-blend-mode: difference;
+}
+.mt-good.locked .mt-good-buy::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: repeating-linear-gradient(135deg, transparent 0 8px, color-mix(in srgb, var(--text) 4%, transparent) 8px 16px);
+}
+.mt-good-buy {
+  position: relative;
+}
+.mt-tier {
+  display: grid;
+  gap: 8px;
+  padding: 14px 16px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+.mt-tier > div:first-child {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+}
+.mt-tier > div:first-child small {
+  color: var(--muted);
+  font-size: 0.75rem;
+}
+.mt-tier > div:first-child b {
+  font-size: 1.1rem;
+}
+.mt-tier.r1 b,
+.mt-pill.tier.r1 {
+  color: #8a8f98;
+}
+.mt-tier.r2 b,
+.mt-pill.tier.r2 {
+  color: #b8860b;
+}
+.mt-tier.r3 b,
+.mt-pill.tier.r3 {
+  color: #3a9fd6;
+}
+.mt-tier.r0 b,
+.mt-pill.tier.r0 {
+  color: #a0663c;
+}
+.mt-tier .btn {
+  justify-self: start;
+}
+.mt-tier-bar {
+  position: relative;
+  height: 6px;
+  border-radius: 99px;
+  background: var(--soft);
+}
+.mt-tier-bar i {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--text);
+  transition: width 1s var(--ease);
+}
+.mt-tier-bar em {
+  position: absolute;
+  top: -3px;
+  width: 1px;
+  height: 12px;
+  background: var(--line-strong);
+}
+.mt-dare {
+  display: grid;
+  gap: 4px;
+}
+.mt-dare .btn {
+  justify-self: start;
+  margin-top: 6px;
+}
+.mt-row.lost b {
+  color: var(--muted);
+  text-decoration: line-through;
+}
+.mt-meter.wide {
+  width: 90px;
+  flex: none;
+}
+.mt-lotto {
+  display: grid;
+  place-items: center;
+  height: 90px;
+  border-radius: 14px;
+  background: repeating-linear-gradient(45deg, var(--soft) 0 10px, var(--surface) 10px 20px);
+  font-size: 1.6rem;
+  font-variant-numeric: tabular-nums;
+}
+.mt-lotto.show {
+  animation: mt-pop 0.6s var(--ease);
+}
+.mt-odds {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  font-size: 0.8rem;
+}
+.mt-odds small {
+  color: var(--muted);
+}
+.mt-black {
+  display: grid;
+  justify-items: center;
+  gap: 4px;
+  padding: 28px 16px;
+  border-radius: var(--radius);
+  background: #0b0b0c;
+  color: #f2f2f0;
+  text-align: center;
+  animation: mt-in 0.5s var(--ease) both;
+}
+.mt-black b {
+  font-size: 1.4rem;
+  letter-spacing: 0.2em;
+}
+.mt-black small {
+  opacity: 0.6;
+}
+.mt-black.closed {
+  background: var(--soft);
+  color: var(--muted);
+}
+.mt-black.closed b {
+  font-size: 1rem;
+  letter-spacing: 0;
+}
+.mt-good.black {
+  background: #141416;
+  border-color: #2a2a2e;
+}
+.mt-good.black .mt-good-buy {
+  color: #f2f2f0;
+}
+.mt-good.black .mt-good-buy small {
+  color: #ff6b6f;
+  font-weight: 600;
+}

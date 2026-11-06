@@ -28,7 +28,7 @@ describe('시장', () => {
     d.sessions = Object.fromEntries(['02', '03', '04', '05', '06'].map((x) => [x, ses(x, `2026-11-${x}`, 360)])) as never;
     const m = newMarket('2026-11-02');
     expect(weeklyPays(d, m, '2026-11-08')).toEqual([]);
-    expect(weeklyPays(d, m, '2026-11-09')).toEqual([{ week: '2026-11-02', minutes: 1800, ratio: 1, pay: 500 }]);
+    expect(weeklyPays(d, m, '2026-11-09')).toEqual([{ week: '2026-11-02', minutes: 1800, ratio: 1, pay: 500, streak: 1 }]);
   });
   it('게임: 이용권 없이 한 분은 3배', () => {
     const at = Date.parse('2026-11-01T10:00:00+09:00');
@@ -108,5 +108,65 @@ describe('하루 쉬기권', async () => {
     const d = emptyStudy();
     const m = { ...newMarket('2026-11-02'), buys: [{ id: 'p', itemId: 'x', name: '하루 쉬기권', kind: 'pass' as const, price: 1500, tax: 0, at: Date.parse('2026-11-01T12:00:00+09:00'), passDate: '2026-11-03' }] };
     expect(fines(d, m, '2026-11-05').map((f) => f.date)).toEqual(['2026-11-04', '2026-11-02']);
+  });
+});
+
+describe('시장 2', async () => {
+  const mk = await import('./market');
+  const { emptyStudy } = await import('../study/model');
+  const ses = (id: string, date: string, minutes: number, start = 0) => ({ id, updatedAt: 1, date, minutes, start, end: start + minutes * 60_000, kind: 'manual' });
+  it('연속 달성 보너스 · 실드', () => {
+    const d = emptyStudy();
+    // 11-02 주 · 11-09 주 목표 달성, 11-16 주 못함(실드) , 11-23 주 달성
+    const weeks = ['2026-11-02', '2026-11-09', '2026-11-23'];
+    d.sessions = Object.fromEntries(weeks.flatMap((w, i) => [0, 1, 2, 3, 4].map((k) => [`${i}${k}`, ses(`${i}${k}`, mk.kst(Date.parse(`${w}T12:00:00+09:00`) + k * 86_400_000), 360)]))) as never;
+    const m = { ...mk.newMarket('2026-11-02'), buys: [{ id: 's', itemId: 'x', name: '실드', kind: 'perk' as const, effect: 'shield' as const, price: 600, tax: 0, at: Date.parse('2026-11-10T12:00:00+09:00') }] };
+    const p = mk.weeklyPays(d, m, '2026-11-30');
+    expect(p.map((x) => [x.pay, x.streak, !!x.shield])).toEqual([
+      [500, 1, false],
+      [600, 2, false],
+      [0, 2, true],
+      [700, 3, false],
+    ]);
+  });
+  it('피버타임: 쓴 뒤 1시간 공부는 2배', () => {
+    const d = emptyStudy();
+    const t0 = Date.parse('2026-11-05T20:00:00+09:00');
+    d.sessions = { a: ses('a', '2026-11-05', 90, t0) } as never;
+    const m = { ...mk.newMarket('2026-11-01'), buys: [{ id: 'f', itemId: 'x', name: '물약', kind: 'perk' as const, effect: 'fever' as const, price: 400, tax: 0, at: t0 - 1000, usedAt: t0 }] };
+    expect(mk.incomeByDay(d, m, '2026-11-05').get('2026-11-05')).toMatchObject({ study: 90, fever: 60, total: 150 });
+  });
+  it('계약서 · 배당 · 복권', () => {
+    expect(mk.contractMult(240, 120)).toBe(2.5);
+    expect(mk.contractMult(600, 60)).toBe(5);
+    expect(mk.betMult(3, 1)).toBe(3.5);
+    expect(mk.betMult(null, 1)).toBe(2.5);
+    const ev = mk.LOTTO_TABLE.reduce((a, x) => a + x.prize * x.p, 0);
+    expect(ev).toBeLessThan(mk.LOTTO_PRICE);
+    expect(mk.LOTTO_TABLE.reduce((a, x) => a + x.p, 0)).toBeCloseTo(1);
+    expect(mk.drawLotto(0)).toBe(20);
+    expect(mk.drawLotto(0.999)).toBe(2000);
+    const d = emptyStudy();
+    d.grades = { g: { id: 'g', updatedAt: 1, kind: 'mock', name: '6월', date: '2026-12-01', scores: [{ id: 's', subject: '수학', grade: 2 }] } } as never;
+    const b = { id: 'b', at: Date.parse('2026-11-01T12:00:00+09:00'), kind: 'mock' as const, subject: '수학', target: 2, stake: 1000, mult: 2, until: '2027-01-01' };
+    expect(mk.betState(b, d, '2026-12-02')).toMatchObject({ state: 'won', got: 2 });
+    expect(mk.betState({ ...b, target: 1 }, d, '2026-12-02').state).toBe('lost');
+  });
+  it('시험 끝난 주 할인 · 자정 할증 · 타임 세일 · 암시장 · 티어', () => {
+    const d = emptyStudy();
+    d.exams = { e: { id: 'e', updatedAt: 1, name: '기말', date: '2026-11-10' } } as never;
+    const m = mk.newMarket('2026-11-01');
+    expect(mk.priceOf(m.items[0], m, d, '2026-11-12').price).toBe(105);
+    const now = Date.parse('2026-11-20T21:00:00+09:00');
+    expect(mk.lateSurge(now, '2026-11-20', 0, 60)).toBe(1.25);
+    expect(mk.lateSurge(now, '2026-11-20', 60, 60)).toBe(1);
+    const s = mk.timeSale(m, '2026-11-20', Date.parse('2026-11-20T18:30:00+09:00'))!;
+    expect(s.off).toBe(0.3);
+    expect(mk.timeSale(m, '2026-11-20', Date.parse('2026-11-20T19:01:00+09:00'))).toBeNull();
+    const b1 = mk.blackToday('2026-11-20');
+    expect(b1).toHaveLength(3);
+    expect(mk.blackToday('2026-11-20')).toEqual(b1);
+    expect(mk.seasonOf('2026-11-20')).toBe('2026-4시즌');
+    expect(mk.tierNow({ ...m, tier: { season: '2026-3시즌', rank: 2 } }, '2026-11-20')).toBe(0);
   });
 });

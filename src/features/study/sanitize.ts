@@ -476,7 +476,9 @@ const FIX: Record<Collection, Fix> = {
   hobbyLogs: (x) => (isDate(x.date) && typeof x.hobbyId === 'string' ? { ...x, minutes: score(x.minutes, 0, 1440), memo: optStr(x.memo)?.slice(0, 300), created: num(x.created) } : null),
   wishes: (x) => ({
     ...x,
-    kind: ['book', 'movie', 'show', 'game', 'place'].includes(x.kind as string) ? x.kind : 'other',
+    kind: ['book', 'movie', 'show', 'game', 'place', 'thing'].includes(x.kind as string) ? x.kind : 'other',
+    won: score(x.won, 1, 100_000_000),
+    link: typeof x.link === 'string' && /^https?:\/\//.test(x.link) ? x.link.slice(0, 500) : undefined,
     title: str(x.title, '하고 싶은 것').slice(0, 80),
     status: x.status === 'doing' || x.status === 'done' ? x.status : 'want',
     rating: score(x.rating, 1, 5),
@@ -939,7 +941,8 @@ const money = (v: unknown) => Math.round(cl(v, 0, 10_000_000, 0));
 /** 시장 (은화). 예전(포인트) 시장 자료는 보상 이름만 옮긴다 */
 function sanitizeMarket(m: Obj) {
   const old = !('weeklyTarget' in m);
-  const kind = (v: unknown) => (v === 'game' || v === 'fun' || v === 'meet' || v === 'thing' || v === 'pass' ? v : 'fun');
+  const kind = (v: unknown) => (v === 'game' || v === 'fun' || v === 'meet' || v === 'thing' || v === 'pass' || v === 'perk' ? v : 'fun');
+  const effect = (v: unknown): 'fever' | 'shield' | 'half' | 'permit' | undefined => (v === 'fever' || v === 'shield' || v === 'half' || v === 'permit' ? v : undefined);
   const items = arr(m.items)
     .filter((it): it is Obj => isObj(it) && typeof it.name === 'string' && !!it.name.trim())
     .slice(0, 60)
@@ -948,10 +951,14 @@ function sanitizeMarket(m: Obj) {
       return {
         id: str(it.id, rid('i')).slice(0, 40),
         name: (it.name as string).trim().slice(0, 30),
-        kind: k as 'game' | 'fun' | 'meet' | 'thing' | 'pass',
-        minutes: k === 'thing' || k === 'pass' ? undefined : Math.round(cl(it.minutes, 1, 600, 30)),
+        kind: k as 'game' | 'fun' | 'meet' | 'thing' | 'pass' | 'perk',
+        minutes: k === 'thing' || k === 'pass' || k === 'perk' ? undefined : Math.round(cl(it.minutes, 1, 600, 30)),
         price: old ? 150 : money(it.price) || 1,
         won: k === 'thing' ? money(it.won) : undefined,
+        pieces: k === 'thing' && typeof it.pieces === 'number' && it.pieces >= 2 ? Math.round(cl(it.pieces, 2, 100, 10)) : undefined,
+        tier: typeof it.tier === 'number' ? Math.round(cl(it.tier, 0, 3, 0)) || undefined : undefined,
+        wishId: optStr(it.wishId)?.slice(0, 40),
+        effect: effect(it.effect),
       };
     });
   const at = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) ? v : 0);
@@ -966,7 +973,7 @@ function sanitizeMarket(m: Obj) {
       : arr(m.buys)
           .filter((b): b is Obj => isObj(b) && typeof b.name === 'string')
           .slice(-500)
-          .map((b) => ({ id: str(b.id, rid('b')).slice(0, 40), itemId: str(b.itemId).slice(0, 40), name: (b.name as string).slice(0, 30), kind: kind(b.kind) as 'game' | 'fun' | 'meet' | 'thing' | 'pass', minutes: b.minutes === undefined ? undefined : Math.round(cl(b.minutes, 0, 600, 0)), price: money(b.price), tax: money(b.tax), at: at(b.at), used: b.used === true ? true : undefined, expires: isDate(b.expires) ? (b.expires as string) : undefined, usedAt: typeof b.usedAt === 'number' ? b.usedAt : undefined, passDate: isDate(b.passDate) ? (b.passDate as string) : undefined })),
+          .map((b) => ({ id: str(b.id, rid('b')).slice(0, 40), itemId: str(b.itemId).slice(0, 40), name: (b.name as string).slice(0, 30), kind: kind(b.kind) as 'game' | 'fun' | 'meet' | 'thing' | 'pass' | 'perk', minutes: b.minutes === undefined ? undefined : Math.round(cl(b.minutes, 0, 600, 0)), price: money(b.price), tax: money(b.tax), at: at(b.at), used: b.used === true ? true : undefined, expires: isDate(b.expires) ? (b.expires as string) : undefined, usedAt: typeof b.usedAt === 'number' ? b.usedAt : undefined, passDate: isDate(b.passDate) ? (b.passDate as string) : undefined, effect: effect(b.effect), piece: b.piece === true ? true : undefined })),
     savings: arr(m.savings)
       .filter(isObj)
       .slice(-100)
@@ -988,6 +995,20 @@ function sanitizeMarket(m: Obj) {
             .map(([k, v]) => [k, Math.round(cl(v, 0, 1440, 0))]),
         )
       : {},
+    contracts: arr(m.contracts)
+      .filter((c): c is Obj => isObj(c) && isDate(c.date))
+      .slice(-200)
+      .map((c) => ({ id: str(c.id, rid('c')).slice(0, 40), at: at(c.at), date: c.date as string, minutes: Math.round(cl(c.minutes, 1, 1440, 60)), stake: money(c.stake), mult: cl(c.mult, 1, 10, 1) })),
+    bets: arr(m.bets)
+      .filter((b): b is Obj => isObj(b) && isDate(b.until) && typeof b.subject === 'string')
+      .slice(-100)
+      .map((b) => ({ id: str(b.id, rid('g')).slice(0, 40), at: at(b.at), kind: (b.kind === 'mock' ? 'mock' : 'school') as 'school' | 'mock', subject: (b.subject as string).slice(0, 20), target: Math.round(cl(b.target, 1, 9, 1)), stake: money(b.stake), mult: cl(b.mult, 1, 10, 1), until: b.until as string })),
+    lotto: arr(m.lotto)
+      .filter(isObj)
+      .slice(-500)
+      .map((l) => ({ id: str(l.id, rid('o')).slice(0, 40), at: at(l.at), price: money(l.price), prize: money(l.prize) })),
+    tier: isObj(m.tier) && typeof (m.tier as Obj).season === 'string' ? { season: ((m.tier as Obj).season as string).slice(0, 10), rank: Math.round(cl((m.tier as Obj).rank, 0, 3, 0)) } : undefined,
+    postExamSale: typeof m.postExamSale === 'number' ? cl(m.postExamSale, 0, 0.9, 0.3) : undefined,
     stockOff: arr(m.stockOff).filter((x): x is string => typeof x === 'string').slice(0, 40),
     examOnly: arr(m.examOnly).filter((x): x is string => typeof x === 'string').slice(0, 40),
   };

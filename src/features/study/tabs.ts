@@ -43,6 +43,7 @@ export const AREA_ITEMS: Record<Exclude<AreaKey, 'home' | 'study'>, AreaItem[]> 
     { key: '', label: '이번 달', icon: 'area-money' },
     { key: 'fixed', label: '고정', icon: 'repeat' },
     { key: 'saving', label: '모으기', icon: 'coin' },
+    { key: 'wish', label: '위시리스트', icon: 'gift' },
   ],
   hobby: [
     { key: '', label: '취미', icon: 'area-hobby' },
@@ -69,6 +70,8 @@ export const AREA_ITEMS: Record<Exclude<AreaKey, 'home' | 'study'>, AreaItem[]> 
   market: [
     { key: '', label: '시장', icon: 'area-market' },
     { key: 'shop', label: '상점', icon: 'bag' },
+    { key: 'dare', label: '도전', icon: 'flag' },
+    { key: 'black', label: '암시장', icon: 'moon' },
     { key: 'bank', label: '은행', icon: 'bank' },
     { key: 'stocks', label: '주식', icon: 'chart' },
     { key: 'rules', label: '규칙', icon: 'scale' },
@@ -170,10 +173,10 @@ export const movieItem = (sub?: string) => (sub === 'watched' || sub === 'want' 
 export function activeItem(area: keyof typeof AREA_ITEMS, sub?: string, p0?: string): string {
   if (area === 'hobby' && (HOBBY_PARTS as readonly string[]).includes(p0 ?? '')) return p0!;
   if (area === 'diary') return sub === 'dream' || sub === 'form' || sub === 'recap' ? sub : sub?.startsWith('highlight') ? 'highlight' : '';
-  if (area === 'money') return sub === 'fixed' || sub === 'saving' ? sub : '';
+  if (area === 'money') return sub === 'fixed' || sub === 'saving' || sub === 'wish' ? sub : '';
   if (area === 'hobby') return sub === 'wish' || sub === 'reading' ? sub : '';
   if (area === 'news') return sub && ['kr', 'biz', 'it', 'ent', 'sports', 'world', 'wbiz', 'wtech'].includes(sub) ? sub : '';
-  if (area === 'market') return sub === 'shop' || sub === 'bank' || sub === 'stocks' || sub === 'rules' ? sub : '';
+  if (area === 'market') return sub === 'shop' || sub === 'dare' || sub === 'black' || sub === 'bank' || sub === 'stocks' || sub === 'rules' ? sub : '';
   return '';
 }
 
