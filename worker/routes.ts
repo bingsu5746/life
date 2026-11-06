@@ -1,0 +1,4 @@
+// /api 주소 길목: 여기 맞는 주소만 계정 서버로 보낸다
+/** 계정 서버(Durable Object)로 보내는 /api 주소들. 새 주소를 만들면 여기에도 넣어야 한다 (index.test 가 확인) */
+export const API_ROUTES =
+  /^\/api\/(auth\/(signup|login|logout|logout-all)|me(\/(nickname|password))?|translate|solve(\/job\/[a-z0-9]{6,32}|\/usage|\/img(\/[a-f0-9]{8,64}\/[a-z0-9]+-[a-f0-9]{8}\.(webp|jpg))?)?|movies\/(kobis|catalog(\/sync)?|recommend|ott)|school|holidays|keys|games\/(search|prices|watch|csmap)|steam\/(me|ach|names|watch|thumbs)|lol\/(profile|games|meta|champ|match|crawl|skins|skinvideo)|discord\/(info|channels|msgs|send)|music\/discogs|kakao\/key|ai\/(note|diary|receipt|toc|stt|coach|title|scope|reviewq|gradecard|blank)|news\/(kr|world)|books\/(search|toc)|bb\/scan(\/[a-f0-9]{16})?|fact|nba\/(games|standings|box|avg|roster|career|players|2k|hlplayer|fav)|dict\/ko|lookup|music\/similar|notify(\/(digest|test|remind))?|store\/(study|words)|study-(photo|video)\/[a-z0-9]{6,32})$/;

@@ -1,4 +1,5 @@
 // 사이트 파일은 그대로 내보내고, /api/* 는 로그인·저장 서버(Durable Object 하나)로 넘긴다.
+import { API_ROUTES } from './routes';
 import { Accounts } from './accounts';
 import { Relay } from './relay';
 
@@ -31,11 +32,7 @@ export default {
     const url = new URL(req.url);
     const img = req.method === 'GET' ? url.pathname.match(/^\/api\/nba\/img\/(h|l)\/(\d{3,12})$/) : null;
     if (img) return nbaImage(img[1], img[2], ctx);
-    if (
-      /^\/api\/(auth\/(signup|login|logout|logout-all)|me(\/(nickname|password))?|translate|solve(\/job\/[a-z0-9]{6,32}|\/usage|\/img(\/[a-f0-9]{8,64}\/[a-z0-9]+-[a-f0-9]{8}\.(webp|jpg))?)?|movies\/(kobis|catalog(\/sync)?|recommend|ott)|school|holidays|keys|games\/(search|prices|watch|csmap)|steam\/(me|ach|names|watch|thumbs)|lol\/(profile|games|meta|champ|match|crawl|skins|skinvideo)|discord\/(info|channels|msgs|send)|music\/discogs|kakao\/key|ai\/(note|diary|receipt|toc|stt|coach|title|scope|reviewq)|books\/(search|toc)|bb\/scan(\/[a-f0-9]{16})?|fact|nba\/(games|standings|box|avg|roster|career|players|2k|hlplayer|fav)|dict\/ko|lookup|music\/similar|notify(\/(digest|test|remind))?|store\/(study|words)|study-(photo|video)\/[a-z0-9]{6,32})$/.test(
-        url.pathname,
-      )
-    ) {
+    if (API_ROUTES.test(url.pathname)) {
       try {
         // 밖에서 붙여 온 키 머리글은 지우고, 영화 정보 요청에만 비밀값의 키를 붙인다
         const headers = new Headers(req.headers);
