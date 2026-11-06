@@ -10216,3 +10216,40 @@ body.focus-on {
   gap: 4px;
   font-size: 0.9rem;
 }
+
+/* 채점: 문제마다 내 답 고르기 */
+.gc-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+  gap: 6px 16px;
+}
+.gc-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.gc-n {
+  min-width: 2em;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+}
+.gc-opts {
+  display: flex;
+  gap: 4px;
+}
+.gc-opts button {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  border: 1px solid var(--line-strong);
+  background: var(--surface);
+  color: var(--text);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.gc-opts button.on {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--on-accent);
+}

@@ -80,7 +80,7 @@ const PRELOAD = [
 ];
 
 import { STUDY_MODE_AREAS, useStudyMode } from '../../lib/studyMode';
-import { activeItem, AREA_ITEMS, AREAS, BASKETBALL_ITEMS, basketballItem, GAME_ITEMS, gameItem, champItems, champItem, HOBBY_PARTS, MOVIE_ITEMS, movieItem, NBA_ITEMS, nbaItem, REVIEW_ITEMS, reviewItem, SETTING_CATS, TABS, TRAVEL_ITEMS, travelItem, type AreaKey } from './tabs';
+import { activeItem, AREA_ITEMS, AREAS, BASKETBALL_ITEMS, basketballItem, EXAM_ITEMS, examItem, GAME_ITEMS, gameItem, champItems, champItem, HOBBY_PARTS, MOVIE_ITEMS, movieItem, NBA_ITEMS, nbaItem, REVIEW_ITEMS, reviewItem, SETTING_CATS, TABS, TRAVEL_ITEMS, travelItem, type AreaKey } from './tabs';
 export { TABS };
 /** 메뉴에는 없지만 열 수 있는 화면 (설정은 맨 위 막대의 톱니) */
 const HIDDEN = ['settings'];
@@ -319,7 +319,8 @@ export function Study({ path, loggedIn, syncReady = true, onLogin }: { path: str
         </nav>
       )}
       {!running && tab === 'review' && <VaultNav sub={id} />}
-      {!running && area === 'study' && tab !== 'settings' && tab !== 'review' && (
+      {!running && tab === 'exams' && <ExamNav id={id} />}
+      {!running && area === 'study' && tab !== 'settings' && tab !== 'review' && tab !== 'exams' && (
         <nav className="st-nav" aria-label="공부 메뉴">
           <button className="st-tab st-tab-home" onClick={() => go('/')}>
             <Icon name="area-home" />
@@ -455,6 +456,27 @@ function VaultNav({ sub }: { sub?: string }) {
           <span className="st-tab-label">{it.label}</span>
           <span className="st-tab-short">{it.short}</span>
           {counts[it.key] > 0 && <b className="st-count">{counts[it.key]}</b>}
+        </button>
+      ))}
+    </nav>
+  );
+}
+
+/** 시험 화면 옆(폰은 아래) 메뉴: 시험 · 수행평가 · 성적 · 내신 목표 · 목표 대학 · 채점 */
+function ExamNav({ id }: { id?: string }) {
+  const on = examItem(id);
+  return (
+    <nav className="st-nav" aria-label="시험 메뉴">
+      <button className="st-tab st-tab-home" onClick={() => go('/study')}>
+        <Icon name="area-study" />
+        <span className="st-tab-label">공부로</span>
+        <span className="st-tab-short">공부</span>
+      </button>
+      {EXAM_ITEMS.map((it) => (
+        <button key={it.key} className={`st-tab ${on === it.key ? 'on' : ''}`} aria-current={on === it.key ? 'page' : undefined} onClick={() => go(it.to!)}>
+          <Icon name={it.icon} />
+          <span className="st-tab-label">{it.label}</span>
+          <span className="st-tab-short">{it.short}</span>
         </button>
       ))}
     </nav>

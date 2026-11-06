@@ -105,6 +105,20 @@ export interface StudySettings {
   homeHide?: string[];
   /** 목표 등급: 성적 종류마다 과목 이름 → 등급 */
   gradeGoals?: { school?: Record<string, number>; mock?: Record<string, number> };
+  /** 목표 대학 · 학과 (목표 성적은 직접 넣는다) */
+  univGoals?: UnivGoal[];
+}
+
+/** 목표 대학 · 학과 하나: 내신 목표 평균 등급 · 모의고사 과목별 목표 (등급 · 백분위) */
+export interface UnivGoal {
+  id: Id;
+  univ: string;
+  major?: string;
+  /** 내신 목표 평균 등급 (1~9) */
+  school?: number;
+  /** 모의고사 과목 이름 → 목표 */
+  mock?: Record<string, { grade?: number; percentile?: number }>;
+  memo?: string;
 }
 
 export interface Subject extends Stamp {

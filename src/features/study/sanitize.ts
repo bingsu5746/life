@@ -803,6 +803,26 @@ export function sanitizeSettings(s: unknown): StudySettings & { updatedAt: numbe
             .filter((t): t is string => typeof t === 'string')
             .slice(0, 10),
     gradeGoals: isObj(x.gradeGoals) ? { school: goals((x.gradeGoals as Obj).school), mock: goals((x.gradeGoals as Obj).mock) } : undefined,
+    univGoals: Array.isArray(x.univGoals)
+      ? (x.univGoals as unknown[])
+          .filter((g): g is Obj => isObj(g) && typeof g.univ === 'string' && !!g.univ.trim())
+          .slice(0, 10)
+          .map((g) => ({
+            id: str(g.id, `u${Math.random().toString(36).slice(2, 10)}`).slice(0, 40),
+            univ: (g.univ as string).trim().slice(0, 40),
+            major: optStr(g.major)?.trim().slice(0, 40) || undefined,
+            school: typeof g.school === 'number' && g.school >= 1 && g.school <= 9 ? Math.round(g.school * 100) / 100 : undefined,
+            mock: isObj(g.mock)
+              ? Object.fromEntries(
+                  Object.entries(g.mock)
+                    .filter(([k, v]) => k.trim() && k.length <= 20 && isObj(v))
+                    .slice(0, 10)
+                    .map(([k, v]) => [k, { grade: score((v as Obj).grade, 1, 9), percentile: score((v as Obj).percentile, 0, 100) }]),
+                )
+              : undefined,
+            memo: optStr(g.memo)?.slice(0, 200) || undefined,
+          }))
+      : undefined,
     hiddenTabs:
       x.hiddenTabs === undefined
         ? undefined

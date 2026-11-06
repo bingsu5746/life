@@ -2,7 +2,6 @@
 import { useState } from 'react';
 import { shortDate } from './dates';
 import { examEnd, examSubjectIds } from './exams';
-import { ExamTabs } from './ExamHero';
 import { parseWrongNums, wrongFrequency, change, changeText, findScore, METRIC_NAME, metricsFor, MOCK_SUBJECTS, readNum, prepBefore, recordAverage, recordsOf, scoreValue, series, studyBefore, subjectNames, type Metric } from './grades';
 import { GRADE_NAME } from './mockExam';
 import { BarChart, LineChart, TableView } from './charts';
@@ -96,7 +95,6 @@ export function Grades({ sub }: { sub?: string }) {
           <Icon name="plus" /> 성적 넣기
         </button>
       </div>
-      <ExamTabs on="grades" />
 
       <div className="st-inline wrap between">
         <div className="st-seg" aria-label="성적 종류">

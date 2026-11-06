@@ -64,23 +64,3 @@ export function DdayHero({ today }: { today: string }) {
     </section>
   );
 }
-
-/** 시험 · 수행평가 · 성적 · 목표 칸 */
-export function ExamTabs({ on }: { on: 'exams' | 'grades' | 'tasks' | 'goal' }) {
-  return (
-    <div className="st-seg" role="tablist" aria-label="시험·수행평가·성적">
-      <button role="tab" aria-selected={on === 'exams'} className={on === 'exams' ? 'on' : ''} onClick={() => go('/exams')}>
-        시험
-      </button>
-      <button role="tab" aria-selected={on === 'tasks'} className={on === 'tasks' ? 'on' : ''} onClick={() => go('/exams/tasks')}>
-        수행평가
-      </button>
-      <button role="tab" aria-selected={on === 'grades'} className={on === 'grades' ? 'on' : ''} onClick={() => go('/exams/grades')}>
-        성적
-      </button>
-      <button role="tab" aria-selected={on === 'goal'} className={on === 'goal' ? 'on' : ''} onClick={() => go('/exams/goal')}>
-        목표
-      </button>
-    </div>
-  );
-}

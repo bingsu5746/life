@@ -4,7 +4,6 @@ import { neededScore } from './grades';
 import { type Id, type SemesterGoal } from './model';
 import { setSettings, useStudy } from './store';
 import { Empty, go, SubjectDot, subjectsOf } from './ui';
-import { ExamTabs } from './ExamHero';
 
 const DEFAULT_PARTS: SemesterGoal['parts'] = [
   { name: '중간고사', weight: 30 },
@@ -27,7 +26,6 @@ export function SemesterGoals() {
       <div className="st-page-head">
         <h2>내신 목표</h2>
       </div>
-      <ExamTabs on="goal" />
       <p className="st-hint">학기 목표 점수(100점 환산)와 반영 비율, 이미 받은 점수를 넣으면 남은 시험에서 몇 점이 필요한지 계산해요. 등급은 다른 학생들 점수에 따라 달라서 점수로만 계산해요. 여기서 정한 목표는 시험 공부 계획의 과목 시간에도 반영돼요.</p>
       {!subjects.length && (
         <Empty title="과목이 없어요">

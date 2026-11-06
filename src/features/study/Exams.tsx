@@ -10,8 +10,7 @@ import { SchoolExams } from './SchoolPanel';
 import { Bar, Check, confirmDelete, Empty, Field, go, Icon, Menu, Sheet, SubjectDot, SubjectPicker, subjectsOf, toast, useToday, tap } from './ui';
 import { askAiLater } from './solveJob';
 import { examPeriodText } from './exams';
-import { ExamTabs } from './ExamHero';
-export { examPeriodText, ExamTabs };
+export { examPeriodText };
 import { CSAT_SECTIONS, sectionSubject } from './papers';
 import { examRetro } from './examRetro';
 import { ScopePhotoButton } from './ScopePhoto';
@@ -21,6 +20,8 @@ import { useSpecialDays } from '../life/specialDays';
 const Grades = lazy(() => import('./Grades').then((m) => ({ default: m.Grades })));
 const SemesterGoals = lazy(() => import('./SemesterGoals').then((m) => ({ default: m.SemesterGoals })));
 const Assessments = lazy(() => import('./Assessments').then((m) => ({ default: m.Assessments })));
+const UnivGoals = lazy(() => import('./UnivGoals').then((m) => ({ default: m.UnivGoals })));
+const GradeCheck = lazy(() => import('./GradeCheck').then((m) => ({ default: m.GradeCheck })));
 const WeakPage = lazy(() => import('./WeakPage').then((m) => ({ default: m.WeakPage })));
 
 export const KIND_NAME: Record<ExamKind, string> = { school: '내신', mock: '모의고사·수능', other: '기타' };
@@ -45,6 +46,12 @@ export function Exams({ id, sub }: { id?: string; sub?: string }) {
         <SemesterGoals />
       </Suspense>
     );
+  if (id === 'univ' || id === 'check')
+    return (
+      <Suspense fallback={<p className="st-muted">여는 중…</p>}>
+        {id === 'univ' ? <UnivGoals /> : <GradeCheck />}
+      </Suspense>
+    );
   if (id?.startsWith('weak-'))
     return (
       <Suspense fallback={<p className="st-muted">여는 중…</p>}>
@@ -55,9 +62,6 @@ export function Exams({ id, sub }: { id?: string; sub?: string }) {
   if (id && id !== 'new' && id !== 'progress') return <ExamDetail id={id} />;
   return <ExamList adding={id === 'new'} progress={id === 'progress'} />;
 }
-
-/** 시험 · 성적 바꾸기 */
-
 
 function ExamList({ adding, progress }: { adding: boolean; progress: boolean }) {
   const d = useStudy();
@@ -81,7 +85,6 @@ function ExamList({ adding, progress }: { adding: boolean; progress: boolean }) 
           <Icon name="plus" /> 시험 넣기
         </button>
       </div>
-      <ExamTabs on="exams" />
 
       {!upcoming.length ? (
         <Empty title="다가오는 시험이 없어요">

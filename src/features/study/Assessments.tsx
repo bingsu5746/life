@@ -2,7 +2,6 @@
 import { useState } from 'react';
 import { addDays, dday, diffDays, shortDate } from './dates';
 import { scopeLines, scopeText } from './exams';
-import { ExamTabs } from './ExamHero';
 import { alive, newId, type Assessment } from './model';
 import { autoSteps, stepDates } from './assessPlan';
 import { put, remove, useStudy } from './store';
@@ -36,7 +35,6 @@ export function Assessments({ sub }: { sub?: string }) {
           <Icon name="plus" /> 수행평가 넣기
         </button>
       </div>
-      <ExamTabs on="tasks" />
       {!all.length ? (
         <Empty title="수행평가를 넣어 보세요">
           <p>내는 날과 준비할 것(자료 찾기, 초안, 발표 연습 등)을 넣으면 D-day와 체크리스트를 오늘 화면에도 보여 드려요.</p>

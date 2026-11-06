@@ -48,9 +48,14 @@ export function Papers({ sub }: { sub?: string }) {
     <div className="st-page">
       <div className="st-page-head">
         <h2>기출·모의고사 풀이</h2>
-        <button className="btn btn-sm btn-primary" onClick={() => go('/review/papers-new')}>
-          <Icon name="plus" /> 푼 것 넣기
-        </button>
+        <div className="st-inline">
+          <button className="btn btn-sm" onClick={() => go('/exams/check')}>
+            채점하기
+          </button>
+          <button className="btn btn-sm btn-primary" onClick={() => go('/review/papers-new')}>
+            <Icon name="plus" /> 푼 것 넣기
+          </button>
+        </div>
       </div>
 
       {!everything.length ? (
@@ -136,12 +141,12 @@ export function Papers({ sub }: { sub?: string }) {
           </section>
         </>
       )}
-      {editing && <PaperSheet item={editing === 'new' ? undefined : editing} pre={pre ? { section: pre.get('section') ?? '', minutes: pre.get('min') ?? '', rec: pre.get('rec') !== '0' } : undefined} onClose={() => go('/review/papers')} />}
+      {editing && <PaperSheet item={editing === 'new' ? undefined : editing} pre={pre ? { section: pre.get('section') ?? '', minutes: pre.get('min') ?? '', rec: pre.get('rec') !== '0', score: pre.get('score') ?? '', full: pre.get('full') ?? '', wrong: pre.get('wrong') ?? '' } : undefined} onClose={() => go('/review/papers')} />}
     </div>
   );
 }
 
-function PaperSheet({ item, pre, onClose }: { item?: PastPaper; pre?: { section: string; minutes: string; rec: boolean }; onClose: () => void }) {
+function PaperSheet({ item, pre, onClose }: { item?: PastPaper; pre?: { section: string; minutes: string; rec: boolean; score?: string; full?: string; wrong?: string }; onClose: () => void }) {
   const d = useStudy();
   const today = useToday();
   const [subjectId, setSubjectId] = useState(item?.subjectId ?? subjectsOf(d)[0]?.id ?? '');
@@ -154,11 +159,11 @@ function PaperSheet({ item, pre, onClose }: { item?: PastPaper; pre?: { section:
   const [touched, setTouched] = useState(!!item);
   const [bookId, setBookId] = useState(item?.bookId ?? '');
   const [date, setDate] = useState(item?.date ?? today);
-  const [score, setScore] = useState(item?.score?.toString() ?? '');
-  const [full, setFull] = useState(item?.full?.toString() ?? String(CSAT_SECTIONS.find((s) => s.name === pre?.section)?.full ?? 100));
+  const [score, setScore] = useState(item?.score?.toString() ?? pre?.score ?? '');
+  const [full, setFull] = useState(item?.full?.toString() ?? (pre?.full || String(CSAT_SECTIONS.find((s) => s.name === pre?.section)?.full ?? 100)));
   const [grade, setGrade] = useState(item?.grade?.toString() ?? '');
   const [minutes, setMinutes] = useState(item?.minutes?.toString() ?? pre?.minutes ?? '');
-  const [wrong, setWrong] = useState(item?.wrong.join(', ') ?? '');
+  const [wrong, setWrong] = useState(item?.wrong.join(', ') ?? pre?.wrong?.replace(/,/g, ', ') ?? '');
   const [memo, setMemo] = useState(item?.memo ?? '');
   const [toNotes, setToNotes] = useState(!item);
   // 모의고사 보기에서 이미 공부 기록에 넣었으면 두 번 넣지 않게
@@ -229,7 +234,8 @@ function PaperSheet({ item, pre, onClose }: { item?: PastPaper; pre?: { section:
                   aria-pressed={section === s.name}
                   onClick={() => {
                     setSection(s.name);
-                    setFull(String(s.full));
+                    // 채점에서 넘어온 만점은 그대로 (점수와 맞게)
+                    if (!pre?.full) setFull(String(s.full));
                   }}
                 >
                   {s.name}

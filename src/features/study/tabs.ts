@@ -164,3 +164,14 @@ export const SETTING_CATS = [
   { key: 'notify', label: '알림', icon: 'bell' },
   { key: 'data', label: '백업', icon: 'save' },
 ] as const;
+
+/** 공부 › 시험 안에서의 메뉴 (공부로 돌아가기 + 시험 · 수행평가 · 성적 · 내신 목표 · 목표 대학 · 채점) */
+export const EXAM_ITEMS: (AreaItem & { short: string })[] = [
+  { key: 'exams', label: '시험', short: '시험', icon: 'exams', to: '/exams' },
+  { key: 'tasks', label: '수행평가', short: '수행', icon: 'books', to: '/exams/tasks' },
+  { key: 'grades', label: '성적', short: '성적', icon: 'up', to: '/exams/grades' },
+  { key: 'goal', label: '내신 목표', short: '내신목표', icon: 'target', to: '/exams/goal' },
+  { key: 'univ', label: '목표 대학', short: '대학', icon: 'pin', to: '/exams/univ' },
+  { key: 'check', label: '채점', short: '채점', icon: 'solve', to: '/exams/check' },
+];
+export const examItem = (id?: string) => (id === 'tasks' || id === 'grades' || id === 'goal' || id === 'univ' || id === 'check' ? id : 'exams');
