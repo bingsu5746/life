@@ -144,7 +144,10 @@ export function fines(d: D, m: MarketSettings, today: DateStr, inc = incomeByDay
   const out: Fine[] = [];
   const yesterday = addDays(today, -1);
   if (yesterday < m.since) return out;
+  const rest = new Set(m.buys.filter((b) => b.kind === 'pass' && b.passDate).map((b) => b.passDate!));
   for (const date of daysBetween(m.since, yesterday)) {
+    // 하루 쉬기권을 쓴 날은 최소 공부 벌금 없음 (밀린 대출의 벌칙 공부는 그대로)
+    if (rest.has(date) && !overdueOn(m, date)) continue;
     const need = (isWeekend(date) ? m.minDay.weekend : m.minDay.weekday) + (overdueOn(m, date) ? RULE.penaltyMin : 0);
     const got = inc.get(date)?.minutes ?? 0;
     if (need > 0 && got < need) out.push({ date, why: `하루 최소 공부 ${need}분 중 ${got}분${overdueOn(m, date) ? ' (벌칙 공부 포함)' : ''}`, amount: RULE.fineMin });
@@ -233,6 +236,7 @@ const funThisWeek = (m: MarketSettings, today: DateStr) =>
 
 /** 물건 하나의 지금 값 · 세금 */
 export function priceOf(it: MarketItem, m: MarketSettings, d: Pick<StudyData, 'exams'>, today: DateStr): { price: number; tax: number; why: string } {
+  if (it.kind === 'pass') return { price: Math.round(it.price * examSurge(d, today).factor), tax: 0, why: examSurge(d, today).why };
   if (it.kind === 'thing') return { price: Math.max(1, Math.round(((it.won ?? 0) / m.wonPerGold) * 100)), tax: 0, why: '' };
   const s = examSurge(d, today);
   const price = Math.round(it.price * s.factor);
@@ -285,7 +289,7 @@ export function stockPrices(d: D, m: MarketSettings, today: DateStr): Map<Id, { 
       p = Math.max(10, p * (1 + r));
       hist.push(Math.round(p * 100) / 100);
     }
-    out.set(sub.id, { price: Math.round(p), prev: Math.round(prev), hist: hist.slice(-30) });
+    out.set(sub.id, { price: Math.round(p), prev: Math.round(prev), hist });
   }
   return out;
 }

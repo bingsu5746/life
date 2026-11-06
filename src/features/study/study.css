@@ -10483,119 +10483,6 @@ body.focus-on {
   background: var(--soft);
 }
 
-/* 시장 */
-.mk-wallet {
-  display: grid;
-  justify-items: center;
-  gap: 2px;
-  text-align: center;
-}
-.mk-wallet b {
-  font-size: 2.4rem;
-  font-variant-numeric: tabular-nums;
-  letter-spacing: -0.02em;
-}
-.mk-shop {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
-  gap: 10px;
-}
-.mk-shop-item {
-  display: grid;
-  justify-items: center;
-  gap: 4px;
-}
-.mk-shop-buy {
-  width: 100%;
-  display: grid;
-  justify-items: center;
-  gap: 4px;
-  padding: 16px 10px;
-  border: 1px solid var(--line);
-  border-radius: var(--radius);
-  background: var(--surface);
-  color: var(--text);
-  font: inherit;
-  cursor: pointer;
-}
-.mk-shop-item.short .mk-shop-buy {
-  opacity: 0.55;
-}
-.mk-icon {
-  font-size: 1.8rem;
-}
-.mk-plus {
-  color: var(--text);
-  font-variant-numeric: tabular-nums;
-}
-.mk-minus {
-  color: var(--bad);
-  font-variant-numeric: tabular-nums;
-}
-.focus .fy-file {
-  border: 1px dashed rgba(255, 255, 255, 0.3);
-  color: #f2f2f0;
-  padding: 9px 16px;
-  border-radius: 999px;
-  font-size: 0.9rem;
-  cursor: pointer;
-}
-.mk-alert {
-  border-color: var(--bad);
-}
-.mk-alert b {
-  color: var(--bad);
-}
-.mk-spark {
-  width: 100%;
-  height: 34px;
-  margin: 4px 0;
-}
-.mk-spark polyline {
-  fill: none;
-  stroke: var(--text);
-  stroke-width: 1.5;
-  vector-effect: non-scaling-stroke;
-}
-.mk-news ol {
-  list-style: none;
-  margin: 6px 0 0;
-  padding: 0;
-  display: grid;
-  gap: 2px;
-}
-.mk-n {
-  display: grid;
-  grid-template-columns: 1.6em 1fr auto;
-  align-items: center;
-  gap: 8px;
-  padding: 6px 2px;
-  border-bottom: 1px solid var(--line);
-  font-size: 0.92rem;
-}
-.mk-n:last-child {
-  border-bottom: 0;
-}
-.mk-n b {
-  font-variant-numeric: tabular-nums;
-  color: var(--muted);
-}
-.mk-n:nth-child(-n + 3) b {
-  color: var(--text);
-}
-.mk-n i {
-  font-style: normal;
-  font-size: 0.75rem;
-  color: var(--muted);
-}
-.mk-n.up i {
-  color: #15803d;
-}
-.mk-n.down i,
-.mk-n.warn i {
-  color: var(--bad);
-}
-
 /* 뉴스 */
 .nw-list {
   display: grid;
@@ -10647,5 +10534,888 @@ body.focus-on {
   .nw-item img {
     width: 100%;
     height: 150px;
+  }
+}
+
+/* ===== 시장 (mt-) ===== */
+:root {
+  --up: #e5484d;
+  --down: #3b7bf6;
+  --gold: #d4a017;
+  --silver: #a3a3a3;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    --up: #ff6b6f;
+    --down: #6aa0ff;
+  }
+}
+:root[data-theme='dark'] {
+  --up: #ff6b6f;
+  --down: #6aa0ff;
+}
+.mt {
+  display: grid;
+  gap: 14px;
+}
+.mt .up {
+  color: var(--up);
+}
+.mt .down {
+  color: var(--down);
+}
+.mt-minus {
+  color: var(--bad);
+}
+@keyframes mt-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+@keyframes mt-pop {
+  0% {
+    transform: scale(1);
+  }
+  40% {
+    transform: scale(0.94);
+  }
+  70% {
+    transform: scale(1.04);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+@keyframes mt-draw {
+  from {
+    stroke-dashoffset: 1;
+  }
+}
+/* 지갑 */
+.mt-hero {
+  display: grid;
+  justify-items: center;
+  gap: 8px;
+  padding: 26px 16px 20px;
+  text-align: center;
+  animation: mt-in 0.4s var(--ease) both;
+}
+.mt-hero > small {
+  color: var(--muted);
+}
+.mt-coins {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 4px;
+  font-variant-numeric: tabular-nums;
+}
+.mt-coins b {
+  font-size: 1.05rem;
+}
+.mt-coins small {
+  font-size: 0.78rem;
+  color: var(--muted);
+  margin-right: 4px;
+}
+.mt-coins i {
+  width: 0.7em;
+  height: 0.7em;
+  border-radius: 50%;
+  align-self: center;
+  background: var(--gold);
+  box-shadow: inset 0 -2px 0 rgba(0, 0, 0, 0.15);
+}
+.mt-coins i.silver {
+  background: var(--silver);
+}
+.mt-coins.big b {
+  font-size: clamp(2rem, 8vw, 2.6rem);
+  letter-spacing: -0.03em;
+  font-weight: 750;
+}
+.mt-coins.big i {
+  width: 0.42em;
+  height: 0.42em;
+}
+.mt-coins.big small {
+  font-size: 0.95rem;
+  margin-right: 10px;
+}
+.mt-coins.neg {
+  color: var(--bad);
+}
+.mt-hero-sub {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  justify-content: center;
+}
+.mt-pill {
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--muted);
+  border-radius: 999px;
+  padding: 4px 10px;
+  font: inherit;
+  font-size: 0.8rem;
+}
+.mt-pill.up {
+  color: var(--up);
+  border-color: transparent;
+  background: color-mix(in srgb, var(--up) 10%, transparent);
+  animation: mt-in 0.5s 0.3s var(--ease) both;
+}
+button.mt-pill {
+  cursor: pointer;
+}
+/* 판 */
+.mt-panel {
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+.mt-panel h3 {
+  margin: 0 0 8px;
+  font-size: 0.9rem;
+  color: var(--muted);
+  font-weight: 600;
+}
+.mt-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--line);
+  animation: mt-in 0.35s calc(var(--i, 0) * 30ms) var(--ease) both;
+}
+.mt-row:last-child {
+  border-bottom: 0;
+}
+.mt-row span {
+  display: grid;
+  min-width: 0;
+}
+.mt-row b {
+  font-weight: 500;
+  font-size: 0.92rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.mt-row small {
+  color: var(--muted);
+  font-size: 0.75rem;
+}
+.mt-row em {
+  font-style: normal;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.mt-alert {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 12px 14px;
+  border: 0;
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--bad) 10%, transparent);
+  color: var(--bad);
+  font: inherit;
+  font-size: 0.88rem;
+  text-align: left;
+  animation: mt-in 0.4s var(--ease) both;
+}
+/* 고리 */
+.mt-rings {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+.mt-ring {
+  position: relative;
+  display: grid;
+  justify-items: center;
+  gap: 2px;
+  padding: 16px 8px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+.mt-ring svg {
+  width: 84px;
+  height: 84px;
+}
+.mt-ring circle {
+  fill: none;
+  stroke-width: 7;
+  stroke-linecap: round;
+}
+.mt-ring .track {
+  stroke: var(--soft);
+}
+.mt-ring .fill {
+  stroke: var(--text);
+  transition: stroke-dashoffset 1s var(--ease);
+}
+.mt-ring .fill.done {
+  stroke: var(--up);
+}
+.mt-ring > div {
+  position: absolute;
+  top: 16px;
+  height: 84px;
+  display: grid;
+  place-items: center;
+  font-variant-numeric: tabular-nums;
+}
+.mt-ring span {
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+.mt-ring small {
+  color: var(--muted);
+  font-size: 0.75rem;
+  text-align: center;
+}
+/* 뉴스 */
+.mt-news {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.mt-news li {
+  display: grid;
+  grid-template-columns: 1.4em 1fr auto;
+  gap: 10px;
+  align-items: center;
+  padding: 7px 0;
+  font-size: 0.9rem;
+  animation: mt-in 0.35s calc(var(--i) * 60ms) var(--ease) both;
+}
+.mt-news li b {
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+}
+.mt-news li:nth-child(-n + 3) b {
+  color: var(--text);
+}
+.mt-news li i {
+  font-style: normal;
+  font-size: 0.7rem;
+  color: var(--muted);
+}
+.mt-news li.up i {
+  color: var(--up);
+}
+.mt-news li.down i,
+.mt-news li.warn i {
+  color: var(--down);
+}
+.mt-news li.warn i {
+  color: var(--bad);
+}
+/* 이용권 */
+.mt-tickets {
+  display: flex;
+  gap: 10px;
+  overflow-x: auto;
+  padding: 2px 2px 6px;
+  scroll-snap-type: x mandatory;
+}
+.mt-ticket {
+  flex: 0 0 150px;
+  scroll-snap-align: start;
+  display: grid;
+  gap: 2px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: var(--text);
+  color: var(--bg);
+  position: relative;
+  animation: mt-in 0.4s var(--ease) both;
+}
+.mt-ticket::before,
+.mt-ticket::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  width: 12px;
+  height: 12px;
+  margin-top: -6px;
+  border-radius: 50%;
+  background: var(--bg);
+}
+.mt-ticket::before {
+  left: -6px;
+}
+.mt-ticket::after {
+  right: -6px;
+}
+.mt-ticket small {
+  opacity: 0.6;
+  font-size: 0.72rem;
+}
+.mt-ticket b {
+  font-size: 0.92rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.mt-ticket span {
+  font-size: 0.75rem;
+  opacity: 0.7;
+}
+.mt-ticket button {
+  margin-top: 6px;
+  justify-self: start;
+  border: 1px solid currentColor;
+  background: none;
+  color: inherit;
+  border-radius: 999px;
+  padding: 3px 12px;
+  font: inherit;
+  font-size: 0.78rem;
+}
+/* 진열대 */
+.mt-toolbar {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  justify-content: space-between;
+}
+.mt-filter {
+  display: flex;
+  gap: 4px;
+  overflow-x: auto;
+}
+.mt-filter button {
+  border: 0;
+  background: none;
+  color: var(--muted);
+  padding: 6px 10px;
+  border-radius: 999px;
+  font: inherit;
+  font-size: 0.85rem;
+  white-space: nowrap;
+}
+.mt-filter button.on {
+  background: var(--text);
+  color: var(--bg);
+}
+.mt-sort {
+  border: 0;
+  background: none;
+  color: var(--muted);
+  font: inherit;
+  font-size: 0.82rem;
+}
+.mt-goods {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 10px;
+}
+.mt-good {
+  position: relative;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+  animation: mt-in 0.35s calc(var(--i, 0) * 35ms) var(--ease) both;
+  transition: transform 0.15s var(--ease), box-shadow 0.15s var(--ease);
+}
+.mt-good:hover {
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.06);
+}
+.mt-good.pop {
+  animation: mt-pop 0.6s var(--ease);
+  border-color: var(--text);
+}
+.mt-good.short {
+  opacity: 0.5;
+}
+.mt-good-buy {
+  width: 100%;
+  display: grid;
+  gap: 2px;
+  padding: 14px 14px 12px;
+  border: 0;
+  background: none;
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.mt-good-buy small {
+  font-size: 0.72rem;
+  color: var(--muted);
+}
+.mt-good-buy b {
+  font-size: 0.95rem;
+  line-height: 1.3;
+  min-height: 2.6em;
+}
+.mt-good-meta {
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+.mt-price {
+  margin-top: 6px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.mt-price i {
+  font-style: normal;
+  font-size: 0.7rem;
+  margin-left: 4px;
+}
+.mt-good-edit {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  border: 0;
+  background: none;
+  color: var(--faint);
+  font: inherit;
+  letter-spacing: 1px;
+}
+.mt-good.add {
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 2px;
+  min-height: 120px;
+  border-style: dashed;
+  color: var(--muted);
+  font: inherit;
+  cursor: pointer;
+}
+.mt-good.add b {
+  font-size: 1.4rem;
+  font-weight: 400;
+}
+.mt-ideas {
+  display: grid;
+  gap: 14px;
+}
+.mt-ideas small {
+  color: var(--muted);
+}
+/* 은행 */
+.mt-credit {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.mt-credit > div {
+  display: grid;
+}
+.mt-credit small {
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+.mt-gauge {
+  width: 140px;
+  flex: none;
+}
+.mt-gauge path {
+  fill: none;
+  stroke-width: 9;
+  stroke-linecap: round;
+}
+.mt-gauge .track {
+  stroke: var(--soft);
+}
+.mt-gauge .fill {
+  stroke: var(--text);
+  animation: mt-draw 1s var(--ease) both;
+}
+.mt-gauge .needle {
+  stroke: var(--text);
+  stroke-width: 2;
+  stroke-linecap: round;
+}
+.mt-gauge .num {
+  font-size: 22px;
+  letter-spacing: -0.5px;
+  font-weight: 700;
+  fill: var(--text);
+}
+.mt-accounts {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 10px;
+}
+.mt-acct {
+  display: grid;
+  gap: 6px;
+  padding: 16px;
+  border-radius: var(--radius);
+  border: 1px solid var(--line);
+  background: var(--surface);
+  animation: mt-in 0.4s var(--ease) both;
+}
+.mt-acct.main {
+  background: var(--text);
+  color: var(--bg);
+  border-color: transparent;
+}
+.mt-acct.main .mt-coins,
+.mt-acct.main .mt-coins b {
+  color: var(--bg);
+}
+.mt-acct.main .mt-coins small {
+  color: inherit;
+  opacity: 0.6;
+}
+.mt-acct > small {
+  font-size: 0.78rem;
+  opacity: 0.7;
+}
+.mt-acct > span {
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+.mt-acct.late {
+  border-color: var(--bad);
+}
+.mt-acct.late > span {
+  color: var(--bad);
+}
+.mt-acct button {
+  justify-self: start;
+  border: 1px solid var(--line-strong);
+  background: none;
+  color: inherit;
+  border-radius: 999px;
+  padding: 4px 12px;
+  font: inherit;
+  font-size: 0.8rem;
+}
+.mt-meter {
+  height: 5px;
+  border-radius: 99px;
+  background: var(--soft);
+  overflow: hidden;
+}
+.mt-meter i {
+  display: block;
+  height: 100%;
+  background: var(--text);
+  border-radius: inherit;
+  transition: width 1s var(--ease);
+}
+.mt-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+.mt-amount {
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 8px;
+}
+.mt-amount input {
+  width: 6ch;
+  border: 0;
+  border-bottom: 2px solid var(--line-strong);
+  background: none;
+  color: var(--text);
+  font: inherit;
+  font-size: 2rem;
+  font-weight: 700;
+  text-align: center;
+}
+.mt-plans {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+.mt-plans button {
+  display: grid;
+  gap: 2px;
+  padding: 12px 6px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+}
+.mt-plans button.on {
+  border-color: var(--text);
+}
+.mt-plans span {
+  color: var(--up);
+  font-size: 0.85rem;
+}
+/* 주식 */
+.mt-port {
+  display: grid;
+  gap: 6px;
+  padding: 18px 4px 4px;
+  animation: mt-in 0.4s var(--ease) both;
+}
+.mt-port small {
+  color: var(--muted);
+}
+.mt-port span {
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.mt-tick {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 70px auto;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 12px 2px;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  background: none;
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  animation: mt-in 0.35s calc(var(--i) * 40ms) var(--ease) both;
+}
+.mt-tick:last-of-type {
+  border-bottom: 0;
+}
+.mt-tick-name {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+.mt-tick-name i {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  flex: none;
+  opacity: 0.85;
+}
+.mt-tick-name > span {
+  display: grid;
+  min-width: 0;
+}
+.mt-tick-name small {
+  color: var(--muted);
+  font-size: 0.75rem;
+}
+.mt-tick-price {
+  display: grid;
+  justify-items: end;
+  font-variant-numeric: tabular-nums;
+}
+.mt-tick-price em {
+  font-style: normal;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--muted);
+}
+.mt-spark {
+  width: 70px;
+  height: 28px;
+}
+.mt-spark polyline {
+  fill: none;
+  stroke-width: 1.6;
+  vector-effect: non-scaling-stroke;
+  stroke: var(--muted);
+}
+.mt-spark.up polyline {
+  stroke: var(--up);
+}
+.mt-spark.down polyline {
+  stroke: var(--down);
+}
+.mt-quote {
+  display: grid;
+  gap: 4px;
+}
+.mt-quote > span {
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.mt-quote small {
+  color: var(--muted);
+  font-weight: 400;
+}
+.mt-chart {
+  position: relative;
+  height: 200px;
+  touch-action: pan-y;
+}
+.mt-chart.empty {
+  display: grid;
+  place-items: center;
+  color: var(--muted);
+  font-size: 0.88rem;
+  border: 1px dashed var(--line);
+  border-radius: var(--radius);
+}
+.mt-chart svg {
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+.mt-chart .line {
+  fill: none;
+  stroke-width: 2;
+  vector-effect: non-scaling-stroke;
+  stroke-dasharray: 1;
+  animation: mt-draw 0.9s var(--ease) both;
+}
+.mt-chart .up .line {
+  stroke: var(--up);
+}
+.mt-chart .down .line {
+  stroke: var(--down);
+}
+.mt-chart .up .g0 {
+  stop-color: var(--up);
+  stop-opacity: 0.18;
+}
+.mt-chart .down .g0 {
+  stop-color: var(--down);
+  stop-opacity: 0.18;
+}
+.mt-chart .g1 {
+  stop-color: var(--bg);
+  stop-opacity: 0;
+}
+.mt-chart .area {
+  animation: mt-in 0.9s var(--ease) both;
+}
+.mt-chart .cross {
+  stroke: var(--line-strong);
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+}
+.mt-chart .dot {
+  fill: var(--text);
+}
+.mt-chart-tip {
+  position: absolute;
+  top: -6px;
+  transform: translateX(-50%);
+  display: grid;
+  justify-items: center;
+  pointer-events: none;
+  font-variant-numeric: tabular-nums;
+  font-size: 0.82rem;
+}
+.mt-chart-tip small {
+  color: var(--muted);
+}
+.mt-range {
+  display: flex;
+  justify-content: space-around;
+}
+.mt-range button {
+  border: 0;
+  background: none;
+  color: var(--muted);
+  padding: 6px 14px;
+  border-radius: 10px;
+  font: inherit;
+  font-size: 0.85rem;
+}
+.mt-range button.on {
+  background: var(--soft);
+  color: var(--text);
+  font-weight: 600;
+}
+.mt-hold > div {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+.mt-hold span {
+  display: grid;
+}
+.mt-hold small {
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+.mt-hold b {
+  font-variant-numeric: tabular-nums;
+}
+.mt-links {
+  display: flex;
+  gap: 16px;
+  justify-content: center;
+  font-size: 0.82rem;
+}
+.mt-trade {
+  position: sticky;
+  bottom: calc(76px + env(safe-area-inset-bottom));
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  padding-top: 14px;
+  background: linear-gradient(transparent, var(--bg) 14px);
+}
+@media (min-width: 861px) {
+  .mt-trade {
+    bottom: 16px;
+  }
+}
+.mt-trade button,
+.mt-go {
+  border: 0;
+  border-radius: 14px;
+  padding: 15px;
+  font: inherit;
+  font-weight: 700;
+  color: #fff;
+}
+.mt-trade .buy,
+.mt-go.buy {
+  background: var(--up);
+}
+.mt-trade .sell,
+.mt-go.sell {
+  background: var(--down);
+}
+.mt-trade button:disabled {
+  opacity: 0.35;
+}
+.mt-step {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 22px;
+}
+.mt-step b {
+  font-size: 1.8rem;
+  font-variant-numeric: tabular-nums;
+  min-width: 4ch;
+  text-align: center;
+}
+.mt-step button {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  border: 1px solid var(--line-strong);
+  background: var(--surface);
+  color: var(--text);
+  font-size: 1.2rem;
+}
+.mt-chips {
+  display: flex;
+  gap: 6px;
+  justify-content: center;
+}
+@media (prefers-reduced-motion: reduce) {
+  .mt *,
+  .mt {
+    animation: none !important;
+    transition: none !important;
   }
 }

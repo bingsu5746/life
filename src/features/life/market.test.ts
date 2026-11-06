@@ -100,3 +100,13 @@ describe('시장 뉴스 · 주식 거르기', async () => {
     expect(stockPrices(d, { ...m, stockOff: ['c'] }, '2026-11-05').has('c')).toBe(false);
   });
 });
+
+describe('하루 쉬기권', async () => {
+  const { fines, newMarket } = await import('./market');
+  const { emptyStudy } = await import('../study/model');
+  it('쉬기권을 쓴 날은 최소 공부 벌금이 없다', () => {
+    const d = emptyStudy();
+    const m = { ...newMarket('2026-11-02'), buys: [{ id: 'p', itemId: 'x', name: '하루 쉬기권', kind: 'pass' as const, price: 1500, tax: 0, at: Date.parse('2026-11-01T12:00:00+09:00'), passDate: '2026-11-03' }] };
+    expect(fines(d, m, '2026-11-05').map((f) => f.date)).toEqual(['2026-11-04', '2026-11-02']);
+  });
+});

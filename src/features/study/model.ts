@@ -139,7 +139,7 @@ export interface MarketSettings {
   wonPerGold: number;
   items: MarketItem[];
   /** 산 것. 이용권은 expires 까지 쓸 수 있고(산 날 쓰면 벌금), 오락 이용권은 쓴 때(usedAt)를 적는다 */
-  buys: { id: Id; itemId: Id; name: string; kind: MarketItem['kind']; minutes?: number; price: number; tax: number; at: number; used?: boolean; expires?: DateStr; usedAt?: number }[];
+  buys: { id: Id; itemId: Id; name: string; kind: MarketItem['kind']; minutes?: number; price: number; tax: number; at: number; used?: boolean; expires?: DateStr; usedAt?: number; passDate?: DateStr }[];
   savings: { id: Id; amount: number; at: number; weeks: number; rate: number; closedAt?: number }[];
   loans: { id: Id; amount: number; at: number; due: DateStr; rate: number; repays: { at: number; amount: number }[] }[];
   /** 과목 주식 사고판 기록 (qty: 산 것 +, 판 것 −) */
@@ -154,7 +154,8 @@ export interface MarketItem {
   id: Id;
   name: string;
   /** game: 게임 이용권(분) · fun: 그 밖 오락(분) · meet: 약속(친구 · 가족, 사치세 없음) · thing: 실제 물건(원) */
-  kind: 'game' | 'fun' | 'meet' | 'thing';
+  /** pass: 하루 쉬기권 (그날 하루 최소 공부 벌금 없음) */
+  kind: 'game' | 'fun' | 'meet' | 'thing' | 'pass';
   /** 이용권 분 (game · fun) */
   minutes?: number;
   /** 기본 값 (은화). thing 이면 won 으로 계산 */
