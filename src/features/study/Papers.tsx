@@ -12,20 +12,6 @@ import { getStudy, put, putMany, remove, useStudy } from './store';
 import { minutesText } from './timer';
 import { confirmDelete, Empty, Field, go, Icon, Sheet, SubjectDot, SubjectPicker, subjectsOf, tap, toast, useToday } from './ui';
 
-/** 문제집 · 기출 풀이 바꾸기 */
-export function BookTabs({ on }: { on: 'books' | 'papers' }) {
-  return (
-    <div className="st-seg" role="tablist" aria-label="문제집과 기출 풀이">
-      <button role="tab" aria-selected={on === 'books'} className={on === 'books' ? 'on' : ''} onClick={() => go('/books')}>
-        문제집
-      </button>
-      <button role="tab" aria-selected={on === 'papers'} className={on === 'papers' ? 'on' : ''} onClick={() => go('/books/papers')}>
-        기출·모의고사 풀이
-      </button>
-    </div>
-  );
-}
-
 const md = (x: string) => shortDate(x).replace(/\(.\)/, '');
 
 /** 과목 이름 (영역으로 넣은 것도) */

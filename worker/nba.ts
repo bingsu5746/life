@@ -182,8 +182,6 @@ export async function seasonPage(key: string, season: number, cursor?: number): 
 }
 
 export const fetchStandings = async (key: string, season: number) => parseStandings(await bdl(key, '/standings', `season=${season}`));
-export const fetchBox = async (key: string, gameId: number) => parseLines(await bdl(key, '/stats', `game_ids[]=${gameId}&per_page=100`));
-export const fetchAverage = async (key: string, playerId: number, season: number) => parseAverage(await bdl(key, '/season_averages', `season=${season}&player_id=${playerId}&player_ids[]=${playerId}`));
 
 /** 날짜(미국) → 시즌 (10월에 시작하는 해) */
 export const seasonOf = (date: string) => (Number(date.slice(5, 7)) >= 9 ? Number(date.slice(0, 4)) : Number(date.slice(0, 4)) - 1);

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { budgetView, daysInMonth, hobbyWeek, monthSummary, readWon, saved, shiftMonth, weeklyMinutes, won, workoutStreak } from './calc';
+import { budgetView, daysInMonth, hobbyWeek, monthSummary, readWon, saved, shiftMonth, weeklyMinutes, won, dayStreak } from './calc';
 import { emptyStudy, type SavingGoal, type Workout } from '../study/model';
 import { mergeStudy } from '../study/merge';
 import { sanitizeCollections } from '../study/sanitize';
@@ -47,8 +47,8 @@ describe('운동·취미', () => {
   const w = (date: string, minutes: number): Workout => ({ id: date + minutes, updatedAt: 1, date, kind: '달리기', minutes, created: 1 });
   it('연속·주별', () => {
     const list = [w('2026-10-25', 30), w('2026-10-24', 20), w('2026-10-23', 40), w('2026-10-20', 10)];
-    expect(workoutStreak(list, '2026-10-25')).toBe(3);
-    expect(workoutStreak(list, '2026-10-26')).toBe(3);
+    expect(dayStreak(list.map((x) => x.date), '2026-10-25')).toBe(3);
+    expect(dayStreak(list.map((x) => x.date), '2026-10-26')).toBe(3);
     expect(weeklyMinutes(list, '2026-10-25', 2)).toEqual([
       { start: '2026-10-12', min: 0, count: 0 },
       { start: '2026-10-19', min: 100, count: 4 },

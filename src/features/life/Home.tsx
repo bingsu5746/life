@@ -1,4 +1,4 @@
-// 메인: 공부 · 운동 · 돈 · 취미 · 일기를 한눈에. 누르면 그 영역으로
+// 메인: 공부 · 돈 · 취미 · 일기 · AI 를 한눈에. 누르면 그 영역으로
 import { isLoggedIn, uselessFact } from '../auth/api';
 import { exportBackup } from '../study/backup';
 import { addDays, dday, longDate, weekStart, weekday } from '../study/dates';
@@ -17,7 +17,7 @@ import { DEFAULT_PLACE, getWeather, weatherText, type Weather } from './weather'
 import { minutesText } from '../study/timer';
 import { AREAS } from '../study/tabs';
 import { go, Icon, toast, useToday } from '../study/ui';
-import { dayStreak, hobbyWeek, monthOf, monthSummary, weekWorkouts, won, workoutStreak } from './calc';
+import { dayStreak, hobbyWeek, monthOf, monthSummary, won } from './calc';
 
 export function Home(_: { loggedIn: boolean; onLogin: () => void }) {
   const d = useStudy();
@@ -38,12 +38,7 @@ export function Home(_: { loggedIn: boolean; onLogin: () => void }) {
   const studied = alive(d.sessions)
     .filter((s) => s.date === today)
     .reduce((a, s) => a + s.minutes, 0);
-  // 운동
   const ws = weekStart(today);
-  const wk = weekWorkouts(d, ws);
-  const wkDays = new Set(wk.map((w) => w.date)).size;
-  const goal = d.settings.fitnessGoal?.perWeek;
-  const didToday = wk.some((w) => w.date === today);
   // 돈
   const ms = monthSummary(d, monthOf(today));
   const budget = d.settings.monthlyBudget;
@@ -79,11 +74,6 @@ export function Home(_: { loggedIn: boolean; onLogin: () => void }) {
           .map((s) => s.date),
         today,
       ),
-    },
-    fitness: {
-      lines: [`이번 주 ${wkDays}${goal ? `/${goal}` : ''}일 운동`, didToday ? '오늘 운동했어요' : workoutStreak(alive(d.workouts), today) ? `${workoutStreak(alive(d.workouts), today)}일 연속` : '오늘은 아직 안 했어요'],
-      action: didToday ? undefined : { label: '운동 넣기', to: '/fitness/new' },
-      streak: workoutStreak(alive(d.workouts), today),
     },
     money: { lines: [`이번 달 쓴 돈 ${won(ms.out)}`, budget ? (budget - ms.out >= 0 ? `예산 ${won(budget - ms.out)} 남음` : `예산 ${won(ms.out - budget)} 넘음`) : ''].filter(Boolean), action: { label: '쓴 것 적기', to: '/money/new' } },
     hobby: {

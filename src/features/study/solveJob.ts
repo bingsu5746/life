@@ -128,7 +128,6 @@ export const useSolveJob = () =>
   );
 export const getSolveJob = () => job;
 export const markJobSeen = () => job && job.status !== 'running' && setJob({ ...job, seen: true });
-export const clearJob = () => setJob(null);
 
 /** 서버에 보낼 대화: 실패한 답은 빼고, 그래서 이어진 질문 둘은 하나로 합친다 (서비스마다 같은 쪽이 연달아 오면 거절하기도 해서).
  *  사진은 마지막 질문 것만 직접 보내고, 그 전 사진 질문은 저장소 열쇠(imgKeys)만 보내면 서버가 꺼내 붙인다 */

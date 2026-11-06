@@ -60,7 +60,6 @@ function setPending(ids: Id[]) {
     // 무시
   }
 }
-export const pendingPhotoCount = () => pending().length;
 
 let uploading = false;
 /** 올리지 못한 사진을 올린다 (동기화가 끝날 때마다). 서버 한도·연결 오류면 다음에 다시 */

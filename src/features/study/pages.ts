@@ -54,7 +54,6 @@ export function rangeText(ranges: Range[] | number[], unit = ''): string {
   return rs.map(([a, b]) => (a === b ? `${a}${unit}` : `${a}~${b}${unit}`)).join(', ');
 }
 
-export const countRanges = (ranges: Range[]) => expand(ranges).length;
 
 /** 체크 기록으로 지금 「한」 번호들: 번호마다 가장 늦은 기록이 체크면 한 것 */
 export function doneSet(done: Mark[], undone: Mark[]): Set<number> {

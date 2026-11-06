@@ -1,5 +1,5 @@
 // 한 주(월~일) 돌아보기: 공부·운동·돈·영화·독서·일기·습관·할 일·취미를 한 곳에, 지난주와 비교
-import { addDays, weekStart, weekday } from '../study/dates';
+import { addDays, weekStart } from '../study/dates';
 import { habitOn } from '../study/habits';
 import { alive, type DateStr, type Movie, type StudyData } from '../study/model';
 import { shiftMonth } from './calc';
@@ -104,7 +104,6 @@ export function lifeRange(d: StudyData, from: DateStr, to: DateStr, pf: DateStr,
 }
 
 /** 일요일인지 (주간 돌아보기 알림) */
-export const isSunday = (date: DateStr) => weekday(date) === 0;
 
 /** 최근 n 달의 공부 시간 · 운동한 날 · 쓴 돈 (오래된 달부터) */
 export function monthTrend(d: StudyData, month: string, n = 6): { month: string; study: number; workoutDays: number; spent: number }[] {

@@ -15,7 +15,6 @@ export function splitExample(s: string, term: string): { before: string; answer:
 }
 
 /** 빈칸 문장 (괄호 없이 보여 줄 때) */
-export const plainExample = (s: string) => s.replace(/\[([^\]]+)\]/g, '$1');
 
 export interface Question {
   n: number;

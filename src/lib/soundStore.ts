@@ -31,16 +31,6 @@ export async function loadSound(key: string): Promise<Blob | null> {
   });
 }
 
-export async function removeSound(key: string): Promise<void> {
-  const db = await open();
-  await new Promise<void>((ok) => {
-    const tx = db.transaction(STORE, 'readwrite');
-    tx.objectStore(STORE).delete(key);
-    tx.oncomplete = () => ok();
-    tx.onerror = () => ok();
-  });
-}
-
 /** 시험장 소리 주소: 앱에 올린 파일 → 이 기기에 넣은 파일 → 없음 */
 export async function examSoundUrl(): Promise<string | null> {
   try {

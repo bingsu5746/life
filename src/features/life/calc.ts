@@ -1,6 +1,6 @@
 // 운동 · 돈 · 취미 계산
 import { addDays, daysBetween, weekStart } from '../study/dates';
-import { alive, type DateStr, type HobbyLog, type MoneyRule, type MoneyTx, type SavingGoal, type StudyData, type Workout } from '../study/model';
+import { alive, type DateStr, type HobbyLog, type MoneyRule, type MoneyTx, type SavingGoal, type StudyData } from '../study/model';
 
 export const won = (n: number) => `${Math.round(n).toLocaleString('ko-KR')}원`;
 
@@ -12,19 +12,6 @@ export function readWon(s: string): number | null {
 }
 
 /** 그 주(월~일)의 운동 */
-export function weekWorkouts(d: StudyData, from: DateStr): Workout[] {
-  const to = addDays(from, 6);
-  return alive(d.workouts).filter((w) => w.date >= from && w.date <= to);
-}
-
-/** 오늘(오늘 안 했으면 어제)까지 연속으로 운동한 날 */
-export function workoutStreak(list: Workout[], today: DateStr): number {
-  return dayStreak(
-    list.map((w) => w.date),
-    today,
-  );
-}
-
 /** 오늘(또는 아직 안 했으면 어제)까지 끊기지 않고 이어진 날 수 */
 export function dayStreak(dates: Iterable<DateStr>, today: DateStr): number {
   const days = new Set(dates);
@@ -114,7 +101,6 @@ export function monthlyOut(d: StudyData, today: DateStr, months: number): { mont
   });
 }
 
-export const datesOfWeek = (from: DateStr) => daysBetween(from, addDays(from, 6));
 
 // ===== 고정 지출·수입 =====
 

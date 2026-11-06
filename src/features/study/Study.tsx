@@ -2,7 +2,6 @@
 import { findMovieNews } from '../life/movieNews';
 import { kobisInfo, movieProviders } from '../auth/api';
 import { Celebrate } from './Celebrate';
-import { breakWordReminders } from './notifyDigest';
 import { dueTodoRules } from './todoRules';
 import { pendingExamLocks } from './examPlan';
 import { lazy, Suspense, useEffect, useRef, useState } from 'react';
@@ -13,7 +12,6 @@ import { getStudy, putMany, setSettings, useSaveFailed, useStudy, useWords } fro
 import { alive } from './model';
 import { useTimerAlarm, useTimerView } from './timerStore';
 import { clock } from './timer';
-import { Today } from './Today';
 import { localTimes, uploadDigest } from './notify';
 import { autoSaves, dueRuleTx } from '../life/calc';
 import { tutorSessions } from './tutor';
@@ -28,6 +26,7 @@ import { go, Icon, Sheet, Toaster, useToday } from './ui';
 const PHONE_TABS: string[] = ['today', 'exams', 'books', 'review', 'words', 'time'];
 
 // 오늘 화면 말고는 열 때 받는다 (처음 여는 속도)
+const Today = lazy(() => import('./Today').then((m) => ({ default: m.Today })));
 const MathRoom = lazy(() => import('./MathRoom').then((m) => ({ default: m.MathRoom })));
 const Books = lazy(() => import('./Books').then((m) => ({ default: m.Books })));
 const Life = lazy(() => import('./Life').then((m) => ({ default: m.Life })));
@@ -68,6 +67,7 @@ const PRELOAD = [
   () => import('../life/Games'),
   () => import('../life/Music'),
   () => import('../life/Diary'),
+  () => import('./Today'),
   () => import('./Books'),
   () => import('./Life'),
   () => import('./Review'),
@@ -148,16 +148,24 @@ export function Study({ path, loggedIn, syncReady = true, onLogin }: { path: str
   // 달력 일정 알림: 바뀌었을 때만 서버에 다시 올린다
   useEffect(() => {
     if (!loggedIn || !localTimes()) return;
+    let gone = false;
     const t = setTimeout(() => {
-      // 일정 · 빚 갚을 날 · 쉬는 시간 단어 (서버는 60개까지라 가까운 것부터)
-      const items = [...reminders(d, today), ...breakWordReminders(d, words, today)].sort((a, b) => a.at - b.at).slice(0, 60);
-      const key = JSON.stringify(items);
-      if (lastRemind.current === key) return;
-      notifyRemind(items)
-        .then(() => (lastRemind.current = key))
+      // 쉬는 시간 단어 계산은 첫 화면에 필요 없어서 이때 받는다
+      void import('./notifyDigest')
+        .then(({ breakWordReminders }) => {
+          if (gone) return;
+          // 일정 · 빚 갚을 날 · 쉬는 시간 단어 (서버는 60개까지라 가까운 것부터)
+          const items = [...reminders(d, today), ...breakWordReminders(d, words, today)].sort((a, b) => a.at - b.at).slice(0, 60);
+          const key = JSON.stringify(items);
+          if (lastRemind.current === key) return;
+          return notifyRemind(items).then(() => (lastRemind.current = key));
+        })
         .catch(() => {});
     }, 4000);
-    return () => clearTimeout(t);
+    return () => {
+      gone = true;
+      clearTimeout(t);
+    };
   }, [d.events, d.moneyTx, d.settings.breakWords, d.settings.schoolTimetable, d.settings.birthdays, d.settings.movieNews, words, today, loggedIn]); // eslint-disable-line react-hooks/exhaustive-deps
   // 보고 싶은 영화 소식: 하루 한 번 (이 기기) OTT · 극장 상영 · 재개봉을 찾아 새 것만 남긴다
   useEffect(() => {

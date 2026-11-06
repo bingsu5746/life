@@ -17,7 +17,6 @@ export function nextClassDate(tt: TT, subjectId: Id, from: DateStr, includeFrom 
 }
 
 /** 시간표에 있는 과목인지 */
-export const inTimetable = (tt: TT, subjectId: Id) => Object.values(tt ?? {}).some((ids) => ids.includes(subjectId));
 
 /** 내일부터 7일 안에서 수업이 있는 첫날 (빼는 날 제외) */
 export function nextSchoolDay(tt: TT, today: DateStr, offDates: DateStr[] = []): DateStr | null {

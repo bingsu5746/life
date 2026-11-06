@@ -1,7 +1,5 @@
 // Life: 맨 위 막대(이름·로그인) + 메인(공부·운동·돈·취미·일기)과 각 영역 화면 (src/features/study/Study.tsx)
-import { useEffect, useState } from 'react';
-import { AccountSheet } from './features/auth/AccountSheet';
-import { LoginModal } from './features/auth/LoginModal';
+import { lazy, Suspense, useEffect, useState } from 'react';
 import { getSyncStatus, onSyncStatus, syncAll, type SyncStatus } from './features/auth/sync';
 import { displayName, useAuth } from './features/auth/useAuth';
 import { isLoggedIn } from './features/auth/api';
@@ -10,6 +8,10 @@ import { AREAS, HOBBY_PARTS } from './features/study/tabs';
 import { AiPill } from './features/study/AiPill';
 import { toast } from './features/study/ui';
 import { ErrorBoundary } from './ErrorBoundary';
+
+// 로그인 · 계정 창은 누를 때 받는다 (첫 화면을 가볍게)
+const LoginModal = lazy(() => import('./features/auth/LoginModal').then((m) => ({ default: m.LoginModal })));
+const AccountSheet = lazy(() => import('./features/auth/AccountSheet').then((m) => ({ default: m.AccountSheet })));
 
 const safeDecode = (s: string) => {
   try {
@@ -143,8 +145,10 @@ export default function App() {
       <ErrorBoundary resetKey={path.join('/')}>
         <Study path={path} loggedIn={!!auth.user || auth.loading} syncReady={!isLoggedIn() || sync !== 'syncing'} onLogin={() => setLoginOpen(true)} />
       </ErrorBoundary>
-      {loginOpen && <LoginModal onClose={() => setLoginOpen(false)} />}
-      {accountOpen && auth.user && <AccountSheet user={auth.user} onClose={() => setAccountOpen(false)} />}
+      <Suspense fallback={null}>
+        {loginOpen && <LoginModal onClose={() => setLoginOpen(false)} />}
+        {accountOpen && auth.user && <AccountSheet user={auth.user} onClose={() => setAccountOpen(false)} />}
+      </Suspense>
     </div>
   );
 }
