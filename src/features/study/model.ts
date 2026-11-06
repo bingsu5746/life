@@ -76,6 +76,12 @@ export interface StudySettings {
   sleepGoal?: number;
   /** 잘 시간 알림: 다음 날 일어날 시각(평일 · 주말) − 잠 목표 = 잘 시각, 그보다 before 분 먼저 알림 */
   bedRemind?: { weekday: string; weekend: string; before: number };
+  /** 약 · 영양제: 이름 · 먹는 시각들 (알림) */
+  meds?: { id: Id; name: string; times: string[]; memo?: string }[];
+  /** 먹었다고 체크한 것: 날짜 → 「약 id@시각」 목록 (최근 60일) */
+  medLog?: Record<DateStr, string[]>;
+  /** 집중 화면에서 틀 유튜브 (영상 · 재생목록, 이름은 내가 붙임) */
+  focusVideos?: { kind: 'v' | 'list'; id: string; name: string }[];
   /** 일주일에 쓸 돈 한도 (넘으면 저녁 알림) */
   weeklyLimit?: number;
   /** 날씨 위치 (없으면 노원구) */
@@ -483,6 +489,8 @@ export interface PastPaper extends Stamp {
   minutes?: number;
   /** 틀린 문항 번호 */
   wrong: number[];
+  /** 문항별 걸린 초 (모의고사 보기에서 문항별 시간을 쟀을 때) */
+  qTimes?: Record<number, number>;
   memo?: string;
   created: number;
 }

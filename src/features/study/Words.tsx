@@ -17,6 +17,7 @@ import { WithSpeak } from './Speak';
 import { Practice } from './Practice';
 import { WordTestSheet } from './WordTestSheet';
 import { dictKo, isLoggedIn, wordMeanings } from '../auth/api';
+import { WordListen } from './WordListen';
 import { Bar, confirmDelete, Empty, Field, go, Menu, Sheet, SubjectDot, toast, useToday, tap } from './ui';
 
 const KIND_LABEL: Record<WordList['kind'], string> = { book: '단어장', test: '단어 시험', inbox: '모르는 단어 모음' };
@@ -24,6 +25,7 @@ const KIND_LABEL: Record<WordList['kind'], string> = { book: '단어장', test: 
 export function Words({ id, sub }: { id?: string; sub?: string }) {
   if (id === 'new') return <NewList />;
   if (id === 'practice') return <Practice listId={sub} />;
+  if (id === 'listen') return <WordListen />;
   if (id && sub === 'test') return <WordTestSheet listId={id} />;
   if (id && (sub === 'learn' || sub === 'prep' || sub === 'weak')) return <WordRun listId={id} mode={sub} />;
   if (id) return <ListDetail id={id} />;
@@ -40,9 +42,14 @@ function ListIndex() {
       <div className="st-page-head">
         <h2>단어</h2>
         {alive(words).length > 0 && (
-          <button className="btn btn-sm" onClick={() => go('/words/practice')}>
-            연습
-          </button>
+          <div className="st-inline">
+            <button className="btn btn-sm" onClick={() => go('/words/listen')}>
+              🎧 듣기
+            </button>
+            <button className="btn btn-sm" onClick={() => go('/words/practice')}>
+              연습
+            </button>
+          </div>
         )}
       </div>
       {!views.length && (

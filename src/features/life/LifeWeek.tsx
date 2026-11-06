@@ -1,5 +1,6 @@
 // 이번 주 돌아보기 화면 (/week, /week/<그 주의 아무 날>)
 import { shareCard, type CardLine } from '../../lib/shareCard';
+import { studyReport } from '../study/studyReport';
 import { addDays, isDate, shortDate, weekStart } from '../study/dates';
 import { put, useStudy } from '../study/store';
 import { go, toast, useToday } from '../study/ui';
@@ -58,9 +59,22 @@ export function LifeWeekPage({ day, monthly }: { day?: string; monthly?: boolean
     <div className="st-page narrow">
       <div className="st-page-head">
         <h2>{monthly ? (cur ? '이번 달' : monthLabel(month)) : cur ? '이번 주' : `${shortDate(w.from)} 주`} 돌아보기</h2>
-        <button className="btn btn-sm" onClick={() => void share()}>
-          그림으로 공유
-        </button>
+        <div className="st-inline">
+          {!monthly && (
+            <button
+              className="btn btn-sm"
+              onClick={async () => {
+                const lines = studyReport(d, w.from, today);
+                if (!(await shareCard(`${shortDate(w.from)} 주 공부 리포트`, lines, `${w.from}-공부-리포트.png`, ['#0c4a6e', '#1e3a8a']))) toast('그림을 만들지 못했어요');
+              }}
+            >
+              공부 리포트
+            </button>
+          )}
+          <button className="btn btn-sm" onClick={() => void share()}>
+            그림으로 공유
+          </button>
+        </div>
       </div>
       <div className="st-inline between">
         <button className="btn btn-sm" onClick={() => go(monthly ? `/month/${shiftMonth(month, -1)}` : `/week/${addDays(w.from, -7)}`)} aria-label={prevWord}>

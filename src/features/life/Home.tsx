@@ -6,6 +6,7 @@ import { upcomingExams } from '../study/exams';
 import { SchoolHome } from '../study/SchoolPanel';
 import { EveBanner } from '../study/Eve';
 import { MorningCard } from './Morning';
+import { MedsCard } from '../study/Meds';
 import { ConditionPrompt } from '../study/ConditionCard';
 import { alive } from '../study/model';
 import { todaySummary } from '../study/select';
@@ -148,6 +149,7 @@ export function Home(_: { loggedIn: boolean; onLogin: () => void }) {
       )}
       {on('morning') && <MorningCard today={today} />}
       {on('school') && <SchoolHome today={today} />}
+      {!studyMode && <MedsCard compact />}
       <div className="hm-grid">
         {areaList
           .filter((a) => show(a.key))

@@ -44,6 +44,52 @@ export interface MockState {
   startedAt: number;
   /** 시간 전에 「다 풀었어요」를 누른 때 (그때 시계가 멈춘다) */
   finishedAt?: number;
+  /** 문항별 시간 재기: 지금 푸는 번호 · 그 번호를 잡은 때 · 번호마다 쌓인 ms */
+  perQ?: { cur: number; since: number; acc: Record<number, number> };
+}
+
+/** 과목마다 문항 수 (수능 기준: 국어 45 · 수학 30 · 영어 45 · 한국사 20 · 탐구 과목당 20) */
+export const QUESTION_COUNT: Record<string, number> = { korean: 45, math: 30, english: 45, history: 20, inquiry1: 20, inquiry2: 40 };
+
+/** 문항별 시간 재기 시작 (1번부터) */
+export const startPerQ = (now: number): NonNullable<MockState['perQ']> => ({ cur: 1, since: now, acc: {} });
+
+/** 다른 번호로 옮기기: 지금 번호에 지난 시간을 더하고 새 번호를 잡는다 (같은 번호면 그대로) */
+export function switchQ(p: NonNullable<MockState['perQ']>, to: number, now: number): NonNullable<MockState['perQ']> {
+  if (to === p.cur) return p;
+  return { cur: to, since: now, acc: { ...p.acc, [p.cur]: (p.acc[p.cur] ?? 0) + Math.max(0, now - p.since) } };
+}
+
+/** 번호마다 걸린 초 (지금 번호는 end 까지 더해서). 0 인 번호는 빼고 */
+export function qSeconds(p: NonNullable<MockState['perQ']>, end: number): Record<number, number> {
+  const acc = { ...p.acc, [p.cur]: (p.acc[p.cur] ?? 0) + Math.max(0, end - p.since) };
+  return Object.fromEntries(
+    Object.entries(acc)
+      .map(([k, v]) => [Number(k), Math.round(v / 1000)] as const)
+      .filter(([, v]) => v > 0),
+  );
+}
+
+/** 오래 걸린 번호 (초가 큰 순서) */
+export const slowest = (sec: Record<number, number>, n = 5) =>
+  Object.entries(sec)
+    .map(([k, v]) => ({ q: Number(k), sec: v }))
+    .sort((a, b) => b.sec - a.sec || a.q - b.q)
+    .slice(0, n);
+
+/** 「12:95,13:40」 처럼 주소에 담기 · 읽기 */
+export const encodeQ = (sec: Record<number, number>) =>
+  Object.entries(sec)
+    .map(([k, v]) => `${k}:${v}`)
+    .join(',');
+export function decodeQ(s: string): Record<number, number> {
+  const out: Record<number, number> = {};
+  for (const m of s.matchAll(/(\d{1,3}):(\d{1,5})/g)) {
+    const q = Number(m[1]),
+      v = Number(m[2]);
+    if (q >= 1 && q <= 200 && v > 0 && v <= 36_000) out[q] = v;
+  }
+  return out;
 }
 
 export interface MockView {

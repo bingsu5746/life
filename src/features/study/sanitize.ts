@@ -243,6 +243,14 @@ const FIX: Record<Collection, Fix> = {
           grade: score(x.grade, 1, 9),
           minutes: score(x.minutes, 0, 600),
           wrong: ints(x.wrong, 1, 200).slice(0, 100),
+          qTimes: isObj(x.qTimes)
+            ? Object.fromEntries(
+                Object.entries(x.qTimes)
+                  .filter(([k, v]) => /^\d{1,3}$/.test(k) && Number(k) >= 1 && Number(k) <= 200 && typeof v === 'number' && v > 0 && v <= 36_000)
+                  .slice(0, 200)
+                  .map(([k, v]) => [Number(k), Math.round(v as number)]),
+              )
+            : undefined,
           memo: optStr(x.memo),
           created: num(x.created),
         }
@@ -710,6 +718,32 @@ export function sanitizeSettings(s: unknown): StudySettings & { updatedAt: numbe
         : undefined,
     school: isObj(x.school) && typeof x.school.name === 'string' && x.school.name.trim() ? { name: x.school.name.trim().slice(0, 40), grade: score(x.school.grade, 1, 3), cls: typeof x.school.cls === 'string' && /^\d{1,2}$/.test(x.school.cls) ? x.school.cls : undefined } : undefined,
     sleepGoal: score(x.sleepGoal, 3, 12),
+    meds: Array.isArray(x.meds)
+      ? (x.meds as unknown[])
+          .filter((m): m is Obj => isObj(m) && typeof m.name === 'string' && !!m.name.trim())
+          .slice(0, 20)
+          .map((m) => ({
+            id: str(m.id, `m${Math.random().toString(36).slice(2, 10)}`).slice(0, 40),
+            name: (m.name as string).trim().slice(0, 30),
+            times: [...new Set(arr(m.times).filter((t): t is string => typeof t === 'string' && /^([01]\d|2[0-3]):[0-5]\d$/.test(t)))].sort().slice(0, 6),
+            memo: optStr(m.memo)?.trim().slice(0, 100) || undefined,
+          }))
+      : undefined,
+    focusVideos: Array.isArray(x.focusVideos)
+      ? (x.focusVideos as unknown[])
+          .filter((v): v is Obj => isObj(v) && (v.kind === 'v' || v.kind === 'list') && typeof v.id === 'string' && /^[\w-]{10,64}$/.test(v.id))
+          .slice(0, 10)
+          .map((v) => ({ kind: v.kind as 'v' | 'list', id: v.id as string, name: str(v.name, '유튜브').trim().slice(0, 30) || '유튜브' }))
+      : undefined,
+    medLog: isObj(x.medLog)
+      ? Object.fromEntries(
+          Object.entries(x.medLog)
+            .filter(([k, v]) => isDate(k) && Array.isArray(v))
+            .sort((a, b) => b[0].localeCompare(a[0]))
+            .slice(0, 60)
+            .map(([k, v]) => [k, (v as unknown[]).filter((t): t is string => typeof t === 'string' && t.length <= 50).slice(0, 60)]),
+        )
+      : undefined,
     bedRemind:
       isObj(x.bedRemind) && [x.bedRemind.weekday, x.bedRemind.weekend].every((t) => typeof t === 'string' && /^([01]\d|2[0-3]):[0-5]\d$/.test(t))
         ? { weekday: x.bedRemind.weekday as string, weekend: x.bedRemind.weekend as string, before: Math.round(cl(x.bedRemind.before, 0, 120, 30)) }

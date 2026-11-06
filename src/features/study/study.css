@@ -10253,3 +10253,191 @@ body.focus-on {
   border-color: var(--accent);
   color: var(--on-accent);
 }
+
+/* 모의고사 보기: 문항별 시간 재기 번호판 · 영어 듣기 */
+.focus.mock.perq {
+  grid-template-rows: auto minmax(0, 1fr) auto auto auto;
+}
+.focus.mock.perq .focus-main {
+  width: min(46vw, 30vh, 280px);
+}
+.mk-q {
+  width: min(100%, 560px);
+  display: grid;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+.mk-q-now {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+}
+.mk-q-now span {
+  display: grid;
+  justify-items: center;
+  min-width: 6em;
+  color: #f2f2f0;
+}
+.mk-q-now b {
+  font-size: 1.6rem;
+  font-variant-numeric: tabular-nums;
+}
+.mk-q-now small {
+  color: rgba(242, 242, 240, 0.6);
+  font-variant-numeric: tabular-nums;
+}
+.focus .mk-q-now button.next {
+  background: #f2f2f0;
+  color: #050505;
+  font-weight: 700;
+  padding: 12px 22px;
+}
+.focus .mk-q-now button:disabled {
+  opacity: 0.3;
+}
+.mk-q-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(38px, 1fr));
+  gap: 5px;
+  max-height: 22vh;
+  overflow-y: auto;
+}
+.focus .mk-q-grid button {
+  padding: 6px 0;
+  border-radius: 8px;
+  font-size: 0.8rem;
+  font-variant-numeric: tabular-nums;
+}
+.focus .mk-q-grid button.seen {
+  background: rgba(255, 255, 255, 0.16);
+}
+.focus .mk-q-grid button.on {
+  background: #f2f2f0;
+  color: #050505;
+  font-weight: 700;
+}
+.mk-slow {
+  display: block;
+  margin-top: 6px;
+  text-align: center;
+}
+.mk-listen {
+  display: grid;
+  gap: 2px;
+  justify-items: start;
+}
+
+/* 단어 듣기 모드 */
+.wl-listen {
+  grid-template-rows: auto 1fr auto auto;
+}
+.wl-card {
+  align-self: center;
+  display: grid;
+  justify-items: center;
+  gap: 18px;
+  text-align: center;
+  padding: 0 12px;
+}
+.wl-card b {
+  font-size: clamp(2.2rem, 9vw, 4rem);
+  color: rgba(242, 242, 240, 0.55);
+  transition: color 0.2s;
+}
+.wl-card span {
+  font-size: clamp(1.1rem, 4.5vw, 1.6rem);
+  color: rgba(242, 242, 240, 0.45);
+  transition: color 0.2s;
+}
+.wl-card .on {
+  color: #f2f2f0;
+}
+
+/* 약 · 영양제 */
+.md-list {
+  display: grid;
+  gap: 6px;
+  margin: 8px 0;
+}
+.md-dose {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: var(--soft);
+  cursor: pointer;
+}
+.md-dose b {
+  font-variant-numeric: tabular-nums;
+}
+.md-dose.done span {
+  text-decoration: line-through;
+  color: var(--muted);
+}
+
+/* 집중 화면 유튜브 */
+.fy-player {
+  position: fixed;
+  left: max(16px, env(safe-area-inset-left));
+  bottom: max(16px, env(safe-area-inset-bottom));
+  width: 240px;
+  aspect-ratio: 16 / 9;
+  border-radius: 12px;
+  overflow: hidden;
+  z-index: 3;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.5);
+}
+.fy-player iframe {
+  width: 100%;
+  height: 100%;
+  border: 0;
+}
+.focus .fy-player button {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  padding: 2px 8px;
+  background: rgba(0, 0, 0, 0.6);
+}
+.fy-pick {
+  display: grid;
+  gap: 8px;
+  justify-items: center;
+  width: min(100%, 480px);
+}
+.fy-pick small {
+  color: rgba(242, 242, 240, 0.5);
+  font-size: 0.75rem;
+  text-align: center;
+}
+.fy-add {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  justify-content: center;
+  width: 100%;
+}
+.fy-add input {
+  flex: 1 1 180px;
+  min-width: 0;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  color: #f2f2f0;
+  border-radius: 999px;
+  padding: 9px 14px;
+  font: inherit;
+  font-size: 0.9rem;
+}
+.fy-saved {
+  display: inline-flex;
+  gap: 2px;
+}
+.focus .fy-saved button + button {
+  padding: 9px 10px;
+}
+.focus-noise button.on {
+  background: #f2f2f0;
+  color: #050505;
+}

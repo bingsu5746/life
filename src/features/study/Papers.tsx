@@ -5,6 +5,7 @@ import { addSession } from './actions';
 import { BarChart, LineChart, TableView } from './charts';
 import { shortDate } from './dates';
 import { parseWrongNums } from './grades';
+import { decodeQ, slowest } from './mockExam';
 import { alive, newId, type PastPaper } from './model';
 import { CSAT_SECTIONS, notesFromPaper, numberFrequency, PAPER_KIND, paperTitle, papersOf, percent, sectionSubject } from './papers';
 export { CSAT_SECTIONS, sectionSubject };
@@ -141,12 +142,12 @@ export function Papers({ sub }: { sub?: string }) {
           </section>
         </>
       )}
-      {editing && <PaperSheet item={editing === 'new' ? undefined : editing} pre={pre ? { section: pre.get('section') ?? '', minutes: pre.get('min') ?? '', rec: pre.get('rec') !== '0', score: pre.get('score') ?? '', full: pre.get('full') ?? '', wrong: pre.get('wrong') ?? '' } : undefined} onClose={() => go('/review/papers')} />}
+      {editing && <PaperSheet item={editing === 'new' ? undefined : editing} pre={pre ? { section: pre.get('section') ?? '', minutes: pre.get('min') ?? '', rec: pre.get('rec') !== '0', score: pre.get('score') ?? '', full: pre.get('full') ?? '', wrong: pre.get('wrong') ?? '', qt: pre.get('qt') ?? '' } : undefined} onClose={() => go('/review/papers')} />}
     </div>
   );
 }
 
-function PaperSheet({ item, pre, onClose }: { item?: PastPaper; pre?: { section: string; minutes: string; rec: boolean; score?: string; full?: string; wrong?: string }; onClose: () => void }) {
+function PaperSheet({ item, pre, onClose }: { item?: PastPaper; pre?: { section: string; minutes: string; rec: boolean; score?: string; full?: string; wrong?: string; qt?: string }; onClose: () => void }) {
   const d = useStudy();
   const today = useToday();
   const [subjectId, setSubjectId] = useState(item?.subjectId ?? subjectsOf(d)[0]?.id ?? '');
@@ -169,6 +170,7 @@ function PaperSheet({ item, pre, onClose }: { item?: PastPaper; pre?: { section:
   // 모의고사 보기에서 이미 공부 기록에 넣었으면 두 번 넣지 않게
   const [toTime, setToTime] = useState(!item && (pre?.rec ?? true));
   const nums = parseWrongNums(wrong);
+  const qTimes = item?.qTimes ?? (pre?.qt ? decodeQ(pre.qt) : undefined);
   const autoTitle = paperTitle(kind, year, month);
   const name = touched ? title : autoTitle;
   // 수능 · 모의고사: 고른 영역에 맞는 내 과목 (없으면 「csat:영역」)
@@ -199,6 +201,7 @@ function PaperSheet({ item, pre, onClose }: { item?: PastPaper; pre?: { section:
       grade: n(grade, 1, 9),
       minutes: n(minutes, 0, 600),
       wrong: nums,
+      qTimes: qTimes && Object.keys(qTimes).length ? qTimes : undefined,
       memo: memo.trim() || undefined,
     } as PastPaper;
     put('papers', p);
@@ -306,6 +309,11 @@ function PaperSheet({ item, pre, onClose }: { item?: PastPaper; pre?: { section:
         <Field label="틀린 번호" hint={nums.length ? `${nums.length}문제: ${nums.join(', ')}` : '예: 3, 7, 21~23'}>
           <input className="st-input" value={wrong} onChange={(e) => setWrong(e.target.value.replace(/[^\d,~\-\s]/g, ''))} placeholder="3, 7, 21~23" />
         </Field>
+        {qTimes && Object.keys(qTimes).length > 0 && (
+          <p className="st-hint">
+            오래 걸린 번호: {slowest(qTimes).map((x) => `${x.q}번 ${x.sec >= 60 ? `${Math.floor(x.sec / 60)}분 ${x.sec % 60}초` : `${x.sec}초`}`).join(' · ')}
+          </p>
+        )}
         <Field label="한마디 (선택)">
           <input className="st-input" value={memo} onChange={(e) => setMemo(e.target.value)} placeholder="예: 시간 배분 실패 — 21번에서 10분 씀" />
         </Field>

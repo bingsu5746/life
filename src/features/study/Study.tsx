@@ -18,6 +18,7 @@ import { tutorSessions } from './tutor';
 import { eventSessions } from '../life/events';
 import { autoDiaries } from '../life/diaryForm';
 import { reminders } from '../life/events';
+import { medReminders } from './meds';
 import { notifyRemind } from '../auth/api';
 // 시험 화면은 오늘 화면(D-day)과 같이 쓰여 함께 받는다
 import { go, Icon, Sheet, Toaster, useToday } from './ui';
@@ -155,7 +156,7 @@ export function Study({ path, loggedIn, syncReady = true, onLogin }: { path: str
         .then(({ breakWordReminders, bedtimeReminders }) => {
           if (gone) return;
           // 일정 · 빚 갚을 날 · 쉬는 시간 단어 · 잘 시간 (서버는 60개까지라 가까운 것부터)
-          const items = [...reminders(d, today), ...breakWordReminders(d, words, today), ...bedtimeReminders(d, today)].sort((a, b) => a.at - b.at).slice(0, 60);
+          const items = [...reminders(d, today), ...breakWordReminders(d, words, today), ...bedtimeReminders(d, today), ...medReminders(d, today)].sort((a, b) => a.at - b.at).slice(0, 60);
           const key = JSON.stringify(items);
           if (lastRemind.current === key) return;
           return notifyRemind(items).then(() => (lastRemind.current = key));
@@ -166,7 +167,7 @@ export function Study({ path, loggedIn, syncReady = true, onLogin }: { path: str
       gone = true;
       clearTimeout(t);
     };
-  }, [d.events, d.moneyTx, d.settings.breakWords, d.settings.schoolTimetable, d.settings.birthdays, d.settings.movieNews, d.settings.bedRemind, d.settings.sleepGoal, words, today, loggedIn]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [d.events, d.moneyTx, d.settings.breakWords, d.settings.schoolTimetable, d.settings.birthdays, d.settings.movieNews, d.settings.bedRemind, d.settings.sleepGoal, d.settings.meds, d.settings.medLog, words, today, loggedIn]); // eslint-disable-line react-hooks/exhaustive-deps
   // 보고 싶은 영화 소식: 하루 한 번 (이 기기) OTT · 극장 상영 · 재개봉을 찾아 새 것만 남긴다
   useEffect(() => {
     if (!loggedIn || !syncReady) return;

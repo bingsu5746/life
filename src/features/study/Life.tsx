@@ -1,5 +1,6 @@
 // 할 일 · 습관 (4단계)
 import { Dictate } from './Dictate';
+import { MedsCard } from './Meds';
 import { parseVoiceTodos } from './voiceTodo';
 import { useState } from 'react';
 import { addDays, shortDate, WEEKDAYS } from './dates';
@@ -24,6 +25,7 @@ export function Life({ sub }: { sub?: string }) {
         <Todos today={today} />
         <Habits today={today} adding={sub === 'new-habit'} />
       </div>
+      <MedsCard />
     </div>
   );
 }

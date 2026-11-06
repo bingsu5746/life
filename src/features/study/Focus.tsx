@@ -1,11 +1,12 @@
 // 집중 화면: 공부 타이머 · 모의고사 보기. 지금 시각은 보여 주지 않는다.
 import { useEffect, useRef, useState } from 'react';
 import { NOISE_NAME, playNoise, setNoiseVolume, stopNoise, type NoiseKind } from '../../lib/noise';
-import { examSoundUrl, saveSound } from '../../lib/soundStore';
+import { embedUrl, parseYoutube, type YtRef } from '../../lib/youtube';
+import { examSoundUrl, loadSound, saveSound } from '../../lib/soundStore';
 import { addSession } from './actions';
 import { alive } from './model';
-import { hhmm, MOCK_SUBJECTS, mockMinutes, mockSection, mockView, type MockState } from './mockExam';
-import { getStudy, useStudy, useWords } from './store';
+import { encodeQ, hhmm, MOCK_SUBJECTS, mockMinutes, mockSection, mockView, QUESTION_COUNT, qSeconds, slowest, startPerQ, switchQ, type MockState } from './mockExam';
+import { getStudy, setSettings, useStudy, useWords } from './store';
 import { clock, minutesText, nextPhase, pause, resume, view, type TimerState } from './timer';
 import { primeAudio } from './timerStore';
 import { go, toast, useNow, useToday } from './ui';
@@ -65,6 +66,8 @@ export function FocusTimer({ timer, update, onStop, onExit }: { timer: TimerStat
   const [shown, poke] = useReveal();
   const [noise, setNoise] = useState<NoiseKind | ''>('');
   const [vol, setVol] = useState(0.5);
+  const [yt, setYt] = useState<YtRef | null>(null);
+  const [ytOpen, setYtOpen] = useState(false);
   useEffect(() => () => stopNoise(), []);
   const studiedNow = timer.kind === 'watch' ? v.shownMs : timer.studiedMs + (timer.phase === 'work' ? Math.min(now - (timer.runningSince ?? now) + timer.elapsedMs, pomo.work * 60_000) : 0);
   const todayMin =
@@ -111,6 +114,14 @@ export function FocusTimer({ timer, update, onStop, onExit }: { timer: TimerStat
           )}
         </div>
       </div>
+      {yt && (
+        <div className="fy-player" onPointerDown={(e) => e.stopPropagation()}>
+          <iframe src={embedUrl(yt)} title="유튜브" allow="autoplay; encrypted-media; picture-in-picture" referrerPolicy="strict-origin-when-cross-origin" />
+          <button aria-label="유튜브 끄기" onClick={() => setYt(null)}>
+            ✕
+          </button>
+        </div>
+      )}
       {timer.kind === 'pomo' && timer.phase !== 'work' && <Stretch />}
       {timer.kind === 'pomo' && timer.phase !== 'work' && <BreakWords dark />}
       <div className="focus-bottom">
@@ -136,7 +147,11 @@ export function FocusTimer({ timer, update, onStop, onExit }: { timer: TimerStat
             </button>
           ))}
           {noise && <input type="range" min={0} max={1} step={0.05} value={vol} onChange={(e) => (setVol(Number(e.target.value)), setNoiseVolume(Number(e.target.value)))} aria-label="소리 크기" />}
+          <button className={yt || ytOpen ? 'on' : ''} onClick={() => setYtOpen(!ytOpen)}>
+            유튜브
+          </button>
         </div>
+        {ytOpen && <YtPicker onPick={(r) => (stopNoise(), setNoise(''), setYt(r), setYtOpen(false))} />}
         <div className="focus-btns">
           {timer.kind === 'pomo' && (v.finished || timer.phase !== 'work') && (
             <button className="primary" onClick={() => (primeAudio(), update(nextPhase(timer, Date.now(), pomo).state))}>
@@ -146,6 +161,48 @@ export function FocusTimer({ timer, update, onStop, onExit }: { timer: TimerStat
           {v.finished && <button onClick={onStop}>끝내고 기록</button>}
         </div>
       </div>
+    </div>
+  );
+}
+
+/** 집중 화면 유튜브: 링크 넣기 · 넣어 둔 것 고르기 (영상 소리를 삽입 플레이어로 튼다) */
+function YtPicker({ onPick }: { onPick: (r: YtRef) => void }) {
+  const d = useStudy();
+  const saved = d.settings.focusVideos ?? [];
+  const [link, setLink] = useState('');
+  const [name, setName] = useState('');
+  const r = parseYoutube(link);
+  return (
+    <div className="fy-pick">
+      {saved.length > 0 && (
+        <div className="focus-noise">
+          {saved.map((v) => (
+            <span key={v.id} className="fy-saved">
+              <button onClick={() => onPick(v)}>{v.name}</button>
+              <button aria-label={`${v.name} 지우기`} onClick={() => setSettings({ focusVideos: saved.filter((x) => x.id !== v.id) })}>
+                ✕
+              </button>
+            </span>
+          ))}
+        </div>
+      )}
+      <div className="fy-add">
+        <input value={link} onChange={(e) => setLink(e.target.value)} placeholder="유튜브 링크 붙여 넣기" aria-label="유튜브 링크" />
+        {r && <input value={name} onChange={(e) => setName(e.target.value)} placeholder="이름 (예: 비 오는 카페)" aria-label="이름" />}
+        <button
+          disabled={!r}
+          onClick={() => {
+            if (!r) return;
+            if (!saved.some((x) => x.id === r.id)) setSettings({ focusVideos: [...saved, { ...r, name: name.trim().slice(0, 30) || (r.kind === 'list' ? '재생목록' : '유튜브') }].slice(-10) });
+            setLink('');
+            setName('');
+            onPick(r);
+          }}
+        >
+          {link && !r ? '링크를 못 읽었어요' : '넣고 틀기'}
+        </button>
+      </div>
+      <small>영상은 유튜브 플레이어로 틀어요 (음원을 따로 내려받지 않아요). 화면을 끄면 멈출 수 있어요.</small>
     </div>
   );
 }
@@ -198,8 +255,33 @@ function saveMock(s: MockState | null) {
 export function MockExamPage() {
   const [state, setState] = useState<MockState | null>(loadMock);
   const [title, setTitle] = useState('과학탐구');
+  // 문항별 시간 재기 (켜 두면 시험 화면에 번호판이 나온다)
+  const [perQOn, setPerQOn] = useState(() => {
+    try {
+      return localStorage.getItem('my-study.mock.perq') === '1';
+    } catch {
+      return false;
+    }
+  });
+  const togglePerQ = (on: boolean) => {
+    setPerQOn(on);
+    try {
+      localStorage.setItem('my-study.mock.perq', on ? '1' : '0');
+    } catch {
+      /* 무시 */
+    }
+  };
   const set = (s: MockState | null) => (setState(s), saveMock(s));
-  if (state) return <MockScreen state={state} onRestart={() => set({ ...state, startedAt: Date.now(), finishedAt: undefined })} onFinish={() => set({ ...state, finishedAt: Date.now() })} onQuit={() => set(null)} />;
+  if (state)
+    return (
+      <MockScreen
+        state={state}
+        onUpdate={set}
+        onRestart={() => set({ ...state, startedAt: Date.now(), finishedAt: undefined, perQ: state.perQ ? startPerQ(Date.now()) : undefined })}
+        onFinish={() => set({ ...state, finishedAt: Date.now() })}
+        onQuit={() => set(null)}
+      />
+    );
   return (
     <div className="st-page narrow">
       <div className="st-page-head">
@@ -217,7 +299,7 @@ export function MockExamPage() {
       </div>
       <div className="mk-list">
         {MOCK_SUBJECTS.map((s) => (
-          <button key={s.key} className="mk-item" onClick={() => set({ key: s.key, title: s.key.startsWith('inquiry') ? title : undefined, startedAt: Date.now() })}>
+          <button key={s.key} className="mk-item" onClick={() => set({ key: s.key, title: s.key.startsWith('inquiry') ? title : undefined, startedAt: Date.now(), perQ: perQOn ? startPerQ(Date.now()) : undefined })}>
             <b>{s.key.startsWith('inquiry') ? s.name.replace('탐구', title) : s.name}</b>
             <small>
               {hhmm(s.parts[0].from)} ~ {hhmm(s.parts[s.parts.length - 1].to)} · {s.parts[s.parts.length - 1].to - s.parts[0].from}분
@@ -225,10 +307,55 @@ export function MockExamPage() {
           </button>
         ))}
       </div>
+      <label className="st-toggle">
+        <input type="checkbox" checked={perQOn} onChange={(e) => togglePerQ(e.target.checked)} /> 문항별 시간 재기 (문제를 옮길 때마다 번호를 눌러요. 끝나면 오래 걸린 번호를 보여 줘요)
+      </label>
       <ExamSoundPicker />
+      <ListeningPicker />
     </div>
   );
 }
+
+/** 영어 듣기 음원: 이 기기에 넣어 두면 영어 영역을 시작할 때 바로 틀어 준다 (수능처럼 시험 시작과 함께 듣기) */
+function ListeningPicker() {
+  const [name, setName] = useState<string | null>(null);
+  useEffect(() => {
+    try {
+      setName(localStorage.getItem('my-study.listening.name'));
+    } catch {
+      /* 무시 */
+    }
+  }, []);
+  return (
+    <div className="mk-listen">
+      <label className="st-link mk-sound">
+        {name ? '영어 듣기 파일 바꾸기' : '영어 듣기 파일 넣기'}
+        <input
+          type="file"
+          accept="audio/*"
+          hidden
+          onChange={async (e) => {
+            const f = e.target.files?.[0];
+            if (!f) return;
+            await saveSound('listening', f);
+            try {
+              localStorage.setItem('my-study.listening.name', f.name.slice(0, 80));
+            } catch {
+              /* 무시 */
+            }
+            setName(f.name);
+            toast('영어 듣기 파일을 이 기기에 넣었어요 · 영어 영역을 시작하면 바로 틀어요');
+          }}
+        />
+      </label>
+      {name && <small className="st-muted">지금 파일: {name} (영어 영역 시작과 함께 재생)</small>}
+    </div>
+  );
+}
+
+/** 문항 번호 이름 (탐구 2과목은 21번부터 제2선택 1번) */
+const qName = (key: string, q: number) => (key === 'inquiry2' && q > 20 ? `②${q - 20}` : String(q));
+const secText = (s: number) => (s >= 60 ? `${Math.floor(s / 60)}분 ${s % 60}초` : `${s}초`);
 
 function ExamSoundPicker() {
   const [has, setHas] = useState<boolean | null>(null);
@@ -254,7 +381,7 @@ function ExamSoundPicker() {
   );
 }
 
-function MockScreen({ state, onRestart, onFinish, onQuit }: { state: MockState; onRestart: () => void; onFinish: () => void; onQuit: () => void }) {
+function MockScreen({ state, onUpdate, onRestart, onFinish, onQuit }: { state: MockState; onUpdate: (s: MockState) => void; onRestart: () => void; onFinish: () => void; onQuit: () => void }) {
   useImmersive();
   const now = useNow(250);
   const v = mockView(state, now);
@@ -280,17 +407,66 @@ function MockScreen({ state, onRestart, onFinish, onQuit }: { state: MockState; 
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state.startedAt]);
+  // 영어 듣기: 영어 영역이면 시작과 함께 한 번 튼다 (막히면 「듣기 틀기」 단추)
+  const listen = useRef<HTMLAudioElement | null>(null);
+  const [listenState, setListenState] = useState<'none' | 'playing' | 'blocked' | 'ended' | 'paused'>('none');
   useEffect(() => {
-    if (v?.done) audio.current?.pause();
+    if (state.key !== 'english') return;
+    let url: string | null = null;
+    let a: HTMLAudioElement | null = null;
+    let gone = false;
+    void loadSound('listening')
+      .then((b) => {
+        if (!b || gone) return;
+        url = URL.createObjectURL(b);
+        a = new Audio(url);
+        listen.current = a;
+        a.onended = () => setListenState('ended');
+        // 시험을 시작한 지 시간이 지났으면(다시 연 화면) 그만큼 넘겨서
+        const off = (Date.now() - state.startedAt) / 1000;
+        a.onloadedmetadata = () => {
+          if (a && off > 2) {
+            if (off >= a.duration) return setListenState('ended');
+            a.currentTime = off;
+          }
+        };
+        void a.play().then(
+          () => setListenState('playing'),
+          () => setListenState('blocked'),
+        );
+      })
+      .catch(() => {});
+    return () => {
+      gone = true;
+      a?.pause();
+      if (url) URL.revokeObjectURL(url);
+      listen.current = null;
+      setListenState('none');
+    };
+  }, [state.key, state.startedAt]);
+  // 듣기 동안은 시험장 소리를 줄인다
+  useEffect(() => {
+    if (audio.current) audio.current.volume = listenState === 'playing' ? Math.min(vol, 0.15) : vol;
+  }, [listenState, vol]);
+  useEffect(() => {
+    if (v?.done) {
+      audio.current?.pause();
+      listen.current?.pause();
+    }
   }, [v?.done]);
   if (!v) return null;
+  const pq = state.perQ;
+  const nQ = QUESTION_COUNT[state.key] ?? 20;
+  const qEnd = state.finishedAt ?? Math.min(now, state.startedAt + mockMinutes(state) * 60_000);
+  const qSec = pq ? qSeconds(pq, qEnd) : null;
+  const goQ = (q: number) => pq && !v.done && onUpdate({ ...state, perQ: switchQ(pq, Math.max(1, Math.min(nQ, q)), Date.now()) });
   const s = v.subject;
   const name = state.title ? s.name.replace('탐구', state.title) : s.name;
   // 실제로 푼 시간 (시간 전에 다 풀었으면 그때까지)
   const total = mockMinutes(state);
   const full = s.parts[s.parts.length - 1].to - s.parts[0].from;
   return (
-    <div className={`focus mock ${shown ? 'show' : ''}`} onPointerDown={poke}>
+    <div className={`focus mock ${pq && !v.done ? 'perq' : ''} ${shown ? 'show' : ''}`} onPointerDown={poke}>
       <div className="focus-top">
         <span>{v.part.label.replace('탐구 영역', state.title ? `${state.title} 영역` : '탐구 영역')}</span>
         <small>
@@ -300,8 +476,61 @@ function MockScreen({ state, onRestart, onFinish, onQuit }: { state: MockState; 
       <div className="focus-main">
         <AnalogClock min={v.clockMin} />
       </div>
-      <div className="focus-bottom">{v.done && <span>{state.finishedAt ? `다 풀었어요 · ${total}분 걸림 (${full}분 중 ${full - total}분 남김)` : '시험 끝'}</span>}</div>
+      {pq && !v.done && (
+        <div className="mk-q" onPointerDown={(e) => e.stopPropagation()}>
+          <div className="mk-q-now">
+            <button onClick={() => goQ(pq.cur - 1)} aria-label="앞 문제" disabled={pq.cur <= 1}>
+              ‹
+            </button>
+            <span>
+              <b>{qName(state.key, pq.cur)}번</b>
+              <small>{secText(qSec?.[pq.cur] ?? 0)}</small>
+            </span>
+            <button className="next" onClick={() => goQ(pq.cur + 1)} aria-label="다음 문제" disabled={pq.cur >= nQ}>
+              다음 ›
+            </button>
+          </div>
+          <div className="mk-q-grid" role="group" aria-label="문제 번호">
+            {Array.from({ length: nQ }, (_, i) => i + 1).map((q) => (
+              <button key={q} className={`${q === pq.cur ? 'on' : ''} ${qSec?.[q] ? 'seen' : ''}`} onClick={() => goQ(q)} aria-pressed={q === pq.cur}>
+                {qName(state.key, q)}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+      <div className="focus-bottom">
+        {v.done && <span>{state.finishedAt ? `다 풀었어요 · ${total}분 걸림 (${full}분 중 ${full - total}분 남김)` : '시험 끝'}</span>}
+        {v.done && qSec && Object.keys(qSec).length > 0 && (
+          <span className="mk-slow">
+            오래 걸린 번호: {slowest(qSec).map((x) => `${qName(state.key, x.q)}번 ${secText(x.sec)}`).join(' · ')}
+          </span>
+        )}
+      </div>
       <div className="focus-ctl" onPointerDown={(e) => e.stopPropagation()}>
+        {!v.done && listenState !== 'none' && (
+          <div className="focus-noise">
+            <span>영어 듣기 {listenState === 'playing' ? '나오는 중' : listenState === 'ended' ? '끝' : listenState === 'blocked' ? '(눌러서 틀기)' : '멈춤'}</span>
+            {listenState !== 'ended' && (
+              <button
+                onClick={() => {
+                  const a = listen.current;
+                  if (!a) return;
+                  if (listenState === 'playing') {
+                    a.pause();
+                    setListenState('paused');
+                  } else
+                    void a.play().then(
+                      () => setListenState('playing'),
+                      () => setListenState('blocked'),
+                    );
+                }}
+              >
+                {listenState === 'playing' ? '멈춤' : '듣기 틀기'}
+              </button>
+            )}
+          </div>
+        )}
         {!v.done && (
           <div className="focus-noise">
             <span>시험장 소리</span>
@@ -340,7 +569,7 @@ function MockScreen({ state, onRestart, onFinish, onQuit }: { state: MockState; 
               onClick={() => {
                 onQuit();
                 // 풀이 기록: 영역 · 걸린 시간을 채워서 (점수 · 등급 · 틀린 번호는 거기서)
-                go(`/review/papers-new?section=${encodeURIComponent(mockSection(state))}&min=${total}&rec=${saved ? 0 : 1}`);
+                go(`/review/papers-new?section=${encodeURIComponent(mockSection(state))}&min=${total}&rec=${saved ? 0 : 1}${qSec && Object.keys(qSec).length ? `&qt=${encodeQ(qSec)}` : ''}`);
               }}
             >
               점수 · 틀린 번호 넣기
