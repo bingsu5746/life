@@ -13,7 +13,7 @@ export const VAULT_ITEMS = [
   { key: 'blank', label: '백지 복습', short: '백지', to: '/review/blank', icon: 'books' },
   { key: 'passages', label: '지문', short: '지문', to: '/review/passages', icon: 'translate' },
   { key: 'papers', label: '기출·모의고사', short: '기출', to: '/review/papers', icon: 'exams' },
-  { key: 'grammar', label: '영어 어법', short: '어법', to: '/review/grammar', icon: 'translate' },
+  { key: 'grammar', label: '영어 어법', short: '어법', to: '/review/grammar', icon: 'list' },
   { key: 'ai', label: 'AI 풀이', short: 'AI', to: '/review/ai', icon: 'area-ai' },
 ] as const;
 export type VaultKey = (typeof VAULT_ITEMS)[number]['key'];

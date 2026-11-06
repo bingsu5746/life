@@ -18,6 +18,7 @@ import { Practice } from './Practice';
 import { WordTestSheet } from './WordTestSheet';
 import { dictKo, isLoggedIn, wordMeanings } from '../auth/api';
 import { WordListen } from './WordListen';
+import { useStudyClock, wordSubject } from './useStudyClock';
 import { Bar, confirmDelete, Empty, Field, go, Menu, Sheet, SubjectDot, toast, useToday, tap } from './ui';
 
 const KIND_LABEL: Record<WordList['kind'], string> = { book: '단어장', test: '단어 시험', inbox: '모르는 단어 모음' };
@@ -842,6 +843,8 @@ function WordRun({ listId, mode }: { listId: string; mode: 'learn' | 'prep' | 'w
     }
   }
 
+  // 외우는 동안 공부 시간이 저절로 쌓인다 (단어 목록의 과목, 없으면 영어)
+  useStudyClock(!!queue && queue.length > 0, wordSubject(listId), `단어 외우기 · ${list?.name ?? ''}`);
   if (!list || list.deleted) return <Empty icon="🤔" title="단어 목록을 찾을 수 없어요" />;
   if (!queue)
     return (

@@ -138,13 +138,17 @@ export interface MarketSettings {
   /** 실제 물건: 1금화 = 몇 원 */
   wonPerGold: number;
   items: MarketItem[];
-  buys: { id: Id; itemId: Id; name: string; kind: MarketItem['kind']; minutes?: number; price: number; tax: number; at: number; used?: boolean }[];
+  /** 산 것. 이용권은 expires 까지 쓸 수 있고(산 날 쓰면 벌금), 오락 이용권은 쓴 때(usedAt)를 적는다 */
+  buys: { id: Id; itemId: Id; name: string; kind: MarketItem['kind']; minutes?: number; price: number; tax: number; at: number; used?: boolean; expires?: DateStr; usedAt?: number }[];
   savings: { id: Id; amount: number; at: number; weeks: number; rate: number; closedAt?: number }[];
   loans: { id: Id; amount: number; at: number; due: DateStr; rate: number; repays: { at: number; amount: number }[] }[];
   /** 과목 주식 사고판 기록 (qty: 산 것 +, 판 것 −) */
   trades: { id: Id; subjectId: Id; qty: number; price: number; at: number }[];
   /** 날마다 게임한 분 (Steam · 롤에서 받아 적어 둔 것) */
   play: Record<DateStr, number>;
+  /** 주식에서 뺀 과목 · 시험 3주 전부터만 내리는 과목 */
+  stockOff?: Id[];
+  examOnly?: Id[];
 }
 export interface MarketItem {
   id: Id;

@@ -4,6 +4,7 @@ import { canSpeak, speakWait, stopSpeak } from '../../lib/speak';
 import { alive, type Word } from './model';
 import { useStudy, useWords } from './store';
 import { go } from './ui';
+import { useStudyClock, wordSubject } from './useStudyClock';
 
 type Source = 'all' | 'weak' | string;
 interface Opt {
@@ -54,6 +55,8 @@ export function WordListen() {
   const [on, setOn] = useState(false);
   const [phase, setPhase] = useState<'term' | 'meaning' | ''>('');
   const run = useRef(0);
+  // 듣는 동안 공부 시간 (켜 둔 시간)
+  useStudyClock(on, wordSubject(opt.src !== 'all' && opt.src !== 'weak' ? opt.src : undefined), '단어 듣기', true);
 
   // 화면 꺼짐 막기 (켜 두는 동안)
   useEffect(() => {

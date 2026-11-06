@@ -40,8 +40,8 @@ export const HOBBY_PARTS = ['movies', 'games', 'music', 'travel', 'basketball'] 
 export const AREA_ITEMS: Record<Exclude<AreaKey, 'home' | 'study'>, AreaItem[]> = {
   money: [
     { key: '', label: '이번 달', icon: 'area-money' },
-    { key: 'fixed', label: '고정', icon: 'review' },
-    { key: 'saving', label: '모으기', icon: 'target' },
+    { key: 'fixed', label: '고정', icon: 'repeat' },
+    { key: 'saving', label: '모으기', icon: 'coin' },
   ],
   hobby: [
     { key: '', label: '취미', icon: 'area-hobby' },
@@ -51,22 +51,22 @@ export const AREA_ITEMS: Record<Exclude<AreaKey, 'home' | 'study'>, AreaItem[]> 
     { key: 'games', label: '게임', icon: 'game', to: '/games' },
     { key: 'music', label: '음악', icon: 'music', to: '/music' },
     { key: 'travel', label: '여행', icon: 'pin', to: '/travel' },
-    { key: 'wish', label: '위시리스트', icon: 'save' },
+    { key: 'wish', label: '위시리스트', icon: 'gift' },
   ],
   ai: [{ key: '', label: '문제 풀이', icon: 'area-ai' }],
   market: [
     { key: '', label: '시장', icon: 'area-market' },
-    { key: 'shop', label: '상점', icon: 'save' },
-    { key: 'bank', label: '은행', icon: 'area-money' },
-    { key: 'stocks', label: '주식', icon: 'up' },
-    { key: 'rules', label: '규칙', icon: 'settings' },
+    { key: 'shop', label: '상점', icon: 'bag' },
+    { key: 'bank', label: '은행', icon: 'bank' },
+    { key: 'stocks', label: '주식', icon: 'chart' },
+    { key: 'rules', label: '규칙', icon: 'scale' },
   ],
   diary: [
     { key: '', label: '일기', icon: 'area-diary' },
     { key: 'dream', label: '꿈', icon: 'moon' },
     { key: 'form', label: '양식', icon: 'settings' },
-    { key: 'highlight', label: '하이라이트', icon: 'review' },
-    { key: 'recap', label: '한 해 결산', icon: 'target' },
+    { key: 'highlight', label: '하이라이트', icon: 'sparkle' },
+    { key: 'recap', label: '한 해 결산', icon: 'trophy' },
   ],
 };
 
@@ -74,24 +74,24 @@ export const AREA_ITEMS: Record<Exclude<AreaKey, 'home' | 'study'>, AreaItem[]> 
 export const MOVIE_ITEMS: AreaItem[] = [
   { key: 'hobby', label: '취미', icon: 'area-hobby', to: '/hobby' },
   { key: 'now', label: '극장가', icon: 'area-movies', to: '/movies' },
-  { key: 'watched', label: '내 영화', icon: 'life', to: '/movies/watched' },
+  { key: 'watched', label: '내 영화', icon: 'film', to: '/movies/watched' },
   { key: 'find', label: '찾기', icon: 'search', to: '/movies/find' },
-  { key: 'rec', label: '추천', icon: 'area-hobby', to: '/movies/rec' },
+  { key: 'rec', label: '추천', icon: 'star', to: '/movies/rec' },
 ];
 
 /** 게임 안에서의 메뉴 (취미로 돌아가기 + 게임 시간 · 롤 전적 · 롤 챔피언 · 롤 실시간 · Steam). 위시리스트는 취미 메뉴로 */
 export const GAME_ITEMS: AreaItem[] = [
   { key: 'hobby', label: '취미', icon: 'area-hobby', to: '/hobby' },
   { key: 'mine', label: '게임 시간', icon: 'time', to: '/games' },
-  { key: 'lol', label: '롤 전적', icon: 'target', to: '/games/lol' },
+  { key: 'lol', label: '롤 전적', icon: 'trophy', to: '/games/lol' },
   { key: 'champs', label: '롤 챔피언', icon: 'search', to: '/games/champs' },
-  { key: 'live', label: '롤 실시간', icon: 'time', to: '/games/live' },
-  { key: 'steam', label: 'Steam', icon: 'life', to: '/games/steam' },
+  { key: 'live', label: '롤 실시간', icon: 'pulse', to: '/games/live' },
+  { key: 'steam', label: 'Steam', icon: 'game', to: '/games/steam' },
 ];
 export const gameItem = (sub?: string) => (sub === 'lol' || sub === 'steam' || sub === 'champs' || sub === 'live' ? sub : sub === 'champ' ? 'champs' : 'mine');
 /** 롤 챔피언 하나 안에서의 메뉴 (챔피언 목록으로 + 빌드 · 룬 · 아이템 · 카운터 · 스킬 · 팁) */
 export const champItems = (id: string, pos: string): AreaItem[] => [
-  { key: 'back', label: '챔피언 목록', icon: 'search', to: '/games/champs' },
+  { key: 'back', label: '챔피언 목록', icon: 'list', to: '/games/champs' },
   ...(
     [
       ['build', '빌드', 'target'],
@@ -109,10 +109,10 @@ export const champItem = (sub?: string) => (sub ?? 'build').split('-')[0];
 /** 여행 안에서의 메뉴 (취미로 돌아가기 + 가 볼 곳 · 다녀온 곳 · 지도 · 여행 기록) */
 export const TRAVEL_ITEMS: AreaItem[] = [
   { key: 'hobby', label: '취미', icon: 'area-hobby', to: '/hobby' },
-  { key: 'want', label: '가 볼 곳', icon: 'target', to: '/travel' },
-  { key: 'visited', label: '다녀온 곳', icon: 'life', to: '/travel/visited' },
+  { key: 'want', label: '가 볼 곳', icon: 'flag', to: '/travel' },
+  { key: 'visited', label: '다녀온 곳', icon: 'done', to: '/travel/visited' },
   { key: 'map', label: '지도', icon: 'pin', to: '/travel/map' },
-  { key: 'trail', label: '여행 기록', icon: 'time', to: '/travel/trail' },
+  { key: 'trail', label: '여행 기록', icon: 'route', to: '/travel/trail' },
 ];
 export const travelItem = (sub?: string) => (sub === 'visited' || sub === 'map' || sub === 'trail' ? sub : 'want');
 
@@ -132,22 +132,22 @@ export const REVIEW_ITEMS: AreaItem[] = [
   { key: 'week', label: '이번 주', icon: 'review', to: '/week' },
   { key: 'month', label: '이번 달', icon: 'exams', to: '/month' },
   { key: 'coach', label: 'AI 코치', icon: 'area-ai', to: '/insights/coach' },
-  { key: 'fun', label: '이것저것', icon: 'target', to: '/insights/fun' },
+  { key: 'fun', label: '이것저것', icon: 'sparkle', to: '/insights/fun' },
   { key: 'study', label: '공부', icon: 'area-study', to: '/insights/study' },
-  { key: 'grades', label: '성적', icon: 'target', to: '/insights/grades' },
+  { key: 'grades', label: '성적', icon: 'up', to: '/insights/grades' },
   { key: 'fitness', label: '운동', icon: 'area-fitness', to: '/insights/fitness' },
   { key: 'hobby', label: '취미', icon: 'area-hobby', to: '/insights/hobby' },
   { key: 'money', label: '돈', icon: 'area-money', to: '/insights/money' },
-  { key: 'year', label: '올해', icon: 'time', to: '/insights/year' },
+  { key: 'year', label: '올해', icon: 'trophy', to: '/insights/year' },
 ];
 export const reviewItem = (p0: string, sub?: string) => (p0 === 'week' || p0 === 'month' ? p0 : REVIEW_ITEMS.some((x) => x.key === sub) ? sub! : 'study');
 
 export const NBA_ITEMS: AreaItem[] = [
   { key: 'back', label: '농구', icon: 'ball', to: '/basketball' },
   { key: 'games', label: '경기', icon: 'game', to: '/basketball/nba' },
-  { key: 'standings', label: '순위', icon: 'target', to: '/basketball/nba/standings' },
-  { key: 'roster', label: '로스터', icon: 'tutor', to: '/basketball/nba/roster' },
-  { key: 'players', label: '선수', icon: 'search', to: '/basketball/nba/players' },
+  { key: 'standings', label: '순위', icon: 'trophy', to: '/basketball/nba/standings' },
+  { key: 'roster', label: '로스터', icon: 'list', to: '/basketball/nba/roster' },
+  { key: 'players', label: '선수', icon: 'tutor', to: '/basketball/nba/players' },
 ];
 export const nbaItem = (sub?: string) => (sub === 'standings' ? 'standings' : sub === 'roster' || sub?.startsWith('roster-') ? 'roster' : sub === 'players' ? 'players' : 'games');
 

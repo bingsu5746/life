@@ -966,7 +966,7 @@ function sanitizeMarket(m: Obj) {
       : arr(m.buys)
           .filter((b): b is Obj => isObj(b) && typeof b.name === 'string')
           .slice(-500)
-          .map((b) => ({ id: str(b.id, rid('b')).slice(0, 40), itemId: str(b.itemId).slice(0, 40), name: (b.name as string).slice(0, 30), kind: kind(b.kind) as 'game' | 'fun' | 'thing', minutes: b.minutes === undefined ? undefined : Math.round(cl(b.minutes, 0, 600, 0)), price: money(b.price), tax: money(b.tax), at: at(b.at), used: b.used === true ? true : undefined })),
+          .map((b) => ({ id: str(b.id, rid('b')).slice(0, 40), itemId: str(b.itemId).slice(0, 40), name: (b.name as string).slice(0, 30), kind: kind(b.kind) as 'game' | 'fun' | 'thing', minutes: b.minutes === undefined ? undefined : Math.round(cl(b.minutes, 0, 600, 0)), price: money(b.price), tax: money(b.tax), at: at(b.at), used: b.used === true ? true : undefined, expires: isDate(b.expires) ? (b.expires as string) : undefined, usedAt: typeof b.usedAt === 'number' ? b.usedAt : undefined })),
     savings: arr(m.savings)
       .filter(isObj)
       .slice(-100)
@@ -988,5 +988,7 @@ function sanitizeMarket(m: Obj) {
             .map(([k, v]) => [k, Math.round(cl(v, 0, 1440, 0))]),
         )
       : {},
+    stockOff: arr(m.stockOff).filter((x): x is string => typeof x === 'string').slice(0, 40),
+    examOnly: arr(m.examOnly).filter((x): x is string => typeof x === 'string').slice(0, 40),
   };
 }

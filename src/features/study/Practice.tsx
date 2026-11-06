@@ -1,5 +1,6 @@
 // 영단어 연습: 카드 넘기기 · 4지선다 · 예문 빈칸 · 듣고 쓰기 (받아쓰기).
 // 「오늘 외우기」와 달리 상자(다시 볼 날)는 바꾸지 않는다. 틀린 횟수만 세서 「자주 틀리는 단어」에 쓰인다.
+import { useStudyClock, wordSubject } from './useStudyClock';
 import { playWord } from '../../lib/engDict';
 import { useMemo, useRef, useState } from 'react';
 import { alive, type Word } from './model';
@@ -45,6 +46,8 @@ export function Practice({ listId }: { listId?: string }) {
   const [scope, setScope] = useState<Scope>('all');
   const [count, setCount] = useState(20);
   const [items, setItems] = useState<Item[] | null>(null);
+  // 연습하는 동안 공부 시간이 저절로 쌓인다
+  useStudyClock(!!items && items.length > 0, wordSubject(src !== 'all' ? src : undefined), '단어 연습');
 
   const pool = src === 'all' ? alive(words) : listWords(words, src);
   const base = pool.filter((w) => w.term && (scope === 'all' || (scope === 'weak' ? w.wrong > 0 : !w.learned)));

@@ -2,19 +2,18 @@
 import { useEffect, useState } from 'react';
 import { isLoggedIn, lolGames, lolProfile, steamMe } from '../auth/api';
 import { addDays, shortDate } from '../study/dates';
-import { alive, newId, type MarketItem, type MarketSettings } from '../study/model';
-import { getStudy, setSettings, useStudy } from '../study/store';
+import { alive, newId, type MarketItem, type MarketSettings, type MoneyTx } from '../study/model';
+import { getStudy, put, setSettings, useStudy } from '../study/store';
 import { minutesText } from '../study/timer';
 import { Bar, confirmDelete, Empty, Field, Sheet, toast, useToday } from '../study/ui';
 import { lolDaily } from './GameTime';
-import { loanOwed, marketView, newMarket, priceOf, RULE, SAVING_PLANS, savingValue, won } from './market';
+import { kst, loanOwed, marketNews, marketView, newMarket, priceOf, RULE, SAME_DAY_FINE, SAVING_PLANS, savingValue, VOUCHER_DAYS, voucherEnds, won } from './market';
 import { dailyPlay } from './steamPlay';
 
 const save = (p: Partial<MarketSettings>) => {
   const cur = getStudy().settings.market;
   if (cur) setSettings({ market: { ...cur, ...p } });
 };
-const kst = (ms: number) => new Date(ms + 9 * 3_600_000).toISOString().slice(0, 10);
 
 export function Market({ sub }: { sub?: string }) {
   const d = useStudy();
@@ -124,6 +123,7 @@ function MarketHome({ m }: { m: MarketSettings }) {
         <h2>시장</h2>
       </div>
       <Wallet m={m} />
+      <NewsBoard m={m} />
       {v.overdue && (
         <section className="st-card mk-alert">
           <b>대출이 밀렸어요</b>
@@ -170,7 +170,43 @@ function MarketHome({ m }: { m: MarketSettings }) {
   );
 }
 
+/** 오늘의 시장 뉴스 (실검처럼 1~10위) */
+function NewsBoard({ m }: { m: MarketSettings }) {
+  const d = useStudy();
+  const today = useToday();
+  const news = marketNews(d, m, today);
+  if (!news.length) return null;
+  return (
+    <section className="st-card mk-news">
+      <h3 className="st-h">오늘의 시장 뉴스</h3>
+      <ol>
+        {news.map((n) => (
+          <li key={n.rank} className={`mk-n ${n.tone}`}>
+            <b>{n.rank}</b>
+            <span>{n.title}</span>
+            <i aria-hidden>{n.tone === 'up' ? '▲' : n.tone === 'down' ? '▼' : n.tone === 'warn' ? '!' : '•'}</i>
+          </li>
+        ))}
+      </ol>
+    </section>
+  );
+}
+
 const KIND_NAME: Record<MarketItem['kind'], string> = { game: '게임 이용권', fun: '오락 이용권', thing: '물건' };
+
+/** 넣을 수 있는 이용권 (눌러서 상점에 넣기) */
+const VOUCHER_IDEAS: Omit<MarketItem, 'id'>[] = [
+  { name: '게임 30분', kind: 'game', minutes: 30, price: 150 },
+  { name: '게임 1시간', kind: 'game', minutes: 60, price: 280 },
+  { name: '유튜브 30분', kind: 'fun', minutes: 30, price: 100 },
+  { name: '넷플릭스 · 드라마 한 편', kind: 'fun', minutes: 60, price: 180 },
+  { name: '웹툰 30분', kind: 'fun', minutes: 30, price: 80 },
+  { name: 'SNS 30분', kind: 'fun', minutes: 30, price: 100 },
+  { name: '늦잠 1시간', kind: 'fun', minutes: 60, price: 150 },
+  { name: '노래방 1시간', kind: 'fun', minutes: 60, price: 200 },
+  { name: '친구랑 놀기 반나절', kind: 'fun', minutes: 240, price: 600 },
+  { name: '배달 음식', kind: 'fun', minutes: 30, price: 250 },
+];
 
 function Shop({ m }: { m: MarketSettings }) {
   const d = useStudy();
@@ -182,53 +218,92 @@ function Shop({ m }: { m: MarketSettings }) {
     const p = priceOf(it, m, d, today);
     const cost = p.price + p.tax;
     if (v.balance < cost) return toast(`${won(cost - v.balance)} 모자라요 (은행에서 빌릴 수도 있어요)`);
-    if (!window.confirm(`「${it.name}」 ${won(p.price)}${p.tax ? ` + 사치세 ${won(p.tax)}` : ''} = ${won(cost)} 에 살까요?`)) return;
-    save({ buys: [...m.buys, { id: newId(), itemId: it.id, name: it.name, kind: it.kind, minutes: it.minutes, price: p.price, tax: p.tax, at: Date.now() }] });
+    const vch = it.kind !== 'thing';
+    if (!window.confirm(`「${it.name}」 ${won(p.price)}${p.tax ? ` + 사치세 ${won(p.tax)}` : ''} = ${won(cost)} 에 살까요?${vch ? `\n${shortDate(voucherEnds(Date.now()))}까지 쓸 수 있고, 오늘 바로 쓰면 이용권 값의 절반이 벌금이에요.` : ''}`)) return;
+    save({ buys: [...m.buys, { id: newId(), itemId: it.id, name: it.name, kind: it.kind, minutes: it.minutes, price: p.price, tax: p.tax, at: Date.now(), expires: vch ? voucherEnds(Date.now()) : undefined }] });
     toast(`${it.name} 샀어요`);
   };
-  const things = m.buys.filter((b) => b.kind === 'thing' && !b.used);
+  const realBuy = (b: MarketSettings['buys'][number]) => {
+    const it = m.items.find((x) => x.id === b.itemId);
+    save({ buys: m.buys.map((x) => (x.id === b.id ? { ...x, used: true } : x)) });
+    if (it?.won && window.confirm(`돈 영역에 쓴 돈 ${it.won.toLocaleString('ko-KR')}원(쇼핑)으로도 적을까요?`)) put('moneyTx', { id: newId(), date: today, type: 'out', amount: it.won, category: '쇼핑', memo: `${b.name} (시장)`, created: Date.now() } as MoneyTx);
+  };
+  const fun = m.items.filter((x) => x.kind !== 'thing');
+  const things = m.items.filter((x) => x.kind === 'thing');
+  const live = m.buys.filter((b) => b.kind === 'fun' && !b.usedAt && (b.expires ?? voucherEnds(b.at)) >= today);
+  const waiting = m.buys.filter((b) => b.kind === 'thing' && !b.used);
+  const card = (it: MarketItem) => {
+    const p = priceOf(it, m, d, today);
+    return (
+      <div key={it.id} className={`mk-shop-item ${v.balance < p.price + p.tax || v.overdue ? 'short' : ''}`}>
+        <button className="mk-shop-buy" onClick={() => buy(it)}>
+          <small className="st-muted">{it.kind === 'thing' ? `${(it.won ?? 0).toLocaleString('ko-KR')}원` : `${it.kind === 'game' ? '게임 · ' : ''}${minutesText(it.minutes ?? 0)}`}</small>
+          <b>{it.name}</b>
+          <span>{won(p.price + p.tax)}</span>
+          {p.why && <small className="mk-minus">{p.why} 값 오름</small>}
+        </button>
+        <button className="st-link" onClick={() => setEdit(it)}>
+          고치기
+        </button>
+      </div>
+    );
+  };
   return (
     <div className="st-page narrow">
       <div className="st-page-head">
         <h2>상점</h2>
         <button className="btn btn-sm" onClick={() => setEdit('new')}>
-          ＋ 물건
+          ＋ 넣기
         </button>
       </div>
       <Wallet m={m} />
       <p className="st-hint">
-        오락은 사치세 {Math.round(RULE.luxBase * 100)}%(이번 주에 산 오락 1시간마다 +{Math.round(RULE.luxPerHour * 100)}%)가 붙고, 시험 2주 전부터 값이 올라 시험 기간엔 2배예요. 이용권 없이 게임하면 {RULE.rawGame}배가 빠져요.
-        {v.game.bought > 0 && ` 게임 이용권 남은 시간 ${minutesText(v.game.left)}.`}
+        이용권은 산 날부터 {VOUCHER_DAYS}일 동안 쓸 수 있어요. 산 날 바로 쓰면 이용권 값의 절반이 벌금이니 미리 사 두세요. 오락은 사치세 {Math.round(RULE.luxBase * 100)}%(이번 주 오락 1시간마다 +{Math.round(RULE.luxPerHour * 100)}%), 시험 2주 전부터 값이 올라 시험 기간엔 2배. 이용권 없이 게임하면 {RULE.rawGame}배.
       </p>
-      <div className="mk-shop">
-        {m.items.map((it) => {
-          const p = priceOf(it, m, d, today);
-          return (
-            <div key={it.id} className={`mk-shop-item ${v.balance < p.price + p.tax || v.overdue ? 'short' : ''}`}>
-              <button className="mk-shop-buy" onClick={() => buy(it)}>
-                <small className="st-muted">{KIND_NAME[it.kind]}</small>
-                <b>{it.name}</b>
-                <span>{won(p.price + p.tax)}</span>
-                {p.why && <small className="mk-minus">{p.why} 값 오름</small>}
-                {it.kind === 'thing' && <small className="st-muted">{(it.won ?? 0).toLocaleString('ko-KR')}원</small>}
-              </button>
-              <button className="st-link" onClick={() => setEdit(it)}>
-                고치기
-              </button>
-            </div>
-          );
-        })}
-      </div>
-      {things.length > 0 && (
+      {(live.length > 0 || v.game.left > 0) && (
         <section className="st-card">
-          <h3 className="st-h">산 물건 (아직 안 삼)</h3>
-          {things.map((b) => (
+          <h3 className="st-h">가진 이용권</h3>
+          {v.game.left > 0 && <p className="st-sub">게임 {minutesText(v.game.left)} (Steam · 롤 기록으로 저절로 써요)</p>}
+          {live.map((b) => (
             <div key={b.id} className="st-item">
               <div className="st-item-main">
                 <div className="st-item-title">{b.name}</div>
-                <div className="st-item-sub">{shortDate(kst(b.at))} · {won(b.price)}</div>
+                <div className="st-item-sub">
+                  {shortDate(b.expires ?? voucherEnds(b.at))}까지{kst(b.at) === today ? ' · 오늘 산 것 (오늘 쓰면 벌금)' : ''}
+                </div>
               </div>
-              <button className="btn btn-sm" onClick={() => save({ buys: m.buys.map((x) => (x.id === b.id ? { ...x, used: true } : x)) })}>
+              <button className="btn btn-sm" onClick={() => (kst(b.at) !== today || window.confirm(`오늘 산 이용권이라 쓰면 ${won(Math.round(b.price * SAME_DAY_FINE))} 벌금이에요. 쓸까요?`)) && save({ buys: m.buys.map((x) => (x.id === b.id ? { ...x, usedAt: Date.now() } : x)) })}>
+                쓰기
+              </button>
+            </div>
+          ))}
+        </section>
+      )}
+      <h3 className="st-h">오락 이용권</h3>
+      <div className="mk-shop">{fun.map(card)}</div>
+      {VOUCHER_IDEAS.some((x) => !m.items.some((y) => y.name === x.name)) && (
+        <div className="st-chips">
+          {VOUCHER_IDEAS.filter((x) => !m.items.some((y) => y.name === x.name)).map((x) => (
+            <button key={x.name} className="st-chip" onClick={() => save({ items: [...m.items, { ...x, id: newId() }] })}>
+              ＋ {x.name} · {won(x.price)}
+            </button>
+          ))}
+        </div>
+      )}
+      <h3 className="st-h">물건</h3>
+      {things.length ? <div className="mk-shop">{things.map(card)}</div> : <p className="st-hint">사고 싶은 물건을 실제 가격(원)으로 넣으면 금화로 바꿔 보여 줘요 (1금화 = {m.wonPerGold.toLocaleString('ko-KR')}원).</p>}
+      {waiting.length > 0 && (
+        <section className="st-card">
+          <h3 className="st-h">산 물건 (아직 실제로 안 삼)</h3>
+          {waiting.map((b) => (
+            <div key={b.id} className="st-item">
+              <div className="st-item-main">
+                <div className="st-item-title">{b.name}</div>
+                <div className="st-item-sub">
+                  {shortDate(kst(b.at))} · {won(b.price)}
+                </div>
+              </div>
+              <button className="btn btn-sm" onClick={() => realBuy(b)}>
                 실제로 샀어요
               </button>
             </div>
@@ -331,9 +406,9 @@ function Bank({ m }: { m: MarketSettings }) {
           <div key={l.id} className="st-item">
             <div className="st-item-main">
               <div className="st-item-title">
-                {won(l.amount)} 빌림 · 남은 빚 {won(o.owed)}
+                {won(l.amount)} 빌림 · 이자 {won(o.interest)} · 남은 빚 {won(o.owed)}
               </div>
-              <div className={`st-item-sub ${o.overdueDays ? 'mk-minus' : ''}`}>{o.overdueDays ? `${o.overdueDays}일 밀림` : `${shortDate(l.due)}까지 · 이자 주 ${Math.round(l.rate * 100)}%`}</div>
+              <div className={`st-item-sub ${o.overdueDays ? 'mk-minus' : ''}`}>{o.overdueDays ? `${o.overdueDays}일 밀림` : `${shortDate(l.due)}까지 · 이자 주 ${Math.round(l.rate * 100)}% (날마다 붙음)`}</div>
             </div>
             <button
               className="btn btn-sm"
@@ -428,7 +503,17 @@ function Stocks({ m }: { m: MarketSettings }) {
   const today = useToday();
   const v = marketView(d, m, today);
   const [qty, setQty] = useState<Record<string, string>>({});
-  const subs = alive(d.subjects).sort((a, b) => a.order - b.order);
+  // 학교 시간표가 있으면 시간표 과목만 (가진 주식은 늘 보여 준다)
+  const tt = new Set(Object.values(d.settings.schoolTimetable ?? {}).flat());
+  const off = m.stockOff ?? [];
+  const exOnly = m.examOnly ?? [];
+  const all = alive(d.subjects).sort((a, b) => a.order - b.order);
+  const subs = all.filter((s) => (v.hold.get(s.id)?.qty ?? 0) > 0 || (!off.includes(s.id) && (!tt.size || tt.has(s.id))));
+  const hidden = all.filter((s) => !subs.includes(s));
+  const toggle = (k: 'stockOff' | 'examOnly', id: string) => {
+    const cur = m[k] ?? [];
+    save({ [k]: cur.includes(id) ? cur.filter((x) => x !== id) : [...cur, id] });
+  };
   const trade = (id: string, n: number) => {
     const p = v.prices.get(id)?.price ?? 0;
     const have = v.hold.get(id)?.qty ?? 0;
@@ -446,6 +531,17 @@ function Stocks({ m }: { m: MarketSettings }) {
       <Wallet m={m} />
       <p className="st-hint">과목마다 100은화에서 시작해요. 그 과목을 공부하면 10분마다 +0.5%(하루 +8%까지), 오답을 해결하면 +2%, 그날 공부를 안 하면 −1.5%. 성적이 오르면 +10%, 내리면 −10%. 약한 과목 주식을 싸게 사 두고 공부해서 올려 보세요. 사고팔 때 수수료 {Math.round(RULE.stockFee * 100)}%.</p>
       {!subs.length && <p className="st-hint bad">과목을 먼저 넣어 주세요.</p>}
+      {hidden.length > 0 && (
+        <p className="st-hint">
+          안 보이는 과목: {hidden.map((x) => x.name).join(' · ')}
+          {tt.size ? ' (학교 시간표에 없거나 뺀 과목)' : ' (뺀 과목)'}{' '}
+          {hidden.some((x) => off.includes(x.id)) && (
+            <button className="st-link" onClick={() => save({ stockOff: [] })}>
+              뺀 과목 다시 보이기
+            </button>
+          )}
+        </p>
+      )}
       {subs.map((s) => {
         const p = v.prices.get(s.id);
         const h = v.hold.get(s.id);
@@ -465,7 +561,8 @@ function Stocks({ m }: { m: MarketSettings }) {
                 {h.qty}주 · 산 값 {won(Math.round(h.cost))} → 지금 {won(h.qty * (p?.price ?? 0))}
               </small>
             )}
-            <div className="st-inline">
+            {exOnly.includes(s.id) && <small className="st-muted">시험 3주 전부터만 내려요</small>}
+            <div className="st-inline wrap">
               <input className="st-input xs" inputMode="numeric" value={qty[s.id] ?? '1'} onChange={(e) => setQty({ ...qty, [s.id]: e.target.value.replace(/\D/g, '') })} aria-label={`${s.name} 주 수`} />주
               <button className="btn btn-sm" disabled={!n} onClick={() => trade(s.id, n)}>
                 사기
@@ -473,6 +570,14 @@ function Stocks({ m }: { m: MarketSettings }) {
               <button className="btn btn-sm" disabled={!n || !h?.qty} onClick={() => trade(s.id, -n)}>
                 팔기
               </button>
+              <button className="st-link" onClick={() => toggle('examOnly', s.id)}>
+                {exOnly.includes(s.id) ? '늘 내리게' : '시험 3주 전부터만 내리기'}
+              </button>
+              {!h?.qty && (
+                <button className="st-link" onClick={() => toggle('stockOff', s.id)}>
+                  빼기
+                </button>
+              )}
             </div>
           </section>
         );
