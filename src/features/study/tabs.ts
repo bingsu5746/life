@@ -20,6 +20,7 @@ export const AREAS = [
   { key: 'hobby', label: '취미' },
   { key: 'diary', label: '일기' },
   { key: 'market', label: '시장' },
+  { key: 'news', label: '뉴스' },
   { key: 'ai', label: 'AI' },
 ] as const;
 export type AreaKey = (typeof AREAS)[number]['key'];
@@ -54,6 +55,16 @@ export const AREA_ITEMS: Record<Exclude<AreaKey, 'home' | 'study'>, AreaItem[]> 
     { key: 'wish', label: '위시리스트', icon: 'gift' },
   ],
   ai: [{ key: '', label: '문제 풀이', icon: 'area-ai' }],
+  news: [
+    { key: '', label: '오늘', icon: 'news' },
+    { key: 'world', label: '세계', icon: 'globe' },
+    { key: 'business', label: '경제', icon: 'chart' },
+    { key: 'technology', label: '기술', icon: 'solve' },
+    { key: 'science', label: '과학', icon: 'sparkle' },
+    { key: 'environment', label: '환경', icon: 'leaf' },
+    { key: 'sport', label: '스포츠', icon: 'ball' },
+    { key: 'culture', label: '문화', icon: 'music' },
+  ],
   market: [
     { key: '', label: '시장', icon: 'area-market' },
     { key: 'shop', label: '상점', icon: 'bag' },
@@ -160,6 +171,7 @@ export function activeItem(area: keyof typeof AREA_ITEMS, sub?: string, p0?: str
   if (area === 'diary') return sub === 'dream' || sub === 'form' || sub === 'recap' ? sub : sub?.startsWith('highlight') ? 'highlight' : '';
   if (area === 'money') return sub === 'fixed' || sub === 'saving' ? sub : '';
   if (area === 'hobby') return sub === 'wish' || sub === 'reading' ? sub : '';
+  if (area === 'news') return sub && ['world', 'business', 'technology', 'science', 'environment', 'sport', 'culture'].includes(sub) ? sub : '';
   if (area === 'market') return sub === 'shop' || sub === 'bank' || sub === 'stocks' || sub === 'rules' ? sub : '';
   return '';
 }

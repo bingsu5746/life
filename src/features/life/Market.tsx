@@ -192,7 +192,7 @@ function NewsBoard({ m }: { m: MarketSettings }) {
   );
 }
 
-const KIND_NAME: Record<MarketItem['kind'], string> = { game: '게임 이용권', fun: '오락 이용권', thing: '물건' };
+const KIND_NAME: Record<MarketItem['kind'], string> = { game: '게임 이용권', fun: '오락 이용권', meet: '약속', thing: '물건' };
 
 /** 넣을 수 있는 이용권 (눌러서 상점에 넣기) */
 const VOUCHER_IDEAS: Omit<MarketItem, 'id'>[] = [
@@ -203,9 +203,11 @@ const VOUCHER_IDEAS: Omit<MarketItem, 'id'>[] = [
   { name: '웹툰 30분', kind: 'fun', minutes: 30, price: 80 },
   { name: 'SNS 30분', kind: 'fun', minutes: 30, price: 100 },
   { name: '늦잠 1시간', kind: 'fun', minutes: 60, price: 150 },
-  { name: '노래방 1시간', kind: 'fun', minutes: 60, price: 200 },
-  { name: '친구랑 놀기 반나절', kind: 'fun', minutes: 240, price: 600 },
   { name: '배달 음식', kind: 'fun', minutes: 30, price: 250 },
+  { name: '친구랑 놀기 반나절', kind: 'meet', minutes: 240, price: 500 },
+  { name: '친구랑 노래방', kind: 'meet', minutes: 90, price: 250 },
+  { name: '영화 보러 가기', kind: 'meet', minutes: 180, price: 400 },
+  { name: '가족 외식', kind: 'meet', minutes: 120, price: 150 },
 ];
 
 function Shop({ m }: { m: MarketSettings }) {
@@ -226,18 +228,23 @@ function Shop({ m }: { m: MarketSettings }) {
   const realBuy = (b: MarketSettings['buys'][number]) => {
     const it = m.items.find((x) => x.id === b.itemId);
     save({ buys: m.buys.map((x) => (x.id === b.id ? { ...x, used: true } : x)) });
-    if (it?.won && window.confirm(`돈 영역에 쓴 돈 ${it.won.toLocaleString('ko-KR')}원(쇼핑)으로도 적을까요?`)) put('moneyTx', { id: newId(), date: today, type: 'out', amount: it.won, category: '쇼핑', memo: `${b.name} (시장)`, created: Date.now() } as MoneyTx);
+    // 실제로 산 것은 돈 영역 지출로
+    if (it?.won) {
+      put('moneyTx', { id: newId(), date: today, type: 'out', amount: it.won, category: '쇼핑', memo: `${b.name} (시장)`, created: Date.now() } as MoneyTx);
+      toast(`돈 › 쓴 돈에 ${it.won.toLocaleString('ko-KR')}원을 적었어요`);
+    }
   };
-  const fun = m.items.filter((x) => x.kind !== 'thing');
+  const fun = m.items.filter((x) => x.kind === 'game' || x.kind === 'fun');
+  const meets = m.items.filter((x) => x.kind === 'meet');
   const things = m.items.filter((x) => x.kind === 'thing');
-  const live = m.buys.filter((b) => b.kind === 'fun' && !b.usedAt && (b.expires ?? voucherEnds(b.at)) >= today);
+  const live = m.buys.filter((b) => (b.kind === 'fun' || b.kind === 'meet') && !b.usedAt && (b.expires ?? voucherEnds(b.at)) >= today);
   const waiting = m.buys.filter((b) => b.kind === 'thing' && !b.used);
   const card = (it: MarketItem) => {
     const p = priceOf(it, m, d, today);
     return (
       <div key={it.id} className={`mk-shop-item ${v.balance < p.price + p.tax || v.overdue ? 'short' : ''}`}>
         <button className="mk-shop-buy" onClick={() => buy(it)}>
-          <small className="st-muted">{it.kind === 'thing' ? `${(it.won ?? 0).toLocaleString('ko-KR')}원` : `${it.kind === 'game' ? '게임 · ' : ''}${minutesText(it.minutes ?? 0)}`}</small>
+          <small className="st-muted">{it.kind === 'thing' ? `${(it.won ?? 0).toLocaleString('ko-KR')}원` : `${it.kind === 'game' ? '게임 · ' : it.kind === 'meet' ? '약속 · ' : ''}${minutesText(it.minutes ?? 0)}`}</small>
           <b>{it.name}</b>
           <span>{won(p.price + p.tax)}</span>
           {p.why && <small className="mk-minus">{p.why} 값 오름</small>}
@@ -281,9 +288,21 @@ function Shop({ m }: { m: MarketSettings }) {
       )}
       <h3 className="st-h">오락 이용권</h3>
       <div className="mk-shop">{fun.map(card)}</div>
-      {VOUCHER_IDEAS.some((x) => !m.items.some((y) => y.name === x.name)) && (
+      {VOUCHER_IDEAS.some((x) => x.kind !== 'meet' && !m.items.some((y) => y.name === x.name)) && (
         <div className="st-chips">
-          {VOUCHER_IDEAS.filter((x) => !m.items.some((y) => y.name === x.name)).map((x) => (
+          {VOUCHER_IDEAS.filter((x) => x.kind !== 'meet' && !m.items.some((y) => y.name === x.name)).map((x) => (
+            <button key={x.name} className="st-chip" onClick={() => save({ items: [...m.items, { ...x, id: newId() }] })}>
+              ＋ {x.name} · {won(x.price)}
+            </button>
+          ))}
+        </div>
+      )}
+      <h3 className="st-h">약속</h3>
+      <p className="st-hint">친구 · 가족과의 약속은 사치세가 없어요 (시험 기간엔 값이 올라요).</p>
+      {meets.length > 0 && <div className="mk-shop">{meets.map(card)}</div>}
+      {VOUCHER_IDEAS.some((x) => x.kind === 'meet' && !m.items.some((y) => y.name === x.name)) && (
+        <div className="st-chips">
+          {VOUCHER_IDEAS.filter((x) => x.kind === 'meet' && !m.items.some((y) => y.name === x.name)).map((x) => (
             <button key={x.name} className="st-chip" onClick={() => save({ items: [...m.items, { ...x, id: newId() }] })}>
               ＋ {x.name} · {won(x.price)}
             </button>

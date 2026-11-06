@@ -153,8 +153,8 @@ export interface MarketSettings {
 export interface MarketItem {
   id: Id;
   name: string;
-  /** game: 게임 이용권(분) · fun: 그 밖 오락(분) · thing: 실제 물건(원) */
-  kind: 'game' | 'fun' | 'thing';
+  /** game: 게임 이용권(분) · fun: 그 밖 오락(분) · meet: 약속(친구 · 가족, 사치세 없음) · thing: 실제 물건(원) */
+  kind: 'game' | 'fun' | 'meet' | 'thing';
   /** 이용권 분 (game · fun) */
   minutes?: number;
   /** 기본 값 (은화). thing 이면 won 으로 계산 */

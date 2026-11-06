@@ -56,6 +56,7 @@ const Movies = lazy(() => import('../life/Movies').then((m) => ({ default: m.Mov
 const Search = lazy(() => import('../life/Search').then((m) => ({ default: m.Search })));
 const LifeWeekPage = lazy(() => import('../life/LifeWeek').then((m) => ({ default: m.LifeWeekPage })));
 const CheckinPage = lazy(() => import('../life/Checkin').then((m) => ({ default: m.CheckinPage })));
+const NewsPage = lazy(() => import('../life/News').then((m) => ({ default: m.NewsPage })));
 const Market = lazy(() => import('../life/Market').then((m) => ({ default: m.Market })));
 const Diary = lazy(() => import('../life/Diary').then((m) => ({ default: m.Diary })));
 const SubjectProblems = lazy(() => import('./SavedProblems').then((m) => ({ default: m.SubjectProblems })));
@@ -241,6 +242,7 @@ export function Study({ path, loggedIn, syncReady = true, onLogin }: { path: str
   else if (area === 'hobby') content = <Hobby sub={path[1]} sub2={path[2]} />;
   else if (area === 'diary') content = <Diary sub={path[1]} />;
   else if (area === 'market') content = <Market sub={path[1]} />;
+  else if (area === 'news') content = <NewsPage sub={path[1]} />;
   else if (area === 'ai' && path[1] === 's' && path[2]) content = <SubjectProblems subject={path[2]} />;
   else if (area === 'ai') content = <Solve open={path[1]} />;
   else if (tab === 'books') content = <Books id={id} sub={sub} />;

@@ -103,6 +103,7 @@ export function Home(_: { loggedIn: boolean; onLogin: () => void }) {
       badge: nextOpen ? { big: dday(today, nextOpen.release!), small: nextOpen.title } : undefined,
       action: { label: '극장가', to: '/movies' },
     },
+    news: { lines: ['오늘의 세계 뉴스', '한국어로 읽고, 원문도 볼 수 있어요'], action: { label: '뉴스 보기', to: '/news' } },
     market: (() => {
       const m = d.settings.market;
       if (!m) return { lines: ['공부로 은화를 벌어요', '은화로 오락 · 물건을 사고, 은행 · 주식도 있어요'], action: { label: '시장 열기', to: '/market' } };

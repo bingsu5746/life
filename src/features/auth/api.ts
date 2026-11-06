@@ -644,6 +644,18 @@ export interface GradeCardRead {
   scores: { subject: string; raw: number | null; full: number | null; grade: number | null; average: number | null; standard: number | null; percentile: number | null }[];
 }
 export const gradeCardScan = (images: { mime: string; data: string }[]) => aiJob<GradeCardRead>('ai/gradecard', { images });
+/** 세계 뉴스 (Guardian, 한국어 번역 포함) */
+export interface WorldNews {
+  id: string;
+  title: string;
+  trail: string;
+  url: string;
+  section: string;
+  at: string;
+  thumb?: string;
+  ko?: { title: string; trail: string };
+}
+export const worldNews = (section: string) => call<{ items: WorldNews[]; at: number }>(`news/world?section=${encodeURIComponent(section)}`, 'GET', undefined, 60_000);
 /** 교과서 글 → 백지 복습 카드 */
 export const blankScan = (text: string, subject: string, pages: string) => aiJob<{ sheets: { title: string; points: string[] }[] }>('ai/blank', { text, subject, pages });
 /** 목차 사진들 → 단원 · 쪽 */

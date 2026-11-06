@@ -210,7 +210,7 @@ export function gameUse(m: MarketSettings, today?: DateStr) {
 /** 오락 이용권(게임 말고): 쓴 날이 산 날과 같으면 벌금 */
 export function funSameDayFines(m: MarketSettings): Fine[] {
   return m.buys
-    .filter((b) => b.kind === 'fun' && b.usedAt && kst(b.usedAt) === kst(b.at))
+    .filter((b) => (b.kind === 'fun' || b.kind === 'meet') && b.usedAt && kst(b.usedAt) === kst(b.at))
     .map((b) => ({ date: kst(b.usedAt!), why: `산 날 바로 쓴 이용권: ${b.name}`, amount: Math.round(b.price * SAME_DAY_FINE) }));
 }
 
@@ -236,6 +236,8 @@ export function priceOf(it: MarketItem, m: MarketSettings, d: Pick<StudyData, 'e
   if (it.kind === 'thing') return { price: Math.max(1, Math.round(((it.won ?? 0) / m.wonPerGold) * 100)), tax: 0, why: '' };
   const s = examSurge(d, today);
   const price = Math.round(it.price * s.factor);
+  // 약속(친구 · 가족)은 사치세가 없다
+  if (it.kind === 'meet') return { price, tax: 0, why: s.why };
   const rate = Math.min(RULE.luxMax, RULE.luxBase + RULE.luxPerHour * Math.floor(funThisWeek(m, today) / 60));
   return { price, tax: Math.round(price * rate), why: s.why };
 }

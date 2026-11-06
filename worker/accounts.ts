@@ -23,6 +23,7 @@ import { fetchSpecialDays } from './holidays';
 import { cleanFact, goodKo } from './fact';
 import { fetch2k } from './nba2k';
 import { hcBody, parseHc } from './homecourt';
+import { buildNewsTranslate, guardianUrl, NEWS_SECTIONS, parseGuardian, readNewsTranslate, type NewsSection } from './news';
 import { coachBody, diaryBody, noteBody, parseCoach, parseDiary, parseNote, parseReceipt, parseTocRead, receiptBody, tocBody, titleBody, parseTitles, scopeBody, parseScopeRead, reviewQBody, parseReviewQ, gradeCardBody, parseGradeCard, blankBody, parseBlank } from './aiRead';
 import { seojiSearch, seojiToc, seojiTocByIsbn, yes24Search, yes24Toc } from './books';
 import { cheapShark } from './cheapshark';
@@ -372,6 +373,10 @@ export class Accounts extends DurableObject<Env> {
       );
     if (path === 'games/watch' && req.method === 'PUT') return this.gameWatch(req, user, body);
     if (path === 'nba/fav' && (req.method === 'GET' || req.method === 'PUT')) return this.nbaFav(req, user, body);
+    if (path === 'news/world' && req.method === 'GET') {
+      const sec = new URL(req.url).searchParams.get('section') ?? 'all';
+      return this.worldNews((NEWS_SECTIONS as readonly string[]).includes(sec) ? (sec as NewsSection) : 'all');
+    }
     if (path === 'kakao/key' && req.method === 'GET') {
       // 지도 JS 키: 브라우저에서 쓰라고 만든 키 (카카오 개발자 콘솔에 등록한 사이트 주소에서만 동작)
       const key = this.secret('kakaomap', 'kakaomapkey', 'kakaojs', 'kakaojskey', 'kakaojavascriptkey');
@@ -1394,6 +1399,33 @@ export class Accounts extends DurableObject<Env> {
     return env.balldontlie || env.BALLDONTLIE_KEY;
   }
   /** 기억해 둔 값 (ms 안이면) 또는 새로 받아 기억 */
+  /** 세계 뉴스 (Guardian) + 한국어 번역. 섹션마다 1시간 기억 (모두가 같이 씀) */
+  private async worldNews(section: NewsSection): Promise<Response> {
+    const key = this.secret('guardian', 'guardiankey', 'guardianapikey');
+    if (!key) return fail('세계 뉴스 키(guardian)가 아직 없어요.', 503);
+    try {
+      const r = await this.nbaCached(`news:world:${section}`, 3600_000, async () => {
+        const res = await within(fetch(guardianUrl(key, section)), 15_000, 'guardian');
+        if (!res.ok) throw new Error(`Guardian ${res.status}`);
+        const items = parseGuardian(await res.json());
+        if (!items.length) return items;
+        const b = buildNewsTranslate(items);
+        try {
+          const out = await this.env.AI.run(TRANSLATE_MODEL as never, modelInput(TRANSLATE_MODEL, b) as never);
+          const ko = readNewsTranslate(readOutput(out), items.length);
+          return items.map((x, i) => (ko[i] ? { ...x, ko: ko[i]! } : x));
+        } catch (e) {
+          console.error('news translate', e instanceof Error ? e.message : String(e));
+          return items;
+        }
+      });
+      return json({ items: r.v, at: r.at });
+    } catch (e) {
+      console.error('news', e instanceof Error ? e.message : String(e));
+      return fail('뉴스를 받지 못했어요. 잠시 뒤 다시 해 주세요.', 502);
+    }
+  }
+
   private async nbaCached<T>(ck: string, ms: number, get: () => Promise<T>): Promise<{ v: T; at: number; stale?: boolean }> {
     const c = this.sql.exec<{ data: string; at: number }>('SELECT data, at FROM cache WHERE key = ?', ck).toArray()[0];
     if (c && Date.now() - c.at < ms) return { v: JSON.parse(c.data) as T, at: c.at };

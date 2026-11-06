@@ -80,3 +80,14 @@ describe('시험 범위 사진 읽기 결과', () => {
     expect(parseBlank(JSON.stringify({ sheets: [{ title: '1. 세포의 구조', points: ['핵: 유전 물질 보관', ''] }, { title: '', points: ['x'] }, { title: '빈 것', points: [] }] }))).toEqual({ sheets: [{ title: '1. 세포의 구조', points: ['핵: 유전 물질 보관'] }] });
   });
 });
+
+describe('세계 뉴스', () => {
+  it('Guardian 응답 읽기 · 번역 줄 읽기', async () => {
+    const { parseGuardian, readNewsTranslate, guardianUrl } = await import('./news');
+    const items = parseGuardian({ response: { results: [{ id: 'world/1', webTitle: 'A &amp; B', webUrl: 'https://www.theguardian.com/world/1', sectionName: 'World news', webPublicationDate: '2026-11-06T01:00:00Z', fields: { trailText: '<p>Hi</p>', thumbnail: 'https://media.guim.co.uk/x.jpg' } }, { id: 'x', webTitle: 'bad', webUrl: 'https://evil.com' }] } });
+    expect(items).toEqual([{ id: 'world/1', title: 'A & B', trail: 'Hi', url: 'https://www.theguardian.com/world/1', section: 'World news', at: '2026-11-06T01:00:00Z', thumb: 'https://media.guim.co.uk/x.jpg' }]);
+    expect(readNewsTranslate('1T: 가와 나\n1S: 안녕\n2T: 둘\n2S: -', 2)).toEqual([{ title: '가와 나', trail: '안녕' }, { title: '둘', trail: '' }]);
+    expect(guardianUrl('k', 'world')).toContain('section=world');
+    expect(guardianUrl('k', 'all')).not.toContain('section=');
+  });
+});
