@@ -286,7 +286,10 @@ function NewsBoard({ m }: { m: MarketSettings }) {
         {news.map((n) => (
           <li key={n.rank} className={n.tone} style={{ ['--i' as string]: n.rank }}>
             <b>{n.rank}</b>
-            <span>{n.title}</span>
+            <span>
+              {n.title}
+              {n.why && <small>{n.why}</small>}
+            </span>
             <i aria-hidden>{n.tone === 'up' ? '▲' : n.tone === 'down' ? '▼' : n.tone === 'warn' ? '!' : '·'}</i>
           </li>
         ))}
@@ -299,31 +302,31 @@ const KIND_NAME: Record<MarketItem['kind'], string> = { game: '게임', fun: '�
 
 /** 눌러서 상점에 넣을 수 있는 것들 */
 const IDEAS: Omit<MarketItem, 'id'>[] = [
-  { name: '게임 30분', kind: 'game', minutes: 30, price: 150 },
-  { name: '게임 1시간', kind: 'game', minutes: 60, price: 280 },
-  { name: '게임 3시간 (주말)', kind: 'game', minutes: 180, price: 750 },
-  { name: '숏폼 20분', kind: 'fun', minutes: 20, price: 80 },
-  { name: '유튜브 30분', kind: 'fun', minutes: 30, price: 100 },
-  { name: '넷플릭스 · 드라마 한 편', kind: 'fun', minutes: 60, price: 180 },
-  { name: '영화 한 편 (집)', kind: 'fun', minutes: 120, price: 300 },
-  { name: '웹툰 30분', kind: 'fun', minutes: 30, price: 80 },
-  { name: 'SNS 30분', kind: 'fun', minutes: 30, price: 100 },
-  { name: '만화책 한 권', kind: 'fun', minutes: 60, price: 120 },
-  { name: '늦잠 1시간', kind: 'fun', minutes: 60, price: 150 },
-  { name: '늦게 자기 1시간', kind: 'fun', minutes: 60, price: 200 },
-  { name: '배달 음식', kind: 'fun', minutes: 30, price: 250 },
-  { name: '카페 디저트', kind: 'fun', minutes: 30, price: 150 },
-  { name: '친구랑 놀기 반나절', kind: 'meet', minutes: 240, price: 500 },
-  { name: '친구랑 노래방', kind: 'meet', minutes: 90, price: 250 },
-  { name: '친구랑 PC방 2시간', kind: 'meet', minutes: 120, price: 400 },
-  { name: '영화 보러 가기', kind: 'meet', minutes: 180, price: 400 },
-  { name: '쇼핑하러 가기', kind: 'meet', minutes: 180, price: 350 },
-  { name: '가족 외식', kind: 'meet', minutes: 120, price: 150 },
-  { name: '하루 쉬기권', kind: 'pass', price: 1500 },
-  { name: '피버타임 물약 (1시간 2배)', kind: 'perk', effect: 'fever', price: 400 },
-  { name: '연속 달성 실드', kind: 'perk', effect: 'shield', price: 600 },
-  { name: '음악 들으며 문제 풀기 1시간', kind: 'perk', effect: 'permit', price: 60 },
-  { name: '게임 과금 허가권', kind: 'perk', effect: 'permit', price: 300 },
+  { name: '게임 30분', kind: 'game', minutes: 30, price: 225 },
+  { name: '게임 1시간', kind: 'game', minutes: 60, price: 420 },
+  { name: '게임 3시간 (주말)', kind: 'game', minutes: 180, price: 1125 },
+  { name: '숏폼 20분', kind: 'fun', minutes: 20, price: 120 },
+  { name: '유튜브 30분', kind: 'fun', minutes: 30, price: 150 },
+  { name: '넷플릭스 · 드라마 한 편', kind: 'fun', minutes: 60, price: 270 },
+  { name: '영화 한 편 (집)', kind: 'fun', minutes: 120, price: 450 },
+  { name: '웹툰 30분', kind: 'fun', minutes: 30, price: 120 },
+  { name: 'SNS 30분', kind: 'fun', minutes: 30, price: 150 },
+  { name: '만화책 한 권', kind: 'fun', minutes: 60, price: 180 },
+  { name: '늦잠 1시간', kind: 'fun', minutes: 60, price: 225 },
+  { name: '늦게 자기 1시간', kind: 'fun', minutes: 60, price: 300 },
+  { name: '배달 음식', kind: 'fun', minutes: 30, price: 375 },
+  { name: '카페 디저트', kind: 'fun', minutes: 30, price: 225 },
+  { name: '친구랑 놀기 반나절', kind: 'meet', minutes: 240, price: 750 },
+  { name: '친구랑 노래방', kind: 'meet', minutes: 90, price: 375 },
+  { name: '친구랑 PC방 2시간', kind: 'meet', minutes: 120, price: 600 },
+  { name: '영화 보러 가기', kind: 'meet', minutes: 180, price: 600 },
+  { name: '쇼핑하러 가기', kind: 'meet', minutes: 180, price: 525 },
+  { name: '가족 외식', kind: 'meet', minutes: 120, price: 225 },
+  { name: '하루 쉬기권', kind: 'pass', price: 2250 },
+  { name: '피버타임 물약 (1시간 2배)', kind: 'perk', effect: 'fever', price: 600 },
+  { name: '연속 달성 실드', kind: 'perk', effect: 'shield', price: 900 },
+  { name: '음악 들으며 문제 풀기 1시간', kind: 'perk', effect: 'permit', price: 90 },
+  { name: '게임 과금 허가권', kind: 'perk', effect: 'permit', price: 450 },
 ];
 
 type Sort = 'rec' | 'low' | 'high' | 'long' | 'cheap';
@@ -1187,6 +1190,7 @@ function StockDetail({ m, id, onBack }: { m: MarketSettings; id: string; onBack:
                 <span>
                   <small>{shortDate(e.date)}</small>
                   {e.title}
+                  <i>{e.why}</i>
                 </span>
                 <em>{signed(e.pct)}</em>
               </li>

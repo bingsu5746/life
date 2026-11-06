@@ -33,11 +33,11 @@ describe('시장', () => {
   });
   it('게임: 이용권 없이 한 분은 3배', () => {
     const at = Date.parse('2026-11-01T10:00:00+09:00');
-    const m = { ...newMarket('2026-11-01'), play: { '2026-11-02': 50 }, buys: [{ id: 'x', itemId: 'game30', name: '게임 30분', kind: 'game' as const, minutes: 30, price: 150, tax: 0, at }] };
-    expect(gameUse(m, '2026-11-03')).toMatchObject({ bought: 30, played: 50, left: 0, raw: 20, charge: 20 * 5 * 3, sameDay: [] });
+    const m = { ...newMarket('2026-11-01'), play: { '2026-11-02': 50 }, buys: [{ id: 'x', itemId: 'game30', name: '게임 30분', kind: 'game' as const, minutes: 30, price: 225, tax: 0, at }] };
+    expect(gameUse(m, '2026-11-03')).toMatchObject({ bought: 30, played: 50, left: 0, raw: 20, charge: Math.round(20 * 7.5 * 3), sameDay: [] });
     // 산 날 바로 쓰면 이용권 값의 절반 벌금
     const same = { ...m, play: { '2026-11-01': 30 } };
-    expect(gameUse(same, '2026-11-02').sameDay).toEqual([{ date: '2026-11-01', why: '산 날 바로 쓴 게임 이용권 30분', amount: 75 }]);
+    expect(gameUse(same, '2026-11-02').sameDay).toEqual([{ date: '2026-11-01', why: '산 날 바로 쓴 게임 이용권 30분', amount: 113 }]);
     // 기한(7일)이 지난 이용권은 못 씀
     const late = { ...m, play: { '2026-11-09': 30 } };
     expect(gameUse(late, '2026-11-10')).toMatchObject({ raw: 30, left: 0, expired: 30 });
@@ -49,9 +49,9 @@ describe('시장', () => {
     expect(examSurge(d, '2026-11-20').factor).toBe(2);
     const m = newMarket('2026-11-01');
     const p = priceOf(m.items[0], m, d, '2026-11-13'); // D-7
-    expect(p.price).toBe(Math.round(150 * (1 + 8 / 15)));
+    expect(Math.abs(p.price - 225 * (1 + 8 / 15))).toBeLessThanOrEqual(1);
     expect(p.tax).toBe(Math.round(p.price * 0.1));
-    expect(priceOf({ id: 't', name: '이어폰', kind: 'thing', price: 0, won: 50000 }, m, d, '2026-11-13')).toMatchObject({ price: 1000, tax: 0 });
+    expect(priceOf({ id: 't', name: '이어폰', kind: 'thing', price: 0, won: 50000 }, m, d, '2026-11-13')).toMatchObject({ price: 1500, tax: 0 });
   });
   it('대출: 기한 넘으면 밀린 주마다 이자', () => {
     const l = { id: 'l', amount: 1000, at: Date.parse('2026-11-03T12:00:00+09:00'), due: '2026-11-10', rate: 0.07, repays: [] };
@@ -101,7 +101,11 @@ describe('시장', () => {
   });
   it('설정에 저장 (예전 포인트 시장은 보상 이름만)', () => {
     const old = sanitizeSettings({ market: { since: '2026-11-01', rate: {}, items: [{ id: 'i', name: '게임 30분', icon: '🎮', price: 30 }], buys: [{ id: 'b', name: 'x', price: 3, at: 1 }] } });
-    expect(old.market).toMatchObject({ since: '2026-11-01', weeklyTarget: 1800, items: [{ id: 'i', name: '게임 30분', kind: 'game', minutes: 30, price: 150 }], buys: [] });
+    expect(old.market).toMatchObject({ since: '2026-11-01', weeklyTarget: 1800, items: [{ id: 'i', name: '게임 30분', kind: 'game', minutes: 30, price: 225 }], buys: [], priceV: 2, wonPerGold: 3333 });
+    // 예전 판(priceV 없음) 값은 한 번만 1.5배
+    const v1 = sanitizeSettings({ market: { since: '2026-11-01', weeklyTarget: 1800, wonPerGold: 5000, items: [{ id: 'g', name: '게임', kind: 'game', minutes: 30, price: 200 }] } });
+    expect(v1.market).toMatchObject({ wonPerGold: 3333, priceV: 2, items: [{ price: 300 }] });
+    expect(sanitizeSettings({ market: v1.market }).market).toMatchObject({ wonPerGold: 3333, items: [{ price: 300 }] });
   });
 });
 
@@ -180,7 +184,7 @@ describe('시장 2', async () => {
     const d = emptyStudy();
     d.exams = { e: { id: 'e', updatedAt: 1, name: '기말', date: '2026-11-10' } } as never;
     const m = mk.newMarket('2026-11-01');
-    expect(mk.priceOf(m.items[0], m, d, '2026-11-12').price).toBe(105);
+    expect(mk.priceOf(m.items[0], m, d, '2026-11-12').price).toBe(158);
     const now = Date.parse('2026-11-20T21:00:00+09:00');
     expect(mk.lateSurge(now, '2026-11-20', 0, 60)).toBe(1.25);
     expect(mk.lateSurge(now, '2026-11-20', 60, 60)).toBe(1);

@@ -941,6 +941,7 @@ const money = (v: unknown) => Math.round(cl(v, 0, 10_000_000, 0));
 /** 시장 (은화). 예전(포인트) 시장 자료는 보상 이름만 옮긴다 */
 function sanitizeMarket(m: Obj) {
   const old = !('weeklyTarget' in m);
+  const bump = (typeof m.priceV === 'number' ? m.priceV : 1) < 2;
   const kind = (v: unknown) => (v === 'game' || v === 'fun' || v === 'meet' || v === 'thing' || v === 'pass' || v === 'perk' ? v : 'fun');
   const effect = (v: unknown): 'fever' | 'shield' | 'half' | 'permit' | undefined => (v === 'fever' || v === 'shield' || v === 'half' || v === 'permit' ? v : undefined);
   const items = arr(m.items)
@@ -953,7 +954,8 @@ function sanitizeMarket(m: Obj) {
         name: (it.name as string).trim().slice(0, 30),
         kind: k as 'game' | 'fun' | 'meet' | 'thing' | 'pass' | 'perk',
         minutes: k === 'thing' || k === 'pass' || k === 'perk' ? undefined : Math.round(cl(it.minutes, 1, 600, 30)),
-        price: old ? 150 : money(it.price) || 1,
+        // 가격 판 1 → 2: 상점 값 1.5배
+        price: old ? 225 : Math.max(1, Math.round((money(it.price) || 1) * (bump ? 1.5 : 1))),
         won: k === 'thing' ? money(it.won) : undefined,
         pieces: k === 'thing' && typeof it.pieces === 'number' && it.pieces >= 2 ? Math.round(cl(it.pieces, 2, 100, 10)) : undefined,
         tier: typeof it.tier === 'number' ? Math.round(cl(it.tier, 0, 3, 0)) || undefined : undefined,
@@ -966,7 +968,8 @@ function sanitizeMarket(m: Obj) {
     since: m.since as string,
     weeklyTarget: Math.round(cl(m.weeklyTarget, 60, 100 * 60, 30 * 60)),
     minDay: isObj(m.minDay) ? { weekday: Math.round(cl((m.minDay as Obj).weekday, 0, 900, 60)), weekend: Math.round(cl((m.minDay as Obj).weekend, 0, 900, 120)) } : { weekday: 60, weekend: 120 },
-    wonPerGold: Math.round(cl(m.wonPerGold, 100, 1_000_000, 5000)),
+    wonPerGold: Math.round(cl(bump ? (typeof m.wonPerGold === 'number' ? m.wonPerGold : 5000) / 1.5 : m.wonPerGold, 100, 1_000_000, 3333)),
+    priceV: 2,
     items,
     buys: old
       ? []

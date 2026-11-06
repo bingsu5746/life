@@ -2,6 +2,7 @@
 // 버는 것과 벌금은 기록(공부 · 오답 · 시험 범위 · 습관 · 할 일)에서 그때그때 계산하고, 사고판 것 · 적금 · 대출만 저장한다.
 import { addDays, daysBetween, diffDays, weekStart, weekday } from '../study/dates';
 import { examEnd, upcomingExams } from '../study/exams';
+import { minutesText } from '../study/timer';
 import { alive, type DateStr, type Id, type MarketItem, type MarketSettings, type StudyData } from '../study/model';
 
 type D = Pick<StudyData, 'sessions' | 'habits' | 'todos' | 'notes' | 'exams' | 'assessments' | 'subjects' | 'grades'>;
@@ -47,11 +48,12 @@ export const newMarket = (today: DateStr): MarketSettings => ({
   since: today,
   weeklyTarget: 30 * 60,
   minDay: { weekday: 60, weekend: 120 },
-  wonPerGold: 5000,
+  wonPerGold: 3333,
   items: [
-    { id: 'game30', name: '게임 30분', kind: 'game', minutes: 30, price: 150 },
-    { id: 'yt30', name: '유튜브 30분', kind: 'fun', minutes: 30, price: 100 },
+    { id: 'game30', name: '게임 30분', kind: 'game', minutes: 30, price: 225 },
+    { id: 'yt30', name: '유튜브 30분', kind: 'fun', minutes: 30, price: 150 },
   ],
+  priceV: 2,
   buys: [],
   savings: [],
   loans: [],
@@ -337,6 +339,8 @@ export interface StockEvent {
   date: DateStr;
   pct: number;
   title: string;
+  /** 왜 그랬는지 (그날 그 과목 공부 · 확률) */
+  why: string;
 }
 const GOOD = ['깜짝 실적 발표', '신제품 대박', '대형 계약 따내', '해외 진출 성공', '기술 특허 등록', '목표 주가 상향'];
 const BAD = ['실적 부진', '제품 리콜 사태', '공장 가동 멈춤', '대표 사임설', '목표 주가 하향', '소송에 휘말려'];
@@ -393,12 +397,16 @@ export function stockPrices(d: D, m: MarketSettings, today: DateStr): Map<Id, { 
       const pick = rnd();
       const pGood = 0.06 + Math.min(0.34, (mm / 600) * 0.34);
       const pBad = date === today ? 0 : mm > 0 || calm ? 0.03 : 0.14;
+      const pg = `${Math.round(pGood * 100)}%`;
       if (u < pGood) {
         r += size;
-        events.push({ subjectId: sub.id, date, pct: size, title: `${co} ${GOOD[Math.floor(pick * GOOD.length)]}` });
+        const why = mm > 0 ? `${sub.name} ${minutesText(mm)} 공부 → 호재 확률 ${pg}` : `${sub.name} 공부는 없었지만 운이 좋았어요 (호재 확률 ${pg})`;
+        events.push({ subjectId: sub.id, date, pct: size, title: `${co} ${GOOD[Math.floor(pick * GOOD.length)]}`, why });
       } else if (u > 1 - pBad) {
         r -= size;
-        events.push({ subjectId: sub.id, date, pct: -size, title: `${co} ${BAD[Math.floor(pick * BAD.length)]}` });
+        const pb = `${Math.round(pBad * 100)}%`;
+        const why = mm > 0 ? `${sub.name} ${minutesText(mm)} 공부했지만 운이 나빴어요 (악재 확률 ${pb})` : calm ? `${sub.name} 공부 안 함 · 시험 3주 전까지 잔잔 (악재 확률 ${pb})` : `${sub.name} 공부 안 함 → 악재 확률 ${pb}`;
+        events.push({ subjectId: sub.id, date, pct: -size, title: `${co} ${BAD[Math.floor(pick * BAD.length)]}`, why });
       }
       r += (notes.get(k) ?? 0) * 0.02 + (gradeMove.get(k) ?? 0);
       prev = p;
@@ -514,12 +522,18 @@ export interface News {
   title: string;
   /** up · down · hot · warn */
   tone: 'up' | 'down' | 'hot' | 'warn';
+  /** 이유 (작게) */
+  why?: string;
 }
 
 /** 오늘의 시장 뉴스: 내 기록에서 만든 소식들, 크기(점수) 순 */
 export function marketNews(d: D, m: MarketSettings, today: DateStr): News[] {
   const v = marketView(d, m, today);
-  const items: { score: number; title: string; tone: News['tone'] }[] = [];
+  const items: { score: number; title: string; tone: News['tone']; why?: string }[] = [];
+  // 과목별 공부한 날 (연속 상승 · 내림세 이유)
+  const studied = new Set<string>();
+  for (const x of alive(d.sessions)) if (x.subjectId && x.minutes > 0) studied.add(`${x.subjectId}|${x.date}`);
+  const daysStudied = (id: Id, n: number, end: DateStr) => daysBetween(addDays(end, -(n - 1)), end).filter((x) => studied.has(`${id}|${x}`)).length;
   const yday = addDays(today, -1);
   const subName = (id: Id) => d.subjects[id]?.name ?? '과목';
   for (const [id, p] of v.prices) {
@@ -530,24 +544,25 @@ export function marketNews(d: D, m: MarketSettings, today: DateStr): News[] {
     for (let i = h.length - 1; i > 0 && h[i] > h[i - 1]; i--) run++;
     let fall = 0;
     for (let i = h.length - 1; i > 0 && h[i] < h[i - 1]; i--) fall++;
-    if (run >= 3) items.push({ score: 50 + run * 5, title: `${companyName(subName(id), id)} ${run}일 연속 상승`, tone: 'up' });
-    
-    if (fall >= 3) items.push({ score: 45 + fall * 5, title: `${companyName(subName(id), id)} ${fall}일째 내림세`, tone: 'down' });
+    // h 의 마지막 칸 날짜 (hist[i] = since + (i−1)일)
+    const end = addDays(m.since, h.length - 2);
+    if (run >= 3) items.push({ score: 50 + run * 5, title: `${companyName(subName(id), id)} ${run}일 연속 상승`, tone: 'up', why: `${run}일 가운데 ${daysStudied(id, run, end)}일 ${subName(id)} 공부` });
+    if (fall >= 3) items.push({ score: 45 + fall * 5, title: `${companyName(subName(id), id)} ${fall}일째 내림세`, tone: 'down', why: daysStudied(id, fall, end) ? `${fall}일 가운데 ${daysStudied(id, fall, end)}일만 ${subName(id)} 공부` : `${fall}일 동안 ${subName(id)} 공부 없음` });
   }
   // 과목 주식 호재 · 악재 (오늘 · 어제)
   for (const [, p] of v.prices)
     for (const e of p.events)
-      if (e.date === today || e.date === yday) items.push({ score: (e.date === today ? 85 : 60) + Math.abs(e.pct) * 100, title: `${e.title} ${e.pct > 0 ? '+' : ''}${(e.pct * 100).toFixed(1)}%`, tone: e.pct > 0 ? 'up' : 'down' });
+      if (e.date === today || e.date === yday) items.push({ score: (e.date === today ? 85 : 60) + Math.abs(e.pct) * 100, title: `${e.title} ${e.pct > 0 ? '+' : ''}${(e.pct * 100).toFixed(1)}%`, tone: e.pct > 0 ? 'up' : 'down', why: `${e.date === today ? '오늘' : '어제'} ${e.why}` });
   const s = examSurge(d, today);
-  if (s.factor > 1) items.push({ score: 70, title: `${s.why}: 오락 값 ${s.factor}배`, tone: 'warn' });
+  if (s.factor > 1) items.push({ score: 70, title: `오락 값 ${s.factor}배`, tone: 'warn', why: s.why });
   const yInc = v.inc.get(yday);
   if (yInc && yInc.minutes >= 300) items.push({ score: 60, title: `어제 ${Math.floor(yInc.minutes / 60)}시간 공부 · 은화 ${yInc.total} 벌어`, tone: 'hot' });
   const yFines = v.fines.filter((f) => f.date === yday);
-  if (yFines.length) items.push({ score: 65, title: `어제 벌금 ${yFines.length}건 · ${won(yFines.reduce((a, f) => a + f.amount, 0))}`, tone: 'down' });
-  if (v.overdue) items.push({ score: 90, title: `대출 연체 · 상점 영업 정지`, tone: 'down' });
-  if (v.game.raw > 0) items.push({ score: 55, title: `무단 게임 ${v.game.raw}분 적발 · ${RULE.rawGame}배 청구`, tone: 'down' });
+  if (yFines.length) items.push({ score: 65, title: `어제 벌금 ${yFines.length}건 · ${won(yFines.reduce((a, f) => a + f.amount, 0))}`, tone: 'down', why: yFines.map((f) => f.why).join(' · ') });
+  if (v.overdue) items.push({ score: 90, title: `대출 연체 · 상점 영업 정지`, tone: 'down', why: '갚을 날이 지난 대출이 있어요' });
+  if (v.game.raw > 0) items.push({ score: 55, title: `무단 게임 ${v.game.raw}분 적발 · ${RULE.rawGame}배 청구`, tone: 'down', why: '게임 기록보다 쓴 게임 이용권이 모자라요' });
   const lastPay = v.pays[v.pays.length - 1];
-  if (lastPay && addDays(lastPay.week, 7) === weekStart(today)) items.push({ score: 75, title: `주급 지급 ${won(lastPay.pay)} · 지난주 목표 ${Math.round(lastPay.ratio * 100)}%`, tone: lastPay.pay ? 'up' : 'down' });
+  if (lastPay && addDays(lastPay.week, 7) === weekStart(today)) items.push({ score: 75, title: `주급 지급 ${won(lastPay.pay)} · 지난주 목표 ${Math.round(lastPay.ratio * 100)}%`, tone: lastPay.pay ? 'up' : 'down', why: `지난주 공부 ${minutesText(lastPay.minutes)} / 목표 ${minutesText(m.weeklyTarget)}${lastPay.streak >= 2 ? ` · ${lastPay.streak}주 연속 달성` : ''}` });
   if (v.credit.score >= 900) items.push({ score: 30, title: `신용 ${v.credit.score}점 최우량`, tone: 'up' });
   else if (v.credit.score < 680) items.push({ score: 50, title: `신용 ${v.credit.score}점 · 대출 불가`, tone: 'down' });
   const bestStock = [...v.prices].sort((a, b) => b[1].price - a[1].price)[0];
@@ -557,7 +572,7 @@ export function marketNews(d: D, m: MarketSettings, today: DateStr): News[] {
   return items
     .sort((a, b) => b.score - a.score)
     .slice(0, 10)
-    .map((x, i) => ({ rank: i + 1, title: x.title, tone: x.tone }));
+    .map((x, i) => ({ rank: i + 1, title: x.title, tone: x.tone, why: x.why }));
 }
 
 // ===== 악마의 계약서 · 성적 배당권 · 복권 =====
@@ -677,13 +692,13 @@ function seeded(date: DateStr, salt: number) {
 }
 
 export const BLACK_ITEMS: (Omit<MarketItem, 'id'> & { key: string })[] = [
-  { key: 'half', name: '내일 계획 반토막권', kind: 'perk', effect: 'half', price: 800 },
-  { key: 'yt11', name: '유튜브 1+1 이용권', kind: 'fun', minutes: 60, price: 100 },
-  { key: 'game11', name: '게임 1+1 이용권', kind: 'game', minutes: 60, price: 150 },
-  { key: 'fever', name: '피버타임 물약', kind: 'perk', effect: 'fever', price: 400 },
-  { key: 'shield', name: '연속 달성 실드', kind: 'perk', effect: 'shield', price: 600 },
-  { key: 'rest', name: '하루 쉬기권', kind: 'pass', price: 1500 },
-  { key: 'sleep2', name: '늦잠 2시간', kind: 'fun', minutes: 120, price: 220 },
+  { key: 'half', name: '내일 계획 반토막권', kind: 'perk', effect: 'half', price: 1200 },
+  { key: 'yt11', name: '유튜브 1+1 이용권', kind: 'fun', minutes: 60, price: 150 },
+  { key: 'game11', name: '게임 1+1 이용권', kind: 'game', minutes: 60, price: 225 },
+  { key: 'fever', name: '피버타임 물약', kind: 'perk', effect: 'fever', price: 600 },
+  { key: 'shield', name: '연속 달성 실드', kind: 'perk', effect: 'shield', price: 900 },
+  { key: 'rest', name: '하루 쉬기권', kind: 'pass', price: 2250 },
+  { key: 'sleep2', name: '늦잠 2시간', kind: 'fun', minutes: 120, price: 330 },
 ];
 /** 오늘의 암시장 3개 (20~50% 할인) */
 export function blackToday(today: DateStr): { item: Omit<MarketItem, 'id'> & { key: string }; off: number; price: number; id: string }[] {

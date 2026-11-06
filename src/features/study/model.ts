@@ -159,6 +159,8 @@ export interface MarketSettings {
   tier?: { season: string; rank: number };
   /** 시험이 끝난 주 할인 (0~0.9) */
   postExamSale?: number;
+  /** 가격 판: 2 = 상점 값 1.5배로 올린 뒤 */
+  priceV?: number;
 }
 export interface MarketItem {
   id: Id;
