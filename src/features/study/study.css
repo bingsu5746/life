@@ -11718,3 +11718,28 @@ button.mt-pill {
   font-size: 0.74rem;
   margin-top: 2px;
 }
+/* 상점 → 보관함 */
+.mt-baglink {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 14px 16px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.mt-baglink span {
+  flex: 1;
+  display: grid;
+}
+.mt-baglink small {
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+.mt-baglink b {
+  font-weight: 600;
+}

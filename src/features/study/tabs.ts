@@ -70,6 +70,7 @@ export const AREA_ITEMS: Record<Exclude<AreaKey, 'home' | 'study'>, AreaItem[]> 
   market: [
     { key: '', label: '시장', icon: 'area-market' },
     { key: 'shop', label: '상점', icon: 'bag' },
+    { key: 'mine', label: '보관함', icon: 'ticket' },
     { key: 'dare', label: '도전', icon: 'flag' },
     { key: 'black', label: '암시장', icon: 'moon' },
     { key: 'bank', label: '은행', icon: 'bank' },
@@ -176,7 +177,7 @@ export function activeItem(area: keyof typeof AREA_ITEMS, sub?: string, p0?: str
   if (area === 'money') return sub === 'fixed' || sub === 'saving' || sub === 'wish' ? sub : '';
   if (area === 'hobby') return sub === 'wish' || sub === 'reading' ? sub : '';
   if (area === 'news') return sub && ['kr', 'biz', 'it', 'ent', 'sports', 'world', 'wbiz', 'wtech'].includes(sub) ? sub : '';
-  if (area === 'market') return sub === 'shop' || sub === 'dare' || sub === 'black' || sub === 'bank' || sub === 'stocks' || sub === 'rules' ? sub : '';
+  if (area === 'market') return sub === 'shop' || sub === 'mine' || sub === 'dare' || sub === 'black' || sub === 'bank' || sub === 'stocks' || sub === 'rules' ? sub : '';
   return '';
 }
 
