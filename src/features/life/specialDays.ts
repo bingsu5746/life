@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react';
 import { isLoggedIn, specialDays, type SpecialDay } from '../auth/api';
 
 export function useSpecialDays(year: number): SpecialDay[] {
-  const ck = `my-study.special.${year}`;
+  const ck = `my-study.special2.${year}`;
   const read = (): { at: number; days: SpecialDay[] } | null => {
     try {
       return JSON.parse(localStorage.getItem(ck) ?? 'null');

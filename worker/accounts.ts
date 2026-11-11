@@ -2410,9 +2410,9 @@ export class Accounts extends DurableObject<Env> {
     const year = Number(y);
     if (!Number.isInteger(year) || year < 2000 || year > 2100) return fail('연도를 확인해 주세요.');
     const env = this.env as unknown as Record<string, string | undefined>;
-    const key = env.Datagokr || env.DATA_GO_KR_KEY || this.secret('datagokr', 'datagokrkey', 'datagokey', 'publicdata', 'publicdatakey', 'kasi', 'kasikey');
-    if (!key) return fail('공휴일을 보려면 공공데이터포털 키(Datagokr)가 필요해요.', 503);
-    const ck = `holidays:${year}`;
+    const key = this.secret('calander', 'calanderkey', 'calendar', 'calendarkey') || env.Datagokr || env.DATA_GO_KR_KEY || this.secret('datagokr', 'datagokrkey', 'datagokey', 'publicdata', 'publicdatakey', 'kasi', 'kasikey');
+    if (!key) return fail('공휴일을 보려면 공공데이터포털 키(calander)가 필요해요.', 503);
+    const ck = `holidays2:${year}`;
     const c = this.sql.exec<{ data: string; at: number }>('SELECT data, at FROM cache WHERE key = ?', ck).toArray()[0];
     if (c && Date.now() - c.at < 7 * DAY) return json({ days: JSON.parse(c.data) });
     try {

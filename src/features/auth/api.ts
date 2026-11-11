@@ -450,6 +450,8 @@ export interface SpecialDay {
   date: string;
   name: string;
   holiday: boolean;
+  /** 24절기 */
+  term?: boolean;
 }
 export const specialDays = (year: number) => call<{ days: SpecialDay[] }>(`holidays?year=${year}`);
 

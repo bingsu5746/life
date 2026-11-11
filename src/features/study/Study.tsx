@@ -89,7 +89,7 @@ const PRELOAD = [
 ];
 
 import { STUDY_MODE_AREAS, useStudyMode } from '../../lib/studyMode';
-import { activeItem, AREA_ITEMS, AREAS, BASKETBALL_ITEMS, basketballItem, EXAM_ITEMS, examItem, GAME_ITEMS, gameItem, champItems, champItem, HOBBY_PARTS, MOVIE_ITEMS, movieItem, NBA_ITEMS, nbaItem, REVIEW_ITEMS, reviewItem, SETTING_CATS, TABS, TRAVEL_ITEMS, travelItem, type AreaKey } from './tabs';
+import { activeItem, AREA_ITEMS, CAL_ITEMS, AREAS, BASKETBALL_ITEMS, basketballItem, EXAM_ITEMS, examItem, GAME_ITEMS, gameItem, champItems, champItem, HOBBY_PARTS, MOVIE_ITEMS, movieItem, NBA_ITEMS, nbaItem, REVIEW_ITEMS, reviewItem, SETTING_CATS, TABS, TRAVEL_ITEMS, travelItem, type AreaKey } from './tabs';
 export { TABS };
 /** 메뉴에는 없지만 열 수 있는 화면 (설정은 맨 위 막대의 톱니) */
 const HIDDEN = ['settings'];
@@ -228,7 +228,7 @@ export function Study({ path, loggedIn, syncReady = true, onLogin }: { path: str
   let content;
   if (isCheckin) content = <CheckinPage />;
   else if (isInsights) content = <InsightsPage tab={path[1]} />;
-  else if (p0 === 'calendar') content = <CalendarPage />;
+  else if (p0 === 'calendar') content = <CalendarPage sub={path[1]} />;
   else if (p0 === 'plan') content = <WeekPlanPage />;
   else if (p0 === 'eve') content = <EvePage />;
   else if (isWeek) content = <LifeWeekPage day={path[1]} monthly={p0 === 'month'} />;
@@ -265,7 +265,26 @@ export function Study({ path, loggedIn, syncReady = true, onLogin }: { path: str
   return (
     <main className={`study ${running ? 'running' : ''}`}>
       {!running && <Celebrate />}
-      {!running && area === 'home' && !isWeek && !isInsights && (
+      {!running && p0 === 'calendar' && (
+        <nav className="st-nav" aria-label="달력 메뉴">
+          <button className="st-tab st-tab-home" onClick={() => go('/')}>
+            <Icon name="area-home" />
+            <span className="st-tab-label">메인으로</span>
+            <span className="st-tab-short">메인</span>
+          </button>
+          {CAL_ITEMS.map((it) => {
+            const on = (path[1] === 'week' || path[1] === 'list' ? path[1] : '') === it.key;
+            return (
+              <button key={it.key} className={`st-tab ${on ? 'on' : ''}`} aria-current={on ? 'page' : undefined} onClick={() => go(it.to!)}>
+                <Icon name={it.icon} />
+                <span className="st-tab-label">{it.label}</span>
+                <span className="st-tab-short">{it.label}</span>
+              </button>
+            );
+          })}
+        </nav>
+      )}
+      {!running && area === 'home' && !isWeek && !isInsights && p0 !== 'calendar' && (
         <nav className="st-nav" aria-label="영역">
           {AREAS.filter((a) => (a.key === 'home' || !d.settings.hiddenAreas?.includes(a.key)) && (!studyMode || STUDY_MODE_AREAS.includes(a.key))).map((a) => (
             <button key={a.key} className={`st-tab ${area === a.key ? 'on' : ''}`} aria-current={area === a.key ? 'page' : undefined} onClick={() => go(a.key === 'home' ? '/' : `/${a.key}`)}>

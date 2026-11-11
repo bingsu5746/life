@@ -7,6 +7,8 @@ export interface SpecialDay {
   name: string;
   /** 쉬는 날(공휴일) 인지 */
   holiday: boolean;
+  /** 24절기 */
+  term?: boolean;
 }
 
 const tag = (xml: string, name: string) => xml.match(new RegExp(`<${name}>([\\s\\S]*?)</${name}>`))?.[1]?.trim() ?? '';
@@ -32,18 +34,25 @@ export function parseSpecialDays(xml: string): SpecialDay[] {
   return out;
 }
 
-/** 한 해의 공휴일 + 기념일. key 는 포털의 인증키 (인코딩된 키를 넣어도 되게 한 번 풀어서 쓴다) */
+/** 한 해의 공휴일 + 기념일 + 24절기. key 는 포털의 인증키 (인코딩된 키를 넣어도 되게 한 번 풀어서 쓴다).
+ * 공휴일 · 24절기는 문서에서 달(solMonth)이 꼭 있어야 해서 열두 달을 따로 받는다 */
 export async function fetchSpecialDays(key: string, year: number): Promise<SpecialDay[]> {
   const k = key.includes('%') ? decodeURIComponent(key) : key;
-  const get = async (op: string) => {
-    const q = new URLSearchParams({ serviceKey: k, solYear: String(year), numOfRows: '200', pageNo: '1' });
+  const get = async (op: string, month?: number) => {
+    const q = new URLSearchParams({ serviceKey: k, solYear: String(year), numOfRows: '100', pageNo: '1' });
+    if (month) q.set('solMonth', String(month).padStart(2, '0'));
     const res = await fetch(`${BASE}/${op}?${q}`, { headers: { 'user-agent': 'Mozilla/5.0 (Life app)' } });
     const text = await res.text();
     if (!res.ok) throw new Error(`특일 정보 ${res.status} ${text.slice(0, 120)}`);
     return parseSpecialDays(text);
   };
-  const [rest, anniv] = await Promise.all([get('getRestDeInfo'), get('getAnniversaryInfo')]);
+  const months = Array.from({ length: 12 }, (_, i) => i + 1);
+  const byMonth = async (op: string) => (await Promise.all(months.map((m) => get(op, m)))).flat();
+  const [rest, anniv, terms] = await Promise.all([byMonth('getRestDeInfo'), get('getAnniversaryInfo'), byMonth('get24DivisionsInfo').catch(() => [] as SpecialDay[])]);
   // 같은 날 같은 이름은 하나로 (공휴일 쪽을 남김)
   const seen = new Set(rest.map((x) => `${x.date}|${x.name}`));
-  return [...rest, ...anniv.filter((x) => !seen.has(`${x.date}|${x.name}`))].sort((a, b) => a.date.localeCompare(b.date));
+  const out = [...rest];
+  for (const x of anniv) if (!seen.has(`${x.date}|${x.name}`)) (seen.add(`${x.date}|${x.name}`), out.push(x));
+  for (const x of terms) if (!seen.has(`${x.date}|${x.name}`)) (seen.add(`${x.date}|${x.name}`), out.push({ ...x, holiday: false, term: true }));
+  return out.sort((a, b) => a.date.localeCompare(b.date));
 }

@@ -25,23 +25,25 @@ const UNIT: Record<Exclude<Freq, ''>, string> = {
   yearly: '년',
 };
 
-export function EventSheet({ date, ev, on, onClose }: { date: DateStr; ev?: CalEvent; on?: DateStr; onClose: () => void }) {
-  const [title, setTitle] = useState(ev?.title ?? '');
-  const [color, setColor] = useState(ev?.color ?? 'blue');
-  const [start, setStart] = useState<DateStr>(ev?.date ?? date);
-  const [endDate, setEndDate] = useState<DateStr>(ev?.endDate ?? ev?.date ?? date);
-  const [allDay, setAllDay] = useState(ev?.allDay ?? true);
-  const [t1, setT1] = useState(ev?.start ?? '09:00');
-  const [t2, setT2] = useState(ev?.end ?? '10:00');
-  const [freq, setFreq] = useState<Freq>(ev?.repeat?.freq ?? '');
-  const [every, setEvery] = useState(ev?.repeat?.every ?? 1);
-  const [days, setDays] = useState<number[]>(ev?.repeat?.weekdays ?? []);
-  const [until, setUntil] = useState(ev?.repeat?.until ?? '');
+export function EventSheet({ date, ev, on, init, onClose }: { date: DateStr; ev?: CalEvent; on?: DateStr; init?: Partial<CalEvent>; onClose: () => void }) {
+  // 한 줄로 넣기에서 읽은 값 (새 일정일 때만)
+  const src: Partial<CalEvent> | undefined = ev ?? init;
+  const [title, setTitle] = useState(src?.title ?? '');
+  const [color, setColor] = useState(src?.color ?? 'blue');
+  const [start, setStart] = useState<DateStr>(src?.date ?? date);
+  const [endDate, setEndDate] = useState<DateStr>(src?.endDate ?? src?.date ?? date);
+  const [allDay, setAllDay] = useState(src?.allDay ?? true);
+  const [t1, setT1] = useState(src?.start ?? '09:00');
+  const [t2, setT2] = useState(src?.end ?? '10:00');
+  const [freq, setFreq] = useState<Freq>(src?.repeat?.freq ?? '');
+  const [every, setEvery] = useState(src?.repeat?.every ?? 1);
+  const [days, setDays] = useState<number[]>(src?.repeat?.weekdays ?? []);
+  const [until, setUntil] = useState(src?.repeat?.until ?? '');
   const [remind, setRemind] = useState<number | undefined>(ev ? ev.remind : 10);
-  const [place, setPlace] = useState(ev?.place ?? '');
-  const [memo, setMemo] = useState(ev?.memo ?? '');
-  const [study, setStudy] = useState(!!ev?.study);
-  const [subjectId, setSubjectId] = useState(ev?.subjectId ?? '');
+  const [place, setPlace] = useState(src?.place ?? '');
+  const [memo, setMemo] = useState(src?.memo ?? '');
+  const [study, setStudy] = useState(!!src?.study);
+  const [subjectId, setSubjectId] = useState(src?.subjectId ?? '');
   const d = useStudy();
 
   const save = () => {

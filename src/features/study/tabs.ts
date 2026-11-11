@@ -158,6 +158,13 @@ export const REVIEW_ITEMS: AreaItem[] = [
 ];
 export const reviewItem = (p0: string, sub?: string) => (p0 === 'week' || p0 === 'month' ? p0 : REVIEW_ITEMS.some((x) => x.key === sub) ? sub! : 'study');
 
+/** 달력 안의 메뉴 (달 · 주 · 일정 목록) */
+export const CAL_ITEMS: AreaItem[] = [
+  { key: '', label: '달', icon: 'exams', to: '/calendar' },
+  { key: 'week', label: '주', icon: 'list', to: '/calendar/week' },
+  { key: 'list', label: '일정', icon: 'time', to: '/calendar/list' },
+];
+
 export const NBA_ITEMS: AreaItem[] = [
   { key: 'back', label: '농구', icon: 'ball', to: '/basketball' },
   { key: 'games', label: '경기', icon: 'game', to: '/basketball/nba' },
