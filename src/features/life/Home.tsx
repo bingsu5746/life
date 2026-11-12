@@ -1,7 +1,7 @@
 // 메인: 공부 · 돈 · 취미 · 일기 · AI 를 한눈에. 누르면 그 영역으로
 import { isLoggedIn, uselessFact } from '../auth/api';
 import { exportBackup } from '../study/backup';
-import { addDays, dday, longDate, weekStart, weekday } from '../study/dates';
+import { addDays, dday, longDate, shortDate, weekStart, weekday } from '../study/dates';
 import { upcomingExams } from '../study/exams';
 import { SchoolHome } from '../study/SchoolPanel';
 import { EveBanner } from '../study/Eve';
@@ -20,7 +20,27 @@ import { DEFAULT_PLACE, getWeather, weatherText, type Weather } from './weather'
 import { minutesText } from '../study/timer';
 import { AREAS } from '../study/tabs';
 import { go, Icon, toast, useToday } from '../study/ui';
+import { onThisDay } from './diarySearch';
 import { dayStreak, hobbyWeek, monthOf, monthSummary, won } from './calc';
+
+/** 메인: N년 전 오늘(없으면 앞뒤 3일) 쓴 일기 한 편 */
+function AgoCard({ today }: { today: string }) {
+  const d = useStudy();
+  const ago = onThisDay(d.diary, today);
+  if (!ago.length) return null;
+  // 여러 해가 있으면 날마다 돌아가며
+  const x = ago[Number(today.slice(8)) % ago.length];
+  return (
+    <button className="hm-ago" onClick={() => go(`/diary/${x.e.id}`)}>
+      <small>
+        {x.years}년 전 {x.exact ? '오늘' : '이맘때'} · {shortDate(x.e.id)}
+        {ago.length > 1 ? ` · 지난 ${ago.length}해` : ''}
+      </small>
+      {x.e.title && <b>{x.e.title}</b>}
+      <span>{(x.e.text || Object.values(x.e.parts ?? {})[0] || '').replace(/\s+/g, ' ').slice(0, 90)}</span>
+    </button>
+  );
+}
 
 export function Home(_: { loggedIn: boolean; onLogin: () => void }) {
   const d = useStudy();
@@ -157,6 +177,7 @@ export function Home(_: { loggedIn: boolean; onLogin: () => void }) {
         </button>
       )}
       {on('morning') && <MorningCard today={today} />}
+      {on('ago') && !studyMode && <AgoCard today={today} />}
       {on('school') && <SchoolHome today={today} />}
       <AfterExamCard banner />
       <VacationCard compact />
@@ -355,6 +376,7 @@ function HomeEdit({ list }: { list: { key: string; label: string }[] }) {
     ['morning', '아침 카드'],
     ['school', '학교 (급식 · 시간표)'],
     ['fact', '쓸모없는 지식'],
+    ['ago', 'N년 전 오늘 일기'],
   ];
   return (
     <section className="st-card hm-editor">

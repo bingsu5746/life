@@ -13,6 +13,7 @@ import { daySummary, DIARY_PARTS, dreamDates, formOf, sleepSummary, studySummary
 import { diarySplit, diaryTitles, isLoggedIn } from '../auth/api';
 import { LineChart } from '../study/charts';
 import { RecapPage } from './Recap';
+import { DiarySearchPage, PastMePage } from './DiarySearch';
 import { NotifyTime } from './NotifyTime';
 
 /** 기분 점: 좋을수록 진하게 */
@@ -22,6 +23,8 @@ const MOOD_NAME = ['', '나쁨', '별로', '보통', '좋음', '최고'];
 /** sub: 날짜(YYYY-MM-DD) 면 그날 쓰기, 'YYYY-MM' 이면 그 달 목록 */
 export function Diary({ sub }: { sub?: string }) {
   const today = useToday();
+  if (sub === 'search') return <DiarySearchPage />;
+  if (sub === 'ask') return <PastMePage />;
   if (sub === 'dream') return <Dreams />;
   if (sub === 'form') return <Form />;
   if (sub === 'recap') return <RecapPage />;
@@ -32,7 +35,7 @@ export function Diary({ sub }: { sub?: string }) {
 
 function List({ month, today }: { month: string; today: string }) {
   const d = useStudy();
-  const [q, setQ] = useState('');
+  const q = '';
   const all = alive(d.diary).sort((a, b) => b.id.localeCompare(a.id));
   const list = q.trim() ? all.filter((e) => `${e.title ?? ''}\n${e.text}\n${Object.values(e.parts ?? {}).join('\n')}`.toLowerCase().includes(q.trim().toLowerCase())) : all.filter((e) => monthOf(e.id) === month);
   const wrote = d.diary[today] && !d.diary[today].deleted;
@@ -100,7 +103,9 @@ function List({ month, today }: { month: string; today: string }) {
             </section>
           ) : null;
         })}
-      <input className="st-input" value={q} onChange={(e) => setQ(e.target.value)} placeholder="모든 일기에서 찾기" aria-label="일기 찾기" />
+      <button className="st-input dy-find" onClick={() => go('/diary/search')}>
+        모든 일기에서 찾기
+      </button>
       {!list.length ? (
         <p className="st-hint">{q ? '찾는 글이 있는 일기가 없어요.' : '이 달에 쓴 일기가 없어요.'}</p>
       ) : (

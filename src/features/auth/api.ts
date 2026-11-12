@@ -688,6 +688,7 @@ export const bookTocIsbn = (isbn: string) => remember(`tocisbn:${isbn}`, 60 * MI
 /** 일기 → 제목 추천 3개 (지금까지 쓴 제목 느낌으로) */
 export const diaryTitles = (text: string, past: string[]) => aiJob<{ titles: string[] }>('ai/title', { text, past });
 export const diarySplit = (text: string) => aiJob<Partial<Record<'good' | 'hard' | 'thanks' | 'learned' | 'fix' | 'worry' | 'tomorrow' | 'dream', string>>>('ai/diary', { text });
+export const diaryAsk = (worry: string, entries: { date: string; text: string }[]) => aiJob<{ summary: string; items: { date: string; situation: string; did: string; result: string; quote: string }[] }>('ai/diaryask', { worry, entries });
 /** 카카오맵 JS 키 (브라우저용, 등록한 사이트에서만 동작) */
 export const kakaoKey = () => call<{ key: string }>('kakao/key');
 /** AI 코치: 기록 글 → 다음 주 계획 */

@@ -333,3 +333,37 @@ export function parseBlank(text: string): BlankRead {
     .slice(0, 12);
   return { sheets };
 }
+
+/** 고민과 비슷한 지난 일기에서 그때의 상황 · 한 일 · 결과를 뽑는다. 주어진 일기 밖의 일은 지어내지 않게 */
+export function diaryAskBody(worry: string, entries: { date: string; text: string }[]) {
+  const prompt = [
+    '나는 고등학생이고, 아래 [지금 고민]과 비슷했던 [지난 일기]들이 있어.',
+    '지난 일기에서 그때 나는 어떤 상황이었고, 무엇을 했고(대처), 어떻게 됐는지 찾아 줘.',
+    '- 반드시 [지난 일기]에 실제로 쓰여 있는 내용만. 일기에 없는 대처나 결과는 지어내지 말고, 모르면 빈 문자열.',
+    '- date 는 [지난 일기]의 날짜를 그대로. 관련 없는 일기는 빼.',
+    '- quote 는 그 일기에서 그대로 옮긴 짧은 한 문장 (40자 안).',
+    '- summary 는 지난 내가 했던 방법을 묶어 지금 해 볼 만한 것 2~3가지 (지난 일기에 있는 방법만, 반말, 120자 안).',
+    'JSON: {"summary": 문자열, "items": [{"date": "YYYY-MM-DD", "situation": 문자열, "did": 문자열, "result": 문자열, "quote": 문자열}]}',
+    '',
+    '[지금 고민]',
+    worry,
+    '',
+    '[지난 일기]',
+    ...entries.map((e) => `<${e.date}>\n${e.text}`),
+  ].join('\n');
+  return { contents: [{ role: 'user', parts: [{ text: prompt }] }], generationConfig: { responseMimeType: 'application/json', temperature: 0.3 } };
+}
+export interface DiaryAsk {
+  summary: string;
+  items: { date: string; situation: string; did: string; result: string; quote: string }[];
+}
+export function parseDiaryAsk(text: string, dates: string[]): DiaryAsk {
+  const j = obj(text);
+  const items = (Array.isArray(j.items) ? j.items : [])
+    .filter((x): x is Record<string, unknown> => !!x && typeof x === 'object')
+    .map((x) => ({ date: str(x.date, 10) ?? '', situation: str(x.situation, 200) ?? '', did: str(x.did, 200) ?? '', result: str(x.result, 200) ?? '', quote: str(x.quote, 80) ?? '' }))
+    // 보낸 일기에 없는 날짜는 버린다 (지어낸 것)
+    .filter((x) => dates.includes(x.date))
+    .slice(0, 8);
+  return { summary: str(j.summary, 300) ?? '', items };
+}

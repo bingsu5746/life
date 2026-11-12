@@ -24,7 +24,7 @@ import { cleanFact, goodKo } from './fact';
 import { fetch2k } from './nba2k';
 import { hcBody, parseHc } from './homecourt';
 import { buildNewsTranslate, googleNewsUrl, guardianUrl, KR_TOPICS, NEWS_SECTIONS, parseGoogleNews, parseGuardian, readNewsTranslate, type KrTopic, type NewsSection } from './news';
-import { coachBody, diaryBody, noteBody, parseCoach, parseDiary, parseNote, parseReceipt, parseTocRead, receiptBody, tocBody, titleBody, parseTitles, scopeBody, parseScopeRead, reviewQBody, parseReviewQ, gradeCardBody, parseGradeCard, blankBody, parseBlank } from './aiRead';
+import { coachBody, diaryBody, noteBody, parseCoach, parseDiary, parseNote, parseReceipt, parseTocRead, receiptBody, tocBody, titleBody, parseTitles, scopeBody, parseScopeRead, reviewQBody, parseReviewQ, gradeCardBody, parseGradeCard, blankBody, parseBlank, diaryAskBody, parseDiaryAsk } from './aiRead';
 import { seojiSearch, seojiToc, seojiTocByIsbn, yes24Search, yes24Toc } from './books';
 import { cheapShark } from './cheapshark';
 import { invenChamps, invenSkins, invenSkinVideo } from './skins';
@@ -252,7 +252,7 @@ export class Accounts extends DurableObject<Env> {
     if (req.method === 'POST' || req.method === 'PUT' || req.method === 'DELETE') {
       const big = path.startsWith('store/') || path.startsWith('study-photo/') || path.startsWith('study-video/') || path === 'solve' || path === 'solve/img' || path === 'bb/scan' || path === 'ai/note' || path === 'ai/receipt' || path === 'ai/toc' || path === 'ai/stt';
       const text = await req.text();
-      if (text.length > (big ? MAX_STORE + 1000 : path === 'translate' || path === 'notify/digest' || path === 'notify/remind' || path === 'ai/diary' || path === 'ai/coach' || path === 'ai/blank' ? 4 * MAX_SMALL_BODY : MAX_SMALL_BODY)) return fail('보낸 내용이 너무 커요.', 413);
+      if (text.length > (big ? MAX_STORE + 1000 : path === 'translate' || path === 'notify/digest' || path === 'notify/remind' || path === 'ai/diary' || path === 'ai/diaryask' || path === 'ai/coach' || path === 'ai/blank' ? 4 * MAX_SMALL_BODY : MAX_SMALL_BODY)) return fail('보낸 내용이 너무 커요.', 413);
       try {
         const parsed: unknown = text ? JSON.parse(text) : {};
         if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return fail('잘못된 요청이에요.');
@@ -436,6 +436,17 @@ export class Accounts extends DurableObject<Env> {
       if (text.length < 10) return fail('일기가 너무 짧아요.');
       const past = (Array.isArray(body.past) ? body.past : []).filter((x): x is string => typeof x === 'string' && !!x.trim()).map((x) => x.trim().slice(0, 40)).slice(0, 30);
       return this.aiJob(user, titleBody(text, past), parseTitles, 'title');
+    }
+    if (path === 'ai/diaryask' && req.method === 'POST') {
+      const worry = typeof body.worry === 'string' ? body.worry.trim().slice(0, 1000) : '';
+      if (worry.length < 4) return fail('고민을 조금 더 적어 주세요.');
+      const entries = (Array.isArray(body.entries) ? body.entries : [])
+        .filter((x): x is { date: string; text: string } => !!x && typeof x === 'object' && typeof (x as { date?: unknown }).date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test((x as { date: string }).date) && typeof (x as { text?: unknown }).text === 'string')
+        .slice(0, 12)
+        .map((x) => ({ date: x.date, text: x.text.slice(0, 900) }));
+      if (!entries.length) return fail('비슷한 일기가 없어요.');
+      const dates = entries.map((x) => x.date);
+      return this.aiJob(user, diaryAskBody(worry, entries), (t) => parseDiaryAsk(t, dates), 'diaryask');
     }
     if (path === 'ai/stt' && req.method === 'POST') return this.stt(user, body);
     if (path === 'bb/scan' && req.method === 'POST') return this.bbScan(user, body);

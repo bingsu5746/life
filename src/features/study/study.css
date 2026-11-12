@@ -11975,3 +11975,70 @@ button.mt-pill {
   opacity: 0;
   cursor: pointer;
 }
+/* 일기 찾기 · 과거의 나 · N년 전 오늘 */
+.dy-find {
+  text-align: left;
+  color: var(--muted);
+  cursor: pointer;
+}
+.dy-filters {
+  display: grid;
+  gap: 8px;
+  margin: 8px 0 14px;
+}
+.dy-hit {
+  display: grid;
+  gap: 3px;
+  width: 100%;
+  padding: 12px 0;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.dy-hit:last-child {
+  border-bottom: 0;
+}
+.dy-hit > span {
+  font-size: 0.88rem;
+}
+.dy-hit mark,
+.dy-preview mark {
+  background: color-mix(in srgb, var(--warn) 35%, transparent);
+  color: inherit;
+  border-radius: 3px;
+  padding: 0 1px;
+}
+.dy-quote {
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+.dy-ai p {
+  margin: 0 0 6px;
+  line-height: 1.55;
+}
+.hm-ago {
+  display: grid;
+  gap: 4px;
+  width: 100%;
+  padding: 14px 16px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.hm-ago small {
+  color: var(--muted);
+  font-size: 0.75rem;
+}
+.hm-ago span {
+  color: var(--muted);
+  font-size: 0.86rem;
+  line-height: 1.45;
+}

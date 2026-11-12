@@ -99,3 +99,16 @@ describe('국내 뉴스', () => {
     expect(parseGoogleNews(xml)).toEqual([{ id: 'AB', title: '제목 & 하나', trail: '', url: 'https://news.google.com/rss/articles/AB?oc=5', section: '연합뉴스', at: '2026-11-06T11:00:00.000Z' }]);
   });
 });
+
+describe('과거의 나 (일기 묻기)', async () => {
+  const { parseDiaryAsk, diaryAskBody } = await import('./aiRead');
+  it('보낸 일기에 없는 날짜는 버린다', () => {
+    const r = parseDiaryAsk(JSON.stringify({ summary: '산책하기', items: [{ date: '2025-11-12', situation: '시험', did: '산책', result: '나아짐', quote: '마음이 좀 나아졌다' }, { date: '2020-01-01', situation: '지어냄' }] }), ['2025-11-12']);
+    expect(r.items.map((x) => x.date)).toEqual(['2025-11-12']);
+    expect(r.summary).toBe('산책하기');
+  });
+  it('일기 날짜가 글에 들어간다', () => {
+    const b = diaryAskBody('속상해', [{ date: '2025-11-12', text: '산책했다' }]);
+    expect(b.contents[0].parts[0].text).toContain('<2025-11-12>');
+  });
+});
