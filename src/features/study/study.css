@@ -9780,7 +9780,7 @@ body.focus-on {
 .km-row.on {
   background: var(--soft);
 }
-.dy-auto {
+.dy-autotag {
   padding: 1px 8px;
   border-radius: 999px;
   background: var(--soft);
