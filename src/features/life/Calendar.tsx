@@ -1,9 +1,9 @@
 // 달력: 달 · 주 · 일정 목록. 날마다 내 일정 + 시험 · 수행 · 예습 · 할 일 · 개봉 · 결제 · 학교 일정 · 공휴일 · 기념일 · 24절기
 // 일요일 · 공휴일은 빨강, 토요일은 파랑
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { addDays, daysBetween, diffDays, longDate, shortDate, weekday, WEEKDAYS } from '../study/dates';
 import { useSchoolData } from '../study/SchoolPanel';
-import { put, remove, useStudy } from '../study/store';
+import { put, remove, setSettings, useStudy } from '../study/store';
 import { go, toast, useToday } from '../study/ui';
 import { daysInMonth, monthLabel, shiftMonth } from './calc';
 import { CAL_KIND, monthItems, type CalItem } from './calendar';
@@ -95,7 +95,10 @@ function MonthView({ pick, setPick, setEdit }: { pick: DateStr; setPick: (d: Dat
   const n = daysInMonth(month);
   const to = `${month}-${String(n).padStart(2, '0')}`;
   const data = useDays(from, to);
-  const { special, items, evs } = data;
+  const { d, special, items, evs } = data;
+  const hide = new Set(d.settings.calHide ?? []);
+  const [pickDots, setPickDots] = useState(false);
+  const kinds = [...new Set([...items.values()].flat().map((x) => x.kind))].filter((k) => k !== 'holiday');
   const lead = weekday(from);
   const cells = [...Array(lead).fill(null), ...Array.from({ length: n }, (_, i) => addDays(from, i))];
   const move = (k: number) => {
@@ -105,10 +108,41 @@ function MonthView({ pick, setPick, setEdit }: { pick: DateStr; setPick: (d: Dat
   };
   // 옆으로 밀어 달 넘기기
   const touch = useRef<{ x: number; y: number } | null>(null);
+  // PC: ← → 로 달 넘기기 (글 쓰는 칸에 있을 때는 빼고)
+  useEffect(() => {
+    const on = (e: KeyboardEvent) => {
+      const t = e.target as HTMLElement | null;
+      if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT' || t.isContentEditable)) return;
+      if (document.querySelector('.sheet, [role=dialog]')) return;
+      if (e.key === 'ArrowLeft') move(-1);
+      else if (e.key === 'ArrowRight') move(1);
+    };
+    window.addEventListener('keydown', on);
+    return () => window.removeEventListener('keydown', on);
+  });
   return (
     <div className="st-page narrow">
       <div className="st-page-head">
-        <h2>{monthLabel(month)}</h2>
+        <label className="cal-month">
+          <h2>{monthLabel(month)}</h2>
+          <input
+            type="month"
+            value={month}
+            aria-label="달 고르기"
+            onClick={(e) => {
+              try {
+                e.currentTarget.showPicker?.();
+              } catch {
+                /* 고르는 창을 못 열면 그냥 둔다 */
+              }
+            }}
+            onChange={(e) => {
+              if (!/^\d{4}-\d{2}$/.test(e.target.value)) return;
+              setMonth(e.target.value);
+              setPick(e.target.value === today.slice(0, 7) ? today : `${e.target.value}-01`);
+            }}
+          />
+        </label>
         <div className="st-inline">
           <button className="btn btn-sm" aria-label="지난달" onClick={() => move(-1)}>
             ‹
@@ -162,13 +196,32 @@ function MonthView({ pick, setPick, setEdit }: { pick: DateStr; setPick: (d: Dat
               ))}
               {list.length > 3 && <small className="cal-more">+{list.length - 3}</small>}
               <span className="cal-dots">
-                {[...new Set((items.get(date) ?? []).filter((x) => x.kind !== 'holiday').map((x) => x.kind))].slice(0, 4).map((k) => (
+                {[...new Set((items.get(date) ?? []).filter((x) => x.kind !== 'holiday' && !hide.has(x.kind)).map((x) => x.kind))].slice(0, 4).map((k) => (
                   <i key={k} className={`cal-k ${k}`} />
                 ))}
               </span>
             </button>
           );
         })}
+      </div>
+      <div className="cal-legend">
+        <button className="st-link" onClick={() => setPickDots(!pickDots)} aria-expanded={pickDots}>
+          {pickDots ? '닫기' : `달력 점 고르기${hide.size ? ` · ${hide.size}개 숨김` : ''}`}
+        </button>
+        {pickDots && (
+          <div className="st-chips">
+            {[...new Set([...kinds, ...hide])].map((k) => (
+              <button
+                key={k}
+                className={`st-chip cal-chip ${hide.has(k) ? 'off' : 'on'}`}
+                aria-pressed={!hide.has(k)}
+                onClick={() => setSettings({ calHide: hide.has(k) ? [...hide].filter((x) => x !== k) : [...hide, k] })}
+              >
+                <i className={`cal-k ${k}`} /> {CAL_KIND[k as keyof typeof CAL_KIND] ?? k}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
       <DayPanel date={pick} data={data} setEdit={setEdit} />
     </div>
@@ -184,6 +237,18 @@ function DayPanel({ date, data, setEdit }: { date: DateStr; data: ReturnType<typ
   const terms = special.filter((x) => x.date === date && x.term);
   const gap = diffDays(today, date);
   /** 과외 그날만 쉬기 (휴강) · 되돌리기. 쉬면 그날 저절로 들어간 공부 기록도 뺀다 */
+  /** 보강: 수업 없는 날에 한 번 더 · 되돌리기 */
+  const toggleExtra = (tutorId: string, day: string, on: boolean) => {
+    const t = d.tutors[tutorId];
+    if (!t) return;
+    put('tutors', { ...t, extra: on ? [...new Set([...t.extra, day])].sort() : t.extra.filter((x) => x !== day), cancelled: on ? t.cancelled.filter((x) => x !== day) : t.cancelled });
+    if (!on) {
+      const sid = `tut-${t.id}-${day}`;
+      if (d.sessions[sid] && !d.sessions[sid].deleted) remove('sessions', sid);
+    }
+    toast(on ? `${shortDate(day)} ${t.name} 보강을 넣었어요` : '보강을 뺐어요');
+  };
+  const noClass = Object.values(d.tutors).filter((t) => !t.deleted && !sel.some((x) => x.tutorId === t.id));
   const toggleClass = (tutorId: string, day: string, off: boolean) => {
     const t = d.tutors[tutorId];
     if (!t) return;
@@ -218,14 +283,29 @@ function DayPanel({ date, data, setEdit }: { date: DateStr; data: ReturnType<typ
             <div key={i} className={`cal-item cal-tutor ${x.cancelled ? 'off' : ''}`}>
               <span className={`cal-tag ${x.kind}`}>{CAL_KIND[x.kind]}</span>
               <span>{x.label}</span>
-              <button className="st-link" onClick={() => toggleClass(x.tutorId!, date, !x.cancelled)}>
-                {x.cancelled ? '되돌리기' : '이날 수업 없음'}
-              </button>
+              {x.extra ? (
+                <button className="st-link" onClick={() => toggleExtra(x.tutorId!, date, false)}>
+                  보강 빼기
+                </button>
+              ) : (
+                <button className="st-link" onClick={() => toggleClass(x.tutorId!, date, !x.cancelled)}>
+                  {x.cancelled ? '되돌리기' : '휴강'}
+                </button>
+              )}
             </div>
           ) : (
             <ItemRow key={i} x={x} />
           ),
         )
+      )}
+      {noClass.length > 0 && (
+        <div className="cal-extra">
+          {noClass.map((t) => (
+            <button key={t.id} className="st-chip" onClick={() => toggleExtra(t.id, date, true)}>
+              + {t.name} 보강
+            </button>
+          ))}
+        </div>
       )}
     </section>
   );

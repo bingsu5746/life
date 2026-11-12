@@ -1,5 +1,5 @@
 // 저장된 자료 → 화면에 보일 것 (계획 대상, 오늘 할 것, 숙제 분량 …)
-import { textAmount, wholeDays } from './splitHomework';
+import { resplit, textAmount, wholeDays, type HwPart } from './splitHomework';
 import { apportion } from './allocate';
 import { addDays, daysBetween } from './dates';
 import { habitOn } from './habits';
@@ -110,6 +110,8 @@ export interface HwItemView {
   unit?: string;
   /** 나눌 수 없는 숙제(분량 없음)를 통으로 할 날 */
   day?: DateStr;
+  /** 남은 분량을 마감까지 날마다 나눈 것 (쪽 · 번호) */
+  plan?: HwPart[];
 }
 
 export interface HomeworkView {
@@ -151,12 +153,12 @@ export function homeworkViews(d: StudyData, today: DateStr): HomeworkView[] {
           if (!amt) return { item, remaining: [], today: [], finished: !!item.done };
           const done = new Set(expand(item.doneRanges ?? []));
           const remaining = expand([[amt.from, amt.to]]).filter((p) => !done.has(p));
-          return { item, remaining, today: homeworkToday(remaining, today, due, hw.includeDue, d.settings.offDates), finished: remaining.length === 0, unit: amt.unit };
+          return { item, remaining, today: homeworkToday(remaining, today, due, hw.includeDue, d.settings.offDates), finished: remaining.length === 0, unit: amt.unit, plan: resplit(remaining, today, due, hw.includeDue, d.settings.offDates) };
         }
         if (item.kind !== 'pages' || !item.range) return { item, remaining: [], today: [], finished: !!item.done };
         const done = hwItemPagesDone(d, item);
         const remaining = expand([item.range]).filter((p) => !done.has(p));
-        return { item, remaining, today: homeworkToday(remaining, today, due, hw.includeDue, d.settings.offDates), finished: remaining.length === 0 };
+        return { item, remaining, today: homeworkToday(remaining, today, due, hw.includeDue, d.settings.offDates), finished: remaining.length === 0, plan: resplit(remaining, today, due, hw.includeDue, d.settings.offDates) };
       });
       // 분량 없는 숙제(글 · 단어장)는 아직 안 한 것끼리 마감까지 하루에 하나씩 통으로
       const whole = items.filter((i) => i.item.kind !== 'pages' && !i.unit && !i.finished);

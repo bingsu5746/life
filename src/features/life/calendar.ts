@@ -15,6 +15,8 @@ export interface CalItem {
   /** 과외 수업 (달력에서 「이날 수업 없음」으로 뺄 수 있게) · 뺀 날인지 */
   tutorId?: string;
   cancelled?: boolean;
+  /** 보강 날 */
+  extra?: boolean;
 }
 
 export const CAL_KIND: Record<CalKind, string> = { bday: '생일', tutor: '과외', exam: '시험', task: '수행', preview: '예습', todo: '할 일', movie: '개봉', money: '결제', school: '학교', off: '쉬는 날', holiday: '공휴일', anniv: '기념일' };
@@ -40,11 +42,12 @@ export function monthItems(d: StudyData, month: string, school: { date: DateStr;
   for (const b of d.settings.birthdays ?? []) add(birthdayIn(b.md, Number(month.slice(0, 4))), { kind: 'bday', label: `${b.name} 생일${b.budget ? ` · 선물 ${won(b.budget)}` : ''}`, to: '/money/saving' });
   for (const t of alive(d.tutors))
     for (const day of daysBetween(from, to)) {
-      if (hasClass(t, day)) add(day, { kind: 'tutor', label: `${t.name}${t.time ? ` ${t.time}` : ''}`, tutorId: t.id });
+      if (hasClass(t, day)) add(day, { kind: 'tutor', label: `${t.name}${t.time ? ` ${t.time}` : ''}${t.extra.includes(day) ? ' (보강)' : ''}`, tutorId: t.id, extra: t.extra.includes(day) || undefined });
       else if (t.cancelled.includes(day) && t.weekdays.includes(weekday(day))) add(day, { kind: 'tutor', label: `${t.name} (수업 없음)`, tutorId: t.id, cancelled: true });
     }
   for (const x of special) add(x.date, { kind: x.holiday ? 'holiday' : 'anniv', label: x.name });
   for (const s of school) if (!(s.off && special.some((x) => x.holiday && x.date === s.date && x.name === s.name))) add(s.date, { kind: s.off ? 'off' : 'school', label: s.name });
+  if (d.settings.csatGoal?.date) add(d.settings.csatGoal.date, { kind: 'exam', label: '수능', to: '/exams/csat' });
   for (const off of d.settings.offDates) if (!school.some((s) => s.date === off && s.off)) add(off, { kind: 'off', label: '빼는 날' });
   const order: CalKind[] = ['holiday', 'bday', 'exam', 'off', 'school', 'tutor', 'task', 'preview', 'todo', 'money', 'movie', 'anniv'];
   for (const [k, v] of m)

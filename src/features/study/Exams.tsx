@@ -21,6 +21,7 @@ import { useSpecialDays } from '../life/specialDays';
 const Grades = lazy(() => import('./Grades').then((m) => ({ default: m.Grades })));
 const SemesterGoals = lazy(() => import('./SemesterGoals').then((m) => ({ default: m.SemesterGoals })));
 const Assessments = lazy(() => import('./Assessments').then((m) => ({ default: m.Assessments })));
+const CsatGoals = lazy(() => import('./CsatGoals').then((m) => ({ default: m.CsatGoals })));
 const UnivGoals = lazy(() => import('./UnivGoals').then((m) => ({ default: m.UnivGoals })));
 const GradeCheck = lazy(() => import('./GradeCheck').then((m) => ({ default: m.GradeCheck })));
 const WeakPage = lazy(() => import('./WeakPage').then((m) => ({ default: m.WeakPage })));
@@ -45,6 +46,12 @@ export function Exams({ id, sub }: { id?: string; sub?: string }) {
     return (
       <Suspense fallback={<p className="st-muted">여는 중…</p>}>
         <SemesterGoals />
+      </Suspense>
+    );
+  if (id === 'csat')
+    return (
+      <Suspense fallback={<p className="st-muted">여는 중…</p>}>
+        <CsatGoals />
       </Suspense>
     );
   if (id === 'univ' || id === 'check')

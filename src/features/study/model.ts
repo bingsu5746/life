@@ -58,16 +58,12 @@ export interface StudySettings {
   diaryTime?: string;
   /** 단어 퀴즈 알림 시각 (자주 틀린 단어 3개) */
   wordQuizTime?: string;
-  /** 내일 챙길 것: 늘 챙길 것 · 과목별 준비물 (예: 체육 → 체육복) · 체크한 것 (그 날짜 → id) */
   /** 생일 · 선물 계획: 이름 · 월-일 · 선물 예산(원) · 선물 생각 */
   birthdays?: { id: Id; name: string; md: string; budget?: number; idea?: string }[];
   /** 이미 축하한 신기록 (최근 50개 key) */
   celebrated?: string[];
   /** 보고 싶은 영화 소식 (최근 40개): OTT · 극장 상영 · 재개봉. key 로 같은 소식은 한 번만 */
   movieNews?: { key: string; movieId: Id; text: string; at: number; read?: boolean }[];
-  packAlways?: string[];
-  packBySubject?: Record<Id, string>;
-  packChecks?: { date: DateStr; ids: string[] };
   /** 쉬는 시간 단어 알림: 1교시 시작 · 수업 길이(분) · 쉬는 시간(분) · 하루 몇 번 */
   breakWords?: { start: string; len: number; rest: number; per: number };
   /** 하루 마감 체크인 알림 시각 HH:MM */
@@ -125,6 +121,15 @@ export interface StudySettings {
   gradeGoals?: { school?: Record<string, number>; mock?: Record<string, number> };
   /** 목표 대학 · 학과 (목표 성적은 직접 넣는다) */
   univGoals?: UnivGoal[];
+  /** 수능 목표: 수능 날(직접 넣음) · 과목 이름 → 목표 등급 · 백분위 · 원점수 */
+  csatGoal?: CsatGoal;
+  /** 달력 칸 아래 점에서 뺄 종류 (과외 · 결제 …) */
+  calHide?: string[];
+}
+
+export interface CsatGoal {
+  date?: DateStr;
+  subjects: Record<string, { grade?: number; percentile?: number; raw?: number }>;
 }
 
 /** 시장: 은화(100 = 1금화)를 공부로 벌고, 오락 · 물건을 사고, 은행(적금 · 대출) · 과목 주식. 돈은 모두 은화로 적는다 */

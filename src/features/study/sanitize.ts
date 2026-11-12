@@ -806,16 +806,6 @@ export function sanitizeSettings(s: unknown): StudySettings & { updatedAt: numbe
             return { key: (o.key as string).slice(0, 200), movieId: str(o.movieId).slice(0, 40), text: (o.text as string).slice(0, 200), at: num(o.at), read: o.read === true ? true : undefined };
           })
       : undefined,
-    packAlways: Array.isArray(x.packAlways) ? (x.packAlways as unknown[]).filter((v): v is string => typeof v === 'string' && !!v.trim()).map((v) => v.trim().slice(0, 30)).slice(0, 20) : undefined,
-    packBySubject: isObj(x.packBySubject)
-      ? Object.fromEntries(
-          Object.entries(x.packBySubject)
-            .filter(([k, v]) => k.length <= 40 && typeof v === 'string' && v.trim())
-            .map(([k, v]) => [k, (v as string).trim().slice(0, 40)])
-            .slice(0, 40),
-        )
-      : undefined,
-    packChecks: isObj(x.packChecks) && isDate((x.packChecks as Obj).date) && Array.isArray((x.packChecks as Obj).ids) ? { date: (x.packChecks as Obj).date as string, ids: ((x.packChecks as Obj).ids as unknown[]).filter((v): v is string => typeof v === 'string').slice(0, 60) } : undefined,
     wordQuizTime: typeof x.wordQuizTime === 'string' && /^([01]\d|2[0-3]):[0-5]\d$/.test(x.wordQuizTime) ? x.wordQuizTime : undefined,
     checkinTime: typeof x.checkinTime === 'string' && /^([01]\d|2[0-3]):[0-5]\d$/.test(x.checkinTime) ? x.checkinTime : undefined,
     semesterGoals: isObj(x.semesterGoals)
@@ -874,6 +864,20 @@ export function sanitizeSettings(s: unknown): StudySettings & { updatedAt: numbe
             .filter((t): t is string => typeof t === 'string')
             .slice(0, 10),
     gradeGoals: isObj(x.gradeGoals) ? { school: goals((x.gradeGoals as Obj).school), mock: goals((x.gradeGoals as Obj).mock) } : undefined,
+    calHide: x.calHide === undefined ? undefined : arr(x.calHide).filter((t): t is string => typeof t === 'string' && t.length <= 20).slice(0, 20),
+    csatGoal: isObj(x.csatGoal)
+      ? {
+          date: isDate((x.csatGoal as Obj).date) ? ((x.csatGoal as Obj).date as string) : undefined,
+          subjects: isObj((x.csatGoal as Obj).subjects)
+            ? Object.fromEntries(
+                Object.entries((x.csatGoal as Obj).subjects as Obj)
+                  .filter(([k, v]) => k.trim() && k.length <= 20 && isObj(v))
+                  .slice(0, 12)
+                  .map(([k, v]) => [k, { grade: score((v as Obj).grade, 1, 9), percentile: score((v as Obj).percentile, 0, 100), raw: score((v as Obj).raw, 0, 200) }]),
+              )
+            : {},
+        }
+      : undefined,
     univGoals: Array.isArray(x.univGoals)
       ? (x.univGoals as unknown[])
           .filter((g): g is Obj => isObj(g) && typeof g.univ === 'string' && !!g.univ.trim())

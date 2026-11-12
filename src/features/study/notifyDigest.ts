@@ -5,7 +5,6 @@ import { scopeDate, upcomingExams, timetable } from './exams';
 import { buildExamPlan } from './examPlan';
 import { alive, type DateStr, type StudyData, type WordsData } from './model';
 import { planViews, homeworkViews } from './select';
-import { classesOn } from './timetable';
 import { ruleDates, weekSpent } from '../life/calc';
 import { backupDue } from './backup';
 import { lifeWeek } from '../life/lifeWeek';
@@ -139,10 +138,6 @@ export function evening(d: StudyData, today: DateStr, date: DateStr): string {
   if (pay.length) parts.push(`내일 빠져나가는 돈: ${pay[0].name} ${pay[0].amount.toLocaleString('ko-KR')}원${pay.length > 1 ? ` 외 ${pay.length - 1}건` : ''}`);
   const pv = alive(d.previews).filter((p) => !p.done && p.date === next);
   if (pv.length) parts.push(`내일 수업 예습 ${pv.length}개`);
-  else {
-    const cls = classesOn(d.settings.schoolTimetable, next);
-    if (cls.length) parts.push(`내일 수업: ${names(d, cls)}`);
-  }
   return parts.length ? parts.join(' · ') : '내일 정해 둔 것이 없어요. 오늘 공부 시간을 기록했는지 확인해 보세요';
 }
 

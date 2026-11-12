@@ -144,6 +144,9 @@ function HwLine({ hw, iv }: { hw: Homework; iv: ReturnType<typeof homeworkViews>
   const [q, setQ] = useState<string | null>(null);
   const todayStr = useToday();
   const title = item.kind === 'pages' ? `${item.bookName ?? d.books[item.bookId ?? '']?.name ?? ''} p.${item.range ? rangeText([item.range]) : ''}` : item.text;
+  // 마감까지 날마다 나눈 것 (2일 이상일 때만)
+  const plan = !iv.finished && iv.plan && iv.plan.length > 1 ? iv.plan : null;
+  const unitOf = item.kind === 'pages' ? '쪽' : iv.unit === '번' ? '번' : (iv.unit ?? '');
   return (
     <div className="st-item">
       {item.kind === 'pages' ? (
@@ -161,6 +164,17 @@ function HwLine({ hw, iv }: { hw: Homework; iv: ReturnType<typeof homeworkViews>
           {iv.unit && !iv.finished && (iv.today.length ? `오늘 ${rangeText(iv.today)}${iv.unit} · ` : '') + `남은 ${iv.remaining.length}${iv.unit === '번' ? '문제' : iv.unit}`}
           {item.question && ` · 질문: ${item.question}`}
         </div>
+        {plan && (
+          <div className="st-hw-plan">
+            {plan.map((p) => (
+              <span key={p.date} className={p.date === todayStr ? 'on' : ''}>
+                {p.date === todayStr ? '오늘' : shortDate(p.date)} {item.kind === 'pages' ? 'p.' : ''}
+                {p.from === p.to ? p.from : `${p.from}~${p.to}`}
+                {item.kind === 'pages' ? '' : unitOf}
+              </span>
+            ))}
+          </div>
+        )}
         {q !== null && (
           <form
             className="st-inline"
@@ -290,15 +304,21 @@ function HomeworkSheet({ tutor, hw, today, onClose }: { tutor: Tutor; hw?: Homew
     for (const x of items) {
       const prev = hw?.items.find((i) => i.id === x.id);
       if (x.kind === 'pages') {
-        const m = x.pages.match(/^\s*(\d{1,12})\s*(?:[-~]\s*(\d{1,12}))?\s*$/);
-        const range = m && clampRange(Number(m[1]), Number(m[2] ?? m[1]));
-        if (!range) continue;
-        out.push({ ...prev, id: x.id, kind: 'pages', bookId: x.bookId || undefined, bookName: x.bookId ? undefined : x.bookName.trim() || '문제집', range });
+        // 「37-40」 「p.37~40쪽」 「37-40, 52-55」 (여러 범위면 범위마다 한 줄)
+        const ranges = [...x.pages.matchAll(/(\d{1,12})\s*(?:[-~∼–]\s*(\d{1,12}))?/g)].map((m) => clampRange(Number(m[1]), Number(m[2] ?? m[1]))).filter((r): r is NonNullable<typeof r> => !!r);
+        ranges.forEach((range, k) => out.push({ ...(k ? {} : prev), id: k ? newId() : x.id, kind: 'pages', bookId: x.bookId || undefined, bookName: x.bookId ? undefined : x.bookName.trim() || '문제집', range }));
       } else if (x.kind === 'words') {
         const l = d.wordLists[x.wordListId];
         if (!l) continue;
         out.push({ ...prev, id: x.id, kind: 'words', wordListId: l.id, text: x.text.trim() || `${l.name} 외우기` });
-      } else if (x.text.trim()) out.push({ ...prev, id: x.id, kind: 'text', text: x.text.trim() });
+      } else {
+        // 여러 줄로 적으면 줄마다 따로 (분량 있는 줄은 날마다 나누고, 없는 줄은 하루에 하나씩)
+        const lines = x.text
+          .split(/\n+/)
+          .map((t) => t.replace(/^\s*(?:[-*•·]|\d+[.)])\s+/, '').trim())
+          .filter(Boolean);
+        lines.forEach((text, k) => out.push({ ...(k ? {} : prev), id: k ? newId() : x.id, kind: 'text', text: text.slice(0, 200) }));
+      }
     }
     if (!out.length) return toast('숙제 내용을 넣어 주세요');
     const at = Date.now();
@@ -330,10 +350,10 @@ function HomeworkSheet({ tutor, hw, today, onClose }: { tutor: Tutor; hw?: Homew
                   ))}
                 </select>
                 {!x.bookId && <input className="st-input sm" placeholder="책 이름" value={x.bookName} onChange={(e) => set(i, { bookName: e.target.value })} />}
-                <input className="st-input xs" placeholder="37-40" value={x.pages} onChange={(e) => set(i, { pages: e.target.value })} aria-label="쪽" />
+                <input className="st-input sm" placeholder="37-40, 52-55" value={x.pages} onChange={(e) => set(i, { pages: e.target.value })} aria-label="쪽" />
               </div>
             )}
-            {x.kind === 'text' && <input className="st-input" placeholder="예: 블랙라벨 1~40번, 오답 정리" value={x.text} onChange={(e) => set(i, { text: e.target.value })} />}
+            {x.kind === 'text' && <textarea className="st-input" rows={Math.min(8, Math.max(2, x.text.split('\n').length))} placeholder={'한 줄에 숙제 하나씩\n블랙라벨 1~40번\n오답 정리'} value={x.text} onChange={(e) => set(i, { text: e.target.value })} />}
             {x.kind === 'words' && (
               <div className="st-inline wrap">
                 <select className="st-input sm" value={x.wordListId} onChange={(e) => set(i, { wordListId: e.target.value })} aria-label="단어 목록">

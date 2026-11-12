@@ -204,7 +204,8 @@ export const EXAM_ITEMS: (AreaItem & { short: string })[] = [
   { key: 'tasks', label: '수행평가', short: '수행', icon: 'books', to: '/exams/tasks' },
   { key: 'grades', label: '성적', short: '성적', icon: 'up', to: '/exams/grades' },
   { key: 'goal', label: '내신 목표', short: '내신목표', icon: 'target', to: '/exams/goal' },
+  { key: 'csat', label: '수능 목표', short: '수능목표', icon: 'trophy', to: '/exams/csat' },
   { key: 'univ', label: '목표 대학', short: '대학', icon: 'pin', to: '/exams/univ' },
   { key: 'check', label: '채점', short: '채점', icon: 'solve', to: '/exams/check' },
 ];
-export const examItem = (id?: string) => (id === 'tasks' || id === 'grades' || id === 'goal' || id === 'univ' || id === 'check' ? id : 'exams');
+export const examItem = (id?: string) => (id === 'tasks' || id === 'grades' || id === 'goal' || id === 'csat' || id === 'univ' || id === 'check' ? id : 'exams');

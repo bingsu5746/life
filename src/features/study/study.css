@@ -11896,3 +11896,82 @@ button.mt-pill {
 .cal-wday-head b {
   line-height: 1.1;
 }
+/* 수능 목표 */
+.csat {
+  display: grid;
+  gap: 8px;
+}
+.csat-row {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.csat-row label {
+  display: grid;
+  gap: 2px;
+}
+.csat-row small {
+  color: var(--muted);
+  font-size: 0.72rem;
+}
+.csat-ok {
+  color: var(--text);
+  font-weight: 600;
+  font-size: 0.82rem;
+}
+.csat-gap {
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+.cal-legend {
+  display: grid;
+  gap: 8px;
+  margin: 8px 0 12px;
+}
+.cal-legend > .st-link {
+  justify-self: start;
+}
+.cal-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.cal-chip.off {
+  opacity: 0.45;
+  text-decoration: line-through;
+}
+.cal-extra {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 10px;
+}
+/* 과외 숙제: 마감까지 날마다 나눈 것 */
+.st-hw-plan {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 4px;
+}
+.st-hw-plan span {
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: var(--soft);
+  color: var(--muted);
+  font-size: 0.72rem;
+}
+.st-hw-plan span.on {
+  background: var(--accent);
+  color: var(--on-accent);
+}
+/* 달력: 제목을 눌러 달 고르기 */
+.cal-month {
+  position: relative;
+  cursor: pointer;
+}
+.cal-month input {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+}

@@ -1,5 +1,5 @@
 // 두 기기의 공부 자료 합치기 (설계 §8.2). 합치기는 기기에서, 서버는 저장만 한다.
-import { COLLECTIONS, type Collection, type Assessment, type BlankSheet, type Exam, type ExamScope, type GradeRecord, type Habit, type SavingGoal, type WrongNote, type Homework, type Id, type Mark, type Stamp, type StudyData, type Subject, type WordsData } from './model';
+import { COLLECTIONS, type Collection, type Assessment, type BlankSheet, type DayCondition, type Exam, type ExamScope, type GradeRecord, type Habit, type SavingGoal, type WrongNote, type Homework, type Id, type Mark, type Stamp, type StudyData, type Subject, type WordsData } from './model';
 import { mergeHabitChecks } from './habits';
 import { compactMarks } from './pages';
 
@@ -135,7 +135,16 @@ function mergeSubject(a?: Subject, b?: Subject): Subject | undefined {
   return w.progress ? { ...w, progress: mergeList(w.progress, o.progress, (p) => p.date) } : w;
 }
 
+/** 아침 기록: 잔 시각 · 일어난 시각 · 컨디션을 다른 기기에서 따로 적어도 둘 다 남게 (새 쪽에 없는 칸은 옛 쪽 것으로) */
+export function mergeCondition(a?: DayCondition, b?: DayCondition): DayCondition | undefined {
+  const s = sides(a, b);
+  if (!s) return pick(a, b);
+  const [w, o] = s;
+  return { ...w, sleep: w.sleep ?? o.sleep, wake: w.wake ?? o.wake, mood: w.mood ?? o.mood, missed: w.missed ?? o.missed };
+}
+
 const MERGERS: Partial<Record<Collection, (a?: never, b?: never) => unknown>> = {
+  conditions: mergeCondition as never,
   books: mergeMarked as never,
   wordLists: mergeMarked as never,
   exams: mergeExam as never,

@@ -152,7 +152,7 @@ describe('주간 돌아보기·알림 글', () => {
     expect(e[1]).toMatchObject({ date: '2026-10-25', slot: 1, title: '이번 주 통계 · 내일 준비', url: '/week' });
     expect(e[1].body).toMatch(/^내일 수업 예습 1개 · 📊 이번 주 공부 0분/);
     expect(e[2].body).toContain('오늘 수업 예습 1개');
-    expect(e[3].body).toBe('내일 수업: 수학');
+    expect(e[3].body).not.toContain('내일 수업:');
   });
 });
 
@@ -1279,20 +1279,7 @@ describe('쉬는 시간 단어 알림 · 수행평가 단계 · 월말 돈 리�
   });
 });
 
-describe('내일 챙길 것 · 생일 · 시험 범위 사진 읽기', () => {
-  it('시간표 · 과목 준비물 · 수행평가 · 늘 챙길 것', async () => {
-    const { packList } = await import('./pack');
-    const { emptyStudy } = await import('./model');
-    const d = emptyStudy();
-    d.subjects = { pe: { id: 'pe', name: '체육', color: '#000', order: 0, updatedAt: 1 }, ko: { id: 'ko', name: '국어', color: '#000', order: 1, updatedAt: 1 } } as never;
-    d.settings.schoolTimetable = { '2': ['ko', 'pe', 'ko'] };
-    d.settings.packBySubject = { pe: '체육복' };
-    d.settings.packAlways = ['학생증'];
-    d.assessments = { a: { id: 'a', subjectId: 'ko', title: '독서 감상문', due: '2026-11-10', steps: [], done: false, created: 0, updatedAt: 1 } } as never;
-    // 2026-11-10 은 화요일
-    expect(packList(d, '2026-11-10').map((x) => x.text)).toEqual(['국어 교과서 · 노트', '체육 교과서 · 노트 · 체육복', '「독서 감상문」 낼 것', '학생증']);
-    expect(packList(d, '2026-11-11')).toEqual([]);
-  });
+describe('생일 · 시험 범위 사진 읽기', () => {
   it('다가오는 생일 (2월 29일은 평년 28일) · 달력 · 알림', async () => {
     const { nextBirthday } = await import('../life/birthdays');
     expect(nextBirthday('11-20', '2026-11-06')).toBe('2026-11-20');

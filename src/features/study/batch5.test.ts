@@ -141,3 +141,13 @@ describe('단어 외우기 순서', async () => {
     expect(s).toEqual({ queue: [], round: 0 });
   });
 });
+
+describe('아침 기록 합치기', () => {
+  it('두 기기에서 따로 적은 잔 시각 · 일어난 시각이 둘 다 남는다', async () => {
+    const { mergeCondition } = await import('./merge');
+    const phone = { id: '2026-11-12', updatedAt: 10, sleep: '23:30' };
+    const pc = { id: '2026-11-12', updatedAt: 20, wake: '07:00' };
+    expect(mergeCondition(phone, pc)).toMatchObject({ sleep: '23:30', wake: '07:00', updatedAt: 20 });
+    expect(mergeCondition(pc, phone)).toMatchObject({ sleep: '23:30', wake: '07:00' });
+  });
+});
