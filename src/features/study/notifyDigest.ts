@@ -214,6 +214,23 @@ export function breakWordReminders(d: StudyData, words: WordsData, today: DateSt
   return out;
 }
 
+/** 일기 안 쓴 날: 밤 10시 · 11시 · 0시 · 1시 · 2시 (한국 시간)에 일기 쓰라는 알림. 어제(자정 넘긴 시각) ~ 앞으로 days 일 */
+export const DIARY_NAG_HOURS = [22, 23, 24, 25, 26];
+export function diaryNagReminders(d: StudyData, today: DateStr, now = Date.now(), days = 2): { at: number; title: string; body: string; url: string }[] {
+  if (d.settings.diaryNag === false) return [];
+  const out: { at: number; title: string; body: string; url: string }[] = [];
+  for (let i = -1; i <= days; i++) {
+    const date = addDays(today, i);
+    if (d.diary[date] && !d.diary[date].deleted) continue;
+    for (const h of DIARY_NAG_HOURS) {
+      const at = Date.parse(`${date}T00:00:00+09:00`) + h * 3_600_000;
+      if (at <= now) continue;
+      out.push({ at, title: '일기 쓸 시간이에요', body: `${Number(date.slice(5, 7))}월 ${Number(date.slice(8))}일 일기를 아직 안 썼어요. 짧게라도 남겨 볼까요?`, url: `/diary/${date}` });
+    }
+  }
+  return out;
+}
+
 /** 그날 밤 잘 시각 (한국 시간 ms): 다음 날 일어날 시각(다음 날이 토 · 일이면 주말 시각) − 잠 목표 */
 export function bedtimeAt(date: DateStr, wake: { weekday: string; weekend: string }, goalHours: number): number {
   const next = addDays(date, 1);

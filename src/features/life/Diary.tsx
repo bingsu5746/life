@@ -521,6 +521,9 @@ function Form() {
         })}
         <NotifyTime k="diaryTime" label="일기 알림" fallback="22:30" />
         <label className="st-toggle">
+          <input type="checkbox" checked={d.settings.diaryNag !== false} onChange={(e) => setSettings({ diaryNag: e.target.checked ? undefined : false })} /> 일기를 안 쓴 날은 밤 10시부터 새벽 2시까지 한 시간마다 알림
+        </label>
+        <label className="st-toggle">
           <input type="checkbox" checked={form.autoFill} onChange={(e) => set(form.parts, e.target.checked)} /> 새 일기를 열면 본문에 오늘 기록(운동 · 영화 · 할 일)을 미리 채우기
         </label>
       </section>

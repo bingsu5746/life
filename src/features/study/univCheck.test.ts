@@ -56,6 +56,24 @@ describe('목표 대학', () => {
   });
 });
 
+describe('일기 안 쓴 밤 알림', () => {
+  it('밤 10시 ~ 새벽 2시 매시, 일기를 쓴 날 · 지난 시각은 빼고, 끄면 없음', async () => {
+    const { diaryNagReminders } = await import('./notifyDigest');
+    const d = emptyStudy();
+    const h = (s: string) => Date.parse(`${s}+09:00`);
+    // 11-05 23:30: 그날 남은 0시 · 1시 · 2시, 다음 날은 10시부터 다섯 번
+    const r = diaryNagReminders(d, '2026-11-05', h('2026-11-05T23:30:00'), 1);
+    expect(r.map((x) => x.at)).toEqual([h('2026-11-06T00:00:00'), h('2026-11-06T01:00:00'), h('2026-11-06T02:00:00'), h('2026-11-06T22:00:00'), h('2026-11-06T23:00:00'), h('2026-11-07T00:00:00'), h('2026-11-07T01:00:00'), h('2026-11-07T02:00:00')]);
+    expect(r[0].url).toBe('/diary/2026-11-05');
+    // 자정 넘어 앱의 오늘이 다음 날이어도 어제 일기 알림은 남는다
+    expect(diaryNagReminders(d, '2026-11-06', h('2026-11-06T00:30:00'), 0).map((x) => x.url)).toEqual(['/diary/2026-11-05', '/diary/2026-11-05', '/diary/2026-11-06', '/diary/2026-11-06', '/diary/2026-11-06', '/diary/2026-11-06', '/diary/2026-11-06']);
+    d.diary['2026-11-05'] = { id: '2026-11-05', text: '씀', mood: 3, updatedAt: 1 } as never;
+    expect(diaryNagReminders(d, '2026-11-05', h('2026-11-05T23:30:00'), 0)).toEqual([]);
+    d.settings.diaryNag = false;
+    expect(diaryNagReminders(d, '2026-11-06', h('2026-11-06T12:00:00'), 1)).toEqual([]);
+  });
+});
+
 describe('잘 시간 알림', () => {
   it('다음 날이 주말이면 주말 시각 · 잠 목표만큼 앞 · 알림은 그보다 먼저', async () => {
     const { bedtimeAt, bedtimeReminders } = await import('./notifyDigest');

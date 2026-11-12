@@ -56,6 +56,8 @@ export interface StudySettings {
   semesterGoals?: Record<Id, SemesterGoal>;
   /** 일기 쓰라는 알림 시각 HH:MM */
   diaryTime?: string;
+  /** 일기 안 쓴 날 밤 10시 ~ 새벽 2시 한 시간마다 알림. false 면 끔 (없으면 켜짐) */
+  diaryNag?: boolean;
   /** 단어 퀴즈 알림 시각 (자주 틀린 단어 3개) */
   wordQuizTime?: string;
   /** 생일 · 선물 계획: 이름 · 월-일 · 선물 예산(원) · 선물 생각 */

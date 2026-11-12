@@ -165,10 +165,10 @@ export function Study({ path, loggedIn, syncReady = true, onLogin }: { path: str
       const wantRain = d.settings.rainRemind !== false && eventsBetween(d, today, addDays(today, 7)).size > 0;
       const fc = wantRain ? getForecast(place.lat, place.lon).catch(() => null) : Promise.resolve(null);
       void Promise.all([import('./notifyDigest'), fc])
-        .then(([{ breakWordReminders, bedtimeReminders }, forecast]) => {
+        .then(([{ breakWordReminders, bedtimeReminders, diaryNagReminders }, forecast]) => {
           if (gone) return;
-          // 일정 · 빚 갚을 날 · 쉬는 시간 단어 · 잘 시간 · 약 · 비 예보 (서버는 60개까지라 가까운 것부터)
-          const items = [...reminders(d, today), ...breakWordReminders(d, words, today), ...bedtimeReminders(d, today), ...medReminders(d, today), ...(forecast ? rainReminders(d, forecast, today) : []), ...afterExamReminder(upcomingExams(d, today)[0] ? examEnd(upcomingExams(d, today)[0]) : null, d.settings.afterExam)].sort((a, b) => a.at - b.at).slice(0, 60);
+          // 일정 · 빚 갚을 날 · 쉬는 시간 단어 · 잘 시간 · 일기 안 쓴 밤 · 약 · 비 예보 (서버는 60개까지라 가까운 것부터)
+          const items = [...reminders(d, today), ...breakWordReminders(d, words, today), ...bedtimeReminders(d, today), ...diaryNagReminders(d, today), ...medReminders(d, today), ...(forecast ? rainReminders(d, forecast, today) : []), ...afterExamReminder(upcomingExams(d, today)[0] ? examEnd(upcomingExams(d, today)[0]) : null, d.settings.afterExam)].sort((a, b) => a.at - b.at).slice(0, 60);
           const key = JSON.stringify(items);
           if (lastRemind.current === key) return;
           return notifyRemind(items).then(() => (lastRemind.current = key));
@@ -179,7 +179,7 @@ export function Study({ path, loggedIn, syncReady = true, onLogin }: { path: str
       gone = true;
       clearTimeout(t);
     };
-  }, [d.events, d.moneyTx, d.settings.breakWords, d.settings.schoolTimetable, d.settings.birthdays, d.settings.movieNews, d.settings.bedRemind, d.settings.sleepGoal, d.settings.meds, d.settings.medLog, d.settings.rainRemind, d.settings.weatherPlace, d.settings.afterExam, d.exams, words, today, loggedIn]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [d.events, d.moneyTx, d.diary, d.settings.diaryNag, d.settings.breakWords, d.settings.schoolTimetable, d.settings.birthdays, d.settings.movieNews, d.settings.bedRemind, d.settings.sleepGoal, d.settings.meds, d.settings.medLog, d.settings.rainRemind, d.settings.weatherPlace, d.settings.afterExam, d.exams, words, today, loggedIn]); // eslint-disable-line react-hooks/exhaustive-deps
   // 보고 싶은 영화 소식: 하루 한 번 (이 기기) OTT · 극장 상영 · 재개봉을 찾아 새 것만 남긴다
   useEffect(() => {
     if (!loggedIn || !syncReady) return;
