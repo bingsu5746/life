@@ -6,7 +6,7 @@ import { isLoggedIn } from './features/auth/api';
 import { Study } from './features/study/Study';
 import { AREAS, HOBBY_PARTS } from './features/study/tabs';
 import { AiPill } from './features/study/AiPill';
-import { toast } from './features/study/ui';
+import { canLeave, toast } from './features/study/ui';
 import { ErrorBoundary } from './ErrorBoundary';
 
 // 로그인 · 계정 창은 누를 때 받는다 (첫 화면을 가볍게)
@@ -47,7 +47,12 @@ export default function App() {
     };
   }, []);
   useEffect(() => {
-    const on = () => {
+    const on = (e: HashChangeEvent) => {
+      // 뒤로 가기 · 위쪽 버튼 등으로 주소가 바뀌어도, 지금 화면이 못 나가게 하면 주소를 되돌린다
+      if (!canLeave()) {
+        history.replaceState(history.state, '', e.oldURL);
+        return;
+      }
       setPath(parse());
       window.scrollTo(0, 0);
     };

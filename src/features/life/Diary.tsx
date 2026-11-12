@@ -1,13 +1,13 @@
 // 일기: 하루에 하나, 기분과 글. 달별로 모아 보고 찾기
 import { Highlight } from './Highlight';
 import { Dictate } from '../study/Dictate';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { addPhoto, photoUrl, removePhoto } from '../study/photos';
 import { addVideo, MAX_SEC, removeVideo, shrinkVideo, videoUrl } from '../study/videos';
 import { addDays, longDate, shortDate } from '../study/dates';
 import { alive, type DiaryEntry } from '../study/model';
 import { getStudy, put, putMany, remove, setSettings, useStudy } from '../study/store';
-import { confirmDelete, go, tap, toast, useToday } from '../study/ui';
+import { confirmDelete, go, setLeaveGuard, tap, toast, useToday } from '../study/ui';
 import { monthLabel, monthOf, shiftMonth } from './calc';
 import { daySummary, DIARY_PARTS, dreamDates, formOf, sleepSummary, studySummary } from './diaryForm';
 import { diarySplit, diaryTitles, isLoggedIn } from '../auth/api';
@@ -39,9 +39,8 @@ export function Diary({ sub }: { sub?: string }) {
 
 function List({ month, today }: { month: string; today: string }) {
   const d = useStudy();
-  const q = '';
-  const all = alive(d.diary).sort((a, b) => b.id.localeCompare(a.id));
-  const list = q.trim() ? all.filter((e) => `${e.title ?? ''}\n${e.text}\n${Object.values(e.parts ?? {}).join('\n')}`.toLowerCase().includes(q.trim().toLowerCase())) : all.filter((e) => monthOf(e.id) === month);
+  // 이 달 것만 골라서 정렬 (찾기는 「모든 일기에서 찾기」 화면에서)
+  const list = useMemo(() => alive(d.diary).filter((e) => monthOf(e.id) === month).sort((a, b) => b.id.localeCompare(a.id)), [d.diary, month]);
   const wrote = d.diary[today] && !d.diary[today].deleted;
   // 이번 달 기분 칸 (날마다)
   const days = Array.from({ length: 31 }, (_, i) => `${month}-${String(i + 1).padStart(2, '0')}`).filter((x) => x.slice(0, 7) === month && !Number.isNaN(Date.parse(x)) && new Date(`${x}T00:00:00Z`).toISOString().slice(0, 10) === x);
@@ -111,7 +110,7 @@ function List({ month, today }: { month: string; today: string }) {
         모든 일기에서 찾기
       </button>
       {!list.length ? (
-        <p className="st-hint">{q ? '찾는 글이 있는 일기가 없어요.' : '이 달에 쓴 일기가 없어요.'}</p>
+        <p className="st-hint">이 달에 쓴 일기가 없어요.</p>
       ) : (
         list.map((e) => (
           <section key={e.id} className="st-card dy-entry st-tap" {...tap(() => go(`/diary/${e.id}`))}>
@@ -173,24 +172,23 @@ function Write({ date, today }: { date: string; today: string }) {
   const [photos, setPhotos] = useState<string[]>(draft0?.photos ?? cur?.photos ?? []);
   const [title, setTitle] = useState(draft0?.title ?? cur?.title ?? '');
   const form = formOf(d);
-  const lines = daySummary(d, date);
+  // 그날 기록 요약은 모든 기록을 훑으니, 글자를 칠 때마다가 아니라 기록이 바뀔 때만 다시 만든다
+  const lines = useMemo(() => daySummary(d, date), [d, date]);
+  const studyLines = useMemo(() => studySummary(d, date), [d, date]);
+  const sleepLines = useMemo(() => sleepSummary(d, date), [d, date]);
   // 새 일기: 본문 앞에 오늘 앱 기록(운동 · 영화 · 할 일 …)을 미리 채운다 (양식에서 끌 수 있음)
   // 미리 채운 글만 있으면 바뀐 것으로 치지 않는다 (임시저장 알림이 괜히 뜨지 않게)
   const [prefill] = useState(() => (!cur && form.autoFill && lines.length ? `${lines.join('\n')}\n\n` : ''));
   const [text, setText] = useState(() => draft0?.text ?? cur?.text ?? prefill);
   const [videos, setVideos] = useState<string[]>(draft0?.videos ?? cur?.videos ?? []);
   const [vBusy, setVBusy] = useState('');
-  const studyLines = studySummary(d, date);
-  const sleepLines = sleepSummary(d, date);
-  // 「공부」 · 「잠」 칸은 비어 있으면 늘 기록으로 채운다
-  const [parts, setParts] = useState<Record<string, string>>(
-    () =>
-      draft0?.parts ?? {
-        ...(cur?.parts ?? {}),
-        ...(form.parts.includes('study') && studyLines.length && !cur?.parts?.study?.trim() ? { study: studyLines.join('\n') } : {}),
-        ...(form.parts.includes('sleep') && sleepLines.length && !cur?.parts?.sleep?.trim() ? { sleep: sleepLines.join('\n') } : {}),
-      },
-  );
+  // 「공부」 · 「잠」 칸은 비어 있으면 늘 기록으로 채운다 (이렇게 채운 것만으로는 바뀐 것으로 치지 않는다)
+  const [baseParts] = useState<Record<string, string>>(() => ({
+    ...(cur?.parts ?? {}),
+    ...(form.parts.includes('study') && studyLines.length && !cur?.parts?.study?.trim() ? { study: studyLines.join('\n') } : {}),
+    ...(form.parts.includes('sleep') && sleepLines.length && !cur?.parts?.sleep?.trim() ? { sleep: sleepLines.join('\n') } : {}),
+  }));
+  const [parts, setParts] = useState<Record<string, string>>(() => draft0?.parts ?? baseParts);
   // 받아쓴 본문을 AI 가 칸마다 나눠 준다 (빈 칸만 채우고, 이미 쓴 칸은 뒤에 붙임). 글에 없는 말은 안 넣게 했다
   const [splitting, setSplitting] = useState(false);
   const split = async () => {
@@ -219,16 +217,6 @@ function Write({ date, today }: { date: string; today: string }) {
   const added = useRef<string[]>([]);
   const addedV = useRef<string[]>([]);
   const savedRef = useRef(false);
-  // 저장도 임시저장도 없이 나가면 넣은 사진을 지운다 (임시저장이 있으면 그대로 둔다)
-  useEffect(
-    () => () => {
-      if (!savedRef.current && !loadDraft(date)) {
-        for (const p of added.current) void removePhoto(p);
-        for (const v of addedV.current) void removeVideo(v);
-      }
-    },
-    [date],
-  );
   async function addPhotos(files: FileList) {
     setBusy(true);
     const ids: string[] = [];
@@ -266,7 +254,7 @@ function Write({ date, today }: { date: string; today: string }) {
     mood !== (cur?.mood ?? 0) ||
     title !== (cur?.title ?? '') ||
     text !== (cur?.text ?? prefill) ||
-    JSON.stringify(clean(parts)) !== JSON.stringify(clean(cur?.parts ?? {}));
+    JSON.stringify(clean(parts)) !== JSON.stringify(clean(baseParts));
   // 바뀌면 0.5초 뒤 이 기기에 임시저장
   useEffect(() => {
     if (savedRef.current) return;
@@ -282,23 +270,58 @@ function Write({ date, today }: { date: string; today: string }) {
     setMood(cur?.mood ?? 0);
     setTitle(cur?.title ?? '');
     setText(cur?.text ?? prefill);
-    setParts(cur?.parts ?? {});
+    setParts(baseParts);
     setPhotos(cur?.photos ?? []);
   }
-  function save() {
-    // 실제 저장: 양식에 있는데 비어 있는 칸은 「안 해서 / 없어서 안 쓴 것」으로 X 를 적는다
+  /** 실제 저장 (기분이 있어야 한다). 양식에 있는데 비어 있는 칸은 「안 해서 / 없어서 안 쓴 것」으로 X 를 적는다 */
+  function persist(): boolean {
+    if (!mood) return false;
     const filled = { ...parts };
     for (const k of form.parts) if (!filled[k]?.trim()) filled[k] = 'X';
     const p = clean(filled);
-    if (!text.trim() && !mood && !Object.keys(p).length && !photos.length && !videos.length) return toast('한 줄이라도 써 주세요');
-    savedRef.current = true;
     setDraft(date, null);
     for (const old of cur?.photos ?? []) if (!photos.includes(old)) void removePhoto(old);
     for (const old of cur?.videos ?? []) if (!videos.includes(old)) void removeVideo(old);
-    put('diary', { id: date, mood: mood || undefined, title: title.trim() || undefined, text: text.trim() ? text.replace(/\s+$/, '') : '', parts: Object.keys(p).length ? p : undefined, photos: photos.length ? photos : undefined, videos: videos.length ? videos : undefined } as DiaryEntry);
+    put('diary', { id: date, mood, title: title.trim() || undefined, text: text.trim() ? text.replace(/\s+$/, '') : '', parts: Object.keys(p).length ? p : undefined, photos: photos.length ? photos : undefined, videos: videos.length ? videos : undefined } as DiaryEntry);
+    return true;
+  }
+  function save() {
+    if (!persist()) return toast('오늘의 기분을 골라 주세요');
+    savedRef.current = true;
     toast('일기를 저장했어요');
     go(`/diary/${monthOf(date)}`);
   }
+  // 나갈 때: 고친 게 있으면 기분을 골라야 나갈 수 있고, 고르면 저장 버튼 없이도 저장한다
+  const live = useRef({ changed, mood, persist });
+  live.current = { changed, mood, persist };
+  useEffect(() => {
+    const autoSave = () => {
+      const l = live.current;
+      return !savedRef.current && l.changed && !!l.mood && l.persist();
+    };
+    // 앱을 닫거나 다른 앱으로 갈 때도 (기분이 있으면) 저장. 기분이 없으면 임시저장으로 남는다
+    const onHide = () => document.visibilityState === 'hidden' && autoSave();
+    window.addEventListener('pagehide', autoSave);
+    document.addEventListener('visibilitychange', onHide);
+    const guard = () => {
+      const l = live.current;
+      if (savedRef.current || !l.changed || l.mood) return true;
+      toast('오늘의 기분을 골라야 나갈 수 있어요');
+      return false;
+    };
+    setLeaveGuard(guard);
+    return () => {
+      window.removeEventListener('pagehide', autoSave);
+      document.removeEventListener('visibilitychange', onHide);
+      setLeaveGuard(null, guard);
+      if (autoSave()) toast('일기를 자동 저장했어요');
+      // 저장도 임시저장도 없이 나가면 넣은 사진을 지운다 (임시저장이 있으면 그대로 둔다)
+      else if (!savedRef.current && !loadDraft(date)) {
+        for (const p of added.current) void removePhoto(p);
+        for (const v of addedV.current) void removeVideo(v);
+      }
+    };
+  }, [date]);
   const photoBox = (
     <div className="dy-photos">
       {photos.map((id) => (
@@ -367,19 +390,21 @@ function Write({ date, today }: { date: string; today: string }) {
           다음 날 ›
         </button>
       </div>
-      {fromDraft && changed && (
+      {changed && (fromDraft || !mood) && (
         <p className="st-hint">
-          임시저장한 글을 불러왔어요.{' '}
+          {fromDraft ? '임시저장한 글을 불러왔어요.' : '기분을 고르면 나갈 때 저절로 저장돼요.'}{' '}
           <button className="st-link" onClick={discardDraft}>
             버리기
           </button>
         </p>
       )}
       <section className="st-card st-form">
-        <span className="st-label">오늘의 기분</span>
+        <span className="st-label">
+          오늘의 기분 <small className="st-muted">(꼭 골라 주세요)</small>
+        </span>
         <div className="st-seg dy-moods" role="radiogroup" aria-label="오늘의 기분">
           {[1, 2, 3, 4, 5].map((m) => (
-            <button key={m} role="radio" aria-checked={mood === m} className={mood === m ? 'on' : ''} onClick={() => setMood(mood === m ? 0 : m)}>
+            <button key={m} role="radio" aria-checked={mood === m} className={mood === m ? 'on' : ''} onClick={() => setMood(m)}>
               <Mood m={m} /> {MOOD_NAME[m]}
             </button>
           ))}
@@ -425,6 +450,8 @@ function Write({ date, today }: { date: string; today: string }) {
               className="btn btn-sm st-danger"
               onClick={() => {
                 if (!confirmDelete(`${shortDate(date)} 일기`)) return;
+                savedRef.current = true;
+                setDraft(date, null);
                 for (const ph of cur.photos ?? []) void removePhoto(ph);
                 for (const v of cur.videos ?? []) void removeVideo(v);
                 remove('diary', date);

@@ -4,7 +4,16 @@ import { studyDate, WEEKDAYS } from './dates';
 import { alive, newId, SUBJECT_COLORS, type Id, type StudyData, type Subject } from './model';
 import { put, useStudy } from './store';
 
+/** 지금 화면을 떠나도 되는지 묻는 함수 (일기: 기분을 안 고르면 못 나감). 하나만 둔다 */
+let leaveGuard: (() => boolean) | null = null;
+/** f 를 등록한다. null 로 지울 때는 mine 이 지금 것과 같을 때만 지운다 (다른 화면이 새로 건 것을 지우지 않게) */
+export function setLeaveGuard(f: (() => boolean) | null, mine?: () => boolean) {
+  if (f || !mine || leaveGuard === mine) leaveGuard = f;
+}
+export const canLeave = () => !leaveGuard || leaveGuard();
+
 export const go = (path: string) => {
+  if (!canLeave()) return;
   window.location.hash = path;
 };
 
