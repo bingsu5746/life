@@ -21,6 +21,7 @@ import { minutesText } from '../study/timer';
 import { AREAS } from '../study/tabs';
 import { go, Icon, toast, useToday } from '../study/ui';
 import { onThisDay } from './diarySearch';
+import { LetterBanner } from './DiaryMore';
 import { dayStreak, hobbyWeek, monthOf, monthSummary, won } from './calc';
 
 /** 메인: N년 전 오늘(없으면 앞뒤 3일) 쓴 일기 한 편 */
@@ -177,6 +178,7 @@ export function Home(_: { loggedIn: boolean; onLogin: () => void }) {
         </button>
       )}
       {on('morning') && <MorningCard today={today} />}
+      {!studyMode && <LetterBanner today={today} />}
       {on('ago') && !studyMode && <AgoCard today={today} />}
       {on('school') && <SchoolHome today={today} />}
       <AfterExamCard banner />

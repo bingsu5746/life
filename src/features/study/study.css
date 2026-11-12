@@ -12042,3 +12042,43 @@ button.mt-pill {
   font-size: 0.86rem;
   line-height: 1.45;
 }
+/* 편지 · 사람 · 기분 말 */
+.dy-letter p {
+  margin: 10px 0 0;
+  white-space: pre-wrap;
+  line-height: 1.7;
+}
+.dy-dday {
+  font-style: normal;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+.dy-cands {
+  display: grid;
+  gap: 6px;
+  margin: 10px 0 14px;
+}
+.dy-person-edit {
+  margin: 8px 0 4px;
+}
+.dy-words {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: 6px;
+}
+.dy-word {
+  display: grid;
+  gap: 2px;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface);
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.dy-word small {
+  color: var(--muted);
+  font-size: 0.72rem;
+}

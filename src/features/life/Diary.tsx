@@ -14,6 +14,7 @@ import { diarySplit, diaryTitles, isLoggedIn } from '../auth/api';
 import { LineChart } from '../study/charts';
 import { RecapPage } from './Recap';
 import { DiarySearchPage, PastMePage } from './DiarySearch';
+import { LettersPage, MoodWordsPage, PeoplePage } from './DiaryMore';
 import { NotifyTime } from './NotifyTime';
 
 /** 기분 점: 좋을수록 진하게 */
@@ -25,6 +26,9 @@ export function Diary({ sub }: { sub?: string }) {
   const today = useToday();
   if (sub === 'search') return <DiarySearchPage />;
   if (sub === 'ask') return <PastMePage />;
+  if (sub === 'letter') return <LettersPage />;
+  if (sub === 'people') return <PeoplePage />;
+  if (sub === 'words') return <MoodWordsPage />;
   if (sub === 'dream') return <Dreams />;
   if (sub === 'form') return <Form />;
   if (sub === 'recap') return <RecapPage />;

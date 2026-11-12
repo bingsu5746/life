@@ -303,6 +303,16 @@ const FIX: Record<Collection, Fix> = {
         img: m.img === true ? true : undefined,
       })),
   }),
+  letters: (x) =>
+    isDate(x.openOn) && isDate(x.written)
+      ? {
+          ...x,
+          title: optStr(x.title)?.slice(0, 60) || undefined,
+          text: str(x.text).slice(0, 20000),
+          openedAt: typeof x.openedAt === 'number' ? x.openedAt : undefined,
+          created: num(x.created),
+        }
+      : null,
   events: (x) => ({
     ...x,
     title: str(x.title, '일정').slice(0, 80),
@@ -864,6 +874,12 @@ export function sanitizeSettings(s: unknown): StudySettings & { updatedAt: numbe
             .filter((t): t is string => typeof t === 'string')
             .slice(0, 10),
     gradeGoals: isObj(x.gradeGoals) ? { school: goals((x.gradeGoals as Obj).school), mock: goals((x.gradeGoals as Obj).mock) } : undefined,
+    diaryPeople: Array.isArray(x.diaryPeople)
+      ? (x.diaryPeople as unknown[])
+          .filter((p): p is Obj => isObj(p) && typeof p.name === 'string' && !!p.name.trim())
+          .slice(0, 50)
+          .map((p) => ({ id: str(p.id, `p${Math.random().toString(36).slice(2, 10)}`).slice(0, 40), name: (p.name as string).trim().slice(0, 20), aliases: arr(p.aliases).filter((a): a is string => typeof a === 'string' && !!a.trim()).map((a) => a.trim().slice(0, 20)).slice(0, 8) }))
+      : undefined,
     calHide: x.calHide === undefined ? undefined : arr(x.calHide).filter((t): t is string => typeof t === 'string' && t.length <= 20).slice(0, 20),
     csatGoal: isObj(x.csatGoal)
       ? {

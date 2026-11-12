@@ -125,3 +125,94 @@ export function similarEntries(entries: DiaryEntry[], worry: string, n = 8): { e
     .sort((a, b) => b.score - a.score || b.e.id.localeCompare(a.e.id))
     .slice(0, n);
 }
+
+// ===== 일기 속 사람 =====
+
+/** 그 사람이 나온 일기 (이름이나 다르게 부르는 말 중 하나라도) */
+export function personEntries(entries: DiaryEntry[], names: string[]): DiaryEntry[] {
+  const ns = names.map(norm).filter((x) => x.length >= 1);
+  if (!ns.length) return [];
+  return entries.filter((e) => {
+    const t = norm(entryText(e));
+    return ns.some((n) => t.includes(n));
+  });
+}
+
+/** 사람 이름일 것 같은 말: 「민수랑」 「지민이한테」처럼 랑 · 한테 · 에게 · 하고 · 이랑 앞에 두 번 이상 나온 2~4글자 */
+export function nameCandidates(entries: DiaryEntry[], known: string[] = []): { name: string; n: number }[] {
+  const m = new Map<string, number>();
+  const skip = new Set(['친구', '엄마', '아빠', '동생', '언니', '오빠', '누나', '형', '선생님', '쌤', '가족', '사람', '애들', '우리', '다같이', '혼자', '같이', ...known.map(norm)]);
+  for (const e of entries) {
+    const seen = new Set<string>();
+    for (const r of entryText(e).matchAll(/([가-힣]{2,4}?)(?:이)?(?:랑|한테|에게|하고|이하고|와 같이|과 같이)(?=[\s,.!?])/g)) {
+      const w = r[1];
+      if (skip.has(w) || seen.has(w)) continue;
+      seen.add(w);
+      m.set(w, (m.get(w) ?? 0) + 1);
+    }
+  }
+  return [...m]
+    .filter(([, n]) => n >= 2)
+    .map(([name, n]) => ({ name, n }))
+    .sort((a, b) => b.n - a.n)
+    .slice(0, 12);
+}
+
+// ===== 기분별 자주 쓴 말 =====
+
+const PARTICLES = ['했는데', '했었다', '했다', '했고', '해서', '하기', '하는', '했어', '한다', '하다', '에서는', '에게서', '한테서', '으로는', '이랑은', '에서', '에게', '한테', '으로', '이랑', '까지', '부터', '보다', '처럼', '이나', '하고', '은', '는', '이', '가', '을', '를', '에', '도', '랑', '와', '과', '로', '의', '만'];
+const WORD_STOP = new Set(['오늘', '그냥', '진짜', '너무', '근데', '그래서', '그리고', '하지만', '그런데', '정말', '많이', '조금', '좀', '내가', '나는', '나도', '했다', '했는데', '있었다', '없었다', '같다', '같은', '것', '거', '것도', '거의', '그거', '이거', '저거', '하루', '오늘은', '내일', '어제', '다시', '계속', '아주', '완전', '되게', '약간', '이제', '아직', '한번', '생각', '때문에', '그때', '했고', '하고', '해서', '해야', '하는', '하기', '있는', '없는', '있다', '없다', '됐다', '된다', '한다', '이다', '였다', '이었다', '것이다', '거다']);
+
+/** 일기 글 → 낱말들 (조사 떼고, 2글자 이상, 흔한 말 빼고, 한 편에 한 번씩) */
+export function wordsOf(text: string): Set<string> {
+  const out = new Set<string>();
+  for (let w of norm(text).split(/[^0-9a-z가-힣]+/)) {
+    if (w.length < 2 || /^\d+$/.test(w)) continue;
+    for (const p of PARTICLES)
+      if (w.length - p.length >= 2 && w.endsWith(p)) {
+        w = w.slice(0, -p.length);
+        break;
+      }
+    if (w.length >= 2 && !WORD_STOP.has(w)) out.add(w);
+  }
+  return out;
+}
+
+/**
+ * 기분이 좋은 날(좋음 · 최고)과 나쁜 날(나쁨 · 별로)에 자주 쓴 말.
+ * 두 쪽 모두에 고르게 나온 말은 빼고, 한쪽에 치우친 말이 위 (각 쪽 2편 이상 나온 말만)
+ */
+export function moodWords(entries: DiaryEntry[], n = 15): { good: { w: string; g: number; b: number }[]; bad: { w: string; g: number; b: number }[]; goodDays: number; badDays: number } {
+  const good = entries.filter((e) => (e.mood ?? 0) >= 4);
+  const bad = entries.filter((e) => e.mood && e.mood <= 2);
+  const count = (es: DiaryEntry[]) => {
+    const m = new Map<string, number>();
+    for (const e of es) for (const w of wordsOf(entryText(e))) m.set(w, (m.get(w) ?? 0) + 1);
+    return m;
+  };
+  const G = count(good);
+  const B = count(bad);
+  const side = (mine: Map<string, number>, other: Map<string, number>, a: number, b: number) =>
+    [...mine]
+      .filter(([, c]) => c >= 2)
+      .map(([w, c]) => {
+        const o = other.get(w) ?? 0;
+        // 그 쪽 일기 중 나온 비율 ÷ 다른 쪽 비율 (0 으로 나누지 않게 1을 더함)
+        const lift = (c / Math.max(1, a)) / ((o + 1) / Math.max(1, b + 1));
+        return { w, c, o, lift };
+      })
+      .filter((x) => x.lift > 1.2)
+      .sort((x, y) => y.lift * Math.log(1 + y.c) - x.lift * Math.log(1 + x.c))
+      .slice(0, n);
+  return {
+    good: side(G, B, good.length, bad.length).map((x) => ({ w: x.w, g: x.c, b: x.o })),
+    bad: side(B, G, bad.length, good.length).map((x) => ({ w: x.w, g: x.o, b: x.c })),
+    goodDays: good.length,
+    badDays: bad.length,
+  };
+}
+
+// ===== 미래의 나에게 편지 =====
+
+/** 편지 상태: 열 수 있는지 · 남은 날 */
+export const letterState = (openOn: DateStr, today: DateStr) => (openOn <= today ? 'open' : 'locked');

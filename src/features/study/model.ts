@@ -60,6 +60,8 @@ export interface StudySettings {
   wordQuizTime?: string;
   /** 생일 · 선물 계획: 이름 · 월-일 · 선물 예산(원) · 선물 생각 */
   birthdays?: { id: Id; name: string; md: string; budget?: number; idea?: string }[];
+  /** 일기 속 사람: 이름 · 다르게 부르는 말 (일기에서 찾아 모아 본다) */
+  diaryPeople?: { id: Id; name: string; aliases: string[] }[];
   /** 이미 축하한 신기록 (최근 50개 key) */
   celebrated?: string[];
   /** 보고 싶은 영화 소식 (최근 40개): OTT · 극장 상영 · 재개봉. key 로 같은 소식은 한 번만 */
@@ -1057,6 +1059,21 @@ export interface StudyData {
   places: Record<Id, TravelPlace>;
   problems: Record<Id, SolvedProblem>;
   events: Record<Id, CalEvent>;
+  letters: Record<Id, Letter>;
+}
+
+/** 미래의 나에게 편지: openOn 날이 되기 전에는 글을 볼 수 없다 */
+export interface Letter extends Stamp {
+  id: Id;
+  /** 쓴 날 */
+  written: DateStr;
+  /** 열리는 날 */
+  openOn: DateStr;
+  title?: string;
+  text: string;
+  /** 처음 열어 본 때 */
+  openedAt?: number;
+  created: number;
 }
 
 /** 달력 일정 (내가 넣는 것) */
@@ -1130,6 +1147,7 @@ export const COLLECTIONS = [
   'places',
   'problems',
   'events',
+  'letters',
 ] as const;
 export type Collection = (typeof COLLECTIONS)[number];
 
@@ -1189,6 +1207,7 @@ export function emptyStudy(): StudyData {
     places: {},
     problems: {},
     events: {},
+    letters: {},
   };
 }
 
