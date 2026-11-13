@@ -23,6 +23,15 @@ const MOOD_NAME = ['', '나쁨', '별로', '보통', '좋음', '최고'];
 
 /** sub: 날짜(YYYY-MM-DD) 면 그날 쓰기, 'YYYY-MM' 이면 그 달 목록 */
 export function Diary({ sub }: { sub?: string }) {
+  // 일기 화면들은 모서리를 둥글리지 않고 직사각형으로 (study.css 의 .dy-square)
+  return (
+    <div className="dy-square">
+      <DiaryPage sub={sub} />
+    </div>
+  );
+}
+
+function DiaryPage({ sub }: { sub?: string }) {
   const today = useToday();
   if (sub === 'search') return <DiarySearchPage />;
   if (sub === 'ask') return <PastMePage />;

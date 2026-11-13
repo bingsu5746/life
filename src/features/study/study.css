@@ -12082,3 +12082,13 @@ button.mt-pill {
   color: var(--muted);
   font-size: 0.72rem;
 }
+
+/* 일기 화면들: 둥근 모서리 없이 직사각형 (카드 · 버튼 · 입력칸 · 사진 · 기분 점까지 모두) */
+.dy-square {
+  display: contents;
+}
+.dy-square *,
+.dy-square *::before,
+.dy-square *::after {
+  border-radius: 0 !important;
+}
